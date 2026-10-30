@@ -16,5 +16,7 @@
 - `dbms/assets/sqlplay.js`: live SQL playground (Oracle-flavoured syntax, loads a WASM engine from the internet).
 - `dbms/assets/aicheck.js`: "AI check my answer" box on every `.exam` block. Key points come from `dbms/assets/keypoints.json`; marking goes to Amos from the browser.
   **After adding or editing exam questions, run** `python3 dbms/tools/build_keypoints.py` (needs chromium and `TYPELLM_API_KEY` in your local `.env`). It only generates the new ones. Questions missing from the JSON simply show no AI box.
+  Add `--fix` to regenerate entries that fail its quality check (rambling, merged or cut-off points).
+  On pages that load `i07/lecture.js` (the ER chapters), each AI box also offers **Answer with an ER diagram**: the student types the design in the converter's text format, sees it drawn live, and the diagram is marked as a plain-English description plus its relational schema. A new chapter gets this automatically if it loads `i07/lecture.js`.
 - `dbms/tools/ai_proxy.py`: optional local helper. Adds photo upload when the book is opened from your own machine.
 - Lecture folders can carry their own `lecture.css` / `lecture.js` for figures used only in that lecture.

@@ -763,7 +763,7 @@ document.querySelectorAll('.exam').forEach(ex => {
   src.insertAdjacentHTML('beforebegin', `<div class="comp-badge">★ Compulsory · ${parts.join(', ')}</div>`);
 });
 
-// AI answer checking: loads only on pages with exam questions; it stays hidden unless tools/ai_proxy.py runs.
+// AI answer checking: loads only on pages with exam questions (see aicheck.js for how it works without a server).
 (function loadAICheck() {
   if (!document.querySelector('.exam')) return;
   const s = document.createElement('script');

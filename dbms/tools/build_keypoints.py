@@ -3,6 +3,7 @@
 published site can mark answers without the local helper (the browser talks to Amos directly).
 
 Run after adding or editing exam questions:  python3 tools/build_keypoints.py
+Regenerate entries that fail the quality check (rambling, merged or cut-off points):  ... --fix
 Needs chromium (renders each chapter so JS-drawn figure labels are included, exactly as the
 browser sees them) and TYPELLM_API_KEY in the same .env ai_proxy.py reads. Resumable: questions
 already in keypoints.json are skipped; questions no longer in any chapter are dropped.
@@ -72,8 +73,17 @@ def points(q, a):
         {"points": {"type": "array", "minItems": 2, "maxItems": 8, "items": {"type": "string"},
                     "instructions": "List the separate key points a marker would look for in a full-mark answer, "
                                     "most important first. Each point is one short, self-contained claim in plain words "
-                                    "(include the specific value, name or rule the answer must contain). No duplicates."}})
+                                    "(include the specific value, name or rule the answer must contain), at most 30 words. "
+                                    "No duplicates, no reasoning or commentary, one claim per item."}})
     return [p.strip() for p in res.get("points") or [] if p and p.strip()][:8]
+
+
+RAMBLE = re.compile(r"\b(actually|let's re|hmm|stick to|model answer says|depending on|or it is not)\b|\bwait, |', '|\?\s", re.I)
+
+
+def bad(pts):
+    """Fails when a point rambles, merges several points, or was cut off by the model."""
+    return len(pts) < 2 or any(len(p) > 300 or RAMBLE.search(p) for p in pts)
 
 
 def main():
@@ -82,7 +92,8 @@ def main():
         found = {key(q): (q, a) for exams in pool.map(exams_in, pages) for q, a in exams}
     old = json.loads(OUT.read_text()) if OUT.exists() else {}
     out = {k: v for k, v in old.items() if k in found}
-    todo = [k for k in found if k not in out]
+    fix = "--fix" in sys.argv
+    todo = [k for k in found if k not in out or (fix and bad(out[k]))]
     print(f"{len(pages)} chapters, {len(found)} distinct questions, {len(todo)} to generate", file=sys.stderr)
 
     def one(k):
@@ -94,13 +105,14 @@ def main():
 
     with ThreadPoolExecutor(6) as pool:
         for n, (k, pts) in enumerate(pool.map(one, todo), 1):
-            if pts:
+            if pts and (k not in out or not bad(pts)):   # --fix keeps the old entry if the retry is no better
                 out[k] = pts
             if n % 20 == 0:   # save as we go so an interrupted run keeps its work
                 OUT.write_text(json.dumps(out, ensure_ascii=False, indent=0))
                 print(f"  {n}/{len(todo)}", file=sys.stderr)
     OUT.write_text(json.dumps(out, ensure_ascii=False, indent=0))
-    print(f"wrote {len(out)}/{len(found)} questions to {OUT.relative_to(ROOT)}", file=sys.stderr)
+    print(f"wrote {len(out)}/{len(found)} questions to {OUT.relative_to(ROOT)}; "
+          f"{sum(bad(v) for v in out.values())} still fail the quality check", file=sys.stderr)
 
 
 if __name__ == "__main__":

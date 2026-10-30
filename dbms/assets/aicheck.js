@@ -59,6 +59,19 @@
       on_topic: onTopic, error: ans.error?.noul ?? 0,
       unsure: Math.abs((ov.score || 0) / 4 - frac) > 0.35 || (ov.confidence ?? 1) < 0.5 };
   };
+  // ER chapters load i07/lecture.js, whose converter lets a student answer with a typed ER diagram
+  const ERD = typeof erConvert === 'function' && typeof erd === 'function' && typeof erAutoSpec === 'function';
+  const attrText = a => (a.key ? 'key ' : a.pkey ? 'partial key ' : a.der ? 'derived ' : a.multi ? 'multivalued ' : '') + a.name +
+    (a.parts ? ` (composite of ${a.parts.map(x => x.name).join(', ')})` : '');
+  const erDescribe = (M, rels) => [
+    ...Object.values(M.entities).map(e => `Entity set ${e.name}${e.weak ? ` (weak, identified through its owner ${e.owner})` : ''}` +
+      (e.attrs.length ? `: ${e.attrs.map(attrText).join(', ')}.` : '.')),
+    ...M.rels.map(r => `Relationship ${r.name} between ${r.parts.map(x => `${x.e}${x.role ? ` as ${x.role}` : ''} (${x.one ? 'one' : 'many'}${x.total ? ', total participation' : ''})`).join(' and ')}` +
+      (r.attrs.length ? `, with attributes ${r.attrs.map(attrText).join(', ')}.` : '.')),
+    ...M.isas.map(i => `${i.sup} isA hierarchy with subclasses ${i.subs.map(x => x.name + (x.attrs.length ? ` (${x.attrs.map(attrText).join(', ')})` : '')).join(', ')}; converted in the ${i.how.toUpperCase()} style.`),
+    '', 'Relational schema (underlined = primary key, italic = foreign key):',
+    ...rels.map(r => { const d = document.createElement('div'); d.innerHTML = relLine(r); return d.textContent; }),
+  ].join('\n');
   const ICON = { established: ['✓', 'ok', 'Covered'], partial: ['~', 'mid', 'Partly covered'], missing: ['✗', 'bad', 'Missing'], contradicted: ['⚠', 'bad', 'Contradicts the model answer'] };
 
   const getJSON = (url, opt) => fetch(url, opt).then(r => r.ok ? r.json() : null).catch(() => null);
@@ -80,6 +93,12 @@
         <p class="aic-note">Write your answer as you would in the exam, or upload a photo of your written answer. The AI marks it against the
         key points of the worked answer${marks ? ` (out of ${marks})` : ''}. Your answer is sent to Amos (scira.ai), which keeps requests to improve its models${helper ? '; photos go to TypeLLM' : ''}.</p>
         <textarea id="${id}-t" class="sq-ed" rows="6" aria-label="Your answer" placeholder="Your answer…"></textarea>
+        ${ERD ? `<details class="aic-erd"><summary>✏️ Answer with an ER diagram</summary>
+          <p class="aic-note">One statement per line, same format as the <a href="13-er-to-schema-tool.html">ER to Schema Converter</a>:
+          <code>entity Student: _sid, name</code> · <code>weak entity Room of Building: ~no</code> · <code>rel enrolls: Student N, Course N total; grade</code> ·
+          <code>isa Person: Staff(salary), Student(cgpa) [er]</code>. Your diagram draws as you type, and “Mark my answer” sends it with any text above.</p>
+          <textarea id="${id}-e" class="sq-ed ert-in" rows="7" spellcheck="false" aria-label="Your ER diagram" placeholder="entity …"></textarea>
+          <div class="aic-erd-out" aria-live="polite"></div></details>` : ''}
         <div class="sq-btns"><button type="button" data-mark>Mark my answer</button>
           ${helper ? `<label class="aic-file">📷 Photo of my answer <input type="file" accept="image/*" capture="environment" id="${id}-f"></label>` : ''}
           <button type="button" data-keys>Show key points</button></div>
@@ -87,6 +106,24 @@
       ex.append(box);
       const ta = box.querySelector('textarea'), out = box.querySelector('.aic-out');
       let points = known || null;
+      const erIn = box.querySelector('.aic-erd textarea'), erOut = box.querySelector('.aic-erd-out');
+      const erRead = () => {   // {text} for marking, or {errors}; null when the diagram box is empty
+        if (!erIn || !erIn.value.trim()) return null;
+        const res = erConvert(erIn.value);
+        if (res.errors) return res;
+        if (!res.rels.length) return { errors: ['Add at least one entity.'] };
+        return { res, text: erDescribe(res.model, res.rels) };
+      };
+      let erTimer;
+      if (erIn) erIn.addEventListener('input', () => { clearTimeout(erTimer); erTimer = setTimeout(() => {
+        const r = erRead();
+        if (!r) { erOut.innerHTML = ''; return; }
+        if (r.errors) { erOut.innerHTML = `<div class="ert-err"><ul>${r.errors.map(e => `<li>${esc(e)}</li>`).join('')}</ul></div>`; return; }
+        let pic = '';
+        try { pic = erd(erAutoSpec(r.res.model)); } catch (e) { /* layout failed: still show the schema */ }
+        erOut.innerHTML = `<figure class="wide"><div class="figlabel">Your ER diagram (automatic layout; lines may cross)</div>${pic}</figure>
+          <p class="ert-lines">${r.res.rels.map(relLine).join('<br>')}</p>`;
+      }, 400); });
       const getPoints = async () => points || (points = (await call('/keypoints', { question: q, model_answer: model })).points);
       const busy = msg => { out.innerHTML = `<p class="sq-msg">${msg}</p>`; };
       const fail = e => { out.innerHTML = `<p class="sq-msg err"><b>Could not finish:</b> ${esc(e.message)}. Try again in a minute.</p>`; };
@@ -97,7 +134,9 @@
         catch (e) { fail(e); }
       };
       box.querySelector('[data-mark]').onclick = async () => {
-        const a = ta.value.trim();
+        const er = erRead();
+        if (er?.errors) { out.innerHTML = `<p class="sq-msg err">Fix your ER diagram first: ${esc(er.errors[0])}</p>`; return; }
+        const a = [ta.value.trim(), er ? 'My ER diagram:\n' + er.text : ''].filter(Boolean).join('\n\n');
         if (a.length < 3) { out.innerHTML = '<p class="sq-msg err">Write your answer first.</p>'; return; }
         busy('Marking… (about 5–20 seconds)');
         try {
