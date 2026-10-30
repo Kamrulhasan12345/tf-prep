@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dependency Preservation · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 01 (Sukarna) · Chapter 13 · Slides 53–56 · Book §3.4 (intro), §3.4.4</div>
+<h1>Dependency Preservation, and Where BCNF Falls Short</h1>
+<p class="lede">A BCNF decomposition never loses tuples, but it can lose the ability to check an FD without joining tables. This chapter shows the problem on the slides' R(A, B, C) and Bookings examples, gives a test for dependency preservation with a tool, and explains why this motivates 3NF.</p>
+
+<h2>1. Three things we want from a decomposition</h2>
+<p>The textbook lists three properties:</p>
+<ol>
+  <li><strong>Elimination of anomalies</strong> (Chapter 9): the pieces are in a normal form such as BCNF.</li>
+  <li><strong>Recoverability of information</strong> (Chapter 12): the join is lossless.</li>
+  <li><strong>Preservation of dependencies</strong>: if each piece satisfies its own projected FDs, then the join is sure to satisfy all the original FDs. Every FD can be enforced by checking the pieces separately, with no join.</li>
+</ol>
+<p>The BCNF algorithm guarantees 1 and 2 but not 3. The 3NF algorithm (Chapter 14) guarantees 2 and 3 but not quite 1. No method can guarantee all three for every relation.</p>
+<dl class="def">
+  <dt>Dependency-preserving decomposition</dt><dd>Let S₁, …, Sₖ be the FD sets projected onto the pieces R₁, …, Rₖ. The decomposition preserves dependencies if every FD X → Y of the original set S can be logically inferred from S₁ ∪ S₂ ∪ … ∪ Sₖ.</dd>
+</dl>
+
+<h2>2. BCNF does not preserve dependency (slide 53)</h2>
+<p>Back to R(A, B, C) with AB → C and C → A (Chapter 12). BCNF splits it into R₁ = {A, C} and R₂ = {B, C}. Neither piece contains all of A, B, C, so <strong>AB → C cannot be checked</strong> on either piece alone. Projected FDs: S₁ = {C → A}, S₂ = ∅ (nothing nontrivial on B, C). Under S₁ ∪ S₂, (AB)⁺ = {A, B}, which lacks C: AB → C is not implied. Here is the damage in data:</p>
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="abc"></div>
+</figure>
+
+<h2>3. Bookings (slides 54–55, book Example 3.25)</h2>
+<p>Bookings(title, theatre, city): movie <i>title</i> is being shown at <i>theatre</i> in <i>city</i>. FDs:</p>
+<ul>
+  <li><code>theatre → city</code>: a theatre is in one city.</li>
+  <li><code>title city → theatre</code>: a movie is not shown in two theatres of the same city (assumed for the example).</li>
+</ul>
+<p><strong>Keys (slide 54).</strong> No single attribute is a key: a title plays in several theatres, a theatre plays several movies (multiscreen), a city has several theatres. {title, city} is a key (it determines theatre by the second FD). {title, theatre} is a key (theatre gives city). {theatre, city} is not ({theatre, city}⁺ = {theatre, city}). So the keys are <strong>{title, city}</strong> and <strong>{title, theatre}</strong>.</p>
+<p><strong>BCNF violation (slide 55):</strong> theatre → city, since theatre is not a superkey. Decomposing gives {theatre, city} and {theatre, title}. The FD title city → theatre now spans both pieces:</p>
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="book"></div>
+</figure>
+<p>Each piece is legal on its own: {theatre, city} satisfies theatre → city, and {theatre, title} has no nontrivial FD to violate. But the join holds two tuples with the same (title, city) = (Antz, Menlo Park) and different theatres, so <code>title city → theatre</code> is violated, and no check on the pieces could have caught it.</p>
+
+<h2>4. How to test dependency preservation</h2>
+<p><strong>Slide 53's method:</strong> project S onto each piece (Chapter 10), take the union of the projections, and for each original FD X → Y compute X⁺ under that union. If some FD is not implied, the decomposition does not preserve dependencies.</p>
+<p><strong>A faster equivalent test</strong> (Silberschatz) avoids computing projections, which is exponential. For each FD X → Y in S:</p>
+<pre>result := X
+repeat until result stops changing:
+    for each piece Rᵢ:
+        result := result ∪ ((result ∩ Rᵢ)⁺ ∩ Rᵢ)      -- closure under the original S
+X → Y is preserved  ⇔  Y ⊆ result</pre>
+<p>Each pass asks “what can piece Rᵢ alone conclude from what we know so far?”. If the pieces together can reach Y, the FD is enforced by the pieces.</p>
+<figure class="wide">
+<span class="anim-tag">Interactive tool</span>
+<div id="tool"></div>
+<figcaption><b>Tool 6b: dependency preservation.</b> Preset: Bookings split by BCNF. Each frame tests one original FD. The 3NF answer of Chapter 14 keeps Bookings as one relation, which preserves every FD trivially (the tool needs at least two pieces, so there is nothing to test). Try instead the split <code>{title, city}; {theatre, city}</code>: lossy, and it also loses title city → theatre.</figcaption>
+</figure>
+
+<h2>5. What to do about it (slide 56)</h2>
+<p>We want a decomposition that has (1) a lossless join and (2) the dependency-preservation property. BCNF cannot always give both: for Bookings, every BCNF decomposition must split the three attributes (the relation itself is not in BCNF), and any split loses title city → theatre. The solution is a slightly weaker normal form, <b class="term">third normal form (3NF)</b>, which allows Bookings to stay as it is. That is Chapter 14.</p>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+
+<h3>Exam questions</h3>
+<div class="exam">
+  <div class="exam-src">DB QB · 24-25 2a · 16 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-1 | 2024–25 · 16 marks</div>
+  <div class="exam-q"><p>For a relation schema R(A, B, C, D, E), consider the following set of functional dependencies: ABE → C, BC → D, BD → E, DE → A. Decompose the relation into BCNF. Show the final schemas and the projected functional dependencies for each schema after decomposition. Is your final decomposition dependency-preserving? Justify your answer.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><strong>Keys.</strong> B appears on no right side, so it is in every key. B⁺ = {B}. BC⁺: BC → D, BD → E, DE → A gives ABCDE. BD⁺: BD → E, DE → A, ABE → C gives ABCDE. BE⁺ = {B, E}, AB⁺ = {A, B}. ABE⁺: ABE → C, BC → D gives ABCDE, and AB, AE, BE are not superkeys, so ABE is a key. Keys: <strong>BC, BD, ABE</strong>.</p>
+    <p><strong>BCNF check.</strong> ABE → C: ABE is a key ✓. BC → D: BC key ✓. BD → E: BD key ✓. DE → A: DE⁺ = {A, D, E}, not a superkey ✗. One violation.</p>
+    <p><strong>Split on DE → A.</strong> DE⁺ = {A, D, E}. R₁ = <b>ADE</b>, R₂ = DE ∪ (R − ADE) = <b>BCDE</b>.</p>
+    <ul>
+      <li>R₁(A, D, E): projected FDs: DE → A (A⁺ = A, D⁺ = D, E⁺ = E, AD⁺ = AD, AE⁺ = AE give nothing). Key DE. BCNF.</li>
+      <li>R₂(B, C, D, E): closing its subsets with the original FDs: BC⁺ ⊇ BCDE gives BC → D, BC → E; BD⁺ ⊇ BCDE gives BD → C, BD → E; no other subset gives anything inside BCDE (e.g. DE⁺ = ADE, CE⁺ = CE, BE⁺ = BE). Minimal basis: <b>BC → D, BD → C, BD → E</b> (BC → E follows from BC → D and BD → E). Keys BC, BD. Every left side is a key: BCNF.</li>
+    </ul>
+    <div id="t65"></div>
+    <p><strong>Final schemas:</strong> R₁(A, D, E) with {DE → A}; R₂(B, C, D, E) with {BC → D, BD → C, BD → E}.</p>
+    <p><strong>Dependency preserving? No.</strong> BC → D, BD → E and DE → A are each inside one piece. Test ABE → C with the union S₁ ∪ S₂ = {DE → A, BC → D, BD → C, BD → E}: (ABE)⁺ = {A, B, E}; no FD fires (each needs C, D or both D and E). C is not reached, so <strong>ABE → C is lost</strong>: to enforce it we would have to join R₁ and R₂. (The only BCNF violations of R are DE → A and its augmentation CDE → A. Splitting on either separates A from B, so no piece can hold A, B, E and C together: every BCNF decomposition of R loses ABE → C.)</p>
+  </div></details>
+</div>
+
+<div class="key"><p><strong>Summary:</strong> a decomposition preserves dependencies if the FDs projected onto the pieces imply every original FD, so each FD can be enforced without a join. BCNF decompositions are lossless but may lose FDs: R(A, B, C) with AB → C, C → A, and Bookings with title city → theatre, cannot be decomposed into BCNF without losing an FD. Test preservation by closing each left side through the pieces; the fix is 3NF.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="lecture.js"></script>
+<script>
+const row2 = (a, b) => `<div class="figrow"><div>${a}</div><div>${b}</div></div>`;
+stepper('#abc', [
+  { html: row2(inst(['A', 'C'], [['a1', 'c1'], ['a1', 'c2']], { cap: 'R₁(A, C): C → A' }), inst(['B', 'C'], [['b1', 'c1'], ['b1', 'c2']], { cap: 'R₂(B, C): no FDs' })), cap: 'Insert into the pieces. R₁ satisfies C → A (c1 and c2 each have one A). R₂ has no FD to violate. Both inserts are accepted.' },
+  { html: inst(['A', 'B', 'C'], [['a1', 'b1', 'c1'], ['a1', 'b1', 'c2']], { cap: 'R₁ ⋈ R₂', cell: { '0,0': 'hl', '0,1': 'hl', '1,0': 'hl', '1,1': 'hl', '0,2': 'bad', '1,2': 'bad' } }), cap: 'Join them: two tuples with the same (A, B) = (a1, b1) and different C. <b>AB → C is violated</b>, and neither piece could detect it.' },
+]);
+stepper('#book', [
+  { html: row2(inst(['theatre', 'city'], [['Guild', 'Menlo Park'], ['Park', 'Menlo Park']], { cap: '{theatre, city}' }), inst(['theatre', 'title'], [['Guild', 'Antz'], ['Park', 'Antz']], { cap: '{theatre, title}' })), cap: 'Slide 55: both relations satisfy every FD that can be checked on them.' },
+  { html: inst(['theatre', 'city', 'title'], [['Guild', 'Menlo Park', 'Antz'], ['Park', 'Menlo Park', 'Antz']], { cap: 'join', cell: { '0,1': 'hl', '0,2': 'hl', '1,1': 'hl', '1,2': 'hl', '0,0': 'bad', '1,0': 'bad' } }), cap: 'The join: Antz in Menlo Park at two theatres. <b>title city → theatre is violated.</b>' },
+]);
+FD.depTool('#tool', { attrs: 'title theatre city', fds: 'theatre -> city; title city -> theatre', decomp: '{theatre, city}; {title, theatre}' });
+(() => { const S = FD.parseAttrs('A B C D E'), F = FD.parseFDs(S, 'ABE -> C; BC -> D; BD -> E; DE -> A'); $('#t65').innerHTML = `<figure>${FD.treeSVG(S, bcnfDecompose(S, F))}</figure>`; })();
+flashcards('#cards', [
+  { f: 'Dependency preserving', b: 'The union of the projected FDs implies every original FD.' },
+  { f: 'Why it matters', b: 'Each FD can be enforced by checking single pieces, without joins.' },
+  { f: 'BCNF guarantees', b: 'Lossless join and no anomalies, but not dependency preservation.' },
+  { f: 'Bookings keys', b: '{title, city} and {title, theatre}.' },
+  { f: 'Bookings lost FD', b: 'title city → theatre after splitting on theatre → city.' },
+  { f: 'Fix', b: '3NF: lossless and dependency preserving.' },
+]);
+quiz('#quiz', [
+  { q: 'R(A, B, C), A → B, B → C, split into AB and BC. Dependency preserving?', opts: ['Yes', 'No'], a: 0, why: 'A → B lives in AB, B → C in BC.' },
+  { q: 'R(A, B, C), A → B, B → C, split into AB and AC. Dependency preserving?', opts: ['Yes', 'No'], a: 1, why: 'Projections: A → B and A → C. B → C is not implied (B⁺ = B).' },
+  { q: 'Why is title city → theatre lost?', opts: ['It is trivial', 'No piece contains title, city and theatre together, and the pieces\' FDs do not imply it', 'It is not a real FD', 'The join is lossy'], a: 1, why: 'The pieces are {theatre, city} and {theatre, title}.' },
+  { q: 'Which property does the BCNF algorithm always guarantee?', opts: ['dependency preservation', 'lossless join', 'both', 'neither'], a: 1, why: 'Lossless always; preservation sometimes.' },
+]);
+ask('#try1', { q: 'R(A, B, C, D) with A → B, B → C, C → D, decomposed into AB, BC, CD. Dependency preserving? (yes / no)', a: ['yes'], why: 'Each FD fits inside one piece.' });
+</script>
+</body>
+</html>

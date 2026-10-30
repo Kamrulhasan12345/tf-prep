@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cartesian Product and Renaming · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 12 (Ishrak) · Chapter 3 · Slides 12–16 · Book §2.4.7, §2.4.11</div>
+<h1>Cartesian Product (×) and Renaming (ρ)</h1>
+<p class="lede">The cross product combines two relations by pairing every row of one with every row of the other. Renaming changes names without touching rows. Together they are what lets you compare a relation with itself, which many exam queries need.</p>
+
+<h2>1. Cartesian product × (slides 12–13)</h2>
+
+<dl class="def">
+  <dt>Cartesian product R × S</dt>
+  <dd>The relation containing every tuple formed by joining one tuple of R with one tuple of S (slide 12: "each tuple in R1 with each tuple in R2"). Its schema is all attributes of R followed by all attributes of S. If both have an attribute called A, the result has two attributes, written <b>R.A</b> and <b>S.A</b>.</dd>
+  <dt>Size of a product</dt>
+  <dd>|R × S| = |R| · |S| tuples, and arity(R × S) = arity(R) + arity(S).</dd>
+</dl>
+
+<p>Slide 12 uses Students(sid, sname, gpa) and People(ssn, pname, address):</p>
+<div class="figrow">
+<pre>SELECT *
+FROM Students, People;</pre>
+<p class="ra-big">Students × People</p>
+</div>
+<p>A comma-separated <code>FROM</code> list is exactly a Cartesian product. The slide's other example is Employee × Dependents, which pairs every employee with every dependent, including other employees' dependents. That is why slide 12 adds that × is "rare in practice; mainly used to express joins": on its own it mostly produces meaningless pairs. Followed by a selection that keeps the sensible pairs (σ<sub>Employee.SSN = Dependents.SSN</sub>), it becomes a join (<a href="04-natural-join.html">Chapter 4</a>).</p>
+
+<h3>Slide 13's example</h3>
+<p>Two people times two students gives 2 × 2 = 4 tuples with 3 + 3 = 6 attributes. One correction: in the slide's result the fourth row shows Bob (ssn 5423341) at "216 Rosse", but People says Bob lives at <b>217 Rosse</b>. A product never changes values; it only copies them, so the correct fourth row is (5423341, Bob, 217 Rosse, 002, Bob, 1.3). The slide lists People's attributes first, which by the named perspective is the same relation as Students × People.</p>
+
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="s14"></div>
+<figcaption><b>Figure 1.</b> People × Students on slide 13's data. Every People row is paired with every Students row.</figcaption>
+</figure>
+
+<h2>2. Renaming ρ (slides 14–16)</h2>
+
+<dl class="def">
+  <dt>Renaming ρ<sub>S(B1,…,Bn)</sub>(R)</dt>
+  <dd>Returns the same tuples as R, but the relation is called S and its attributes are called B1, …, Bn (in the order of R's attributes). It "changes the schema, not the instance" (slide 14).</dd>
+  <dt>Shorthand ρ<sub>S(A1→B1, …, An→Bn)</sub>(R)</dt>
+  <dd>Since attributes are identified by name, not order, the proper form says which old name becomes which new name. ρ<sub>S</sub>(R) renames only the relation; ρ<sub>A→B</sub>(R) renames only attribute A.</dd>
+</dl>
+
+<p>The slide calls ρ a "special" operator: neither basic nor derived. It cannot be built from σ, π, ×, ∪, −, but it never changes any data either; it only changes how attributes are referred to. In SQL it is the <code>AS</code> keyword (slide 15):</p>
+<div class="figrow">
+<pre>SELECT sid AS studId,
+       sname AS name,
+       gpa AS gradePtAvg
+FROM Students;</pre>
+<p class="ra-big">ρ<sub>Students(studId, name, gradePtAvg)</sub>(Students)</p>
+</div>
+
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="s17"></div>
+<figcaption><b>Figure 2.</b> Slide 16's renaming: same two rows, new attribute names.</figcaption>
+</figure>
+
+<h3>Why renaming is needed</h3>
+<ol>
+  <li><b>Comparing a relation with itself.</b> To compare two tuples of the same relation, you need two copies with different names: ρ<sub>S1</sub>(Students) × ρ<sub>S2</sub>(Students). Without renaming, Students × Students would have two attributes called Students.gpa, and a condition could not say which one it means.</li>
+  <li><b>Controlling a natural join.</b> A natural join matches attributes with equal names (<a href="04-natural-join.html">Chapter 4</a>). Renaming makes two attributes match (sname → name) or stops an accidental match.</li>
+  <li><b>Union compatibility.</b> ∪, ∩ and − need the same attributes on both sides (<a href="05-set-operations.html">Chapter 5</a>); ρ can make the names agree.</li>
+  <li><b>Naming intermediate results</b>, as in R1 := … on slide 48 (<a href="08-writing-queries.html">Chapter 8</a>).</li>
+</ol>
+
+<h3>A self-product, step by step</h3>
+<p>"Find pairs of students where the first has a higher gpa than the second." Make two copies, pair them, keep the pairs that satisfy the comparison, and project:</p>
+<p class="ra-big">π<sub>S1.sname, S2.sname</sub>(σ<sub>S1.gpa &gt; S2.gpa</sub>(ρ<sub>S1</sub>(Students) × ρ<sub>S2</sub>(Students)))</p>
+
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="self"></div>
+<figcaption><b>Figure 3.</b> A self-product: 4 × 4 = 16 pairs, 6 satisfy S1.gpa &gt; S2.gpa.</figcaption>
+</figure>
+
+<p>Notice that the pair (Rina, Tanvir) appears but (Tanvir, Rina) does not: the strict &gt; already orders each pair. When the condition is symmetric (for example "same gpa"), add S1.sid &lt; S2.sid so each pair is listed once and a student is not paired with itself. Slide 47's "pairs of PC models with the same speed and RAM, listed once" uses exactly this trick (<a href="08-writing-queries.html">Chapter 8</a>).</p>
+
+<figure class="wide">
+<span class="anim-tag">Interactive tool</span>
+<div id="lab"></div>
+</figure>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+<div id="try2"></div>
+<h3>Write it yourself</h3>
+<div id="ex1"></div>
+<div id="ex2"></div>
+<div id="ex3"></div>
+<div id="ex4"></div>
+<div id="ex5"></div>
+
+<h3>Exam questions</h3>
+<p>The bank's questions that say "using Cartesian product" (the Sonali Bank and customer/transaction questions) also need a join condition, so they are worked in <a href="04-natural-join.html">Chapter 4</a>.</p>
+
+<div class="key"><p><strong>Summary:</strong> R × S pairs every tuple of R with every tuple of S: |R|·|S| tuples, arity(R)+arity(S) attributes, clashing names qualified as R.A and S.A. It is a comma in FROM. ρ<sub>S(B1,…,Bn)</sub>(R) renames the relation and/or its attributes without changing any tuple (SQL's AS). Renaming is essential for self-products such as ρ<sub>S1</sub>(R) × ρ<sub>S2</sub>(R). Slide 13's last row should read 217 Rosse.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/sqlplay.js"></script>
+<script src="lecture.js"></script>
+<script>
+const DB3 = raDB(`
+People(ssn, pname, address)
+1234545 | John | 216 Rosse
+5423341 | Bob | 217 Rosse
+
+Students(sid, sname, gpa)
+001 | John | 3.4
+002 | Bob | 1.3
+`);
+raSteps('#s14', DB3, 'People x Students', { sql: 'SELECT * FROM People, Students;' });
+raSteps('#s17', DB3, 'rename[Students(studId, name, gradePtAvg)](Students)', { sql: 'SELECT sid AS studId, sname AS name, gpa AS gradePtAvg FROM Students;' });
+raSteps('#self', DB_SLIDES, 'project[S1.sname, S2.sname](select[S1.gpa > S2.gpa](rename[S1](Students) x rename[S2](Students)))',
+  { sql: 'SELECT DISTINCT S1.sname, S2.sname FROM Students S1, Students S2 WHERE S1.gpa > S2.gpa;' });
+raLab('#lab', { db: DB_SLIDES, presets: [
+  { label: 'Students × People', ra: 'Students x People', sql: 'SELECT *\nFROM Students, People;' },
+  { label: 'ρ with new attribute names', ra: 'rename[Stud(studId, name, gradePtAvg)](Students)', sql: 'SELECT sid AS studId, sname AS name, gpa AS gradePtAvg\nFROM Students;' },
+  { label: 'ρ of one attribute only', ra: 'rename[gpa -> grade](Students)', sql: 'SELECT sid, sname, gpa AS grade\nFROM Students;' },
+  { label: 'Self-product: higher gpa than', ra: 'project[S1.sname, S2.sname](select[S1.gpa > S2.gpa](rename[S1](Students) x rename[S2](Students)))', sql: 'SELECT DISTINCT S1.sname, S2.sname\nFROM Students S1, Students S2\nWHERE S1.gpa > S2.gpa;' },
+  { label: 'Students whose name is also a person\'s name', ra: 'project[sid, sname](select[sname = pname](Students x People))', sql: 'SELECT DISTINCT sid, sname\nFROM Students, People\nWHERE sname = pname;' },
+] });
+
+flashcards('#cards', [
+  { f: 'R × S', b: 'Every tuple of R paired with every tuple of S. SQL: FROM R, S.' },
+  { f: '|R × S|', b: '|R| · |S| tuples; arity(R) + arity(S) attributes.' },
+  { f: 'R.A and S.A', b: 'How the product keeps two attributes with the same name apart.' },
+  { f: 'ρ<sub>S(B1,…,Bn)</sub>(R)', b: 'Rename relation R to S and its attributes to B1…Bn. Rows unchanged. SQL: AS.' },
+  { f: 'Why ρ is "special"', b: 'It is neither basic nor derived: it changes the schema only, never the instance.' },
+  { f: 'Self-product', b: 'ρ<sub>S1</sub>(R) × ρ<sub>S2</sub>(R): two named copies of R, so tuples of R can be compared with each other.' },
+  { f: 'Listing each pair once', b: 'Add S1.key &lt; S2.key to the condition: removes (x, x) and keeps only one of (x, y), (y, x).' },
+]);
+quiz('#quiz', [
+  { q: 'R has 3 tuples with 2 attributes; S has 4 tuples with 3 attributes. R × S has…', opts: ['7 tuples, 5 attributes', '12 tuples, 5 attributes', '12 tuples, 6 attributes', '7 tuples, 6 attributes'], a: 1, why: 'Tuples multiply (3·4), attributes add (2+3).' },
+  { q: 'Which SQL is a Cartesian product?', opts: ['SELECT * FROM R WHERE a = 1', 'SELECT * FROM R, S', 'SELECT * FROM R UNION SELECT * FROM S', 'SELECT DISTINCT a FROM R'], a: 1, why: 'A comma in FROM with no join condition.' },
+  { q: 'What does ρ change?', opts: ['The tuples', 'The names (relation and/or attributes) only', 'The number of attributes', 'The order of tuples'], a: 1, why: 'Slide 14: "changes the schema, not the instance".' },
+  { q: 'Why can you not write σ<sub>gpa &gt; gpa</sub>(Students × Students) to compare students?', opts: ['× is not allowed on one relation', 'Both copies have the same names, so the condition cannot say which gpa is which', 'gpa is not numeric', 'It returns 0 rows'], a: 1, why: 'Rename the copies (ρ<sub>S1</sub>, ρ<sub>S2</sub>) so the condition can say S1.gpa &gt; S2.gpa.' },
+  { q: 'Slide 13 shows (5423341, Bob, 216 Rosse, 002, Bob, 1.3). What is wrong?', opts: ['Nothing', 'The address should be 217 Rosse, Bob\'s address in People', 'The row should not exist', 'gpa should be 3.4'], a: 1, why: '× copies values; it never changes them.' },
+]);
+ask('#try1', { q: 'Students has 4 tuples. How many tuples does ρ<sub>S1</sub>(Students) × ρ<sub>S2</sub>(Students) have?', a: 16, why: '4 · 4 = 16, including the 4 pairs of a student with itself.' });
+ask('#try2', { q: 'With 4 students all having different gpas, how many tuples satisfy S1.gpa &gt; S2.gpa in that product?', a: 6, why: 'Each unordered pair of different students contributes exactly one ordered pair: 4·3/2 = 6.' });
+
+raCheck('#ex1', { db: DB_SLIDES, task: '1. (Easy) The Cartesian product of People and Students, keeping only pname and sname.', solution: 'project[pname, sname](People x Students)', hint: 'π on top of ×.' });
+raCheck('#ex2', { db: DB_SLIDES, task: '2. Rename Students to Learner with attributes (id, name, grade).', solution: 'rename[Learner(id, name, grade)](Students)' });
+raCheck('#ex3', { db: DB_UNI, task: '3. (Exam style) Pairs of names (n1, n2) of different instructors working in the same department, each pair listed once.', solution: 'project[I1.name, I2.name](select[I1.dept_name = I2.dept_name and I1.ID < I2.ID](rename[I1](instructor) x rename[I2](instructor)))', hint: 'Two renamed copies, equal dept_name, and I1.ID &lt; I2.ID to list each pair once.' });
+sqlCheck('#ex4', { setup: raSetup(DB_SLIDES), task: '4. Write the SQL for ρ<sub>Stud(studId, name, gradePtAvg)</sub>(Students).', solution: 'SELECT sid AS studId, sname AS name, gpa AS gradePtAvg\nFROM Students;' });
+sqlCheck('#ex5', { setup: raSetup(DB_UNI), task: '5. Write exercise 3 in SQL: distinct pairs of names of different instructors in the same department, each pair once.', solution: 'SELECT DISTINCT I1.name, I2.name\nFROM instructor I1, instructor I2\nWHERE I1.dept_name = I2.dept_name AND I1.ID < I2.ID;', hint: 'Table aliases in FROM play the role of ρ.' });
+</script>
+</body>
+</html>

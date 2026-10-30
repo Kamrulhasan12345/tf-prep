@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Shared and Exclusive Locks · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="../s02/lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 03 (Sukarna) · Chapter 1 · Slides 2–5 · Book §18.4.1–18.4.2</div>
+<h1>Shared and Exclusive Locks</h1>
+<p class="lede">With a single kind of lock, two transactions that only read X still block each other. Shared locks for reading and exclusive locks for writing fix that. This chapter gives the rules for the two modes, the compatibility matrix, the slides' example, and a scheduler you can run on your own schedules.</p>
+
+<h2>1. Two lock modes (slide 2)</h2>
+<p>Lec 02's single lock had to be taken for any access, even a read. That is wasteful: any number of transactions can read X at the same time without harm, as long as nobody writes X meanwhile. So the scheduler uses two kinds of lock:</p>
+<dl class="def">
+  <dt>Shared lock (S, read lock), sl<sub>i</sub>(X)</dt><dd>Requested by T<sub>i</sub> when it wants to read X but not write it. Several transactions may hold shared locks on X at once.</dd>
+  <dt>Exclusive lock (X, write lock), xl<sub>i</sub>(X)</dt><dd>Required for writing X (and also allows reading). While T<sub>i</sub> holds it, no other transaction may hold any lock on X.</dd>
+  <dt>u<sub>i</sub>(X)</dt><dd>T<sub>i</sub> releases <em>all</em> its locks on X (whatever their modes).</dd>
+</dl>
+<p>An exclusive lock is <b class="term">stronger</b> than a shared one: it prevents both reads and writes by others, while a shared lock only prevents writes. So if a transaction only wants to read, it should take only a shared lock.</p>
+
+<h2>2. The three requirements (slides 3–4)</h2>
+<p>Lec 02's rules carry over, adjusted for two modes (textbook §18.4.1):</p>
+<dl class="def">
+  <dt>1. Consistency of transactions</dt><dd>(a) A read r<sub>i</sub>(X) must be preceded by sl<sub>i</sub>(X) or xl<sub>i</sub>(X), with no u<sub>i</sub>(X) in between. (b) A write w<sub>i</sub>(X) must be preceded by xl<sub>i</sub>(X), with no u<sub>i</sub>(X) in between. Every lock must later be followed by an unlock of the same element.</dd>
+  <dt>2. Two-phase locking of transactions</dt><dd>All locking actions precede all unlocking actions: no sl<sub>i</sub>(X) or xl<sub>i</sub>(X) may come after any u<sub>i</sub>(Y).</dd>
+  <dt>3. Legality of schedules</dt><dd>An element may be locked exclusively by one transaction, or in shared mode by several, but not both. (a) If xl<sub>i</sub>(X) appears, there cannot be a later xl<sub>j</sub>(X) or sl<sub>j</sub>(X), j ≠ i, without u<sub>i</sub>(X) in between. (b) If sl<sub>i</sub>(X) appears, there cannot be a later xl<sub>j</sub>(X), j ≠ i, without u<sub>i</sub>(X) in between.</dd>
+</dl>
+<p>Note what legality does <em>not</em> forbid: sl<sub>i</sub>(X) followed by sl<sub>j</sub>(X) (shared with shared), and one transaction holding both a shared and an exclusive lock on the same element. A transaction that knows in advance it will write X can simply ask for xl(X); one that only discovers later that it must write can ask for sl(X) first and xl(X) later (an <em>upgrade</em>, Chapter 2).</p>
+<p>The proof of Lec 02 Chapter 7 still works unchanged: <strong>a legal schedule of consistent 2PL transactions with shared and exclusive locks is conflict-serializable</strong>, and the transaction that unlocks first can be placed first.</p>
+
+<h2>3. The compatibility matrix (textbook §18.4.2)</h2>
+<dl class="def">
+  <dt>Compatibility matrix</dt><dd>A table with a row for each mode a lock may be <em>held</em> in by another transaction, and a column for each mode that may be <em>requested</em>. A lock on X in mode C can be granted if and only if, for every mode R in which some <em>other</em> transaction holds a lock on X, the entry in row R, column C is “Yes”.</dd>
+</dl>
+<div class="figrow"><div><div id="cm"></div></div></div>
+<p>The S column says a shared lock can be granted if the only locks on X are shared locks. The X column says an exclusive lock can be granted only if no other transaction holds any lock on X. Note that locks held by the requester itself are not checked against the matrix.</p>
+
+<h2>4. Slide 5: an example</h2>
+<pre>T₁: sl₁(A); r₁(A); xl₁(B); r₁(B); w₁(B); u₁(A); u₁(B);
+T₂: sl₂(A); r₂(A); sl₂(B); r₂(B); u₂(A); u₂(B);</pre>
+<p>Both read A and B; only T₁ writes B; nobody writes A. In the slide's interleaving T₁ gets a shared lock on A, then T₂ gets shared locks on A and B. When T₁ asks for an exclusive lock on B it is denied, because T₂ holds a shared lock on B. T₁ waits until T₂ unlocks:</p>
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="f15"></div>
+<figcaption><b>Figure 1.</b> The slide's schedule (textbook Fig. 18.15) in the locking scheduler. The matrix cell used for each decision is outlined.</figcaption>
+</figure>
+<p>The slide notes that the schedule is conflict-serializable. The equivalent serial order is <strong>(T₂, T₁)</strong>, even though T₁ started first: r₂(B) comes before w₁(B), and T₂ unlocks before T₁, just as the 2PL proof predicts.</p>
+
+<h2>5. Run the scheduler</h2>
+<p>Type locks yourself (<code>sl1(A) xl2(B) u1(A)</code> …) with “Locks: as written”, or type only reads, writes and commits and let the scheduler insert shared and exclusive locks (as in Part I of the textbook's scheduler, Chapter 3). With commit actions, locks are released at commit.</p>
+<figure class="wide">
+<span class="anim-tag">Interactive</span>
+<div id="tool"></div>
+</figure>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+
+<h3>Exam questions</h3>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2016–17 · 6 marks</div>
+  <div class="exam-q"><p>Mention the requirements of using shared and exclusive locks.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+  <ol>
+    <li><b>Consistency of transactions.</b> A read r<sub>i</sub>(X) must be preceded by sl<sub>i</sub>(X) or xl<sub>i</sub>(X) with no intervening u<sub>i</sub>(X); a write w<sub>i</sub>(X) must be preceded by xl<sub>i</sub>(X) with no intervening u<sub>i</sub>(X); every lock must eventually be followed by an unlock of the same element.</li>
+    <li><b>Two-phase locking of transactions.</b> In each transaction no sl<sub>i</sub>(X) or xl<sub>i</sub>(X) may be preceded by any u<sub>i</sub>(Y): all locks before all unlocks.</li>
+    <li><b>Legality of schedules.</b> An element is locked either exclusively by one transaction or in shared mode by any number, never both: after xl<sub>i</sub>(X) there is no xl<sub>j</sub>(X) or sl<sub>j</sub>(X) (j ≠ i) without u<sub>i</sub>(X) in between; after sl<sub>i</sub>(X) there is no xl<sub>j</sub>(X) (j ≠ i) without u<sub>i</sub>(X) in between.</li>
+  </ol>
+  <p>The scheduler enforces legality through the compatibility matrix (S–S Yes, all other pairs No). A transaction may hold both an S and an X lock on one element. With all three requirements, every schedule is conflict-serializable.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2014–15 · 5 marks</div>
+  <div class="exam-q"><p>Show and explain the lock compatibility matrix with examples.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+  <p>Rows: mode in which another transaction already holds a lock on X. Columns: mode requested. Grant the request iff every held mode's row has “Yes” in the requested column.</p>
+  <div class="tbl"><table style="width:auto;text-align:center"><tr><th>held \ requested</th><th>S</th><th>X</th><th>U</th></tr><tr><th>S</th><td class="good">Yes</td><td class="bad">No</td><td class="good">Yes</td></tr><tr><th>X</th><td class="bad">No</td><td class="bad">No</td><td class="bad">No</td></tr><tr><th>U</th><td class="bad">No</td><td class="bad">No</td><td class="bad">No</td></tr></table></div>
+  <p>(The S/X matrix is the top-left 2 × 2 part; the U row and column are for update locks, Chapter 2.)</p>
+  <ul>
+    <li><b>S held, S requested: Yes.</b> sl₁(A); sl₂(A): T₁ and T₂ both read A; reads do not interfere.</li>
+    <li><b>S held, X requested: No.</b> sl₂(B); xl₁(B): T₁ must wait until T₂ unlocks B, otherwise T₂ might read B before and after T₁'s write (slide 5's example).</li>
+    <li><b>X held, S or X requested: No.</b> xl₁(A); sl₂(A): T₂ may not read A while T₁ may still change it (that would be a dirty or inconsistent read).</li>
+    <li><b>S held, U requested: Yes; U held, anything requested: No.</b> An update lock is requested like a shared lock but, once held, blocks everyone, so its holder can later upgrade to X.</li>
+  </ul>
+  <p>The matrix is used with the group mode of a lock-table entry, so the scheduler checks one value instead of every holder (Chapter 3).</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2016–17 · 9 marks &nbsp;|&nbsp; BUET QBank · CSE 303 | L-3/T-1 | 2012–13 · 10 marks</div>
+  <div class="exam-q"><p>Consider the following schedule: r₁(A); r₂(B); r₃(C); w₁(B); w₂(C); w₃(D). Insert shared and exclusive locks and place necessary unlocks to maximise concurrency. <em>(2012–13 wording: insert shared and exclusive locks and place necessary unlocks in appropriate positions.)</em></p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+  <p>Each transaction reads one element and writes another: T₁ reads A, writes B; T₂ reads B, writes C; T₃ reads C, writes D. Reads get S locks, writes get X locks.</p>
+  <p><b>Two-phase locked version (guarantees serializability).</b> To maximise concurrency under 2PL, each transaction releases each lock as early as 2PL allows: its S lock right after it has obtained its X lock (its lock point), and its X lock right after the write.</p>
+  <pre>T₁: sl₁(A); r₁(A); xl₁(B); u₁(A); w₁(B); u₁(B);
+T₂: sl₂(B); r₂(B); xl₂(C); u₂(B); w₂(C); u₂(C);
+T₃: sl₃(C); r₃(C); xl₃(D); u₃(C); w₃(D); u₃(D);</pre>
+  <p>Run in the given order: the three S locks are granted. xl₁(B) is <b>denied</b> (T₂ holds S on B), so T₁ waits. xl₂(C) is <b>denied</b> (T₃ holds S on C), so T₂ waits. xl₃(D) is granted; T₃ unlocks C and writes D. Now xl₂(C) is granted; T₂ unlocks B and writes C. Now xl₁(B) is granted and T₁ finishes. The reads and writes reach the database as r₁(A) r₂(B) r₃(C) w₃(D) w₂(C) w₁(B), equivalent to the serial order <b>(T₃, T₂, T₁)</b>. Step through it in Figure 2 below.</p>
+  <p><b>Unlock-immediately version (most concurrency, not 2PL).</b> If each transaction unlocks right after each access (sl₁(A); r₁(A); u₁(A); … xl₁(B); w₁(B); u₁(B); …), nothing ever waits and the given order runs unchanged. The transactions are then not two-phase locked (each locks B, C or D after unlocking), so serializability is no longer guaranteed in general. Here the result happens to be conflict-serializable: r₂(B) before w₁(B) gives T₂ → T₁ and r₃(C) before w₂(C) gives T₃ → T₂, again the order (T₃, T₂, T₁).</p>
+  <figure><div id="q30"></div><figcaption><b>Figure 2.</b> The 2PL version, with each transaction's actions issued in the given order.</figcaption></figure>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2013–14 · 10 marks</div>
+  <div class="exam-q"><p>Consider the following schedule involving transactions T₁, T₂, and T₃: r₁(A), r₂(B), r₃(C), r₁(B), r₂(C), r₃(D), w₁(A), w₂(B), w₃(C). Insert shared locks, exclusive locks, and unlock actions in appropriate places. Tell what happens when the schedule is run by a scheduler supporting shared and exclusive locks.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+  <p>T₁ reads A and B, then writes A; T₂ reads B and C, then writes B; T₃ reads C and D, then writes C. Each transaction reads the element it later writes, so it takes a shared lock first and upgrades to exclusive just before the write (2PL: all unlocks at the end):</p>
+  <pre>T₁: sl₁(A); r₁(A); sl₁(B); r₁(B); xl₁(A); w₁(A); u₁(A); u₁(B);
+T₂: sl₂(B); r₂(B); sl₂(C); r₂(C); xl₂(B); w₂(B); u₂(B); u₂(C);
+T₃: sl₃(C); r₃(C); sl₃(D); r₃(D); xl₃(C); w₃(C); u₃(C); u₃(D);</pre>
+  <p><b>What happens</b> (Figure 3): all six shared locks are granted, because S is compatible with S (T₁ and T₂ share B; T₂ and T₃ share C). xl₁(A): only T₁ holds a lock on A, so the upgrade is granted; T₁ writes A and unlocks A and B. xl₂(B): T₁ has released B, so it is granted; T₂ writes B and unlocks. xl₃(C): T₂ has released C, so it is granted; T₃ finishes. <b>No transaction ever waits.</b> The executed schedule is the given one, and it is conflict-serializable: r₁(B) before w₂(B) gives T₁ → T₂, r₂(C) before w₃(C) gives T₂ → T₃, so the order is <b>(T₁, T₂, T₃)</b>, which is also the order in which they unlock.</p>
+  <p>If instead each transaction took an exclusive lock on its write element at the first read (no upgrades), xl₂(B) at r₂(B) would block T₁'s r₁(B), and xl₃(C) at r₃(C) would block T₂'s r₂(C): T₁ waits for T₂ and T₂ waits for T₃, so the transactions finish one after another in the order T₃, T₂, T₁. Less concurrency, same correctness.</p>
+  <figure><div id="q39"></div><figcaption><b>Figure 3.</b> The schedule with locks inserted (S then X upgrade, unlock at the end).</figcaption></figure>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 20-21 3b · 15 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-2 | 2020–21 · 15 marks</div>
+  <div class="exam-q"><p>The list of instructions of transactions T1, T2 and T3 are given in chronological order as follows: T1(READ A), T2(WRITE A), T3(READ A), T1(WRITE B), T2(WRITE B), T1(READ B), T1(WRITE P), T3(WRITE Q), T2(READ B), T1(WRITE A). Put appropriate lock to the transactions and show the status of locks. In appropriate place, you can upgrade or downgrade lock.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+  <p>In r/w notation: r₁(A) w₂(A) r₃(A) w₁(B) w₂(B) r₁(B) w₁(P) w₃(Q) r₂(B) w₁(A). Shared locks before reads, exclusive before writes; T₁ reads A and later writes A, so it takes S on A and <b>upgrades</b> to X before w₁(A). Assumption: each transaction is 2PL and releases its locks after its last instruction listed.</p>
+  <div class="tbl"><table>
+  <tr><th>#</th><th>request</th><th>decision</th><th>lock status afterwards</th></tr>
+  <tr><td>1</td><td>sl₁(A); r₁(A)</td><td>granted</td><td>A: S(T₁)</td></tr>
+  <tr><td>2</td><td>xl₂(A)</td><td><b>wait</b> (S held by T₁)</td><td>A: S(T₁), T₂ waits for X</td></tr>
+  <tr><td>3</td><td>sl₃(A); r₃(A)</td><td>granted (S–S)</td><td>A: S(T₁, T₃); T₂ waiting</td></tr>
+  <tr><td>4</td><td>xl₁(B); w₁(B)</td><td>granted</td><td>B: X(T₁)</td></tr>
+  <tr><td>5</td><td>w₂(B)</td><td>delayed (T₂ is blocked)</td><td>unchanged</td></tr>
+  <tr><td>6</td><td>r₁(B)</td><td>allowed: T₁'s X lock covers reading</td><td>unchanged</td></tr>
+  <tr><td>7</td><td>xl₁(P); w₁(P)</td><td>granted</td><td>P: X(T₁)</td></tr>
+  <tr><td>8</td><td>xl₃(Q); w₃(Q); u₃(A); u₃(Q)</td><td>granted; T₃ is done and unlocks</td><td>A: S(T₁); Q free</td></tr>
+  <tr><td>9</td><td>r₂(B)</td><td>delayed (T₂ still blocked)</td><td>unchanged</td></tr>
+  <tr><td>10</td><td>xl₁(A) (upgrade); w₁(A)</td><td>granted: only T₁ holds A now (T₂ is waiting but holds nothing)</td><td>A: S+X(T₁); B, P: X(T₁)</td></tr>
+  <tr><td>11</td><td>u₁(A)</td><td>T₂'s xl₂(A) is granted; T₂ resumes: w₂(A), then xl₂(B) is <b>denied</b> (T₁ still holds X on B)</td><td>A: X(T₂); B: X(T₁), T₂ waits</td></tr>
+  <tr><td>12</td><td>u₁(B); u₁(P)</td><td>xl₂(B) granted; T₂ runs w₂(B); r₂(B); u₂(A); u₂(B)</td><td>empty</td></tr>
+  </table></div>
+  <p>Result: no deadlock; the executed order r₁(A) r₃(A) w₁(B) r₁(B) w₁(P) w₃(Q) w₁(A) w₂(A) w₂(B) r₂(B) is conflict-serializable with order <b>(T₃, T₁, T₂)</b> (r₃(A) before w₁(A); T₁'s A and B accesses before T₂'s). Figure 4 steps through it. No downgrade is needed: at step 6 T₁ already holds X on B, which permits reading.</p>
+  <p><b>If locks are held until a later commit</b> (strict 2PL; this is what the question bank's answer assumes), T₃ keeps its S lock on A, so T₁'s upgrade at step 10 must wait for T₃, and T₂ waits for T₁: the waits-for graph is T₂ → T₁ → T₃, a chain, not a deadlock; everything proceeds once T₃ commits. Note: the bank's answer “downgrades” T₁'s X(B) to S(B) at step 6. That is unnecessary, since an exclusive lock already allows reading, and releasing write privileges before commit would break strict 2PL.</p>
+  <figure class="wide"><div id="q21"></div><figcaption><b>Figure 4.</b> The scheduler running the instructions with inserted locks.</figcaption></figure>
+  </div></details>
+</div>
+
+<div class="key"><p><strong>Summary:</strong> read with a shared lock, write with an exclusive lock. Any number of shared locks may coexist; an exclusive lock excludes all other locks. The compatibility matrix (rows held, columns requested) encodes this: only S–S is Yes. Consistency, two-phase locking and legality are restated for the two modes, and the same proof shows that such schedules are conflict-serializable, in the order of the transactions' first unlocks.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../s02/lecture.js"></script>
+<script>
+document.querySelector('#cm').innerHTML = CC.matrixHTML(['S', 'X']);
+stepper('#f15', CC.lockSteps(CC.parse('sl1(A) r1(A) sl2(A) r2(A) sl2(B) r2(B) xl1(B) u2(A) u2(B) r1(B) w1(B) u1(A) u1(B)').acts).steps, { interval: 2300 });
+CC.lockTool('#tool', 'r1(A) r2(A) r2(B) r1(B) w1(B) c2 c1', { auto: true, scheme: 'upgrade', release: 'end' });
+const ins = (s, sch, rel) => CC.lockSteps(CC.insertLocks(CC.parse(s).acts, sch, rel)).steps;
+stepper('#q30', CC.lockSteps(CC.parse('sl1(A) r1(A) sl2(B) r2(B) sl3(C) r3(C) xl1(B) xl2(C) xl3(D) u3(C) w3(D) u2(B) w2(C) u1(A) w1(B) u1(B) u2(C) u3(D)').acts).steps, { interval: 2300 });
+stepper('#q39', ins('r1(A) r2(B) r3(C) r1(B) r2(C) r3(D) w1(A) w2(B) w3(C)', 'upgrade', 'end'), { interval: 2300 });
+stepper('#q21', ins('r1(A) w2(A) r3(A) w1(B) w2(B) r1(B) w1(P) w3(Q) r2(B) w1(A)', 'upgrade', 'end'), { interval: 2300 });
+flashcards('#cards', [
+  { f: 'sl₁(X)', b: 'T₁ requests a shared (read) lock on X.' },
+  { f: 'xl₁(X)', b: 'T₁ requests an exclusive (write) lock on X.' },
+  { f: 'S held, S requested', b: 'Yes: readers can share.' },
+  { f: 'S held, X requested', b: 'No: the writer must wait for readers to unlock.' },
+  { f: 'X held, anything requested', b: 'No.' },
+  { f: 'Compatibility matrix rule', b: 'Grant mode C on X iff for every mode R held on X by another transaction, entry (R, C) is Yes.' },
+  { f: 'Can one transaction hold S and X on X?', b: 'Yes; the matrix only checks other transactions\' locks.' },
+]);
+quiz('#quiz', [
+  { q: 'T₂ holds S on B. Which request on B by T₁ is granted?', opts: ['xl₁(B)', 'sl₁(B)', 'both', 'neither'], a: 1, why: 'S is compatible with S only.' },
+  { q: 'Which is required before w₁(X)?', opts: ['sl₁(X)', 'xl₁(X)', 'either', 'no lock'], a: 1, why: 'Writing needs an exclusive lock.' },
+  { q: 'In slide 5\'s schedule, the conflict-equivalent serial order is…', opts: ['(T₁, T₂)', '(T₂, T₁)', 'none', 'both'], a: 1, why: 'r₂(B) precedes w₁(B), and T₂ unlocks first.' },
+  { q: 'Which sequence is illegal?', opts: ['sl₁(A) sl₂(A)', 'sl₁(A) xl₁(A)', 'xl₁(A) sl₂(A) u₁(A)', 'sl₁(A) u₁(A) xl₂(A)'], a: 2, why: 'T₂ gets S on A while T₁ still holds X.' },
+]);
+ask('#try1', { q: 'X is locked in mode S by T₁ and T₂. T₃ requests X. How many of the modes S, X can be granted to T₃?', a: 1, why: 'Only S (column S has Yes in row S; column X has No).' });
+</script>
+</body>
+</html>

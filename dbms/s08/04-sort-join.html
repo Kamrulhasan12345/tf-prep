@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sort-Join and Sort-Merge-Join · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="../s07/lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 08 (Sukarna) · Chapter 4 · Slides 22–28 · Book §15.4.6–15.4.9</div>
+<h1>Sort-Based Joins: Simple Sort-Join and the Efficient Sort-Merge-Join</h1>
+<p class="lede">Joining by sorting turns a quadratic problem into a linear one. This chapter gives the simple sort-join (5 I/Os per block), explains why nested-loop join looks better on small examples and loses badly on big ones, then gives the efficient sort-merge-join (3 I/Os per block) with its stricter memory rule, and ends with the summary of all sort-based algorithms.</p>
+
+<h2>1. Simple sort-join (slide 22)</h2>
+<p>To compute R(X, Y) ⋈ S(Y, Z) with M buffers:</p>
+<ol>
+  <li>Sort R with TPMMS, using Y as the sort key, and store the sorted R on disk.</li>
+  <li>Sort S with TPMMS on Y, and store the sorted S on disk. (Slide 22 says "store sorted R" on this line too; it means S.)</li>
+  <li>Merge the sorted R and S, using just <b>two buffers</b>, one for the current block of R and one for S. Repeatedly:
+    <ol type="a">
+      <li>Find the least value y of the join attributes Y currently at the front of the blocks for R and S.</li>
+      <li>If y does not appear at the front of <b>both</b> relations, remove the tuples with sort key y: they cannot join.</li>
+      <li>Otherwise, get <b>all</b> tuples from both relations with sort key y, reading more blocks of the sorted R and/or S if needed. Up to M buffers are available for this.</li>
+      <li>Output every tuple formed by joining an R tuple and an S tuple with this common y.</li>
+      <li>If a relation has no unconsidered tuples left in memory, reload its buffer.</li>
+    </ol></li>
+</ol>
+
+<div class="q">
+<h4>Slide 22 question (worked answer): "More blocks may need to be read from the disk during this checking. Why?"</h4>
+<p>Every R tuple with Y = y must meet every S tuple with Y = y. Those tuples are consecutive in the sorted files, but there can be more of them than fit in the one block currently in memory: the run of y-tuples can continue onto the next block, or several blocks, of R or of S. Until we have read past the last y in both relations we cannot be sure we have all of them, so further blocks are read into the spare buffers (up to M) and all y-tuples of both sides are held together while they are joined. If they need more than M buffers, the algorithm has to fall back to a nested-loop join of those tuples.</p>
+</div>
+
+<figure class="wide">
+<span class="anim-tag">Interactive animation</span>
+<div id="merge"></div>
+</figure>
+
+<h2>2. Cost of the simple sort-join (slides 23–25)</h2>
+<ul>
+  <li>Sorting R and S with TPMMS <b>and storing the results</b>: 4B(R) + 4B(S) (2 I/Os per block in each of the two phases).</li>
+  <li>The final merge reads sorted R and sorted S once: B(R) + B(S).</li>
+</ul>
+<div class="key">
+<p class="formula">Simple sort-join: 5(B(R) + B(S)) disk I/Os</p>
+<p style="text-align:center;margin:0">Memory: B(R) ≤ M² and B(S) ≤ M² ⟹ M ≥ √max(B(R), B(S)); and all tuples sharing one Y-value must fit in M blocks.</p>
+</div>
+<p>The last condition is the special risk of joins: in the extreme case where every tuple has the same Y-value, every R tuple joins every S tuple, and holding them all would need M ≥ B(R) + B(S). Then the only option is a nested-loop join of those tuples.</p>
+
+<h3>The slides' two calculations</h3>
+<div class="tbl"><table>
+<tr><th></th><th>B(R) = 1000, B(S) = 500, M = 101 (slide 24)</th><th>B(R) = 10,000, B(S) = 5,000, M = 101 (slide 25)</th></tr>
+<tr><td>Sort R (4B(R))</td><td class="num">4,000</td><td class="num">40,000</td></tr>
+<tr><td>Sort S (4B(S))</td><td class="num">2,000</td><td class="num">20,000</td></tr>
+<tr><td>Merge (B(R) + B(S))</td><td class="num">1,500</td><td class="num">15,000</td></tr>
+<tr><td><b>Simple sort-join</b></td><td class="num"><b>7,500</b></td><td class="num"><b>75,000</b></td></tr>
+<tr><td>Block nested-loop: B(S) + B(S)B(R)/(M − 1)</td><td class="num">500 + 5 × 1000 = <b>5,500</b></td><td class="num">5,000 + 50 × 10,000 = <b>505,000</b></td></tr>
+<tr><td>Winner</td><td class="bad">nested-loop</td><td class="good">sort-join, by a factor of almost 7</td></tr>
+</table></div>
+<p><b>Reason (slide 25):</b> nested-loop join needs I/O proportional to <b>B(R) × B(S)</b>, while sort-based join needs I/O proportional to <b>B(R) + B(S)</b>. Making both relations 10 times bigger multiplies the nested-loop cost by about 100 and the sort-join cost by only 10. Nested-loop wins only in small cases like slide 24's, where each relation is just 5 or 10 times the size of memory (textbook Example 15.6). Both relations still sort in two phases in the second example: 10,000 ≤ 101 × 100 = 10,100.</p>
+
+<h2>3. The efficient sort-based join (slides 26–27)</h2>
+<dl class="def">
+<dt>Sort-merge-join (the textbook's "sort-join", also "merge-join")</dt>
+<dd>A two-pass join that merges the second phase of sorting with the join itself, saving 2 I/Os per block. It is usable when the number of tuples sharing a common sort-key value is small.</dd>
+</dl>
+<ol>
+  <li><b>Phase 1:</b> create sorted sublists of R and of S (M blocks each), using Y as the sort key.</li>
+  <li><b>Phase 2:</b> bring the first block of each sublist of R and of S into a buffer. Repeatedly: find the smallest y among all sublists; find all tuples of both relations with sort key y (using spare buffers if needed); combine the R and S tuples with common value y into joined tuples and copy them to the output.</li>
+</ol>
+<div class="key">
+<p class="formula">Sort-merge-join: 3(B(R) + B(S)) disk I/Os · Memory: B(R) + B(S) ≤ M² ⟹ M ≥ √(B(R) + B(S))</p>
+</div>
+<p><b>Example (slide 27, textbook Example 15.7):</b> B(R) = 1000, B(S) = 500, M = 101. With 100-block sublists, R has 10 sublists and S has 5. Phase 2 needs 10 + 5 = <b>15 buffers</b> to read R and S, so <b>86</b> buffers stay free to hold large groups of tuples with the same sort key if needed. Phase 1 costs 2 × 1500 = 3000 I/Os, phase 2 reads the sublists once more: 1500. <b>Total 4500</b>, better than both nested-loop (5500) and simple sort-join (7500).</p>
+<p><b>Its limit.</b> Try slide 25's sizes: B(R) + B(S) = 15,000 &gt; M² = 10,201. There would be 100 + 50 = 150 sublists of 100 blocks, but only 101 buffers. So for those sizes the efficient version <b>cannot</b> be used in two passes, and the simple sort-join (75,000) is the sort-based choice. Simple sort-join needs memory only for the <em>larger</em> relation; sort-merge-join needs it for the <em>sum</em>.</p>
+
+<h2>4. Summary of sort-based algorithms (slide 28, textbook Fig. 15.11)</h2>
+<div class="tbl"><table>
+<tr><th>Operators</th><th>Approximate M required</th><th>Disk I/O</th></tr>
+<tr><td>τ (sort), γ, δ</td><td class="num">√B</td><td class="num">3B</td></tr>
+<tr><td>∪, ∩, −</td><td class="num">√(B(R) + B(S))</td><td class="num">3(B(R) + B(S))</td></tr>
+<tr><td>⋈ (simple sort-join)</td><td class="num">√max(B(R), B(S))</td><td class="num">5(B(R) + B(S))</td></tr>
+<tr><td>⋈ (sort-merge-join)</td><td class="num">√(B(R) + B(S))</td><td class="num">3(B(R) + B(S))</td></tr>
+</table></div>
+<p>τ is the sorting operator. The join rows also need the tuples with a common join value to fit in memory; if that fails, those tuples are joined by nested loop.</p>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+<div id="try2"></div>
+
+<h3>Exam questions</h3>
+<p>The question-bank questions comparing sort-based joins with nested-loop and hash joins (B(R) = 8000, B(S) = 4000, M = 101; hash join versus sort-merge join) are worked in <a href="06-choosing-a-join.html">Chapter 6</a>, where all join algorithms are compared with the calculator.</p>
+
+<div class="key"><p><strong>Summary:</strong> simple sort-join sorts and stores R and S with TPMMS (4 I/Os per block) and merges them with two buffers (1 more): 5(B(R) + B(S)), needing √max(B(R), B(S)) buffers. Sort-merge-join merges all sorted sublists of R and S directly: 3(B(R) + B(S)), needing √(B(R) + B(S)). Both need the tuples sharing one join value to fit in memory. Nested loop beats them only on small inputs (5500 versus 7500) and loses heavily on large ones (505,000 versus 75,000), because its cost is a product, not a sum.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../s07/lecture.js"></script>
+<script>
+// merge phase of the sort-join on sorted R(X,Y) and S(Y,Z)
+function mergeTrace(R, S) {
+  R = R.slice().sort((a, b) => +a[1] - +b[1]); S = S.slice().sort((a, b) => +a[0] - +b[0]);
+  let i = 0, j = 0; const out = [], st = [];
+  const snap = (cap, hr = [], hs = []) => st.push({ i, j, out: out.slice(), hr, hs, cap, R, S });
+  snap('Both relations are sorted on the join attribute Y. Pointers start at the front of each.');
+  while (i < R.length && j < S.length) {
+    const yr = +R[i][1], ys = +S[j][0], y = Math.min(yr, ys);
+    if (yr !== ys) {
+      const side = yr < ys ? 'R' : 'S';
+      const hr = [], hs = [];
+      if (side === 'R') { while (i < R.length && +R[i][1] === y) hr.push(i++); } else { while (j < S.length && +S[j][0] === y) hs.push(j++); }
+      snap(`Least front value y = ${y} appears only in ${side} (the other front is ${side === 'R' ? ys : yr}). Its tuples cannot join: remove them.`, hr, hs);
+    } else {
+      const hr = [], hs = [];
+      while (i < R.length && +R[i][1] === y) hr.push(i++);
+      while (j < S.length && +S[j][0] === y) hs.push(j++);
+      hr.forEach(a => hs.forEach(b => out.push(`${R[a][0]} ${y} ${S[b][1]}`)));
+      snap(`y = ${y} is at the front of both. Collect <b>all</b> ${hr.length} R tuple${hr.length > 1 ? 's' : ''} and ${hs.length} S tuple${hs.length > 1 ? 's' : ''} with Y = ${y} (they may span several blocks) and output all ${hr.length * hs.length} combination${hr.length * hs.length > 1 ? 's' : ''}.`, hr, hs);
+    }
+  }
+  snap(i >= R.length ? 'R is exhausted, so no more joins are possible. Done.' : 'S is exhausted, so no more joins are possible. Done.');
+  return st;
+}
+const mFrame = s => `<div class="qe-row"><span class="qe-lab">sorted R (X, Y)</span><span class="qe-blk">${s.R.map((t, k) => `<span class="${s.hr.includes(k) ? 'pick' : k < s.i ? 'gone' : ''}">${t[0]},${t[1]}</span>`).join('')}</span></div>` +
+  `<div class="qe-row"><span class="qe-lab">sorted S (Y, Z)</span><span class="qe-blk hl">${s.S.map((t, k) => `<span class="${s.hs.includes(k) ? 'pick' : k < s.j ? 'gone' : ''}">${t[0]},${t[1]}</span>`).join('')}</span></div>` +
+  `<div class="qe-row"><span class="qe-lab">output</span>${s.out.length ? s.out.map(t => `<span class="qe-blk new"><span>${t}</span></span>`).join('') : '<span class="qe-note">(nothing yet)</span>'}</div>`;
+QE.form('#merge', [
+  { id: 'R', label: 'R(X, Y): "x y" pairs, Y numeric', value: 'a 1, b 3, c 3, d 4, e 6, f 7', cls: 'wide' },
+  { id: 'S', label: 'S(Y, Z): "y z" pairs, Y numeric', value: '2 p, 3 q, 3 r, 6 s, 8 t', cls: 'wide' },
+], 'Animate the merge', (v, out) => {
+  const parse = (s, n, yi) => QE.list(s, n, 1, 10).map(x => { const p = x.split(/\s+/); if (p.length !== 2 || isNaN(+p[yi])) throw new Error(`${n}: each tuple needs two values and a numeric Y, like "${yi ? 'a 1' : '2 p'}".`); return p; });
+  const R = parse(v.R, 'R', 1), S = parse(v.S, 'S', 0);
+  out.innerHTML = '<div></div>';
+  stepper(out.firstChild, mergeTrace(R, S).map(s => ({ html: mFrame(s), cap: s.cap })), { interval: 1700 });
+});
+
+flashcards('#cards', [
+  { f: 'Simple sort-join', b: 'TPMMS-sort R and S on Y and store them (4B each), then merge with 2 buffers (B each): 5(B(R)+B(S)).' },
+  { f: 'Simple sort-join memory', b: 'B(R), B(S) ≤ M² (M ≥ √max), and each Y-value\'s tuples fit in M blocks.' },
+  { f: 'Sort-merge-join', b: 'Sublists of R and S on Y, then merge all sublists and join on the fly: 3(B(R)+B(S)).' },
+  { f: 'Sort-merge-join memory', b: 'B(R) + B(S) ≤ M² (M ≥ √(B(R)+B(S))).' },
+  { f: 'Why sort beats NLJ on big data', b: 'NLJ ∝ B(R)·B(S); sort-based ∝ B(R) + B(S).' },
+  { f: 'Example 15.7', b: '1000/500/101: 10 + 5 sublists, 15 buffers used, 86 spare, 4500 I/Os.' },
+]);
+quiz('#quiz', [
+  { q: 'Simple sort-join, B(R) = 2000, B(S) = 1000, M = 101?', opts: ['9,000', '15,000', '6,000', '21,000'], a: 1, why: '5 × 3000 = 15,000 (both ≤ M(M − 1) = 10,100, so they sort in two phases).' },
+  { q: 'Same sizes. Can the efficient sort-merge-join be used?', opts: ['Yes: 3000 ≤ 10,201', 'No', 'Only if R is clustered', 'Only with hashing'], a: 0, why: '⌈2000/101⌉ + ⌈1000/101⌉ = 20 + 10 = 30 sublists ≤ 101 buffers. Cost 9,000.' },
+  { q: 'Every tuple of R and S has the same Y value. What happens?', opts: ['Sort-join is fastest', 'All tuples join each other; holding them needs M ≥ B(R) + B(S), so fall back to nested loop', 'The join is empty', 'Hashing fixes it'], a: 1, why: 'Slide 23\'s warning: the common-y tuples must fit in memory together.' },
+  { q: 'Which needs memory proportional to the square root of the LARGER relation only?', opts: ['Sort-merge-join', 'Simple sort-join', 'Sort-based union', 'One-pass join'], a: 1, why: 'Each relation is sorted separately: B(R) ≤ M² and B(S) ≤ M².' },
+  { q: 'In the merge, the least front value y occurs only in R. What happens?', opts: ['Output R tuples padded with NULL', 'Remove the R tuples with key y', 'Wait for S to catch up', 'Read all of S'], a: 1, why: 'Slide 22 step (b): it cannot join, so those tuples are discarded.' },
+]);
+ask('#try1', { q: 'B(R) = B(S) = 10,000 and M = 1000 (textbook Exercise 15.4.2). Simple sort-join disk I/Os?', a: 100000, why: '5 × 20,000.' });
+ask('#try2', { q: 'Same sizes: efficient sort-merge-join disk I/Os (check it is feasible first)?', a: 60000, why: '20,000 ≤ 1000² = 1,000,000, so feasible: 3 × 20,000 = 60,000.' });
+</script>
+</body>
+</html>

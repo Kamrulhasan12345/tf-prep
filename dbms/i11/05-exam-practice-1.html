@@ -1,0 +1,268 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Exam Practice I: Multi-Table Queries · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 08–11 (Ishrak) · Chapter 5 · Exam practice</div>
+<h1>Exam Practice I: Multi-Table Queries</h1>
+<p class="lede">Most exam questions on Lectures 08–11 give a new schema and ask for five queries that mix joins, grouping and subqueries. This chapter first gives a short method for attacking such questions, then works four of them from the question banks in full (toys, books, research projects, conference reviews), each with runnable checks on invented data.</p>
+
+<h2>1. A method for "write SQL for the following"</h2>
+<ol>
+<li><strong>Draw the schema's links.</strong> For every foreign key, note which columns join (Request.toy_id = Toys.id). Most mistakes are missing or wrong join conditions.</li>
+<li><strong>Classify the question by its keywords.</strong>
+  <ul>
+  <li>"… and …", "with their …": a join (Lecture 08).</li>
+  <li>"for each …", "number of …", "total …": GROUP BY with an aggregate (Lecture 10).</li>
+  <li>"… that have at least / more than k …": HAVING COUNT.</li>
+  <li>"more than the average / maximum …": a scalar subquery; "… of the same …" makes it correlated (Lecture 11).</li>
+  <li>"… who do not / never …", "… without any …": anti-join: NOT EXISTS, NOT IN (beware NULLs), MINUS, or LEFT JOIN … IS NULL.</li>
+  <li>"the most / the highest (with ties)": HAVING COUNT(*) &gt;= ALL (…) or = (SELECT MAX …).</li>
+  <li>"… all …": division with NOT EXISTS (… MINUS …).</li>
+  <li>"include those with none / zero": LEFT JOIN and COUNT(column).</li>
+  </ul></li>
+<li><strong>Decide the output and its duplicates.</strong> If the answer is a set of names, use DISTINCT or a subquery so a person is not repeated once per matching row; group by the key, not only the name.</li>
+<li><strong>Check edge cases:</strong> ties, NULLs, empty groups, case of string literals, Oracle syntax (no AS for table aliases, MINUS, NVL).</li>
+</ol>
+
+<h2>Exam questions</h2>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 21-22 1a · 25 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-2 | 2021–22 · 25 marks</div>
+  <div class="exam-q"><p>Consider the Toys database of a retail store. It has the following database schema: Toys (<u>id</u>, name, color, min_age, weight, number_available), Client (<u>id</u>, name, age, address, city), Request (<u>client id, toy id</u>). Toys records information about all of the toys in the store. Each toy has a unique integer id. Attributes name and color are strings that describe the toy; min_age, weight and number_available are integers giving the minimum age a child should be to use the toy, the weight of the toy in pounds, and how many are currently available in the store. Client stores information about each of the clients: a unique integer id, strings with the client's name, address and city, and an integer age. Request has a pair of integers indicating that a particular client has requested a particular toy. You should assume that all entries in all of the tables are not null. Answer the following:</p>
+  <p>i. Give the name of the clients who do not have any request at the moment for any toys.<br>ii. List the name of the toys that have weight more than the average weight of the toys with the same color.<br>iii. List the name of the requesting clients who have to wait because the toys are currently unavailable at the store.<br>iv. List all of the requests where age of the client is less than the min_age listed for the toy. The answer should include the client id, client name, and the toy id. The results should be sorted by client name.<br>v. Give the id and name of the "most popular" toy. The most popular toy is the one that has more requests than all others. If there is a tie so there is more than one toy with the maximum number of requests, give the ids and names of all of these toys.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>Links: Request.client_id = Client.id, Request.toy_id = Toys.id (the attribute names "client id" and "toy id" are written with underscores, since SQL identifiers cannot contain spaces).</p>
+    <p><strong>i.</strong> Anti-join. Every value is NOT NULL, so NOT IN is safe:</p>
+<pre>SELECT name FROM Client
+WHERE  id NOT IN (SELECT client_id FROM Request);</pre>
+    <p><strong>ii.</strong> Correlated subquery: compare each toy with the average of its own colour.</p>
+<pre>SELECT t1.name FROM Toys t1
+WHERE  t1.weight &gt; (SELECT AVG(t2.weight) FROM Toys t2 WHERE t2.color = t1.color);</pre>
+    <p><strong>iii.</strong> A client waits if he requested a toy with nothing in stock. DISTINCT, because a client may wait for several toys:</p>
+<pre>SELECT DISTINCT c.name
+FROM   Client c, Request r, Toys t
+WHERE  c.id = r.client_id AND r.toy_id = t.id
+AND    t.number_available = 0;</pre>
+    <p><strong>iv.</strong></p>
+<pre>SELECT c.id, c.name, r.toy_id
+FROM   Client c, Request r, Toys t
+WHERE  c.id = r.client_id AND r.toy_id = t.id
+AND    c.age &lt; t.min_age
+ORDER BY c.name;</pre>
+    <p><strong>v.</strong> Count requests per toy and keep the toys whose count is at least every toy's count (ties included):</p>
+<pre>SELECT   t.id, t.name
+FROM     Toys t, Request r
+WHERE    t.id = r.toy_id
+GROUP BY t.id, t.name
+HAVING   COUNT(*) &gt;= ALL (SELECT COUNT(*) FROM Request GROUP BY toy_id);</pre>
+    <p>The question bank's answers are correct. Invented data for the checks: 8 toys, 6 clients; Lego and Doll House are tied as most popular with 3 requests each.</p>
+    <div id="t1"></div><div id="t2"></div><div id="t3"></div><div id="t4"></div><div id="t5"></div>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 17-18 6a · 25 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-2 | 2017–18 · 25 marks</div>
+  <div class="exam-q"><p>Consider the following schemas: Books(<u>isbn</u>, title, publisher_id, publish_year, price_per_copy, copies_sold), Author(<u>author_id</u>, name, contact), Publisher(<u>publisher_id</u>, name, address), AuthorOfBook(<u>book_id, author_id</u>). Now answer the following queries.</p>
+  <p>(i) Find all the books authored by "Ernest Hemingway".<br>(ii) Find the revenue earned by each publisher between 1980 and 1990 by selling books.<br>(iii) Find the name of the authors who have published at least 5 books since 1995.<br>(iv) Find the publisher which published books of most of the authors.<br>(v) Find the name of all the books which are sold more copies than any other books published before 1990 by the same publisher.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>Links: AuthorOfBook.book_id = Books.isbn, AuthorOfBook.author_id = Author.author_id, Books.publisher_id = Publisher.publisher_id.</p>
+    <p><strong>(i)</strong></p>
+<pre>SELECT b.title
+FROM   Books b, AuthorOfBook ab, Author a
+WHERE  b.isbn = ab.book_id AND ab.author_id = a.author_id
+AND    a.name = 'Ernest Hemingway';</pre>
+    <p><strong>(ii)</strong> Revenue of a book = price_per_copy × copies_sold; sum per publisher over the books published 1980–1990:</p>
+<pre>SELECT   p.publisher_id, p.name, SUM(b.price_per_copy * b.copies_sold) AS revenue
+FROM     Publisher p, Books b
+WHERE    p.publisher_id = b.publisher_id
+AND      b.publish_year BETWEEN 1980 AND 1990
+GROUP BY p.publisher_id, p.name;</pre>
+    <p>(The schema has no sale dates, so "between 1980 and 1990" can only refer to the publication year.)</p>
+    <p><strong>(iii)</strong> Group by the author's key; COUNT(DISTINCT) in case of duplicate rows:</p>
+<pre>SELECT   a.name
+FROM     Author a, AuthorOfBook ab, Books b
+WHERE    a.author_id = ab.author_id AND ab.book_id = b.isbn
+AND      b.publish_year &gt;= 1995
+GROUP BY a.author_id, a.name
+HAVING   COUNT(DISTINCT b.isbn) &gt;= 5;</pre>
+    <p><strong>(iv)</strong> "Published books of most of the authors": count the distinct authors per publisher and take the maximum (ties included), without a WITH clause:</p>
+<pre>SELECT   p.name
+FROM     Publisher p, Books b, AuthorOfBook ab
+WHERE    p.publisher_id = b.publisher_id AND b.isbn = ab.book_id
+GROUP BY p.publisher_id, p.name
+HAVING   COUNT(DISTINCT ab.author_id) &gt;= ALL
+         (SELECT COUNT(DISTINCT ab2.author_id)
+          FROM   Books b2, AuthorOfBook ab2
+          WHERE  b2.isbn = ab2.book_id
+          GROUP BY b2.publisher_id);</pre>
+    <p><strong>(v)</strong> "More copies than any other book published before 1990 by the same publisher" means more than <em>every</em> such book (in English "more than any other" means "more than all others"), so &gt; ALL with a correlated subquery; the book itself is excluded from the comparison:</p>
+<pre>SELECT b1.title
+FROM   Books b1
+WHERE  b1.copies_sold &gt; ALL (SELECT b2.copies_sold
+                             FROM   Books b2
+                             WHERE  b2.publisher_id = b1.publisher_id
+                             AND    b2.publish_year &lt; 1990
+                             AND    b2.isbn &lt;&gt; b1.isbn);</pre>
+    <p>A publisher with no other pre-1990 book makes the subquery empty and &gt; ALL TRUE, so its books qualify vacuously; if you read the question as requiring at least one such book, use <code>&gt; (SELECT MAX(…))</code> instead and say so. The question bank's answers are correct (its (iv) uses a WITH clause, which Oracle accepts, but the version above shows it is not needed).</p>
+    <div id="b1"></div><div id="b2"></div><div id="b3"></div><div id="b4"></div><div id="b5"></div>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 21 CT1 2 · 10 marks</div>
+  <div class="exam-q"><p>The below figure contains some tables in the University Research Management schema. Here '...' represents other (unshown) attributes. Now, write an SQL code that prints the number of research projects a student is (or was) involved in who hasn't published any paper for those projects.</p>
+  <figure><div id="rfig"></div><figcaption>The figure's tables (PK, FK as marked): STUDENT(id PK, …); STUDENT_PAPER(student_id PK FK, paper_id PK FK); PAPER(id PK, project_id FK, …); STUDENT_PROJECT(student_id PK FK, project_id PK FK); PROJECT(id PK, …).</figcaption></figure></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>Read the question as: for each student, count the projects he is (or was) involved in (rows of STUDENT_PROJECT) for which he has no paper (no STUDENT_PAPER row of his whose PAPER belongs to that project).</p>
+<pre>SELECT   sp.student_id, COUNT(*) AS projects_without_paper
+FROM     STUDENT_PROJECT sp
+WHERE    NOT EXISTS (SELECT *
+                     FROM   STUDENT_PAPER x, PAPER p
+                     WHERE  x.paper_id = p.id
+                     AND    x.student_id = sp.student_id
+                     AND    p.project_id = sp.project_id)
+GROUP BY sp.student_id;</pre>
+    <p>The correlated NOT EXISTS looks, for each (student, project) involvement, for a paper of that student under that project; involvements with none survive and are counted per student. A student who published in every project he joined (or joined none) does not appear; to list him with 0, start from STUDENT with a left join that carries the NOT EXISTS in its ON clause:</p>
+<pre>SELECT   s.id, COUNT(sp.project_id) AS projects_without_paper
+FROM     STUDENT s LEFT JOIN STUDENT_PROJECT sp
+         ON  sp.student_id = s.id
+         AND NOT EXISTS (SELECT * FROM STUDENT_PAPER x, PAPER p
+                         WHERE  x.paper_id = p.id AND x.student_id = s.id
+                         AND    p.project_id = sp.project_id)
+GROUP BY s.id;</pre>
+    <p>Invented data for the check: 4 students, 3 projects, 4 papers (one standalone, with no project).</p>
+    <div id="r1"></div>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 20-21 5b · 15 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-2 | 2020–21 · 15 marks</div>
+  <div class="exam-q"><p>You are in charge of managing the program committee for an important conference. The conference database stores information about papers submitted to the conference (table Paper), reviewers on the program committee (table Reviewer), and the assignment of reviewers to papers (table Reviews). Each reviewer will have to review a set of papers. Each paper will be reviewed by a subset of reviewers. Paper(pid, title), Reviewer(rid, name), Reviews(rid, pid).</p>
+  <p>i. Declare the conference database using CREATE TABLE. Include the declaration of the keys and maintain the referential integrities as needed: pid is a unique paper identifier and the primary key of Paper; rid is a unique reviewer identifier and the primary key of Reviewer; rid in Reviews must be someone mentioned in Reviewer, and modifications to Reviewer that violate this constraint result in the rid in Reviews being set to NULL upon deletion, and update of the rid in Reviews; pid in Reviews must be a paper mentioned in Paper, and modifications to Paper that violate this constraint are rejected. A reviewer is assigned zero or more papers; a paper is assigned zero or more reviewers.<br>ii. Write a SQL query that finds all papers with fewer than three reviewers assigned to them. The output should be a list of paper titles, and it should include papers without any reviewers assigned to them.<br>iii. Write a SQL query that finds the reviewers with the most papers assigned to them. There can be more than one such reviewer. The output should be a list of reviewer names. A reviewer should be listed if no other reviewer has strictly more papers to review.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><strong>i.</strong> Because a deleted reviewer's rid must become NULL, rid in Reviews must be nullable, so (rid, pid) cannot be the primary key (key columns are never NULL). Use a UNIQUE constraint, which allows NULLs, to stop the same reviewer being assigned twice to a paper.</p>
+<pre>CREATE TABLE Paper (
+  pid   NUMBER PRIMARY KEY,
+  title VARCHAR2(200) NOT NULL
+);
+CREATE TABLE Reviewer (
+  rid  NUMBER PRIMARY KEY,
+  name VARCHAR2(100) NOT NULL
+);
+CREATE TABLE Reviews (
+  rid NUMBER,
+  pid NUMBER NOT NULL,
+  CONSTRAINT reviews_rid_fk FOREIGN KEY (rid) REFERENCES Reviewer(rid) ON DELETE SET NULL,
+  CONSTRAINT reviews_pid_fk FOREIGN KEY (pid) REFERENCES Paper(pid),   -- default: reject
+  CONSTRAINT reviews_uq UNIQUE (rid, pid)
+);</pre>
+    <p>Oracle specifics. (1) "Rejected" is Oracle's default behaviour (NO ACTION) when no ON DELETE clause is given; Oracle has no <code>RESTRICT</code> keyword. (2) <strong>Oracle has no ON UPDATE clause at all</strong>: a foreign key cannot cascade updates of the parent key. In standard SQL the rid constraint would read <code>REFERENCES Reviewer(rid) ON DELETE SET NULL ON UPDATE CASCADE</code>. In Oracle, the cascading update must be programmed, for example with an AFTER UPDATE OF rid trigger on Reviewer that updates Reviews, together with a deferrable constraint (or the application updates the child rows itself). The question bank's answer writes <code>ON DELETE RESTRICT ON UPDATE CASCADE</code>, which is correct standard SQL but is rejected by Oracle; it also adds a surrogate key review_id, which is fine.</p>
+    <p><strong>ii.</strong> The left join keeps papers with no reviews; COUNT(r.rid) counts only real reviewers (0 for none, and a reviewer whose rid was set to NULL no longer counts):</p>
+<pre>SELECT   p.title
+FROM     Paper p LEFT JOIN Reviews r ON p.pid = r.pid
+GROUP BY p.pid, p.title
+HAVING   COUNT(r.rid) &lt; 3;</pre>
+    <p><strong>iii.</strong></p>
+<pre>SELECT   rv.name
+FROM     Reviewer rv, Reviews r
+WHERE    rv.rid = r.rid
+GROUP BY rv.rid, rv.name
+HAVING   COUNT(*) &gt;= ALL (SELECT COUNT(*) FROM Reviews
+                          WHERE rid IS NOT NULL GROUP BY rid);</pre>
+    <p>(If no reviewer had any paper at all, every reviewer would tie at 0; a left join from Reviewer with COUNT(r.pid) handles that corner case.) Invented data for the checks: 5 papers, 4 reviewers; Karim and Lima tie with 3 papers each.</p>
+    <div id="c2"></div><div id="c3"></div>
+  </div></details>
+</div>
+
+<h2>More practice</h2>
+<p>Six more exercises on the same four databases, from easy to exam level.</p>
+<div id="x1"></div><div id="x2"></div><div id="x3"></div><div id="x4"></div><div id="x5"></div><div id="x6"></div>
+
+<div class="key"><p><strong>Summary:</strong> attack a multi-part query question by drawing the join links, classifying each part by its keywords (join, group, compare with an aggregate, anti-join, maximum with ties, division), choosing the output's duplicates, and checking edge cases. Most questions reduce to a handful of patterns: correlated comparison with AVG, NOT IN / NOT EXISTS, GROUP BY with HAVING COUNT(…) &gt;= ALL (…), LEFT JOIN with COUNT(column). Know Oracle's limits too: no ON UPDATE CASCADE, no RESTRICT, no AS for table aliases.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/sqlplay.js"></script>
+<script src="../i08/lecture.js"></script>
+<script>
+const TOYS = `CREATE TABLE Toys (id NUMBER PRIMARY KEY, name VARCHAR2(20) NOT NULL, color VARCHAR2(10) NOT NULL, min_age NUMBER NOT NULL, weight NUMBER NOT NULL, number_available NUMBER NOT NULL);
+CREATE TABLE Client (id NUMBER PRIMARY KEY, name VARCHAR2(20) NOT NULL, age NUMBER NOT NULL, address VARCHAR2(30) NOT NULL, city VARCHAR2(15) NOT NULL);
+CREATE TABLE Request (client_id NUMBER REFERENCES Client(id), toy_id NUMBER REFERENCES Toys(id), PRIMARY KEY (client_id, toy_id));
+INSERT INTO Toys VALUES (1, 'Lego', 'red', 6, 3, 5);        INSERT INTO Toys VALUES (2, 'Fire Truck', 'red', 4, 5, 0);
+INSERT INTO Toys VALUES (3, 'Ball', 'red', 2, 1, 10);       INSERT INTO Toys VALUES (4, 'Doll House', 'pink', 5, 8, 0);
+INSERT INTO Toys VALUES (5, 'Teddy', 'pink', 1, 2, 7);      INSERT INTO Toys VALUES (6, 'Chess Set', 'black', 8, 2, 3);
+INSERT INTO Toys VALUES (7, 'Robot Kit', 'black', 10, 4, 0);INSERT INTO Toys VALUES (8, 'Kite', 'blue', 7, 1, 4);
+INSERT INTO Client VALUES (1, 'Ayan', 5, '12 Road 3', 'Dhaka');    INSERT INTO Client VALUES (2, 'Bristi', 9, '7 Lake Rd', 'Khulna');
+INSERT INTO Client VALUES (3, 'Chhoton', 4, '3 Mill St', 'Dhaka'); INSERT INTO Client VALUES (4, 'Dipa', 11, '9 Park Ln', 'Sylhet');
+INSERT INTO Client VALUES (5, 'Ehsan', 7, '1 Hill Rd', 'Dhaka');   INSERT INTO Client VALUES (6, 'Faria', 6, '5 Bank St', 'Rajshahi');
+INSERT INTO Request VALUES (1, 1); INSERT INTO Request VALUES (1, 4); INSERT INTO Request VALUES (2, 1); INSERT INTO Request VALUES (2, 7);
+INSERT INTO Request VALUES (3, 4); INSERT INTO Request VALUES (3, 2); INSERT INTO Request VALUES (4, 1); INSERT INTO Request VALUES (4, 4);
+INSERT INTO Request VALUES (5, 6);`;
+const ck = (sel, setup, task, solution, x = {}) => sqlCheck(sel, { setup, task, solution, ...x });
+ck('#t1', TOYS, 'i. Clients with no request.', 'SELECT name FROM Client WHERE id NOT IN (SELECT client_id FROM Request);');
+ck('#t2', TOYS, 'ii. Toys heavier than the average of their colour.', 'SELECT t1.name FROM Toys t1 WHERE t1.weight > (SELECT AVG(t2.weight) FROM Toys t2 WHERE t2.color = t1.color);');
+ck('#t3', TOYS, 'iii. Clients waiting for an unavailable toy.', 'SELECT DISTINCT c.name FROM Client c, Request r, Toys t WHERE c.id = r.client_id AND r.toy_id = t.id AND t.number_available = 0;');
+ck('#t4', TOYS, 'iv. Requests by under-age clients, sorted by client name.', 'SELECT c.id, c.name, r.toy_id FROM Client c, Request r, Toys t WHERE c.id = r.client_id AND r.toy_id = t.id AND c.age < t.min_age ORDER BY c.name;', { ordered: true });
+ck('#t5', TOYS, 'v. The most popular toy(s).', 'SELECT t.id, t.name FROM Toys t, Request r WHERE t.id = r.toy_id GROUP BY t.id, t.name HAVING COUNT(*) >= ALL (SELECT COUNT(*) FROM Request GROUP BY toy_id);');
+const BOOKS = `CREATE TABLE Publisher (publisher_id NUMBER PRIMARY KEY, name VARCHAR2(30), address VARCHAR2(40));
+CREATE TABLE Author (author_id NUMBER PRIMARY KEY, name VARCHAR2(30), contact VARCHAR2(30));
+CREATE TABLE Books (isbn VARCHAR2(13) PRIMARY KEY, title VARCHAR2(50), publisher_id NUMBER REFERENCES Publisher(publisher_id), publish_year NUMBER(4), price_per_copy NUMBER(6,2), copies_sold NUMBER);
+CREATE TABLE AuthorOfBook (book_id VARCHAR2(13) REFERENCES Books(isbn), author_id NUMBER REFERENCES Author(author_id), PRIMARY KEY (book_id, author_id));
+INSERT INTO Publisher VALUES (1, 'Scribner', 'New York'); INSERT INTO Publisher VALUES (2, 'Penguin', 'London'); INSERT INTO Publisher VALUES (3, 'Anyaprokash', 'Dhaka');
+INSERT INTO Author VALUES (1, 'Ernest Hemingway', 'eh@mail'); INSERT INTO Author VALUES (2, 'Humayun Ahmed', 'ha@mail');
+INSERT INTO Author VALUES (3, 'Zafar Iqbal', 'zi@mail');      INSERT INTO Author VALUES (4, 'Agatha Christie', 'ac@mail');
+INSERT INTO Books VALUES ('B01', 'The Old Man and the Sea', 1, 1952, 10, 900000); INSERT INTO Books VALUES ('B02', 'A Farewell to Arms', 1, 1929, 12, 500000);
+INSERT INTO Books VALUES ('B03', 'The Sun Also Rises', 1, 1986, 11, 300000);      INSERT INTO Books VALUES ('B04', 'Nondito Noroke', 3, 1985, 5, 200000);
+INSERT INTO Books VALUES ('B05', 'Himu', 3, 1995, 6, 400000);    INSERT INTO Books VALUES ('B06', 'Misir Ali', 3, 1997, 6, 350000);
+INSERT INTO Books VALUES ('B07', 'Jochona', 3, 2004, 8, 600000); INSERT INTO Books VALUES ('B08', 'Megher Chhaya', 3, 1999, 5, 150000);
+INSERT INTO Books VALUES ('B09', 'Badshah Namdar', 3, 2011, 7, 250000);
+INSERT INTO Books VALUES ('B10', 'Dipu Number Two', 2, 1989, 4, 120000); INSERT INTO Books VALUES ('B11', 'Amar Bondhu Rashed', 2, 1994, 4, 180000);
+INSERT INTO Books VALUES ('B12', 'Murder on the Orient Express', 2, 1934, 9, 700000); INSERT INTO Books VALUES ('B13', 'Death on the Nile', 2, 1981, 8, 400000);
+INSERT INTO AuthorOfBook VALUES ('B01', 1); INSERT INTO AuthorOfBook VALUES ('B02', 1); INSERT INTO AuthorOfBook VALUES ('B03', 1);
+INSERT INTO AuthorOfBook VALUES ('B04', 2); INSERT INTO AuthorOfBook VALUES ('B05', 2); INSERT INTO AuthorOfBook VALUES ('B06', 2);
+INSERT INTO AuthorOfBook VALUES ('B07', 2); INSERT INTO AuthorOfBook VALUES ('B08', 2); INSERT INTO AuthorOfBook VALUES ('B09', 2);
+INSERT INTO AuthorOfBook VALUES ('B10', 3); INSERT INTO AuthorOfBook VALUES ('B11', 3); INSERT INTO AuthorOfBook VALUES ('B12', 4);
+INSERT INTO AuthorOfBook VALUES ('B13', 4); INSERT INTO AuthorOfBook VALUES ('B09', 3);`;
+ck('#b1', BOOKS, '(i) Books by Ernest Hemingway. (Invented data.)', "SELECT b.title FROM Books b, AuthorOfBook ab, Author a WHERE b.isbn = ab.book_id AND ab.author_id = a.author_id AND a.name = 'Ernest Hemingway';");
+ck('#b2', BOOKS, '(ii) Revenue per publisher for books published 1980–1990 (id, name, revenue).', 'SELECT p.publisher_id, p.name, SUM(b.price_per_copy * b.copies_sold) FROM Publisher p, Books b WHERE p.publisher_id = b.publisher_id AND b.publish_year BETWEEN 1980 AND 1990 GROUP BY p.publisher_id, p.name;');
+ck('#b3', BOOKS, '(iii) Authors with at least 5 books published since 1995.', 'SELECT a.name FROM Author a, AuthorOfBook ab, Books b WHERE a.author_id = ab.author_id AND ab.book_id = b.isbn AND b.publish_year >= 1995 GROUP BY a.author_id, a.name HAVING COUNT(DISTINCT b.isbn) >= 5;');
+ck('#b4', BOOKS, '(iv) The publisher(s) that published books of the most authors.', 'SELECT p.name FROM Publisher p, Books b, AuthorOfBook ab WHERE p.publisher_id = b.publisher_id AND b.isbn = ab.book_id GROUP BY p.publisher_id, p.name HAVING COUNT(DISTINCT ab.author_id) >= ALL (SELECT COUNT(DISTINCT ab2.author_id) FROM Books b2, AuthorOfBook ab2 WHERE b2.isbn = ab2.book_id GROUP BY b2.publisher_id);');
+ck('#b5', BOOKS, '(v) Books that sold more copies than every other pre-1990 book of the same publisher (ALL reading).', 'SELECT b1.title FROM Books b1 WHERE b1.copies_sold > ALL (SELECT b2.copies_sold FROM Books b2 WHERE b2.publisher_id = b1.publisher_id AND b2.publish_year < 1990 AND b2.isbn <> b1.isbn);');
+const RES = `CREATE TABLE STUDENT (id NUMBER PRIMARY KEY, name VARCHAR2(20));
+CREATE TABLE PROJECT (id NUMBER PRIMARY KEY, title VARCHAR2(40));
+CREATE TABLE PAPER (id NUMBER PRIMARY KEY, project_id NUMBER REFERENCES PROJECT(id), journal VARCHAR2(30));
+CREATE TABLE STUDENT_PAPER (student_id NUMBER REFERENCES STUDENT(id), paper_id NUMBER REFERENCES PAPER(id), PRIMARY KEY (student_id, paper_id));
+CREATE TABLE STUDENT_PROJECT (student_id NUMBER REFERENCES STUDENT(id), project_id NUMBER REFERENCES PROJECT(id), PRIMARY KEY (student_id, project_id));
+INSERT INTO STUDENT VALUES (1, 'Rumi'); INSERT INTO STUDENT VALUES (2, 'Sajid'); INSERT INTO STUDENT VALUES (3, 'Tania'); INSERT INTO STUDENT VALUES (4, 'Ubaid');
+INSERT INTO PROJECT VALUES (10, 'Bangla NLP'); INSERT INTO PROJECT VALUES (20, 'Flood prediction'); INSERT INTO PROJECT VALUES (30, 'Low-cost ECG');
+INSERT INTO PAPER VALUES (100, 10, 'TALLIP'); INSERT INTO PAPER VALUES (101, 20, 'IEEE Access'); INSERT INTO PAPER VALUES (102, 10, 'ACL'); INSERT INTO PAPER VALUES (103, NULL, 'arXiv');
+INSERT INTO STUDENT_PROJECT VALUES (1, 10); INSERT INTO STUDENT_PROJECT VALUES (1, 20); INSERT INTO STUDENT_PROJECT VALUES (1, 30);
+INSERT INTO STUDENT_PROJECT VALUES (2, 10); INSERT INTO STUDENT_PROJECT VALUES (3, 20); INSERT INTO STUDENT_PROJECT VALUES (3, 30);
+INSERT INTO STUDENT_PAPER VALUES (1, 100); INSERT INTO STUDENT_PAPER VALUES (2, 102); INSERT INTO STUDENT_PAPER VALUES (3, 103); INSERT INTO STUDENT_PAPER VALUES (4, 103);`;
+$('#rfig').innerHTML = row2(rel('STUDENT', ['id', '…'], [['PK', '…']]), rel('STUDENT_PAPER', ['student_id', 'paper_id'], [['PK, FK', 'PK, FK']]), rel('PAPER', ['id', 'project_id', '…'], [['PK', 'FK', '…']]), rel('STUDENT_PROJECT', ['student_id', 'project_id'], [['PK, FK', 'PK, FK']]), rel('PROJECT', ['id', '…'], [['PK', '…']]));
+ck('#r1', RES, 'Per student, the number of projects without a paper of his in that project (students with none may be omitted).', 'SELECT sp.student_id, COUNT(*) FROM STUDENT_PROJECT sp WHERE NOT EXISTS (SELECT * FROM STUDENT_PAPER x, PAPER p WHERE x.paper_id = p.id AND x.student_id = sp.student_id AND p.project_id = sp.project_id) GROUP BY sp.student_id;');
+const CONF = `CREATE TABLE Paper (pid NUMBER PRIMARY KEY, title VARCHAR2(60) NOT NULL);
+CREATE TABLE Reviewer (rid NUMBER PRIMARY KEY, name VARCHAR2(30) NOT NULL);
+CREATE TABLE Reviews (rid NUMBER REFERENCES Reviewer(rid) ON DELETE SET NULL, pid NUMBER NOT NULL REFERENCES Paper(pid), UNIQUE (rid, pid));
+INSERT INTO Paper VALUES (1, 'Learned Indexes'); INSERT INTO Paper VALUES (2, 'Query Optimization with RL'); INSERT INTO Paper VALUES (3, 'Bengali OCR');
+INSERT INTO Paper VALUES (4, 'Blockchain Ledgers'); INSERT INTO Paper VALUES (5, 'Graph Databases at Scale');
+INSERT INTO Reviewer VALUES (1, 'Karim'); INSERT INTO Reviewer VALUES (2, 'Lima'); INSERT INTO Reviewer VALUES (3, 'Mahbub'); INSERT INTO Reviewer VALUES (4, 'Nazia');
+INSERT INTO Reviews VALUES (1, 1); INSERT INTO Reviews VALUES (2, 1); INSERT INTO Reviews VALUES (3, 1); INSERT INTO Reviews VALUES (1, 2);
+INSERT INTO Reviews VALUES (2, 2); INSERT INTO Reviews VALUES (1, 3); INSERT INTO Reviews VALUES (2, 5); INSERT INTO Reviews VALUES (NULL, 5);`;
+ck('#c2', CONF, 'ii. Titles of papers with fewer than 3 reviewers (including none). Invented data: paper 5 has one real reviewer and one deleted one (NULL).', 'SELECT p.title FROM Paper p LEFT JOIN Reviews r ON p.pid = r.pid GROUP BY p.pid, p.title HAVING COUNT(r.rid) < 3;');
+ck('#c3', CONF, 'iii. Names of the reviewer(s) with the most papers.', 'SELECT rv.name FROM Reviewer rv, Reviews r WHERE rv.rid = r.rid GROUP BY rv.rid, rv.name HAVING COUNT(*) >= ALL (SELECT COUNT(*) FROM Reviews WHERE rid IS NOT NULL GROUP BY rid);');
+ck('#x1', TOYS, '1. (Easy) For each colour, return the colour and the number of toys of that colour.', 'SELECT color, COUNT(*) FROM Toys GROUP BY color;');
+ck('#x2', TOYS, '2. Return the names of toys that nobody has requested.', 'SELECT name FROM Toys t WHERE NOT EXISTS (SELECT * FROM Request r WHERE r.toy_id = t.id);');
+ck('#x3', BOOKS, '3. For each author, return the name and the total copies sold of his or her books.', 'SELECT a.name, SUM(b.copies_sold) FROM Author a, AuthorOfBook ab, Books b WHERE a.author_id = ab.author_id AND ab.book_id = b.isbn GROUP BY a.author_id, a.name;');
+ck('#x4', BOOKS, '4. Return the titles of books with more than one author.', 'SELECT b.title FROM Books b, AuthorOfBook ab WHERE b.isbn = ab.book_id GROUP BY b.isbn, b.title HAVING COUNT(*) > 1;');
+ck('#x5', CONF, '5. Return the names of reviewers who have no paper to review.', 'SELECT name FROM Reviewer rv WHERE NOT EXISTS (SELECT * FROM Reviews r WHERE r.rid = rv.rid);');
+ck('#x6', TOYS, '6. (Exam style) For each city, return the city and the number of distinct toys requested by clients from that city; include cities whose clients requested nothing (count 0).', 'SELECT c.city, COUNT(DISTINCT r.toy_id) FROM Client c LEFT JOIN Request r ON r.client_id = c.id GROUP BY c.city;');
+</script>
+</body>
+</html>

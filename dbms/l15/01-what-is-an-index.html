@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>What an Index Is · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 15 · Chapter 1 · Slides 2–6</div>
+<h1>What an Index Is</h1>
+<p class="lede">An index is a small, sorted lookup table that tells the database exactly where a record is, so it does not have to read the whole file. This chapter defines the basic terms, compares a file scan with an index lookup step by step (Question Q1), and lists the yardsticks used to judge any index.</p>
+
+<h2>1. The problem an index solves</h2>
+
+<p>In Lecture 14 (Chapter 2), finding <code>id = 76766</code> without any help meant a <b class="term">linear file scan</b>: read the file from the first block, check every record, and stop when you find it. On a table with millions of rows, that can mean reading millions of blocks for one answer.</p>
+
+<p>The slide's one-line definition: <em>indexing mechanisms are used to speed up access to desired data.</em> The idea is the same as the index at the back of a textbook. To find “B+ tree” you do not read the book page by page. You look the term up in the alphabetical index, which says “page 642”, and you go straight there. A database index does the same: a sorted list of values, each with the location of the matching record.</p>
+
+<h2>2. Question Q1: file scan versus index</h2>
+
+<p><em>Query: <code>SELECT * FROM instructor WHERE id = 76766</code>. The instructor relation and an index on id are given. Each record is stored in its own block. How is the query executed (a) without the index, using a linear file scan, and (b) using the index?</em></p>
+
+<p>“Each record is stored in one block” is a simplification the slide makes so counting is easy: reading one record costs exactly one block transfer, and the 12 records occupy 12 blocks.</p>
+
+<h3>(a) Without the index: linear file scan</h3>
+<p>Press <b>Play</b> or <b>Next</b> to watch the scan. Each step reads one block and compares its ID with 76766.</p>
+
+<figure>
+<span class="anim-tag">Animation</span>
+<div id="scan"></div>
+</figure>
+
+<p>76766 (Crick) is the 10th record, so the scan reads <strong>10 blocks</strong>. Because ID is the primary key, it can stop as soon as it finds the record. If the ID were not unique, it would have to read all 12.</p>
+
+<h3>(b) With the index</h3>
+<figure>
+<span class="anim-tag">Animation</span>
+<div id="idx"></div>
+</figure>
+
+<p>The index is sorted, so 76766 can be found in it quickly (even reading every entry of an in-memory index is cheap, and a binary search takes about 4 comparisons for 12 entries). The entry's pointer gives the record's exact block, so the disk reads <strong>1 block</strong>.</p>
+
+<div class="q">
+<h4>Question (worked answer): the index is kept in memory</h4>
+<p><strong>(a) Best and worst case of the linear scan.</strong></p>
+<ul>
+  <li><strong>Best case:</strong> the record we want is the first record in the file. The scan reads <strong>1 block</strong> and stops. For this query that would happen if we searched for 10101.</li>
+  <li><strong>Worst case:</strong> the record is the last one, or it does not exist at all. The scan reads <strong>every block</strong>: 12 here, and <i>N</i> for a file of <i>N</i> blocks. Searching for 98345, or for 99999 (absent), costs 12 block reads.</li>
+  <li>On average, a search for a value that exists reads about half the file, roughly <i>N</i>/2 blocks.</li>
+</ul>
+<p><strong>(b) When is the index faster?</strong> With the index in memory, searching it costs no disk I/O, and following the pointer costs exactly 1 block read, whatever the record's position. The linear scan costs 1 block only in its best case. So the index is <strong>faster in every case except when the record happens to be first in the file</strong>, where both cost 1 block (a tie). It is also far faster when the value does not exist: the index says so with 0 block reads, while the scan reads all 12.</p>
+</div>
+
+<h2>3. Basic vocabulary (slides 3–5)</h2>
+
+<dl class="def">
+  <dt>Search key</dt><dd>The attribute, or set of attributes, used to look up records. An index on ID has search key ID, an index on name has search key name, and an index on dept-name has search key dept-name. A search key does <em>not</em> have to be unique and does not have to be the primary key. That is a different idea.</dd>
+  <dt>Index file</dt><dd>A separate file holding the index. It is made of records called <b class="term">index entries</b>.</dd>
+  <dt>Index entry</dt><dd>A pair (<b>search-key</b>, <b>pointer</b>). The search-key is a value such as 76766. The pointer is the location of the record with that value: which block, and where in the block (for example, a slot number from Lecture 14's slotted page).</dd>
+</dl>
+
+<figure>
+<svg viewBox="0 0 320 60" width="320" role="img" aria-label="An index entry: search-key and pointer">
+  <rect class="cell" x="10" y="14" width="150" height="34"/><text x="85" y="36" text-anchor="middle" class="big">search-key</text>
+  <rect class="cell-plain" x="160" y="14" width="150" height="34"/><text x="235" y="36" text-anchor="middle" class="big">pointer</text>
+</svg>
+<figcaption><b>Figure 1.</b> The form of every index entry (slide 4).</figcaption>
+</figure>
+
+<figure>
+<div id="dense"></div>
+<figcaption><b>Figure 2.</b> The index on ID from the slides. Each index entry holds an ID and a pointer (arrow) to the record. The file itself is also linked in order (the curved arrows on the slides show each record pointing to the next).</figcaption>
+</figure>
+
+<h3>Index files are much smaller than the data file</h3>
+<p>An index entry stores only the key and a pointer, for example 5 bytes of ID plus an 8-byte pointer, versus a full row with name, department, salary and possibly dozens of other columns. So many more index entries fit in a block. An index on a 10&nbsp;GB table might be only a few hundred megabytes, small enough to keep mostly in memory.</p>
+
+<h3>Two basic kinds of index</h3>
+<dl class="def">
+  <dt>Ordered index</dt><dd>The index entries are kept <em>sorted</em> by search key, like the index at the back of a book. Sorting lets you find a value quickly and also find all values in a range. Chapters 2–9 of this lecture are about ordered indices, ending with the B+ tree.</dd>
+  <dt>Hash index</dt><dd>The search keys are spread across a number of <b class="term">buckets</b> by a <b class="term">hash function</b>: a formula that turns a key into a bucket number, for example <code>id mod 10</code>. To find 76766 you compute its bucket and look only there. Hashing is very fast for exact matches, but the keys are in no particular order, so it does not help with ranges. (The slides stop here. Hash indices are taught in the “beyond the slides” chapters <a href="13-static-hashing.html">Static hashing</a> and after, because exams ask about them.)</dd>
+</dl>
+
+<h2>4. How to judge an index (slide 6)</h2>
+
+<p>No single index is best for everything. The slide lists five measures, called <b class="term">index evaluation metrics</b>:</p>
+
+<div class="tbl"><table>
+<tr><th>Metric</th><th>Meaning</th><th>Example</th></tr>
+<tr><td><strong>Access types supported efficiently</strong></td><td>Which kinds of query the index speeds up. A <b class="term">point query</b> asks for records with one specific value. A <b class="term">range query</b> asks for records whose value lies in a range.</td><td>Point: <code>WHERE id = 76766</code><br>Range: <code>WHERE id &gt;= 76766</code></td></tr>
+<tr><td><strong>Access time</strong></td><td>Time to find the records a query asks for, using the index.</td><td>1 block read in Q1(b)</td></tr>
+<tr><td><strong>Insertion time</strong></td><td>Time to insert a record, <em>including</em> adding its entry to the index.</td><td>Inserting a new instructor also inserts a new index entry in sorted position.</td></tr>
+<tr><td><strong>Deletion time</strong></td><td>Time to delete a record, <em>including</em> removing its index entry.</td><td>Deleting 22222 also deletes entry 22222.</td></tr>
+<tr><td><strong>Space overhead</strong></td><td>Extra storage the index uses.</td><td>Size of the index file.</td></tr>
+</table></div>
+
+<p>The first two measure how much an index <em>helps</em> reads. The last three measure what it <em>costs</em>: every index makes inserts and deletes slower and uses disk space. The rest of the lecture keeps returning to this trade-off.</p>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+<div id="try2"></div>
+
+<h3>Exam questions</h3>
+<div class="exam">
+  <div class="exam-src">DB QB · 18 CT3 4 · 4 marks &nbsp;|&nbsp; BUET QBank · CSE 303 | L-3/T-1 | 2010–11 · 5 marks</div>
+  <div class="exam-q"><p>There are different types of indexing methods and structures used in every DBMS. Explain the metrics that are used to compare the performance of different indexing methods. (CSE 303 wording: Explain the factors by which an indexing technique can be evaluated.)</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>No index is best for every workload, so indices are compared on five metrics (slide 6, and the textbook's list):</p>
+    <ol>
+      <li><strong>Access types supported efficiently.</strong> Which kinds of query the index speeds up. A <em>point query</em> asks for one value (<code>WHERE id = 76766</code>); a <em>range query</em> asks for a range (<code>WHERE id &gt;= 76766</code>). An ordered index (sparse, dense, B+ tree) supports both. A hash index supports only point queries well, because hashing scatters neighbouring keys into unrelated buckets.</li>
+      <li><strong>Access time.</strong> The time to find the wanted record(s) through the index: the index blocks read plus the data blocks read. Example: a dense index kept in memory finds <code>id = 76766</code> with 1 data-block read, while a linear scan reads 10 blocks (Section 2).</li>
+      <li><strong>Insertion time.</strong> The time to insert a record <em>including</em> placing its entry in the index: finding the position, plus any shifting, overflow blocks or node splits.</li>
+      <li><strong>Deletion time.</strong> The time to delete a record <em>including</em> removing or replacing its index entry, plus any merging of underfull nodes.</li>
+      <li><strong>Space overhead.</strong> The extra storage the index occupies. A sparse index (one entry per block) is far smaller than a dense one (one entry per key).</li>
+    </ol>
+    <p>The first two measure the benefit for reads. The last three measure the cost paid on every modification and in disk space. An update to an indexed attribute counts as a deletion followed by an insertion in that index, so it costs both. The designer picks an index whose benefit for the frequent queries outweighs this cost.</p>
+  </div></details>
+</div>
+
+<div class="key">
+<p><strong>Summary:</strong> an index is a separate, smaller file of (search-key, pointer) entries that lets the database jump straight to records instead of scanning the file. Ordered indices keep entries sorted (good for points and ranges). Hash indices spread them over buckets (good for exact matches). Indices are judged by the queries they speed up, access time, insertion time, deletion time and space overhead.</p>
+</div>
+</main>
+<script src="../assets/book.js"></script>
+<script>
+const dense = INSTR.map((r, i) => ({ key: r[0], to: [i], alignRow: i }));
+document.querySelector('#dense').innerHTML = indexSVG({ rows: INSTR, index: dense, head: ['ID', 'Name', 'Dept.', 'Salary'] });
+
+// (a) linear scan: each record is its own block
+const target = 9, scan = [];
+scan.push({ html: indexSVG({ rows: INSTR, blockSize: 1, labels: { idx: '', file: 'instructor file (1 record per block)' }, index: [] }),
+  cap: 'The head seeks to the start of the file. Nothing has been read yet. <b>Block transfers: 0</b>.' });
+for (let k = 0; k <= target; k++) {
+  const rowCls = {};
+  for (let j = 0; j < k; j++) rowCls[j] = 'dim';
+  rowCls[k] = k === target ? 'new' : 'hl';
+  scan.push({ html: indexSVG({ rows: INSTR, blockSize: 1, rowCls, labels: { idx: '', file: 'instructor file (1 record per block)' }, index: [] }),
+    cap: `Read block ${k}: id ${INSTR[k][0]}. ${k === target ? '<b>Match!</b> ID is unique, so the scan stops.' : `Not 76766, keep going.`} <b>Block transfers: ${k + 1}</b>.` });
+}
+stepper('#scan', scan, { interval: 1100 });
+
+// (b) index lookup
+const idxSteps = [
+  { o: { index: dense }, cap: 'The index on ID is in memory. Every entry points to one record.' },
+  { o: { index: dense.map((e, i) => i === target ? { ...e, cls: 'hl', to: [] } : { ...e, to: [] }) }, cap: 'Search the sorted index for 76766. This happens in memory, so it costs <b>0 block transfers</b>.' },
+  { o: { index: dense.map((e, i) => i === target ? { ...e, cls: 'hl' } : { ...e, to: [] }), rowCls: { [target]: 'new' } }, cap: 'Follow the entry\'s pointer straight to block 9 and read it. <b>Block transfers: 1</b>. Compare with 10 for the scan.' },
+];
+stepper('#idx', idxSteps.map(s => ({ html: indexSVG({ rows: INSTR, blockSize: 1, ...s.o }), cap: s.cap })));
+flashcards('#cards', [
+  { f: 'Index', b: 'A separate, smaller file of (search-key, pointer) entries that lets the DBMS go straight to the records with a given key.' },
+  { f: 'Search key', b: 'The attribute or set of attributes used to look records up. It need not be unique or the primary key.' },
+  { f: 'Index entry', b: 'One record of the index file: a search-key value plus a pointer to the record (block and slot).' },
+  { f: 'Linear file scan', b: 'Reading the file block by block and testing every record. Cost: up to all N blocks.' },
+  { f: 'Ordered index', b: 'Index entries kept sorted by search key. Supports point and range queries.' },
+  { f: 'Hash index', b: 'Keys spread over buckets by a hash function. Fast exact-match lookups, no help for ranges.' },
+  { f: 'Point query vs range query', b: 'Point: one specific value (id = 76766). Range: values in an interval (id ≥ 76766).' },
+  { f: 'Space overhead', b: 'The extra storage an index uses: one of the five evaluation metrics.' },
+]);
+quiz('#quiz', [
+  { q: 'Each instructor record is in its own block. A linear scan searches for <code>id = 98345</code> (the last of 12 records). How many blocks are read?', opts: ['1', '6', '12', '4'], a: 2, why: 'The scan reads every block until it reaches the last one: 12 block transfers. This is the worst case.' },
+  { q: 'An index on ID is kept in memory. How many block reads does <code>id = 99999</code> (absent) cost with the index?', opts: ['0', '1', '12', '4'], a: 0, why: 'The in-memory index shows that 99999 has no entry, so no data block is read at all. The linear scan would read all 12.' },
+  { q: 'Which statement about a search key is true?', opts: ['It must be the primary key', 'It must be unique', 'It can be any attribute or set of attributes', 'It must be numeric'], a: 2, why: 'A search key is whatever the index is built on: name, dept-name, (name, ID)… It may repeat across records.' },
+  { q: 'Which kind of index cannot answer <code>WHERE salary BETWEEN 60000 AND 80000</code> efficiently?', opts: ['Dense ordered index', 'Sparse ordered index', 'Hash index', 'B+ tree'], a: 2, why: 'A hash function scatters neighbouring values across unrelated buckets, so a range would have to probe every bucket.' },
+  { q: 'Which is NOT one of the slide 6 index evaluation metrics?', opts: ['Access time', 'Insertion time', 'Number of attributes in the relation', 'Space overhead'], a: 2, why: 'The five metrics are: access types supported, access time, insertion time, deletion time and space overhead.' },
+  { q: 'Why is an index file much smaller than the data file?', opts: ['It is compressed', 'Each entry stores only a key and a pointer, not the whole row', 'It stores only half the records', 'It is kept in memory'], a: 1, why: 'A full row has many columns. An index entry is a few bytes of key plus a pointer, so many more entries fit in a block.' },
+]);
+ask('#try1', { q: 'A file has 5,000 blocks and the wanted value does not exist. How many blocks does a linear scan read?', a: 5000, why: 'An unsuccessful scan must check every block before it can say “not found”.' });
+ask('#try2', { q: 'Same file, the wanted record is equally likely to be in any block and it exists. About how many blocks does a linear scan read on average?', a: 2500, tol: 1, hint: 'On average you stop halfway through.', why: 'About N/2 = 2,500 blocks (exactly 2,500.5 if each position is equally likely).' });
+
+</script>
+</body>
+</html>

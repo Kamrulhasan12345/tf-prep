@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Keys and Superkeys · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 01 (Sukarna) · Chapter 3 · Slides 15–19 · Book §3.1.2–3.1.3</div>
+<h1>Keys, Superkeys and Primary Keys</h1>
+<p class="lede">A key is a smallest set of attributes that pins down a whole tuple. This chapter states the two conditions, proves the slides' claim that {title, year, starName} is the key of Movies1, separates keys from superkeys and primary keys, and shows how to count superkeys, a frequent exam question.</p>
+
+<h2>1. Definition of a key (slide 15)</h2>
+<dl class="def">
+  <dt>Key</dt>
+  <dd>A set of one or more attributes {A₁, A₂, …, Aₙ} is a key of relation R if
+  <br><b>Condition 1 (uniqueness):</b> A₁, …, Aₙ functionally determine all other attributes of R. Equivalently, two distinct tuples of R cannot agree on all of A₁, …, Aₙ.
+  <br><b>Condition 2 (minimality):</b> no proper subset of {A₁, …, Aₙ} functionally determines all other attributes. Remove any attribute and the key property is lost.</dd>
+</dl>
+<p>Why are the two forms of condition 1 the same? If X determines every other attribute, two tuples that agree on X agree everywhere, so they are the same tuple (a relation is a set, so it has no duplicate tuples). So distinct tuples must differ somewhere in X.</p>
+<p>For Movies1(title, year, length, genre, studioName, starName) the slides claim: <strong>{title, year, starName} is a key.</strong></p>
+
+<h2>2. Proving the claim (slides 16–17)</h2>
+<p>A key proof always has two parts, one per condition.</p>
+<p><strong>Step 1: {title, year, starName} determines every other attribute.</strong> Suppose two tuples agree on title, year and starName. Since they agree on title and year, the FD <code>title year → length genre studioName</code> (Chapter 2) says they also agree on length, genre and studioName. Now they agree on all six attributes.</p>
+<p><strong>Step 2: no proper subset works.</strong> It is enough to check the three subsets with two attributes, because a smaller set cannot determine more than a bigger set containing it:</p>
+<ul>
+  <li>{title, year} does not determine starName: the same movie has several stars (the three Star Wars rows).</li>
+  <li>{title, starName} does not determine year: two movies with the same title and the same star may be made in different years (a remake). The slide writes “startName”; it means starName.</li>
+  <li>{year, starName} does not determine title: a star can appear in two different movies in the same year.</li>
+</ul>
+<figure>
+<span class="anim-tag">Animation</span>
+<div id="proof"></div>
+</figure>
+<p>Both conditions hold, so {title, year, starName} is a key. In fact it is the <em>only</em> key: every key must contain starName (nothing else determines it), and must contain title and year (nothing determines them). Chapter 6 turns this kind of reasoning into an algorithm.</p>
+
+<h2>3. Primary keys and superkeys (slides 18–19)</h2>
+<dl class="def">
+  <dt>Primary key</dt><dd>A relation can have more than one key. The designer picks one of them as the <b>primary key</b>. The choice is up to the designer and usually follows practical concerns (section 5).</dd>
+  <dt>Superkey</dt><dd>Any set of attributes that <em>contains</em> a key (a superset of a key). It satisfies condition 1 but need not satisfy condition 2.</dd>
+  <dt>Candidate key</dt><dd>Another name for “key”, used in Korth (Silberschatz) and many exams. The slides and Garcia-Molina just say “key”.</dd>
+</dl>
+<p>So every key is a superkey (a set contains itself), but not every superkey is a key. Slide 19's example for Movies1: the primary key is {title, year, starName}, and {title, year, starName, length} is a superkey that is not a key, because dropping length still leaves a superkey. The book adds that the term <em>key</em> always means minimal; if you mean “unique but maybe not minimal”, say superkey.</p>
+
+<figure>
+<svg id="lat" viewBox="0 0 560 300" width="560" role="img" aria-label="lattice of subsets of {A, B, C} with keys A and BC"></svg>
+<figcaption><b>Figure 1.</b> All 8 subsets of R(A, B, C), drawn as a lattice (each line adds one attribute). Suppose the keys are {A} and {B, C}. Keys are green, other superkeys blue, sets that are not superkeys grey. Every set above a key is a superkey: 5 in total.</figcaption>
+</figure>
+
+<h2>4. Counting superkeys</h2>
+<p>Because a superkey is “any set containing a key”, counting superkeys is counting subsets, a classic exam question. Let R have n attributes A₁, …, Aₙ.</p>
+<ul>
+  <li><strong>One key K with k attributes:</strong> a superkey must contain all of K, and each of the other n − k attributes is in or out freely. Count = <b>2<sup>n−k</sup></b>.</li>
+  <li><strong>Several keys:</strong> use inclusion–exclusion. For keys K₁ and K₂: |sets ⊇ K₁| + |sets ⊇ K₂| − |sets ⊇ K₁ ∪ K₂| = 2<sup>n−|K₁|</sup> + 2<sup>n−|K₂|</sup> − 2<sup>n−|K₁∪K₂|</sup>.</li>
+</ul>
+<p>For Figure 1 (n = 3, keys {A} and {B, C}): 2² + 2¹ − 2⁰ = 4 + 2 − 1 = 5. The figure shows exactly 5.</p>
+
+<h2>5. Choosing a primary key</h2>
+<p>When several keys exist, good practice is to pick one that is:</p>
+<ol>
+  <li><strong>Never null and always known</strong> when the tuple is created (a student ID is known at admission; an email may not be).</li>
+  <li><strong>Stable</strong>: its value should never change, because other tables refer to it (foreign keys). Names and phone numbers change; IDs do not.</li>
+  <li><strong>Small and simple</strong>: one short attribute is cheaper to index, store in foreign keys and compare than a long composite one. That is why systems often add a surrogate key (an auto-numbered ID).</li>
+  <li><strong>Minimal and meaningful to the business</strong>: it must really be unique by the rules of the organization, not just in today's data.</li>
+</ol>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+<div id="try2"></div>
+
+<h3>Exam questions</h3>
+<div class="exam">
+  <div class="exam-src">DB QB · 24-25 7c · 9 marks</div>
+  <div class="exam-q"><p>Define super key, candidate key and primary key with examples.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>Use Movies1(title, year, length, genre, studioName, starName) with the FD title year → length genre studioName, and a second relation Student(studentID, email, name, dept) where studentID and email are each unique.</p>
+    <p><strong>Superkey:</strong> a set of attributes whose values identify a tuple uniquely, i.e. it functionally determines every attribute of the relation. It need not be minimal. Examples: {title, year, starName}, {title, year, starName, length}, and the set of all six attributes are superkeys of Movies1. In Student, {studentID}, {email}, {studentID, name} are superkeys.</p>
+    <p><strong>Candidate key</strong> (the slides' “key”): a <em>minimal</em> superkey: it determines all attributes, and no proper subset does. Movies1 has one candidate key, {title, year, starName}: drop title, year or starName and uniqueness fails (shown in section 2). Student has two candidate keys, {studentID} and {email}. {studentID, name} is a superkey but not a candidate key, since {studentID} alone suffices.</p>
+    <p><strong>Primary key:</strong> the one candidate key the designer chooses to identify tuples (and that foreign keys refer to). In Student we would choose {studentID} as primary key because it is short, stable and never null; {email} remains an alternate key. In Movies1 the only candidate key {title, year, starName} is the primary key.</p>
+    <p>Relationship: every primary key is a candidate key, and every candidate key is a superkey; the converses are false.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 24-25 1a · 3 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-1 | 2024–25 · 8 marks</div>
+  <div class="exam-q"><p>Suppose R is a relation with attributes A₁, A₂, …, Aₙ. As a function of n, determine how many superkeys R has for each of the following cases: (i) The only key is A₁. (ii) The only keys are {A₁, A₂} and {A₁, A₃}.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><strong>(i)</strong> A superkey is any set that contains a key. The only key is {A₁}, so a superkey is A₁ plus any subset of the other n − 1 attributes: <strong>2<sup>n−1</sup></strong> superkeys.</p>
+    <p><strong>(ii)</strong> A superkey contains {A₁, A₂} or {A₁, A₃}. Inclusion–exclusion:</p>
+    <ul>
+      <li>sets containing {A₁, A₂}: 2<sup>n−2</sup></li>
+      <li>sets containing {A₁, A₃}: 2<sup>n−2</sup></li>
+      <li>sets containing both, i.e. {A₁, A₂, A₃}: 2<sup>n−3</sup> (counted twice above)</li>
+    </ul>
+    <p>Total = 2<sup>n−2</sup> + 2<sup>n−2</sup> − 2<sup>n−3</sup> = 2<sup>n−1</sup> − 2<sup>n−3</sup> = <strong>3 · 2<sup>n−3</sup></strong> (for n ≥ 3).</p>
+    <p>Check with n = 3: the superkeys are {A₁A₂}, {A₁A₃}, {A₁A₂A₃}: 3 = 3 · 2⁰. ✓ (Verified by brute force for n = 3…6: 3, 6, 12, 24.)</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2015–16 · 6 marks</div>
+  <div class="exam-q"><p>Suppose R is a relation with attributes A₁, A₂, …, Aₙ. As a function of n, find how many superkeys R has if the only keys are {A₁} and {A₂, A₃}.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <ul>
+      <li>sets containing {A₁}: 2<sup>n−1</sup></li>
+      <li>sets containing {A₂, A₃}: 2<sup>n−2</sup></li>
+      <li>sets containing both, {A₁, A₂, A₃}: 2<sup>n−3</sup></li>
+    </ul>
+    <p>Total = 2<sup>n−1</sup> + 2<sup>n−2</sup> − 2<sup>n−3</sup> = (4 + 2 − 1) · 2<sup>n−3</sup> = <strong>5 · 2<sup>n−3</sup></strong> (n ≥ 3). For n = 3 this is 5, matching Figure 1 (with A = A₁, B = A₂, C = A₃). Brute force for n = 4, 5, 6 gives 10, 20, 40. ✓</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2013–14 · 12 marks</div>
+  <div class="exam-q"><p>Which considerations should be applied while choosing the primary key of a relation? Discuss with example how the multi-valued attribute problem in database design can be solved.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><strong>Choosing a primary key.</strong> The primary key must first be a candidate key (unique and minimal). Among candidate keys choose one that is (1) never null, known as soon as the tuple is created; (2) stable, never updated, because foreign keys in other relations copy it; (3) small and simple, ideally one short attribute, since it is stored in every index and every referencing table; (4) unique by business rule, not by accident of current data. Example: in Student(studentID, email, phone, name), both studentID and email may be unique, but email can change and phone can be shared or missing, so studentID is the better primary key. If no natural key is good, add a surrogate key (an auto-increment ID).</p>
+    <p><strong>Multivalued attributes.</strong> A multivalued attribute holds a set of values, such as a department with several locations, or a student with several phone numbers. Storing the set in one cell, e.g. <code>Dlocations = {Bellaire, Sugarland, Houston}</code>, violates first normal form (atomic values, Chapter 16), and makes queries like “departments in Houston” and updates of one location awkward. The fix (slide 62's example) is to move the multivalued attribute into its own relation together with the key of the owner:</p>
+    <div class="tbl"><table>
+      <tr><th>Before (not 1NF)</th><th>After</th></tr>
+      <tr><td>DEPARTMENT(Dname, Dnumber, Dmgr_ssn, Dlocations) with Research, 5, 333445555, {Bellaire, Sugarland, Houston}</td>
+          <td>DEPARTMENT(Dname, Dnumber, Dmgr_ssn)<br>DEPT_LOCATIONS(Dnumber, Dlocation): (5, Bellaire), (5, Sugarland), (5, Houston), (4, Stafford), (1, Houston)</td></tr>
+    </table></div>
+    <p>The key of DEPT_LOCATIONS is {Dnumber, Dlocation}, one row per (department, location) pair, and Dnumber is a foreign key to DEPARTMENT. Each value is now atomic and a location can be added or removed by inserting or deleting one row.</p>
+  </div></details>
+</div>
+
+<div class="key"><p><strong>Summary:</strong> a key determines every attribute (uniqueness) and is minimal (no proper subset works). Prove both parts: show agreement on the key forces agreement everywhere, then break each smaller subset. A superkey is any superset of a key, so the number of superkeys is a subset count: 2<sup>n−k</sup> for one k-attribute key, inclusion–exclusion for several. The primary key is the candidate key the designer chooses, preferably stable, non-null and small.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="lecture.js"></script>
+<script>
+// key proof animation on Movies1
+const H = MOVIES1_H, M = MOVIES1;
+const c = (rows, cols, cls) => Object.fromEntries(rows.flatMap(r => cols.map(k => [r + ',' + k, cls])));
+stepper('#proof', [
+  { html: inst(H, M), cap: 'Claim: {title, year, starName} is a key. Two conditions to prove.' },
+  { html: inst(H, [M[0], M[0]], { cell: { ...c([0, 1], [0, 1, 5], 'hl'), ...c([0, 1], [2, 3, 4], 'good') } }), cap: '<b>Step 1.</b> Imagine two tuples that agree on title, year and starName (orange). By <code>title year → length genre studioName</code> they agree on the green columns too, so they agree everywhere: they are the same tuple.' },
+  { html: inst(H, [M[0], M[1]], { cell: { ...c([0, 1], [0, 1], 'hl'), ...c([0, 1], [5], 'bad') } }), cap: '<b>Step 2a.</b> {title, year} is not enough: two Star Wars 1977 tuples differ on starName.' },
+  { html: inst(H, [['Hero', '1990', '100', 'drama', 'MGM', 'Star P'], ['Hero', '2010', '120', 'drama', 'Fox', 'Star P']], { cell: { ...c([0, 1], [0, 5], 'hl'), ...c([0, 1], [1], 'bad') } }), cap: '<b>Step 2b.</b> {title, starName} is not enough: a remake with the same title and star in another year is legal (made-up rows).' },
+  { html: inst(H, [['Movie X', '1992', '95', 'comedy', 'Paramount', 'Dana Carvey'], ['Movie Y', '1992', '101', 'drama', 'Fox', 'Dana Carvey']], { cell: { ...c([0, 1], [1, 5], 'hl'), ...c([0, 1], [0], 'bad') } }), cap: '<b>Step 2c.</b> {year, starName} is not enough: a star can act in two movies in one year. No proper subset works, so the set is minimal: <b>it is a key</b>.' },
+]);
+
+// lattice of subsets of {A,B,C}, keys A and BC
+(() => {
+  const keys = ['A', 'BC'], sets = [[''], ['A', 'B', 'C'], ['AB', 'AC', 'BC'], ['ABC']];
+  const pos = {}; let s = '';
+  sets.forEach((lvl, d) => lvl.forEach((x, i) => { pos[x] = [280 + (i - (lvl.length - 1) / 2) * 150, 260 - d * 75]; }));
+  const isSK = x => keys.some(k => k.split('').every(ch => x.includes(ch)));
+  for (const a of Object.keys(pos)) for (const b of Object.keys(pos))
+    if (b.length === a.length + 1 && a.split('').every(ch => b.includes(ch))) s += `<line x1="${pos[a][0]}" y1="${pos[a][1] - 14}" x2="${pos[b][0]}" y2="${pos[b][1] + 14}" class="s-fg"/>`;
+  for (const [x, [px, py]] of Object.entries(pos)) {
+    const cls = keys.includes(x) ? 'cell-new' : isSK(x) ? 'cell' : 'cell-dim';
+    s += `<rect x="${px - 34}" y="${py - 14}" width="68" height="28" rx="5" class="${cls}"/><text x="${px}" y="${py + 5}" text-anchor="middle" class="big ${cls === 'cell-dim' ? 'dimt' : ''}">{${x.split('').join(',') || ' '}}</text>`;
+  }
+  s += `<text x="12" y="20" class="lbl grn">green: key</text><text x="12" y="36" class="lbl acc">blue: superkey, not key</text><text x="12" y="52" class="lbl">grey: not a superkey</text>`;
+  $('#lat').innerHTML = s;
+})();
+
+flashcards('#cards', [
+  { f: 'Key: condition 1', b: 'The attributes functionally determine every attribute of R (no two distinct tuples agree on them).' },
+  { f: 'Key: condition 2', b: 'Minimality: no proper subset satisfies condition 1.' },
+  { f: 'Superkey', b: 'Any superset of a key. Unique, not necessarily minimal.' },
+  { f: 'Candidate key', b: 'Korth\'s name for a key (minimal superkey).' },
+  { f: 'Primary key', b: 'The candidate key chosen by the designer.' },
+  { f: 'Key of Movies1', b: '{title, year, starName}, the only one.' },
+  { f: 'Superkeys with one k-attribute key', b: '2^(n−k).' },
+]);
+quiz('#quiz', [
+  { q: 'Which is a superkey of Movies1 but not a key?', opts: ['{title, year}', '{title, year, starName}', '{title, year, starName, genre}', '{starName}'], a: 2, why: 'It contains the key {title, year, starName} plus genre, so it is not minimal.' },
+  { q: 'Why is {title, year} not a key of Movies1?', opts: ['It does not determine length', 'It does not determine starName', 'It is too small', 'title is not unique'], a: 1, why: 'A movie has many stars.' },
+  { q: 'Every key is a superkey. Is every superkey a key?', opts: ['Yes', 'No'], a: 1, why: 'A superkey may have extra attributes; a key must be minimal.' },
+  { q: 'R has 5 attributes and the only key is {A, B}. How many superkeys?', opts: ['4', '8', '16', '32'], a: 1, why: 'A and B fixed, the other 3 free: 2³ = 8.' },
+  { q: 'To prove X is minimal, it is enough to check…', opts: ['all subsets of X', 'the subsets with one attribute removed', 'only the empty set', 'supersets of X'], a: 1, why: 'If a smaller subset worked, a one-removed subset containing it would also work.' },
+]);
+ask('#try1', { q: 'R has n = 6 attributes and its only keys are {A₁} and {A₂}. How many superkeys does R have?', a: 48, hint: '2^(n−1) + 2^(n−1) − 2^(n−2).', why: '32 + 32 − 16 = 48.' });
+ask('#try2', { q: 'R(A, B, C, D) has keys {A, B} and {C, D}. How many superkeys?', a: 7, hint: 'Sets ⊇ AB: 4. Sets ⊇ CD: 4. Sets ⊇ ABCD: 1.', why: '4 + 4 − 1 = 7.' });
+</script>
+</body>
+</html>

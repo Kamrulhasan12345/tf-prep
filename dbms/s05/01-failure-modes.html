@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Failure Modes · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 05 (Sukarna) · Chapter 1 · Slides 2–6 · Book §17.1.1</div>
+<h1>What Can Go Wrong: Failure Modes</h1>
+<p class="lede">A database must survive bad input, broken disks, fires and sudden power cuts. This chapter sorts failures into four kinds, says which tool protects against each, and explains why the rest of Chapter 17 is about one of them: the system failure.</p>
+
+<h2>1. Four kinds of failure (slide 2)</h2>
+
+<p>The slides list the things that can go wrong while a database is being queried and modified. The textbook (§17.1.1) adds a fourth kind, the <em>system failure</em>, which slide 6 treats separately. Each kind loses something different, so each needs a different remedy.</p>
+
+<dl class="def">
+  <dt>Failure mode</dt><dd>A category of things that can go wrong, grouped by <em>what</em> is lost or corrupted (a value, a disk, a whole site, or the contents of main memory).</dd>
+  <dt>Volatile storage</dt><dd>Storage whose contents vanish when the power goes: main memory (RAM).</dd>
+  <dt>Non-volatile storage</dt><dd>Storage that keeps its contents without power: disks, SSDs, tape, optical disks.</dd>
+</dl>
+
+<figure>
+<svg id="modes" viewBox="0 0 760 250" width="760" role="img" aria-label="Four failure modes and their remedies"></svg>
+<figcaption><b>Figure 1.</b> The four failure modes. The top row says what is damaged, the bottom row what protects against it. Logging and recovery, the subject of Lectures 05 and 06, handle system failures.</figcaption>
+</figure>
+
+<h2>2. Erroneous data entry (slide 3)</h2>
+
+<p>Some wrong data cannot be detected at all. If a clerk mistypes one digit of your phone number, the result still looks like a valid phone number, possibly someone else's, and no program can tell it is wrong.</p>
+<p>Other errors are detectable. If the clerk <em>omits</em> a digit, the value no longer has the form of a phone number. Such errors are caught by:</p>
+<ul>
+  <li><b class="term">Constraints</b> and <b class="term">triggers</b> in the database: for example a <code>CHECK</code> that the phone number has exactly 11 digits, or a trigger that rejects a malformed value.</li>
+  <li>Validation in the <b class="term">application front end</b> (the form the clerk types into) and the <b class="term">back end</b> (the server code that receives it).</li>
+</ul>
+<p>Logging does nothing for this kind of error: the database faithfully stores and logs the wrong value.</p>
+
+<h2>3. Media failures (slide 4)</h2>
+
+<p>A <b class="term">media failure</b> damages the disk itself. There are two sizes of damage:</p>
+<ul>
+  <li><strong>Local failure</strong>: a bit or a few bits of a sector are corrupted. This is detected by the <b class="term">parity checks</b> stored with each disk sector (Lecture 13): the stored parity no longer matches the data, so the disk reports a read error instead of returning wrong data.</li>
+  <li><strong>Head crash</strong>: the read/write head touches the platter and the entire disk becomes unreadable. Three remedies:
+    <ol>
+      <li><b class="term">RAID</b> (Lecture 13): keep redundant disks (mirrors or parity) so the lost disk can be rebuilt from the others.</li>
+      <li><b class="term">Archiving</b>: periodically copy the whole database to tape or optical disk and store the copy at a safe location, away from the database. Lecture 06, Chapter 5 shows how to restore from an archive plus the log.</li>
+      <li><b class="term">Online redundant copies</b>: keep live copies of the database at several sites. The slides call this a <b class="term">DRS</b> (disaster recovery site).</li>
+    </ol>
+  </li>
+</ul>
+
+<h2>4. Catastrophic failures (slide 5)</h2>
+
+<p>A <b class="term">catastrophic failure</b> destroys the storage media completely: an explosion, a fire or vandalism at the site of the database. The protections are archived copies, online redundant copies, and a DRS that can take over and keep the business running.</p>
+
+<div class="q">
+<h4>Slide 5 question: RAID will not help. Why?</h4>
+<p>RAID protects against the failure of <em>one</em> disk (or two, for RAID 6) by keeping redundant information on the <em>other</em> disks of the same array. All those disks sit in the same machine room. A fire or explosion destroys the data disks and their parity or mirror disks at the same moment, so there is nothing left to rebuild from. Only a copy stored somewhere else survives: an archive kept at a safe distance, or a redundant copy at another site.</p>
+</div>
+
+<h2>5. System failures (slide 6)</h2>
+
+<dl class="def">
+  <dt>System failure (crash)</dt><dd>A failure that loses the contents of main memory but leaves the disk intact. Examples on the slide: a memory failure, a power failure, an operating-system failure while the database software is running. A software bug that overwrites memory has the same effect.</dd>
+  <dt>Transaction</dt><dd>A process that queries and modifies the database as a sequence of steps (defined fully in the next chapter).</dd>
+</dl>
+
+<p>A transaction usually changes the database in several steps. The slides' example is a transfer: <em>credit account A, debit account B</em>. A system failure can stop the transaction between the steps, for example after A was credited but before B was debited. The database is then in an <b class="term">inconsistent state</b>: money appeared in A that never left B.</p>
+
+<p>Worse, after a crash we no longer know which steps happened. Main memory, which held the transaction's progress, is gone. Running the transaction again is not safe either: if it adds 100 to A and the addition may or may not have reached the disk, repeating it may add 100 twice.</p>
+
+<p>The protection is <b class="term">logging</b>: every database change is recorded in a separate file on non-volatile storage, called the <b class="term">log</b>. After a failure, the <em>exact</em> changes can be read back from the log and either <em>reversed</em> (undone) or <em>reapplied</em> (redone). How to do this safely is the subject of the rest of Lectures 05 and 06.</p>
+
+<figure>
+<span class="anim-tag">Animation</span>
+<div id="crash"></div>
+</figure>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+
+<div class="key"><p><strong>Summary:</strong> erroneous data entry is fought with constraints, triggers and validation; media failures with parity checks, RAID, archives and remote copies; catastrophic failures only with copies stored elsewhere (RAID dies with the building). System failures lose main memory but not the disk, and can leave a transaction half done. Logging every change on non-volatile storage lets the recovery manager undo or redo exactly what is needed.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="lecture.js"></script>
+<script>
+(() => {
+  const col = [['Erroneous data entry', 'one wrong value', 'constraints, triggers,', 'app validation'],
+               ['Media failure', 'a disk (or a few bits)', 'parity, RAID, archive,', 'remote copies (DRS)'],
+               ['Catastrophic failure', 'the whole site', 'archive stored far away,', 'remote copies (DRS)'],
+               ['System failure', 'main memory only', 'logging +', 'recovery manager']];
+  let s = '';
+  col.forEach(([t, lost, r1, r2], i) => {
+    const x = 10 + i * 186, hot = i === 3, w = 176, c = x + 88;
+    s += `<rect x="${x}" y="10" width="${w}" height="40" class="${hot ? 'cell-hl' : 'cell'}" rx="4"/><text x="${c}" y="35" text-anchor="middle" class="big">${t}</text>`;
+    s += `<text x="${c}" y="76" text-anchor="middle" class="lbl">what is lost</text><rect x="${x}" y="84" width="${w}" height="34" class="cell-del" rx="4"/><text x="${c}" y="106" text-anchor="middle" style="font-size:11px">${lost}</text>`;
+    s += `<path d="M${c} 122 V150" class="s-fg" marker-end="url(#m-fg)"/>`;
+    s += `<text x="${c}" y="168" text-anchor="middle" class="lbl">protection</text><rect x="${x}" y="176" width="${w}" height="50" class="cell-new" rx="4"/><text x="${c}" y="197" text-anchor="middle" style="font-size:11px">${r1}</text><text x="${c}" y="215" text-anchor="middle" style="font-size:11px">${r2}</text>`;
+  });
+  s += `<text x="${10 + 3 * 186 + 88}" y="244" text-anchor="middle" class="lbl acc" style="font-weight:600">↑ Lectures 05 and 06</text>`;
+  document.querySelector('#modes').innerHTML = s;
+
+  // a transfer interrupted by a crash
+  const fr = (memA, memB, dA, dB, step, crash) => {
+    const box = (x, title, a, b, lost) => `<rect x="${x}" y="30" width="200" height="110" rx="6" class="${lost ? 'cell-del' : 'cell-plain'}" ${lost ? 'style="stroke-dasharray:5 3"' : ''}/>
+      <text x="${x + 100}" y="22" text-anchor="middle" class="big">${title}</text>
+      <text x="${x + 20}" y="72" style="font-size:14px">A = ${a}</text><text x="${x + 20}" y="108" style="font-size:14px">B = ${b}</text>`;
+    let s = box(20, 'Main memory (volatile)', memA, memB, crash) + box(330, 'Disk (non-volatile)', dA, dB, false);
+    s += `<text x="20" y="170" class="lbl">Transaction: credit A by 100, debit B by 100. ${step}</text>`;
+    if (crash) s += `<text x="120" y="92" text-anchor="middle" class="big red">CRASH: lost</text>`;
+    return `<svg viewBox="0 0 560 180" width="560">${s}</svg>`;
+  };
+  stepper('#crash', [
+    { html: fr(500, 300, 500, 300, 'Start: A + B = 800.'), cap: 'Both accounts are on disk and in memory. The invariant the bank cares about: A + B = 800.' },
+    { html: fr(600, 300, 500, 300, 'Step 1 done in memory.'), cap: 'Step 1, credit A: A becomes 600 in a memory buffer.' },
+    { html: fr(600, 300, 600, 300, 'A written to disk.'), cap: 'The buffer of A happens to be written to disk. Disk now says A = 600, B = 300: the sum is 900.' },
+    { html: fr('?', '?', 600, 300, 'Crash before step 2.'), cap: '<b>Power failure</b> before B is debited. Memory, including the knowledge of how far the transaction got, is lost. The disk shows an <b>inconsistent state</b> (A + B = 900). Only a log of the changes can tell the system to put A back to 500 (undo) or to finish the debit (redo).' },
+  ]);
+
+  flashcards('#cards', [
+    { f: 'Erroneous data entry', b: 'Wrong values typed in. Detectable ones are caught by constraints, triggers and application validation; some (one mistyped digit) are undetectable.' },
+    { f: 'Media failure', b: 'Damage to the disk: a few bits (caught by parity checks) or a head crash (whole disk lost; use RAID, archives or remote copies).' },
+    { f: 'Catastrophic failure', b: 'The site and all its media are destroyed (fire, explosion, vandalism). Only copies kept elsewhere help.' },
+    { f: 'System failure', b: 'Main memory is lost (power, OS or memory failure); the disk survives. A transaction may be cut off half way.' },
+    { f: 'Archive', b: 'A periodic copy of the database on tape or optical disk, stored at a safe distance.' },
+    { f: 'DRS', b: 'Disaster recovery site: an online redundant copy of the database at another site that can take over.' },
+    { f: 'Logging', b: 'Recording every database change in a log on non-volatile storage, so that changes can be undone or redone after a crash.' },
+  ]);
+  quiz('#quiz', [
+    { q: 'A power cut hits while transactions are running. What is lost?', opts: ['The disk contents', 'Main memory: buffers and transaction state', 'Both', 'Nothing'], a: 1, why: 'A system failure loses volatile memory only. The disk, including the log on disk, survives.' },
+    { q: 'Why does RAID not protect against a fire in the machine room?', opts: ['RAID is too slow', 'All disks of the array, including the redundant ones, burn together', 'RAID only works for SSDs', 'Parity cannot be recomputed after a fire'], a: 1, why: 'RAID keeps its redundancy in the same place as the data. A copy stored elsewhere is needed.' },
+    { q: 'A clerk types 01711-234568 instead of 01711-234567. Which mechanism catches it?', opts: ['A CHECK constraint', 'A trigger', 'The log', 'None: the value looks valid'], a: 3, why: 'A one-digit typo still has the form of a phone number, so it is impossible to detect.' },
+    { q: 'A few bits of one sector go bad. How is this detected?', opts: ['Parity checks on the sector', 'The log', 'Triggers', 'The archive'], a: 0, why: 'Each sector stores check bits; a mismatch shows the sector is damaged.' },
+    { q: 'What remedy does the rest of Lec 05–06 develop for system failures?', opts: ['RAID', 'Logging all changes and recovering from the log', 'Triggers', 'Running every transaction twice'], a: 1, why: 'The log on non-volatile storage records exactly what changed, so it can be undone or redone.' },
+  ]);
+  ask('#try1', { q: 'In the animation, the crash leaves A = 600 and B = 300 on disk. To make the database consistent by <em>undoing</em> the transfer, what value must A get?', a: 500, hint: 'Undo means: put back the value A had before the transaction changed it.', why: 'Undoing restores the old value, A = 500, so A + B = 800 again.' });
+})();
+</script>
+</body>
+</html>

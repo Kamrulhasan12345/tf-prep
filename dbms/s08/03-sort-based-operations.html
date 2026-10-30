@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sort-Based δ, γ, ∪, ∩, − · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="../s07/lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 08 (Sukarna) · Chapter 3 · Slides 14–21 · Book §15.4.2–15.4.5</div>
+<h1>Two-Pass Sort-Based Duplicate Elimination, Grouping and Set Operations</h1>
+<p class="lede">Every two-pass sort-based algorithm is TPMMS with a different phase 2. Phase 1 always writes sorted sublists; phase 2 merges them and, instead of just outputting tuples in order, handles all copies of the smallest value together. This chapter does that for δ, γ, ∪, ∩ and −, gives the cost 3B and the memory √B rules, and works three exam questions.</p>
+
+<h2>1. The common pattern</h2>
+<p>All the algorithms in this chapter:</p>
+<ol>
+  <li><b>Phase 1:</b> read the argument(s) M blocks at a time, sort, and write sorted sublists (exactly TPMMS phase 1, "do not merge").</li>
+  <li><b>Phase 2:</b> bring one block of each sublist into its own buffer, plus one output buffer. Repeatedly find the <b>smallest</b> value among the fronts of all the buffers, deal with <b>all</b> tuples having that value at once (they are all at the fronts, since every sublist is sorted), output what the operation calls for, and manage empty input buffers and a full output buffer as in TPMMS.</li>
+</ol>
+<p>Cost: each block is read in phase 1, written in phase 1, and read in phase 2: <b>3 I/Os per block</b>. Memory: the total number of sublists must not exceed M − 1, which gives roughly <b>B ≤ M²</b>.</p>
+
+<h2>2. Duplicate elimination δ(R) (slides 14–15)</h2>
+<ul>
+  <li><b>Phase 1:</b> sort the tuples of R into sublists as in TPMMS (do not merge).</li>
+  <li><b>Phase 2:</b> one memory block per sublist and one for output; bring one block from each sublist into memory. Repeatedly: find the smallest tuple t among all the sublists, together with <b>all other tuples equal to t</b>; send <b>one copy</b> of t to the output and discard the other copies. When the output block is full, write it to disk.</li>
+</ul>
+<p>The output comes out sorted, with each tuple exactly once.</p>
+<div class="key">
+<p class="formula">Disk I/O: 3B(R) (ignoring the output write) &nbsp;·&nbsp; Memory: B(R) ≤ M² ⟹ M ≥ √B(R)</p>
+<p style="text-align:center;margin:0">Compare the one-pass algorithm (Lec 07, Ch. 6): B(R) I/Os, but M ≥ B(R).</p>
+</div>
+<p>So two passes trade 2B(R) extra I/Os for an enormous saving in memory: √B(R) blocks instead of B(R). Animate it with your own tuples (the tool is the TPMMS animator with "discard if equal to the last tuple output"):</p>
+<figure class="wide">
+<span class="anim-tag">Interactive animation</span>
+<div id="dd"></div>
+</figure>
+
+<h2>3. Grouping and aggregation γ<sub>L</sub>(R) (slides 16–17)</h2>
+<ul>
+  <li><b>Phase 1:</b> sort the tuples of R into sublists, using the <b>grouping attributes of L as the sort key</b>.</li>
+  <li><b>Phase 2:</b> one buffer per sublist and one for output; load the first block of each sublist. Repeatedly:
+    <ol>
+      <li>Find the smallest value v of the sort key among the fronts. v is the next group. Prepare its aggregate accumulators (MIN, MAX, SUM, COUNT; for AVG, SUM and COUNT).</li>
+      <li>Examine all tuples with sort key v and update the accumulators.</li>
+      <li>If an input buffer becomes empty, replace it with the next block from the same sublist (there may be more v's there).</li>
+      <li>When no tuples with key v remain, output one tuple: the grouping attributes L = v and the aggregate values.</li>
+    </ol></li>
+</ul>
+<p><b>Disk I/O: 3B(R)</b>, ignoring the output write. <b>Memory: B(R) ≤ M² ⟹ M ≥ √B(R)</b>, against M ≥ B(R) for the one-pass algorithm. Unlike one-pass γ, the output is produced group by group during phase 2, in sorted order of the grouping attributes.</p>
+<p><b>Example.</b> R(dept, salary) = (CSE 50), (EEE 40), (CSE 70), (ME 30), (EEE 60), (CSE 20), 1 tuple per block, M = 3. Phase 1 makes sublists [CSE 50, CSE 70, EEE 40] and [CSE 20, EEE 60, ME 30]. Phase 2: the smallest key is CSE: CSE 50 and CSE 70 from sublist 1, CSE 20 from sublist 2: output (CSE, SUM 140, COUNT 3, AVG 46.67). Next EEE: 40 and 60: (EEE, 100, 2, 50). Then ME: (ME, 30, 1, 30).</p>
+
+<h2>4. Set union, intersection and difference (slides 18–21)</h2>
+<p>For a binary operation, phase 1 creates sorted sublists for <b>both</b> R and S (on the whole tuple), and phase 2 uses one buffer for each sublist of R and of S, plus one output buffer. Then, repeatedly, take the smallest tuple t among all buffers and:</p>
+<div class="tbl"><table>
+<tr><th>Operation</th><th>Output for the current smallest t</th><th>Then</th></tr>
+<tr><td>R ∪ S (slide 18)</td><td>one copy of t</td><td>find all other copies of t (in R's and S's sublists) and discard them</td></tr>
+<tr><td>R ∩ S (slide 20)</td><td>t, <b>if it appears in both</b> some sublist of R and some sublist of S</td><td>remove and discard all copies of t from R's and S's sublists</td></tr>
+<tr><td>R − S (slide 21)</td><td>t, if it appears in some sublist of R but in <b>no</b> sublist of S</td><td>remove and discard all copies of t (from R's and S's sublists)</td></tr>
+</table></div>
+<p><em>Wording fixes:</em> slide 20's "present in at least one sub list of R and S" means present in at least one sublist of R <em>and</em> in at least one sublist of S. Slide 21 says "find all tuples of R that are same as t"; the copies of t in S's sublists must be removed too, or they would be met again.</p>
+
+<div class="key">
+<p class="formula">Disk I/O: 3(B(R) + B(S)) &nbsp;·&nbsp; Memory: B(R)/M + B(S)/M ≤ M ⟹ B(R) + B(S) ≤ M² ⟹ M ≥ √(B(R) + B(S))</p>
+<p style="text-align:center;margin:0">(slide 19: "M − 1 to be more correct"; compare one-pass: M ≥ min(B(R), B(S)), which the slide writes as B(R) + B(S))</p>
+</div>
+<p>Why the cost is 3(B(R) + B(S)) (slide 19): R and S are read and written once while the sorted sublists are created, and read a second time in phase 2 while outputs are generated. Note that the memory now depends on the <b>sum</b> of the sizes, because all sublists of both relations are open at once. (Slide 19's comparison line "one pass: M ≥ B(R) + B(S)" is stricter than needed: a one-pass set operation only needs the smaller relation in memory, min(B(R), B(S)) &lt; M.)</p>
+
+<figure class="wide">
+<span class="anim-tag">Interactive animation</span>
+<div id="setop"></div>
+</figure>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+<div id="try2"></div>
+
+<h3>Exam questions</h3>
+<div class="exam">
+  <div class="exam-src">DB QB · 23-24 6a · 14 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-1 | 2023–24 · 14 marks</div>
+  <div class="exam-q"><p>Describe the two-pass algorithm for grouping and aggregation using sorting. Suppose the number of blocks in relation R is 50,000 and in relation S is 20,000. Compute the memory and I/O cost for the sort-based union operation R ∪ S.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+  <p><b>Two-pass γ<sub>L</sub>(R) using sorting</b> (Section 3):</p>
+  <ol>
+    <li>Phase 1: read R M blocks at a time, sort each load on the grouping attributes of L, write it as a sorted sublist.</li>
+    <li>Phase 2: one buffer per sublist (first block loaded) plus an output buffer. Repeatedly take the least sort-key value v among the buffer fronts as the next group; initialize its accumulators (MIN, MAX, SUM, COUNT, or SUM and COUNT for AVG); consume every tuple with key v from all buffers, refilling an empty buffer from its sublist; when no v-tuples remain, output (v, aggregates).</li>
+    <li>Cost 3B(R); needs B(R) ≤ M² (M ≥ √B(R)).</li>
+  </ol>
+  <p><b>Sort-based R ∪ S with B(R) = 50,000, B(S) = 20,000.</b></p>
+  <ul>
+    <li><b>Memory:</b> all sublists of R and S must be merged at once: B(R)/M + B(S)/M ≤ M, so M² ≥ B(R) + B(S) = 70,000, <b>M ≥ √70,000 ≈ 264.6, so M = 265</b> blocks. Being exact (sublists of M blocks, one output buffer: ⌈50,000/M⌉ + ⌈20,000/M⌉ ≤ M − 1), M = 265 gives 189 + 76 = 265 sublists, one too many, and <b>M = 266</b> gives 188 + 76 = 264 ≤ 265: so 266 buffers are needed strictly.</li>
+    <li><b>I/O:</b> phase 1 reads and writes both relations: 2 × 70,000 = 140,000; phase 2 reads them once more: 70,000. Total <b>3(B(R) + B(S)) = 210,000</b> disk I/Os (plus the output write if the union is stored).</li>
+  </ul>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2013–14 · 15 marks</div>
+  <div class="exam-q"><p>Show the steps of duplicate elimination using a two-pass algorithm. Derive the relationship between number of records and memory size in this algorithm.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+  <p><b>Steps</b> (sort-based δ, Section 2):</p>
+  <ol>
+    <li>Phase 1: repeatedly read M blocks of R, sort the tuples in memory (on the whole tuple), and write them as a sorted sublist. (Duplicates inside one load may already be dropped here.)</li>
+    <li>Phase 2: allocate one buffer per sublist and one output buffer; load each sublist's first block.</li>
+    <li>Repeatedly find the smallest tuple t among the buffer fronts; output one copy of t; remove every copy of t from the fronts of all buffers, loading the next block of a sublist whenever its buffer empties (a run of t's may continue into it).</li>
+    <li>Write the output buffer whenever it fills. Stop when all sublists are exhausted. The output is δ(R), in sorted order.</li>
+  </ol>
+  <p><b>Relationship.</b> Let N = number of records, b = records per block, so B(R) = N/b blocks. Phase 1 makes B(R)/M sublists; phase 2 needs one buffer for each plus one output buffer:</p>
+  <p class="formula">B(R)/M ≤ M − 1 ⟹ N/b ≤ M(M − 1) ⟹ N ≤ b·M(M − 1) ≈ b·M²</p>
+  <p>So the number of records that can be de-duplicated in two passes grows with the <b>square</b> of the memory size: M ≥ √(N/b) blocks suffice. Example: b = 100 records per block, M = 1000 buffers: up to 100 × 1000 × 999 ≈ 10<sup>8</sup> records. The cost is 3B(R) = 3N/b I/Os.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2016–17 · 12 marks</div>
+  <div class="exam-q"><p>Write down the pseudocode for a sort-based union algorithm that computes R ∪ S. Also mention its runtime and constraints in terms of B(R), B(S) and M, where B(R) and B(S) are the number of blocks in R and S, and M is the number of blocks of each sublist to be sorted.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+  <pre>SortUnion(R, S, M):
+  -- Phase 1: sorted sublists of M blocks each
+  for each relation X in {R, S}:
+      repeat until X is exhausted:
+          read the next M blocks of X into memory; sort them on the whole tuple;
+          write them out as a sorted sublist
+  -- Phase 2: merge all sublists of R and S together
+  give each sublist one buffer and load its first block; one buffer is the output
+  while some buffer is non-empty:
+      t := smallest tuple at the front of all buffers
+      append t to the output buffer; if it is full, write it to disk
+      for each buffer: while its front tuple = t:
+          remove it; if the buffer is empty, load the next block of its sublist (if any)</pre>
+  <p><b>Runtime:</b> phase 1 reads and writes every block (2(B(R) + B(S))), phase 2 reads every block once (B(R) + B(S)): <b>3(B(R) + B(S))</b> disk I/Os, plus the output write if the result is stored.</p>
+  <p><b>Constraint:</b> phase 2 holds one buffer per sublist and one output buffer, and there are ⌈B(R)/M⌉ + ⌈B(S)/M⌉ sublists: ⌈B(R)/M⌉ + ⌈B(S)/M⌉ + 1 ≤ M, i.e. approximately <b>B(R) + B(S) ≤ M²</b>.</p>
+  <p><i>Alternative:</i> fully sort R and S separately with TPMMS (4B each, results stored) and then merge the two sorted files with 3 buffers: 5(B(R) + B(S)) I/Os, needing only B(R) ≤ M² and B(S) ≤ M² separately. The question bank lists this as the "unoptimized" version; the merged-phase version above is the slides' algorithm.</p>
+  </div></details>
+</div>
+
+<div class="key"><p><strong>Summary:</strong> sort-based two-pass algorithms = TPMMS phase 1 + a modified merge. δ: output one copy of the smallest tuple, drop the rest. γ: the smallest grouping value is the next group; aggregate all its tuples, then output it. ∪ / ∩ / −: sublists of both relations merged together; output t once, only if in both, or only if in R and not S; then drop all copies. Costs 3B(R) or 3(B(R) + B(S)); memory √B(R) or √(B(R) + B(S)).</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../s07/lecture.js"></script>
+<script>
+QE.sortTool('#dd', { items: 'c, a, d, a, b, c, e, a, b, d, c, f', tpb: 2, M: 3, dedup: true });
+
+// two-pass sort-based set operation: sublists of R and S, merge handling all copies of the smallest t
+function setTrace(R, S, op, M) {
+  const cmp = QE.cmpFor([...R, ...S]);
+  const mk = (rel, name) => QE.chunk(rel, M).map((c, i) => ({ name: `${name}${i + 1}`, rel: name, t: c.slice().sort(cmp), at: 0 }));
+  const subs = [...mk(R, 'R'), ...mk(S, 'S')], out = [], st = [];
+  const B = R.length + S.length;       // 1 tuple per block
+  const snap = (cap, t) => st.push({ subs: subs.map(s => ({ ...s })), out: out.slice(), t, cap });
+  snap(`Phase 1: R (${R.length} blocks) and S (${S.length} blocks) are read M = ${M} blocks at a time, sorted, and written as ${subs.length} sorted sublists: ${2 * B} disk I/Os. Phase 2 needs ${subs.length} input buffers + 1 output buffer ${subs.length + 1 <= M ? `≤ M = ${M}: OK` : `> M = ${M}: too many sublists for two passes (the animation still shows the logic)`}.`);
+  for (;;) {
+    const fronts = subs.filter(s => s.at < s.t.length).map(s => s.t[s.at]);
+    if (!fronts.length) break;
+    const t = fronts.reduce((a, b) => cmp(a, b) <= 0 ? a : b);
+    const inR = subs.some(s => s.rel === 'R' && s.t.slice(s.at).includes(t)), inS = subs.some(s => s.rel === 'S' && s.t.slice(s.at).includes(t));
+    const take = op === 'union' || (op === 'inter' && inR && inS) || (op === 'minus' && inR && !inS);
+    snap(`Smallest front tuple: <b>${t}</b>. It is ${inR ? 'in R' : 'not in R'} and ${inS ? 'in S' : 'not in S'}. ${take ? 'Output one copy.' : 'Do not output it.'}`, t);
+    if (take) out.push(t);
+    subs.forEach(s => { while (s.at < s.t.length && s.t[s.at] === t) s.at++; });
+    snap(`Remove every copy of ${t} from the fronts of all sublists.${take ? ` Output so far: ${out.join(', ')}.` : ''}`, null);
+  }
+  snap(`Done. Phase 2 read every block once more: total 3 × ${B} = <b>${3 * B}</b> disk I/Os = 3(B(R) + B(S)).`, null);
+  return st;
+}
+function setFrame(s) {
+  return s.subs.map(x => `<div class="qe-row"><span class="qe-lab">sublist ${x.name}</span><span class="qe-blk ${x.rel === 'R' ? '' : 'hl'}">${x.t.map((v, i) => `<span class="${i < x.at ? 'gone' : v === s.t ? 'pick' : ''}">${v}</span>`).join('')}</span></div>`).join('') +
+    `<div class="qe-row"><span class="qe-lab">output</span>${s.out.length ? s.out.map(v => `<span class="qe-blk new"><span>${v}</span></span>`).join('') : '<span class="qe-note">(nothing yet)</span>'}</div>`;
+}
+QE.form('#setop', [
+  { id: 'op', label: 'Operation', value: 'union', options: [['union', 'R ∪ S'], ['inter', 'R ∩ S'], ['minus', 'R − S']] },
+  { id: 'R', label: 'R (a set; 1 tuple per block)', value: '7, 2, 9, 4, 1, 8', cls: 'wide' },
+  { id: 'S', label: 'S (a set)', value: '4, 6, 2, 10, 3', cls: 'wide' },
+  { id: 'M', label: 'M', value: '5' },
+], 'Animate', (v, out) => {
+  const R = QE.list(v.R, 'R', 1, 10), S = QE.list(v.S, 'S', 1, 10), M = QE.int(v.M, 'M', 2, 6);
+  if (new Set(R).size !== R.length || new Set(S).size !== S.length) throw new Error('R and S must be sets: remove repeated tuples.');
+  out.innerHTML = '<div></div>';
+  stepper(out.firstChild, setTrace(R, S, v.op, M).map(s => ({ html: setFrame(s), cap: s.cap })), { interval: 1500 });
+});
+
+flashcards('#cards', [
+  { f: 'Sort-based δ, phase 2', b: 'Output one copy of the smallest front tuple t; discard all other copies of t.' },
+  { f: 'Sort-based γ, phase 2', b: 'Smallest grouping value v = next group; aggregate all v-tuples (refilling buffers); output (v, aggregates).' },
+  { f: 'Cost of sort-based δ / γ', b: '3B(R); memory B(R) ≤ M², i.e. M ≥ √B(R).' },
+  { f: 'Sort-based ∪ / ∩ / −', b: 'Sublists of both R and S merged together; cost 3(B(R) + B(S)); memory B(R) + B(S) ≤ M².' },
+  { f: 'Sort-based ∩ rule', b: 'Output t only if it is in some sublist of R and in some sublist of S.' },
+  { f: 'Sort-based R − S rule', b: 'Output t only if it is in R\'s sublists and in none of S\'s.' },
+]);
+quiz('#quiz', [
+  { q: 'B(R) = 40,000. Smallest M (using B ≤ M²) for two-pass sort-based δ?', opts: ['200', '400', '20,000', '40,000'], a: 0, why: '√40,000 = 200. One-pass δ would need about 40,000.' },
+  { q: 'Sort-based γ: when is a group\'s result tuple output?', opts: ['After phase 1', 'When no tuples with that key remain at the fronts', 'At the very end', 'As soon as its first tuple is seen'], a: 1, why: 'Slide 16: when there are no more tuples with sort key v, output the group.' },
+  { q: 'Sort-based R ∩ S, B(R) = 900, B(S) = 700, M = 30. Feasible in two passes?', opts: ['Yes', 'No: 1600 > 900', 'Only for bags', 'Yes, because 900 ≤ 30²'], a: 1, why: 'The sum matters: 1600 > M² = 900.' },
+  { q: 'Two-pass sort-based δ on B(R) = 5,000 costs…', opts: ['5,000', '10,000', '15,000', '20,000'], a: 2, why: '3B(R).' },
+  { q: 'Why does sort-based union need memory for the sum B(R) + B(S)?', opts: ['Both relations are stored in memory', 'All sublists of R and S need their own buffer at the same time', 'The output is large', 'It does not'], a: 1, why: 'Phase 2 merges every sublist of both relations at once.' },
+]);
+ask('#try1', { q: 'B(R) = 30,000, B(S) = 6,000. Using B(R) + B(S) ≤ M², the smallest M for sort-based R − S?', a: 190, why: '√36,000 = 189.7, so M = 190.' });
+ask('#try2', { q: 'Same R and S: disk I/Os of sort-based R − S?', a: 108000, why: '3 × 36,000.' });
+</script>
+</body>
+</html>

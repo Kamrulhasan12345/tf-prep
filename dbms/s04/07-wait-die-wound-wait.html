@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wait-Die and Wound-Wait · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 04 (Sukarna) · Chapter 7 · Slides 25–29 · Book §19.2.4</div>
+<h1>Deadlock Prevention by Timestamps: Wait-Die and Wound-Wait</h1>
+<p class="lede">Instead of maintaining a waits-for graph, give each transaction an age and let age decide who may wait for whom. This chapter defines deadlock timestamps, the wait-die and wound-wait rules, animates both slide examples, proves why neither can deadlock, and provides a side-by-side simulator for exam questions.</p>
+
+<h2>1. Why timestamps (slide 25)</h2>
+
+<p>Preventing deadlocks with the waits-for graph is time-consuming: every time a lock request must wait, the scheduler has to search a possibly large graph for a cycle. A cheaper alternative is to compare just two numbers whenever a transaction must wait.</p>
+
+<dl class="def">
+  <dt>Deadlock timestamp</dt><dd>A number given to each transaction when it starts, increasing over time. A smaller timestamp means an <b>older</b> transaction. It is used only for deadlock handling.</dd>
+</dl>
+<p>Two important details from the slide:</p>
+<ul>
+  <li>It is <strong>different from the timestamp used for timestamp-based concurrency control</strong> (the RT/WT scheme of the previous lecture), even if that scheme is also in use.</li>
+  <li><strong>If a transaction is rolled back and restarts because of deadlock handling, it keeps its old deadlock timestamp.</strong> (A concurrency-control timestamp, by contrast, is renewed on restart.) Keeping the old timestamp is what prevents starvation (Chapter 8).</li>
+</ul>
+
+<h2>2. The two schemes (slide 26)</h2>
+
+<p>Both rules apply at the moment a transaction <b>T</b> requests a lock and would have to wait for a lock held by another transaction <b>U</b>. (The slide says the policies "detect" deadlocks; strictly they <em>prevent</em> them, since a cycle never forms. It also writes "would-wait" for wound-wait.)</p>
+
+<div class="tbl"><table>
+  <tr><th>T requests a lock held by U</th><th>Wait-die</th><th>Wound-wait</th></tr>
+  <tr><td><b>T is older</b> (TS(T) &lt; TS(U))</td><td><span class="mid">T waits</span> for U</td><td><span class="bad">T wounds U</span>: U is rolled back, its locks are released and granted to T</td></tr>
+  <tr><td><b>T is younger</b> (TS(T) &gt; TS(U))</td><td><span class="bad">T dies</span>: T is rolled back</td><td><span class="mid">T waits</span> for U</td></tr>
+</table></div>
+
+<p>Memory aid, always from the point of view of the <em>requester</em>: in <b>wait-die</b> "old waits, young dies"; in <b>wound-wait</b> "old wounds, young waits". In both, the <em>older</em> transaction always wins; the schemes differ in whether the loser is the young requester (wait-die) or the young holder (wound-wait). If U holds a conflicting lock together with others, the rule is applied against each of them: in wait-die T may wait only if it is older than all of them; in wound-wait T wounds every younger holder and waits for any older ones.</p>
+
+<p>One exception from the textbook: a wound "usually is fatal", but if by the time the wound takes effect U has already finished and released its locks, U survives and is not rolled back.</p>
+
+<h2>3. Example under wait-die (slide 27, textbook Fig. 19.9)</h2>
+<p>The transactions are the reordered ones from Chapter 6. Timestamps follow the numbering: T<sub>1</sub> is the oldest, T<sub>4</sub> the youngest. Rolled-back transactions restart later with their old timestamps (here T<sub>4</sub> happens to restart first, at row 9).</p>
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="wd"></div>
+</figure>
+<p>The slide's highlights: <b>step 2</b>, T<sub>2</sub> asks for A, held by the older T<sub>1</sub>, so T<sub>2</sub> dies. <b>Step 4</b>, T<sub>4</sub> asks for A held by T<sub>1</sub>, and dies for the same reason. T<sub>3</sub> and then T<sub>1</sub> complete. <b>Step 10</b>, the restarted T<sub>2</sub> asks for A, now held by the restarted T<sub>4</sub>. T<sub>2</sub> is <em>older</em> than T<sub>4</sub> (timestamps never change), so this time T<sub>2</sub> waits instead of dying. T<sub>4</sub> finishes and T<sub>2</sub> runs to completion.</p>
+
+<h2>4. Example under wound-wait (slide 28, textbook Fig. 19.10)</h2>
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="ww"></div>
+</figure>
+<p>The slide's highlights: <b>step 2</b>, T<sub>2</sub> asks for A held by the older T<sub>1</sub>, so the younger requester waits. <b>Step 4</b>, T<sub>4</sub> also waits for T<sub>1</sub>. <b>Step 5</b>, T<sub>1</sub> asks for B, held by the younger T<sub>3</sub>; T<sub>3</sub> has not finished, so the wound is fatal: T<sub>3</sub> is rolled back and B goes to T<sub>1</sub>. T<sub>1</sub> completes, the lock on A goes to T<sub>2</sub>, then to T<sub>4</sub>, and finally T<sub>3</sub> restarts and completes without interference.</p>
+
+<h2>5. Why neither scheme can deadlock (slide 29)</h2>
+<p>A deadlock needs a cycle in the waits-for graph. Look at which edges each scheme allows:</p>
+<ul>
+  <li><strong>Wait-die:</strong> a transaction may wait only for a <em>younger</em> one. Every edge T → U has TS(T) &lt; TS(U).</li>
+  <li><strong>Wound-wait:</strong> a transaction may wait only for an <em>older</em> one. Every edge T → U has TS(T) &gt; TS(U).</li>
+</ul>
+<p>So if T<sub>1</sub> waits for T<sub>2</sub>, then T<sub>2</sub> can never wait for T<sub>1</sub>. More generally (the textbook's argument): suppose there were a cycle, and let T be the oldest transaction on it. In wait-die, T's predecessor on the cycle waits for T, which is older than it: forbidden. In wound-wait, T itself waits for its successor, which is younger: forbidden. Either way the cycle cannot exist. Timestamps strictly increase (or strictly decrease) along every path, and a path that returns to its start would need a timestamp smaller than itself.</p>
+
+<h2>6. Interactive simulator: wait-die and wound-wait side by side</h2>
+<p>Enter lock requests in the same format as the waits-for tool (<code>l1(A)</code>, <code>sl1(A)</code>, <code>xl1(A)</code>, <code>u1(A)</code>, <code>c1</code>, or bare <code>r1(A)</code>/<code>w1(A)</code> which take shared/exclusive locks automatically) and, optionally, timestamps such as <code>T1=100, T2=150</code> (otherwise T<sub>i</sub> gets timestamp i). Exam questions usually say rolled-back transactions do <em>not</em> restart, which is the default; tick the box to let a rolled-back transaction restart (with its old timestamp) when its next action appears. Actions of a waiting transaction are delayed until it gets its lock.</p>
+<figure class="wide">
+<span class="anim-tag">Interactive tool</span>
+<div id="tool"></div>
+</figure>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+
+<h3>Exam questions</h3>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 24-25 3b · 10 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-1 | 2024–25 · 12 marks</div>
+  <div class="exam-q"><p>Consider the following database schedule involving four transactions T<sub>1</sub>, T<sub>2</sub>, T<sub>3</sub> and T<sub>4</sub>:</p>
+  <p>S: l<sub>1</sub>(A); r<sub>1</sub>(A); l<sub>2</sub>(B); w<sub>2</sub>(B); l<sub>2</sub>(A); l<sub>3</sub>(C); r<sub>3</sub>(C); l<sub>3</sub>(A); l<sub>4</sub>(C); r<sub>4</sub>(C); l<sub>1</sub>(C);</p>
+  <p>Assume that the deadlock timestamps of the transactions are 100, 150, 200, and 250, for T<sub>1</sub>, T<sub>2</sub>, T<sub>3</sub>, and T<sub>4</sub>, respectively. (i) Determine the actions (wound/wait) that are taken by the wound-wait deadlock prevention protocol. Assume that transactions are not restarted after rollback. (ii) Determine the actions (wait/die) that are taken by the wait-die deadlock prevention protocol. Assume that transactions are not restarted after rollback.</p>
+  <p><em>Note:</em> the CSE 215 bank prints this question with a different schedule: S: l<sub>1</sub>(A); r<sub>1</sub>(A); l<sub>2</sub>(B); w<sub>2</sub>(B); <b>l<sub>1</sub>(B)</b>; l<sub>3</sub>(C); r<sub>3</sub>(C); <b>l<sub>2</sub>(C)</b>; l<sub>4</sub>(C); r<sub>4</sub>(C); l<sub>1</sub>(C). Both versions are answered below.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+  <p>Ages: T<sub>1</sub> (100) is the oldest, then T<sub>2</sub> (150), T<sub>3</sub> (200), T<sub>4</sub> (250). Only lock requests that hit a lock held by someone else need a decision; everything else is granted. A transaction that is waiting cannot issue further actions; a rolled-back one issues none (no restart).</p>
+  <p><strong>Version 1 (DB QB).</strong></p>
+  <div class="tbl"><table>
+    <tr><th>Action</th><th>Holder</th><th>(i) Wound-wait</th><th>(ii) Wait-die</th></tr>
+    <tr><td>l<sub>1</sub>(A), l<sub>2</sub>(B), l<sub>3</sub>(C)</td><td>free</td><td>granted</td><td>granted (l<sub>3</sub>(C) too)</td></tr>
+    <tr><td>l<sub>2</sub>(A)</td><td>T<sub>1</sub></td><td>T<sub>2</sub> younger: <b>T<sub>2</sub> waits</b></td><td>T<sub>2</sub> younger: <b>T<sub>2</sub> dies</b> (releases B)</td></tr>
+    <tr><td>l<sub>3</sub>(A)</td><td>T<sub>1</sub></td><td>T<sub>3</sub> younger: <b>T<sub>3</sub> waits</b></td><td>T<sub>3</sub> younger: <b>T<sub>3</sub> dies</b> (releases C)</td></tr>
+    <tr><td>l<sub>4</sub>(C)</td><td>WW: T<sub>3</sub>; WD: free</td><td>T<sub>4</sub> younger than T<sub>3</sub>: <b>T<sub>4</sub> waits</b> (r<sub>4</sub>(C) delayed)</td><td>C is free: granted, r<sub>4</sub>(C) runs</td></tr>
+    <tr><td>l<sub>1</sub>(C)</td><td>WW: T<sub>3</sub>; WD: T<sub>4</sub></td><td>T<sub>1</sub> older than T<sub>3</sub>: <b>T<sub>1</sub> wounds T<sub>3</sub></b>; T<sub>3</sub> rolls back, C goes to T<sub>1</sub></td><td>T<sub>1</sub> older than T<sub>4</sub>: <b>T<sub>1</sub> waits</b></td></tr>
+  </table></div>
+  <p>Final state, wound-wait: T<sub>1</sub> holds A and C and runs; T<sub>2</sub> waits for A (on T<sub>1</sub>); T<sub>4</sub> waits for C (now on T<sub>1</sub>); T<sub>3</sub> rolled back. Wait-die: T<sub>4</sub> holds C and runs; T<sub>1</sub> waits for T<sub>4</sub>; T<sub>2</sub> and T<sub>3</sub> rolled back.</p>
+  <p><strong>Version 2 (CSE 215 bank).</strong></p>
+  <div class="tbl"><table>
+    <tr><th>Action</th><th>(i) Wound-wait</th><th>(ii) Wait-die</th></tr>
+    <tr><td>l<sub>1</sub>(A), l<sub>2</sub>(B)</td><td>granted</td><td>granted</td></tr>
+    <tr><td>l<sub>1</sub>(B) (held by T<sub>2</sub>)</td><td>T<sub>1</sub> older: <b>T<sub>1</sub> wounds T<sub>2</sub></b>; B goes to T<sub>1</sub></td><td>T<sub>1</sub> older: <b>T<sub>1</sub> waits</b> for T<sub>2</sub></td></tr>
+    <tr><td>l<sub>3</sub>(C)</td><td>granted</td><td>granted</td></tr>
+    <tr><td>l<sub>2</sub>(C) (held by T<sub>3</sub>)</td><td>ignored: T<sub>2</sub> was rolled back</td><td>T<sub>2</sub> older than T<sub>3</sub>: <b>T<sub>2</sub> waits</b></td></tr>
+    <tr><td>l<sub>4</sub>(C) (held by T<sub>3</sub>)</td><td>T<sub>4</sub> younger: <b>T<sub>4</sub> waits</b></td><td>T<sub>4</sub> younger: <b>T<sub>4</sub> dies</b> (r<sub>4</sub>(C) never runs)</td></tr>
+    <tr><td>l<sub>1</sub>(C)</td><td>held by T<sub>3</sub>, T<sub>1</sub> older: <b>T<sub>1</sub> wounds T<sub>3</sub></b>; C goes to T<sub>1</sub></td><td>not issued: T<sub>1</sub> is still waiting for B</td></tr>
+  </table></div>
+  <p>Final state, wound-wait: T<sub>1</sub> holds A, B, C; T<sub>4</sub> waits for C (on T<sub>1</sub>); T<sub>2</sub>, T<sub>3</sub> rolled back. Wait-die: T<sub>3</sub> holds C and runs; T<sub>1</sub> waits for T<sub>2</sub>, T<sub>2</sub> waits for T<sub>3</sub> (a chain of older-waits-for-younger, never a cycle); T<sub>4</sub> rolled back. The CSE bank's answer to its version agrees. Both versions can be replayed in the simulator above with timestamps <code>T1=100, T2=150, T3=200, T4=250</code>.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 23-24 8a · 13 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-1 | 2023–24 · 13 marks</div>
+  <div class="exam-q"><p>Consider the following schedule involving four transactions T<sub>1</sub>, T<sub>2</sub>, T<sub>3</sub> and T<sub>4</sub>:</p>
+  <p>l<sub>2</sub>(A), r<sub>2</sub>(A), l<sub>2</sub>(B), l<sub>1</sub>(A), l<sub>3</sub>(C), r<sub>3</sub>(C), l<sub>3</sub>(B), l<sub>4</sub>(C), r<sub>4</sub>(C), l<sub>1</sub>(C), r<sub>1</sub>(C)</p>
+  <p>Assume that timestamp-based deadlock prevention scheme is used and the timestamps (TS) of the transactions are as follows: TS(T<sub>1</sub>) &lt; TS(T<sub>2</sub>) &lt; TS(T<sub>3</sub>) &lt; TS(T<sub>4</sub>). (i) For each lock action l<sub>i</sub>(X), determine what happens under the wait-die scheme. (ii) For each lock action l<sub>i</sub>(X), determine what happens under the wound-wait scheme.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+  <p>T<sub>1</sub> is the oldest, T<sub>4</sub> the youngest. No restarts are assumed.</p>
+  <div class="tbl"><table>
+    <tr><th>Lock action</th><th>(i) Wait-die</th><th>(ii) Wound-wait</th></tr>
+    <tr><td>l<sub>2</sub>(A)</td><td>granted</td><td>granted</td></tr>
+    <tr><td>l<sub>2</sub>(B)</td><td>granted</td><td>granted</td></tr>
+    <tr><td>l<sub>1</sub>(A) (A held by T<sub>2</sub>)</td><td>T<sub>1</sub> older: <b>T<sub>1</sub> waits</b></td><td>T<sub>1</sub> older: <b>T<sub>1</sub> wounds T<sub>2</sub></b>; T<sub>2</sub> rolls back, releasing A and B; A goes to T<sub>1</sub></td></tr>
+    <tr><td>l<sub>3</sub>(C)</td><td>granted</td><td>granted</td></tr>
+    <tr><td>l<sub>3</sub>(B)</td><td>B held by T<sub>2</sub>, T<sub>3</sub> younger: <b>T<sub>3</sub> dies</b>, releasing C</td><td>B is free (T<sub>2</sub> was rolled back): granted</td></tr>
+    <tr><td>l<sub>4</sub>(C)</td><td>C is free: granted (and r<sub>4</sub>(C) runs)</td><td>C held by T<sub>3</sub>, T<sub>4</sub> younger: <b>T<sub>4</sub> waits</b></td></tr>
+    <tr><td>l<sub>1</sub>(C)</td><td>not issued yet: T<sub>1</sub> is still waiting for A (it and r<sub>1</sub>(C) are delayed until T<sub>2</sub> releases A)</td><td>C held by T<sub>3</sub>, T<sub>1</sub> older: <b>T<sub>1</sub> wounds T<sub>3</sub></b>; C goes to T<sub>1</sub>, and r<sub>1</sub>(C) runs</td></tr>
+  </table></div>
+  <p>End states. Wait-die: T<sub>2</sub> (holding A, B) and T<sub>4</sub> (holding C) run; T<sub>1</sub> waits for T<sub>2</sub>; T<sub>3</sub> died. When T<sub>2</sub> finishes, T<sub>1</sub> gets A and then asks for C, held by the younger T<sub>4</sub>, so it waits again. Wound-wait: T<sub>3</sub> obtained B but was later wounded, which released B and C; T<sub>1</sub> holds A and C, T<sub>4</sub> waits for C (on T<sub>1</sub>), T<sub>2</sub> and T<sub>3</sub> are rolled back. The question bank's answer agrees.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 22-23 3d · 10 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-1 | 2022–23 · 10 marks</div>
+  <div class="exam-q"><p>Consider the following schedule of actions involving four transactions T<sub>1</sub>, T<sub>2</sub>, T<sub>3</sub> and T<sub>4</sub>:</p>
+  <p>r<sub>1</sub>(A); r<sub>2</sub>(B); w<sub>1</sub>(C); r<sub>3</sub>(D); w<sub>3</sub>(B); w<sub>2</sub>(C); w<sub>4</sub>(A); w<sub>1</sub>(D); w<sub>1</sub>(B);</p>
+  <p>Assume that the deadlock-timestamps of T<sub>1</sub>, T<sub>2</sub>, T<sub>3</sub> and T<sub>4</sub> are 1, 2, 3 and 4, respectively. For each action of the given schedule, determine what happens ("wound" or "wait") under the wound-wait deadlock avoidance system. If the action is a "wound", then don't restart the transaction.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+  <p>As in Chapter 5's version of this schedule, each read first takes a shared lock and each write an exclusive lock, held until the end.</p>
+  <div class="tbl"><table>
+    <tr><th>Action</th><th>Lock</th><th>Conflict with</th><th>Wound-wait decision</th></tr>
+    <tr><td>r<sub>1</sub>(A)</td><td>S(A)</td><td>none</td><td>granted</td></tr>
+    <tr><td>r<sub>2</sub>(B)</td><td>S(B)</td><td>none</td><td>granted</td></tr>
+    <tr><td>w<sub>1</sub>(C)</td><td>X(C)</td><td>none</td><td>granted</td></tr>
+    <tr><td>r<sub>3</sub>(D)</td><td>S(D)</td><td>none</td><td>granted</td></tr>
+    <tr><td>w<sub>3</sub>(B)</td><td>X(B)</td><td>T<sub>2</sub> (S)</td><td>T<sub>3</sub> (3) younger than T<sub>2</sub> (2): <b>T<sub>3</sub> waits</b></td></tr>
+    <tr><td>w<sub>2</sub>(C)</td><td>X(C)</td><td>T<sub>1</sub> (X)</td><td>T<sub>2</sub> (2) younger than T<sub>1</sub> (1): <b>T<sub>2</sub> waits</b></td></tr>
+    <tr><td>w<sub>4</sub>(A)</td><td>X(A)</td><td>T<sub>1</sub> (S)</td><td>T<sub>4</sub> younger than T<sub>1</sub>: <b>T<sub>4</sub> waits</b></td></tr>
+    <tr><td>w<sub>1</sub>(D)</td><td>X(D)</td><td>T<sub>3</sub> (S)</td><td>T<sub>1</sub> older than T<sub>3</sub>: <b>T<sub>1</sub> wounds T<sub>3</sub></b>. T<sub>3</sub> rolls back (its wait for B is cancelled, S(D) released); T<sub>1</sub> gets X(D) and writes D</td></tr>
+    <tr><td>w<sub>1</sub>(B)</td><td>X(B)</td><td>T<sub>2</sub> (S)</td><td>T<sub>1</sub> older than T<sub>2</sub>: <b>T<sub>1</sub> wounds T<sub>2</sub></b>. T<sub>2</sub> rolls back (its wait for C is cancelled, S(B) released); T<sub>1</sub> gets X(B) and writes B</td></tr>
+  </table></div>
+  <p>Result: T<sub>1</sub> continues holding A (S), C, D, B (X); T<sub>4</sub> waits for A (on T<sub>1</sub>); T<sub>2</sub> and T<sub>3</sub> are rolled back and not restarted. Compare Chapter 5: with plain waiting the same actions deadlock (T<sub>1</sub> → T<sub>3</sub> → T<sub>2</sub> → T<sub>1</sub>), while wound-wait never lets the cycle form. The question bank's answer agrees.</p>
+  </div></details>
+</div>
+
+<div class="key"><p><strong>Summary:</strong> each transaction gets a deadlock timestamp (smaller = older) that it keeps across restarts. When T must wait for U: under <b>wait-die</b>, T waits if older and dies if younger; under <b>wound-wait</b>, T wounds (rolls back) U if T is older and waits if younger. Waits then only go from older to younger (wait-die) or younger to older (wound-wait), so the waits-for graph can never have a cycle and no deadlock forms.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="lecture.js"></script>
+<script>
+function figAnim(sel, seq, policy, rowOf, notes) {
+  const acts = s4parse(seq, 'lock').acts, R = s4lockSim(acts, { policy, restart: true });
+  stepper(sel, s4groupFrames(R.frames, rowOf).map(({ row, f, lines, acts }) => ({
+    html: `<div class="s4-two"><div><div class="figlabel">transactions (T1 oldest … T4 youngest)</div>${s4status(f, R.txns)}</div><div class="s4-side">${s4lockTable(f)}</div></div>`,
+    cap: `<b>Row ${row}</b> (<code>${acts.join('; ')}</code>): ${lines.map(l => l.h).join(' ')}${notes[row] ? ' ' + notes[row] : ''}`,
+  })), { interval: 2600 });
+}
+figAnim('#wd', 'l1(A); r1(A); l2(A); l3(B); r3(B); l4(A); l3(C); w3(C); u3(B); u3(C); l1(B); w1(B); u1(A); u1(B); l4(A); l4(D); l2(A); r4(D); w4(A); u4(A); u4(D); l2(C); r2(C); w2(A); u2(A); u2(C)',
+  'wait-die', [1, 1, 2, 3, 3, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 11, 11, 12, 12, 13, 14, 14, 15, 15],
+  { 2: '(Slide: "Step 2: T2 dies.")', 4: '(Slide: "Step 4: T4 dies.")', 10: '(Slide: "Step 10: T2 waits.")', 9: 'T4 restarts first, as the textbook assumes.' });
+figAnim('#ww', 'l1(A); r1(A); l2(A); l3(B); r3(B); l4(A); l1(B); w1(B); u1(A); u1(B); l2(C); r2(C); w2(A); u2(A); u2(C); l4(D); r4(D); w4(A); u4(A); u4(D); l3(B); r3(B); l3(C); w3(C); u3(B); u3(C)',
+  'wound-wait', [1, 1, 2, 3, 3, 4, 5, 5, 6, 6, 7, 8, 8, 9, 9, 10, 11, 11, 12, 12, 13, 13, 14, 14, 15, 15],
+  { 2: '(Slide: "Step 2: T2 waits.")', 4: '(Slide: "Step 4: T4 waits.")', 5: '(Slide: "Step 5: T1 wounds T3.")' });
+
+wdwwTool('#tool', 'l1(A); r1(A); l2(B); w2(B); l2(A); l3(C); r3(C); l3(A); l4(C); r4(C); l1(C)', 'T1=100, T2=150, T3=200, T4=250');
+
+flashcards('#cards', [
+  { f: 'Deadlock timestamp', b: 'Age of a transaction for deadlock handling only; smaller = older; kept when the transaction restarts.' },
+  { f: 'Wait-die', b: 'Requester older than holder: waits. Requester younger: dies (rolled back).' },
+  { f: 'Wound-wait', b: 'Requester older than holder: wounds the holder (holder rolled back, lock to requester). Requester younger: waits.' },
+  { f: 'Who loses?', b: 'Always the younger transaction: the requester in wait-die, the holder in wound-wait.' },
+  { f: 'Why no deadlock (wait-die)', b: 'Waits go only from older to younger, so timestamps increase along any path; a cycle is impossible.' },
+  { f: 'Why no deadlock (wound-wait)', b: 'Waits go only from younger to older; a cycle is impossible.' },
+  { f: 'Wound exception', b: 'If the wounded U has already finished and released its locks, it survives.' },
+]);
+quiz('#quiz', [
+  { q: 'Wait-die, TS(T<sub>5</sub>) = 5, TS(T<sub>2</sub>) = 2. T<sub>5</sub> requests a lock held by T<sub>2</sub>.', opts: ['T<sub>5</sub> waits', 'T<sub>5</sub> dies', 'T<sub>5</sub> wounds T<sub>2</sub>', 'T<sub>2</sub> waits'], a: 1, why: 'T<sub>5</sub> is younger, and young requesters die.' },
+  { q: 'Wound-wait, same situation (T<sub>5</sub> requests, T<sub>2</sub> holds).', opts: ['T<sub>5</sub> waits', 'T<sub>5</sub> dies', 'T<sub>5</sub> wounds T<sub>2</sub>', 'T<sub>2</sub> dies'], a: 0, why: 'Young requesters wait in wound-wait.' },
+  { q: 'Wound-wait, T<sub>2</sub> requests a lock held by T<sub>5</sub>.', opts: ['T<sub>2</sub> waits', 'T<sub>2</sub> dies', 'T<sub>5</sub> is rolled back and T<sub>2</sub> gets the lock', 'Both wait'], a: 2, why: 'Old requesters wound younger holders.' },
+  { q: 'A transaction killed by wait-die restarts. Its deadlock timestamp…', opts: ['is renewed (younger)', 'stays the same', 'becomes 0', 'is copied from its killer'], a: 1, why: 'Slide 25. That is how it eventually becomes the oldest.' },
+  { q: 'In wait-die, can an edge T<sub>3</sub> → T<sub>1</sub> (T<sub>3</sub> waits for T<sub>1</sub>) ever appear?', opts: ['Yes', 'No, a younger transaction never waits for an older one', 'Only with shared locks', 'Only after a restart'], a: 1, why: 'T<sub>3</sub> would die instead of waiting.' },
+  { q: 'Wait-die: T<sub>2</sub> requests X held by T<sub>3</sub> (S) and T<sub>1</sub> (S), wanting an exclusive lock. What happens?', opts: ['T<sub>2</sub> waits', 'T<sub>2</sub> dies, because T<sub>1</sub> is older', 'T<sub>2</sub> wounds T<sub>3</sub>', 'Granted'], a: 1, why: 'T<sub>2</sub> may wait only if it is older than every conflicting holder.' },
+]);
+ask('#try1', { q: 'Wound-wait with TS = 1, 2, 3 for T<sub>1</sub>, T<sub>2</sub>, T<sub>3</sub>: l3(A); l2(A); l1(A). How many transactions are rolled back?', a: 2, why: 'l2(A): T<sub>2</sub> is older than the holder T<sub>3</sub>, so T<sub>3</sub> is wounded and A goes to T<sub>2</sub>. l1(A): T<sub>1</sub> is older than T<sub>2</sub>, so T<sub>2</sub> is wounded as well. Under wait-die the answer would be 0: both requesters are older, so both wait.', hint: 'Each requester is older than the current holder.' });
+</script>
+</body>
+</html>

@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Boyce-Codd Normal Form · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 01 (Sukarna) · Chapter 11 · Slides 45–50 · Book §3.3.3–3.3.4</div>
+<h1>Boyce-Codd Normal Form and BCNF Decomposition</h1>
+<p class="lede">BCNF is the condition that guarantees the anomalies of Chapter 9 cannot occur: every nontrivial FD must have a superkey on its left. This chapter tests Movies1 and Movies2, proves that two-attribute relations are always in BCNF, runs the BCNF decomposition algorithm on the slides' studio example as a tree, and works eight exam questions.</p>
+
+<h2>1. Definition (slide 45)</h2>
+<dl class="def">
+  <dt>Boyce-Codd Normal Form (BCNF)</dt>
+  <dd>A relation R is in BCNF if and only if, whenever A₁A₂…Aₙ → B₁B₂…Bₘ is a nontrivial FD that holds on R, {A₁, A₂, …, Aₙ} is a superkey of R. In short: <em>the left side of every nontrivial FD is a superkey</em>. Equivalently: the left side of every nontrivial FD contains a key.</dd>
+  <dt>BCNF violation</dt><dd>A nontrivial FD X → Y on R whose left side X is not a superkey.</dd>
+</dl>
+<p>Why this kills anomalies: an FD X → Y with X not a superkey means several tuples can share the same X-value, and each of them repeats the same Y-value. That repetition is the redundancy behind every anomaly. If X is a superkey, only one tuple has each X-value, so there is nothing to repeat.</p>
+<p><strong>Test for a violation (slide 45):</strong> for each nontrivial FD X → Y, compute X⁺. If X⁺ contains every attribute of R, X is a superkey and the FD is fine; otherwise the FD violates BCNF.</p>
+<p><strong>Which FDs must be checked?</strong> For the original relation R with its given FD set F, checking the FDs of F is enough: if no FD in F violates BCNF, no FD that follows from F does either. For a relation produced by decomposition, check the <em>projected</em> FDs (Chapter 10), because a violation can hide in an FD that is not in the original list.</p>
+
+<h2>2. Movies1 and Movies2 (slides 46–47)</h2>
+<div class="figrow">
+<div class="q" style="flex:1 1 300px"><h4>Movies1: not in BCNF</h4>
+<p>Only key: {title, year, starName}. The FD <code>title year → length genre studioName</code> is nontrivial, and {title, year}⁺ = {title, year, length, genre, studioName} lacks starName. So {title, year} is not a superkey: <strong>BCNF violation</strong>.</p></div>
+<div class="q" style="flex:1 1 300px"><h4>Movies2: in BCNF</h4>
+<p>Movies2(title, year, length, genre, studioName) has only key {title, year}. Its nontrivial FDs all have title and year on the left (neither alone determines anything), so every left side is a superkey: <strong>BCNF</strong>. Movies3(title, year, starName) has no nontrivial FDs at all, so it is in BCNF too.</p></div>
+</div>
+
+<h3>Every two-attribute relation is in BCNF (book Example 3.17)</h3>
+<p>Let R(A, B). A nontrivial FD must have one attribute on each side, so the only candidates are A → B and B → A. Four cases:</p>
+<ol>
+  <li>Neither holds: there are no nontrivial FDs, nothing can violate BCNF ({A, B} is the key).</li>
+  <li>Only A → B holds: A is the key, and the only nontrivial FD has A on the left.</li>
+  <li>Only B → A holds: symmetric, B is the key.</li>
+  <li>Both hold: A and B are both keys, so either left side is a superkey.</li>
+</ol>
+<p>In every case each nontrivial FD has a superkey on its left. This is why the decomposition below always terminates: pieces only get smaller, and pieces of size 2 are automatically in BCNF.</p>
+
+<h2>3. The BCNF decomposition algorithm (slide 48)</h2>
+<pre>BCNF_decompose(R, S):                         -- "BCNF analysis"
+  Step 1. If R is in BCNF, return {R}.
+  Step 2. Let X → Y be a BCNF violation. Compute X⁺.
+            R₁ := X⁺                         (X and everything it determines)
+            R₂ := X ∪ (R − X⁺)                (X and everything it does not)
+  Step 3. Project S onto R₁ and onto R₂, giving S₁ and S₂ (Chapter 10).
+  Step 4. Recursively decompose (R₁, S₁) and (R₂, S₂); return the union.</pre>
+<figure>
+<svg viewBox="0 0 600 150" width="600" role="img" aria-label="R split into X⁺ and X plus the rest">
+  <rect x="40" y="40" width="130" height="34" class="cell-hl"/><text x="105" y="62" text-anchor="middle" class="big">X</text>
+  <rect x="170" y="40" width="190" height="34" class="cell-new"/><text x="265" y="62" text-anchor="middle" class="big">X⁺ − X</text>
+  <rect x="360" y="40" width="200" height="34" class="cell"/><text x="460" y="62" text-anchor="middle" class="big">R − X⁺ (the rest)</text>
+  <text x="40" y="28" class="lbl">R</text>
+  <path d="M40 90 H360" class="s-grn"/><text x="200" y="108" text-anchor="middle" class="lbl grn">R₁ = X⁺</text>
+  <path d="M40 124 H170 M360 124 H560" class="s-acc"/><path d="M170 124 H360" class="s-acc dash"/><text x="300" y="142" text-anchor="middle" class="lbl acc">R₂ = X ∪ (R − X⁺): skips X⁺ − X</text>
+</svg>
+<figcaption><b>Figure 1.</b> The split (book Fig. 3.8). X appears in both pieces, so they can be joined on X. X is a key of R₁, which is what makes the split lossless (Chapter 12).</figcaption>
+</figure>
+<p>Using all of X⁺ (rather than just Y) for R₁ is optional, but the textbook recommends it: it moves everything X determines at once and usually saves later steps.</p>
+
+<h2>4. Slides 49–50: the studio example</h2>
+<p>Relation {title, year, studioName, president, presAddr}: each movie, its studio, the studio's president and the president's address. FDs:</p>
+<p class="formula">title year → studioName &nbsp; studioName → president &nbsp; president → presAddr</p>
+<ul>
+  <li>Closing sets shows the only key is {title, year}. The last two FDs violate BCNF.</li>
+  <li>Take studioName → president. {studioName}⁺ = {studioName, president, presAddr}. Split into <strong>R₁ = {studioName, president, presAddr}</strong> and <strong>R₂ = {title, year, studioName}</strong>.</li>
+  <li>Projected FDs: on R₂, title year → studioName; key {title, year}; BCNF. On R₁, studioName → president and president → presAddr; key {studioName}; president → presAddr violates BCNF.</li>
+  <li>Split R₁ on president → presAddr: <strong>R₃ = {president, presAddr}</strong>, <strong>R₄ = {studioName, president}</strong>.</li>
+  <li>Final: {title, year, studioName}, {studioName, president}, {president, presAddr}. All in BCNF.</li>
+</ul>
+<p class="tbl-note">Slide 50 errata: it writes “S₁ = {title yaer → studioName} and S₂ = {studioName → president, …}” (the second set runs off the edge of the slide). The labels are swapped: S₁ belongs to R₁ = {studioName, president, presAddr}, so S₁ = {studioName → president, president → presAddr}, and S₂ = {title year → studioName} belongs to R₂. “yaer” means year.</p>
+
+<figure class="wide">
+<span class="anim-tag">Interactive tool</span>
+<div id="tool"></div>
+<figcaption><b>Tool 4: BCNF checker and decomposition tree.</b> The table tests every given FD. The animation grows the decomposition tree one split at a time: orange nodes still violate BCNF, green leaves are in BCNF. The tool picks the first violating FD in your order (for the root) and reports whether dependencies were preserved (Chapter 13).</figcaption>
+</figure>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+
+<h3>Exam questions</h3>
+<div class="exam">
+  <div class="exam-src">DB QB · 21-22 3c · 10 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-2 | 2021–22 · 20 marks</div>
+  <div class="exam-q"><p>Consider a relation with schema R(A, B, C, D, E) and FD's AB → C, DE → C, and B → D. Decompose the relations, as necessary, into collections of relations that are in BCNF. Show your work, and the final normalized schema including all keys.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><strong>Key.</strong> A and E appear on no right side, so they are in every key. (AE)⁺ = {A, E}. Add B: (ABE)⁺: B → D, AB → C → {A, B, C, D, E}. Adding C or D instead: (ACE)⁺ = {A, C, E}, (ADE)⁺ = {A, C, D, E} (DE → C), neither complete; (ACDE)⁺ = ACDE. So the only key is <strong>ABE</strong>.</p>
+    <p><strong>Violations.</strong> AB⁺ = ABCD, DE⁺ = CDE, B⁺ = BD: none is a superkey, so all three given FDs violate BCNF.</p>
+    <p><strong>Split 1</strong> on AB → C. (AB)⁺ = {A, B, C, D}. R₁ = <b>ABCD</b>, R₂ = AB ∪ (R − ABCD) = <b>ABE</b>.</p>
+    <ul>
+      <li>R₂(A, B, E): projected FDs: none nontrivial (no subset of ABE determines another attribute of ABE). Key ABE. BCNF.</li>
+      <li>R₁(A, B, C, D): projected FDs: AB → C, B → D (DE → C needs E, which is not in R₁). Key AB. B → D violates BCNF (B⁺ = BD).</li>
+    </ul>
+    <p><strong>Split 2</strong> of R₁ on B → D: B⁺ ∩ R₁ = {B, D}. R₃ = <b>BD</b>, R₄ = B ∪ (ABCD − BD) = <b>ABC</b>. R₃: B → D, key B. R₄: AB → C, key AB. Both BCNF.</p>
+    <div id="t69"></div>
+    <p><strong>Final schema:</strong> R₂(<u>A, B, E</u>), R₃(<u>B</u>, D), R₄(<u>A, B</u>, C). (Keys underlined.) The decomposition is lossless. It is <em>not</em> dependency preserving: DE → C cannot be checked in any piece (no piece contains D, E and C together). Splitting on B → D first and then on AB → C gives the same three relations; choosing the derived violation BE → C instead would give BD, BCE, ABE, which is also a correct BCNF decomposition.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2015–16 · 10 marks</div>
+  <div class="exam-q"><p>For the relation schema R(A, B, C, D, E) with FDs AB → C, DE → C, and B → D: (a) Indicate all the BCNF violations. (b) Decompose the relations, as necessary, into a collection of relations that are in BCNF.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>Only key: ABE (previous question). A violation is any nontrivial X → A (single attribute on the right) that follows from the FDs with X not a superkey, i.e. X not containing A, B and E together.</p>
+    <p><strong>(a)</strong> Closing every subset that is not a superkey gives 12 violations:</p>
+    <p class="formula">B→D, AB→C, AB→D, BC→D, BE→C, BE→D, DE→C, ABC→D, ABD→C, BCE→D, ADE→C, BDE→C</p>
+    <p>The three given FDs and the derived BE → C (BE⁺ = BCDE via B → D, DE → C) are the essential ones; the rest add extra attributes to these left sides.</p>
+<p class="tbl-note">Note: the CSE 303 bank's answer lists only the three given FDs (AB → C, DE → C, B → D). They are violations, but the list is incomplete: the derived BE → C (and the other FDs above) also violate BCNF, since BE⁺ = BCDE is not all of R.</p>
+    <p><strong>(b)</strong> Same decomposition as the previous question: <strong>BD</strong> (key B), <strong>ABC</strong> (key AB), <strong>ABE</strong> (key ABE). All three are in BCNF; DE → C is not preserved.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 20-21 7a + 7b · 10 + 10 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-2 | 2020–21 · 20 marks</div>
+  <div class="exam-q"><p>(a) Find all functional dependencies that hold on this table. You only need to write a minimal set of functional dependencies that logically imply all others. (b) Using the functional dependencies you have identified, decompose the relation in BCNF. Show your work, and the final normalized schema including all keys.</p><div id="q3t"></div></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><strong>(a)</strong> Look for rules that the meaning of the columns guarantees and that the instance does not contradict (Chapter 2: an instance can refute an FD but cannot prove one).</p>
+    <ul>
+      <li><code>FirstName → FirstInitial</code>: an initial is the first letter of the name.</li>
+      <li><code>LastName → LastInitial</code>.</li>
+      <li><code>FirstName LastName → FullName</code> and <code>FullName → FirstName LastName</code>: the full name is the two names joined, and can be split back.</li>
+      <li><code>FullName → FullAddress</code>: each person in the table has one address (no full name repeats with two addresses).</li>
+      <li><code>FullAddress → ZipCode</code>: the zip code is part of the address.</li>
+    </ul>
+    <p>FDs that fail on the instance: FullAddress ↛ FullName (two people at 45h St), ZipCode ↛ FullAddress (98185 appears with two addresses), LastName ↛ FirstName (two Levys). One FD holds on these five rows only by accident: FirstInitial → FirstName (A, B, C each happen to belong to one first name); a future “Adam” would break it, so it is not included. The six FDs above are a minimal basis (none follows from the others, no left side can shrink). Keys: <strong>{FullName}</strong> and <strong>{FirstName, LastName}</strong>.</p>
+    <p><strong>(b)</strong> Violations: FirstName → FirstInitial, LastName → LastInitial, FullAddress → ZipCode (none of these left sides is a superkey).</p>
+    <ol>
+      <li>Split on FirstName → FirstInitial: R₁(<u>FirstName</u>, FirstInitial) and R₂ = everything except FirstInitial.</li>
+      <li>R₂ still has LastName → LastInitial: split into R₃(<u>LastName</u>, LastInitial) and R₄(FirstName, LastName, FullName, FullAddress, ZipCode).</li>
+      <li>R₄ has FullAddress → ZipCode (FullAddress is not a superkey of R₄): split into R₅(<u>FullAddress</u>, ZipCode) and R₆(FirstName, LastName, FullName, FullAddress).</li>
+      <li>R₆: FDs FullName → FirstName LastName FullAddress and FirstName LastName → FullName FullAddress. Keys {FullName} and {FirstName, LastName}; every left side is a key: BCNF.</li>
+    </ol>
+    <div id="t3"></div>
+    <p><strong>Final:</strong> R₁(<u>FirstName</u>, FirstInitial), R₃(<u>LastName</u>, LastInitial), R₅(<u>FullAddress</u>, ZipCode), R₆(<u>FullName</u>, FirstName, LastName, FullAddress) with alternate key {FirstName, LastName}. Lossless and, here, dependency preserving (every FD lies inside one piece).</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 17-18 7b · 15 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-2 | 2017–18 · 15 marks &nbsp;|&nbsp; BUET QBank · CSE 303 | L-3/T-1 | 2011–12 · 15 marks</div>
+  <div class="exam-q"><p>The following schema has been designed for an address book application: R(SSN, Name, PhoneType, PhoneNumber). A person can have different types of phone numbers (e.g. Mobile, Home or Office). The following set F of functional dependencies hold on R: SSN → Name; SSN, PhoneType → PhoneNumber; SSN, PhoneType → Name; PhoneNumber → SSN, Name, PhoneType. (i) What are the keys for R? (ii) Is R in BCNF? Why or why not? (iii) Decompose R into BCNF (if it is already not in BCNF). <br>2011–12 version adds: Can you remove any dependency without violating equivalency of F?</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><strong>(i) Keys.</strong> PhoneNumber⁺ = {PhoneNumber, SSN, Name, PhoneType}: everything, and a single attribute is minimal, so <strong>{PhoneNumber}</strong> is a key. (SSN, PhoneType)⁺ = {SSN, PhoneType, PhoneNumber, Name}: everything. SSN⁺ = {SSN, Name} and PhoneType⁺ = {PhoneType} are not, so <strong>{SSN, PhoneType}</strong> is a key. Any other key would have to avoid PhoneNumber and contain SSN and PhoneType, so these are the only two.</p>
+    <p><strong>(ii)</strong> <strong>Not in BCNF.</strong> SSN → Name is nontrivial and SSN⁺ = {SSN, Name} is not all of R, so SSN is not a superkey. (The other three FDs have superkeys on the left.) The consequence: a person's name is repeated once per phone.</p>
+    <p><strong>(2011–12, can a dependency be removed?)</strong> Yes. SSN, PhoneType → Name follows from SSN → Name (left augmentation), so it can be removed. Also Name can be dropped from the right side of PhoneNumber → SSN, Name, PhoneType, since PhoneNumber → SSN and SSN → Name give it. A minimal basis: SSN → Name, SSN PhoneType → PhoneNumber, PhoneNumber → SSN, PhoneNumber → PhoneType.</p>
+    <p><strong>(iii)</strong> Split on SSN → Name: SSN⁺ = {SSN, Name}.</p>
+    <ul>
+      <li>R₁(<u>SSN</u>, Name), FD SSN → Name: BCNF.</li>
+      <li>R₂(SSN, PhoneType, PhoneNumber), FDs SSN PhoneType → PhoneNumber and PhoneNumber → SSN PhoneType. Keys {SSN, PhoneType} and {PhoneNumber}; both left sides are keys: BCNF.</li>
+    </ul>
+    <p>Lossless (common attribute SSN is the key of R₁) and dependency preserving.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2012–13 · 15 marks</div>
+  <div class="exam-q"><p>Suppose that we have a schema R = (A, B, C, D) with functional dependencies: B → C, D → A. List the keys of R. Is R in BCNF? If not, convert R to BCNF.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><strong>Keys.</strong> B and D appear on no right side, so they are in every key. (BD)⁺ = {B, D, C, A} = R. The only key is <strong>BD</strong>.</p>
+    <p><strong>BCNF?</strong> No. B⁺ = {B, C} and D⁺ = {A, D}; neither B nor D is a superkey, so both B → C and D → A violate BCNF.</p>
+    <p><strong>Decompose.</strong> On B → C: R₁(<u>B</u>, C), R₂(A, B, D). R₂ has D → A with key BD: violation. Split R₂ on D → A: R₃(<u>D</u>, A), R₄(<u>B, D</u>).</p>
+    <div id="t16"></div>
+    <p>Final: <strong>(B, C), (D, A), (B, D)</strong>, all in BCNF, lossless and dependency preserving. R₄(B, D) stores which B goes with which D; without it the join would lose that pairing.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2015–16 · 7 marks</div>
+  <div class="exam-q"><p>Prove that any two-attribute relation is in BCNF.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>Let R(A, B). A nontrivial FD has a right side that is not contained in its left side. With only two attributes, a nontrivial FD must have one attribute on the left and the other on the right (a left side {A, B} would make every right side trivial). So the only possible nontrivial FDs are A → B and B → A.</p>
+    <ol>
+      <li>Neither holds: no nontrivial FD exists, so no violation is possible.</li>
+      <li>Only A → B holds: then A⁺ = {A, B}, A is a key, and the only nontrivial FD has the superkey A on the left.</li>
+      <li>Only B → A holds: symmetric; B is a key.</li>
+      <li>Both hold: A and B are both keys, so the left side of each FD is a superkey.</li>
+    </ol>
+    <p>In all cases every nontrivial FD has a superkey on its left, so R is in BCNF. ∎</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2010–11 · 10 marks</div>
+  <div class="exam-q"><p>Describe the BCNF decomposition algorithm.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><strong>Input:</strong> relation R₀ with FD set S₀. <strong>Output:</strong> a set of relations, each in BCNF, whose natural join is R₀ (lossless). Apply recursively to (R, S), starting with (R₀, S₀):</p>
+    <ol>
+      <li>Check whether R is in BCNF: for each nontrivial FD X → Y in S, compute X⁺; if X⁺ ⊇ R for all of them, return {R}.</li>
+      <li>Otherwise take a violation X → Y. Compute X⁺. Let R₁ = X⁺ and R₂ = X ∪ (R − X⁺).</li>
+      <li>Compute the projected FD sets S₁ on R₁ and S₂ on R₂ (close each subset of the piece with S and keep FDs inside the piece).</li>
+      <li>Recursively decompose (R₁, S₁) and (R₂, S₂); return the union of the results.</li>
+    </ol>
+    <p><strong>Termination:</strong> each piece has fewer attributes than R (R₁ lacks R − X⁺, which is nonempty since X is not a superkey; R₂ lacks X⁺ − X, which is nonempty since the FD is nontrivial), and a two-attribute relation is always in BCNF. <strong>Lossless:</strong> X is a key of R₁ and X = R₁ ∩ R₂, so each tuple of R₂ joins with exactly one tuple of R₁. <strong>Drawback:</strong> dependencies may not be preserved (Chapter 13). Example: the studio relation above, which splits into {title, year, studioName}, {studioName, president}, {president, presAddr}.</p>
+  </div></details>
+</div>
+
+<div class="key"><p><strong>Summary:</strong> R is in BCNF when every nontrivial FD has a superkey on its left; test each FD with a closure (use projected FDs for decomposed pieces). Every two-attribute relation is in BCNF. To decompose, pick a violation X → Y and split R into X⁺ and X ∪ (R − X⁺), project the FDs, and repeat on each piece. The result is lossless but may lose dependencies.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="lecture.js"></script>
+<script>
+FD.bcnfTool('#tool', { attrs: 'title year studioName president presAddr', fds: 'title year -> studioName\nstudioName -> president\npresident -> presAddr' });
+const tree = (sel, a, f) => { const S = FD.parseAttrs(a), F = FD.parseFDs(S, f); $(sel).innerHTML = `<figure>${FD.treeSVG(S, bcnfDecompose(S, F))}</figure>`; };
+tree('#t69', 'A B C D E', 'AB -> C; DE -> C; B -> D');
+tree('#t3', 'FirstName FirstInitial LastName LastInitial FullName FullAddress ZipCode', 'FirstName -> FirstInitial; LastName -> LastInitial; FirstName LastName -> FullName; FullName -> FirstName LastName; FullName -> FullAddress; FullAddress -> ZipCode');
+tree('#t16', 'A B C D', 'B -> C; D -> A');
+$('#q3t').innerHTML = inst(['FirstName', 'FirstInitial', 'LastName', 'LastInitial', 'FullName', 'FullAddress', 'ZipCode'], [
+  ['Alice', 'A', 'Levy', 'L', 'Alice Levy', '45h St, Seattle, 98185', '98185'], ['Bob', 'B', 'Levy', 'L', 'Bob Levy', '45h St, Seattle, 98185', '98185'],
+  ['Alice', 'A', 'Davis', 'D', 'Alice Davis', 'Oak Ave, Seattle, 98185', '98185'], ['Carol', 'C', 'Davis', 'D', 'Carol Davis', 'Sunnyvale, 94085', '94085'],
+  ['Carol', 'C', 'Louis', 'L', 'Carol Louis', 'Oak Ave, Seattle, 98185', '98185']]);
+flashcards('#cards', [
+  { f: 'BCNF', b: 'Every nontrivial FD X → Y on R has X a superkey of R.' },
+  { f: 'BCNF violation test', b: 'Nontrivial X → Y with X⁺ ≠ R.' },
+  { f: 'BCNF split on X → Y', b: 'R₁ = X⁺, R₂ = X ∪ (R − X⁺).' },
+  { f: 'Two-attribute relation', b: 'Always in BCNF.' },
+  { f: 'Studio example result', b: '{title, year, studioName}, {studioName, president}, {president, presAddr}.' },
+  { f: 'Weakness of BCNF decomposition', b: 'May not preserve dependencies.' },
+]);
+quiz('#quiz', [
+  { q: 'R(A, B, C) with A → B only. Is R in BCNF?', opts: ['Yes', 'No'], a: 1, why: 'Key is AC. A⁺ = AB is not a superkey.' },
+  { q: 'R(A, B, C) with A → BC. Is R in BCNF?', opts: ['Yes', 'No'], a: 0, why: 'A⁺ = ABC: A is a key.' },
+  { q: 'Splitting R(A, B, C, D) on violation B → C (B⁺ = BC) gives…', opts: ['BC and ABD', 'BC and AD', 'AB and CD', 'BCD and AB'], a: 0, why: 'R₁ = B⁺ = BC, R₂ = B ∪ (R − BC) = ABD.' },
+  { q: 'Why must FDs be projected before testing a piece?', opts: ['To find keys faster', 'Violations may hide in FDs that follow from S but are not in S', 'Projection removes violations', 'It is optional'], a: 1, why: 'E.g. a chain through an attribute that is no longer present.' },
+  { q: 'Which is always true of a BCNF decomposition from the algorithm?', opts: ['dependency preserving', 'lossless', 'both', 'neither'], a: 1, why: 'Lossless always; preservation not guaranteed.' },
+]);
+ask('#try1', { q: 'R(A, B, C, D) with A → B, B → C, C → D. Into how many relations does BCNF decomposition (first violation B → C) split R?', a: 3, hint: 'B⁺ = BCD. Then look at the pieces.', why: 'R₁ = BCD (has C → D: split into CD and BC), R₂ = AB. Final: AB, BC, CD.' });
+</script>
+</body>
+</html>

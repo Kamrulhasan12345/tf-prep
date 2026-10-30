@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Deadlocks and the Waits-For Graph · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 04 (Sukarna) · Chapter 5 · Slides 15–20 · Book §19.2–19.2.2</div>
+<h1>Deadlocks: Timeouts and the Waits-For Graph</h1>
+<p class="lede">Locking makes transactions wait, and waiting in a circle is a deadlock. This chapter defines deadlock, covers the two simplest tools against it (timeouts and the waits-for graph), proves why a cycle means deadlock, animates the slides' four-transaction example, and gives you a waits-for-graph builder for any sequence of lock requests.</p>
+
+<h2>1. What a deadlock is (slide 15)</h2>
+
+<dl class="def">
+  <dt>Deadlock</dt><dd>A situation where each of several transactions is waiting for a resource (here, a lock) held by one of the others, so none of them can make progress. (The slide's "held one on of the others" is a typo for "held by one of the others".)</dd>
+</dl>
+
+<p>Without outside help a deadlock lasts forever: every transaction in it is waiting, and the only events that could free a lock are actions of the waiting transactions themselves. The slide recalls two ways we have already met deadlocks:</p>
+
+<div class="figrow">
+<div><div class="figlabel">(a) Two 2PL transactions locking in opposite orders</div><div id="dl1"></div></div>
+<div><div class="figlabel">(b) Two shared locks both upgrading</div><div id="dl2"></div></div>
+</div>
+
+<p>In (a), each transaction holds one element and needs the other's. 2PL forbids releasing a lock and then taking another, so neither can back off. In (b), both hold a shared lock on A and both want to upgrade it to exclusive; each upgrade must wait until the other's shared lock goes away, which never happens.</p>
+
+<h3>Two approaches</h3>
+<ul>
+  <li><strong>Deadlock detection and treatment:</strong> allow deadlocks to happen, detect them, and fix them by rolling back (aborting and restarting) at least one transaction. When a deadlock exists, it is generally impossible to let all its transactions continue, so a rollback is unavoidable.</li>
+  <li><strong>Deadlock prevention:</strong> manage transactions so that a deadlock can never form, by allowing only "conservative" schedules. (The slide writes "conversative".) Chapters 6 and 7 cover the prevention methods.</li>
+</ul>
+
+<h2>2. Detection by timeout (slide 16)</h2>
+
+<p>The simplest method: put a limit on how long a transaction may be active (a <b class="term">transaction timeout</b>), or on how long it may wait for one lock (a <b class="term">lock timeout</b>). A transaction that exceeds the limit is assumed to be deadlocked and is rolled back.</p>
+
+<p>The numbers make it work. If typical transactions take about 1 ms, a timeout of 30 seconds is 30,000 times longer than normal, so it will essentially only hit transactions that are stuck. When one deadlocked transaction times out and rolls back, it releases its locks, and the others in the deadlock may then finish before their own timeouts.</p>
+
+<p>The weaknesses (textbook §19.2.1): a deadlock is noticed only after the full timeout, and the transactions in a deadlock usually started at about the same time, so after one is rolled back others may also time out even though they are no longer deadlocked (spurious timeouts). A genuinely long transaction can also be killed by mistake.</p>
+
+<p>The slide says major DBMSs support timeouts but set them to 0 (meaning unlimited) by default. That is PostgreSQL's convention (<code>lock_timeout</code>, <code>transaction_timeout</code>, default 0 = disabled). Other systems differ, for example MySQL/InnoDB's <code>innodb_lock_wait_timeout</code> defaults to 50 seconds. All of them rely mainly on the waits-for graph below, with timeouts as a backstop.</p>
+
+<h2>3. The waits-for graph (slides 17–18)</h2>
+
+<dl class="def">
+  <dt>Waits-for graph</dt><dd>A directed graph with a node for each transaction that currently holds a lock or is waiting for one, and an edge (arc) T → U whenever there is some element X such that: (1) U holds a lock on X, (2) T is waiting for a lock on X, and (3) T cannot get its lock on X in the mode it wants unless U first releases its lock on X.</dd>
+</dl>
+<p>Read T → U as "T waits for U". Condition 3 matters with lock modes: if U holds a shared lock and T wants a shared lock, T does not wait for U, so there is no edge. The lock table (from the locking lecture) already records holders and waiters for each element, so the graph can be built from it. Oracle, SQL Server, MySQL and PostgreSQL all use variants of this graph; detection typically runs periodically, for example every 5 seconds.</p>
+
+<h3>Theorem: there is a deadlock if and only if the waits-for graph has a cycle</h3>
+<p><strong>Cycle ⇒ deadlock.</strong> Every transaction on a cycle waits for the next one on the cycle. None of them can run until its successor releases a lock, which needs the successor to run first. Going around the cycle, no transaction on it can ever make progress.</p>
+<p><strong>No cycle ⇒ no deadlock.</strong> A finite directed graph with no cycle has at least one node with no outgoing edge: a transaction that is waiting for nobody. It can run to completion and release its locks, which deletes all edges into it. The remaining graph still has no cycle, so again some transaction is free, and so on until every transaction has finished. (This is the argument behind topological sorting.)</p>
+<p>Transactions that are not on a cycle but wait (directly or through others) for a transaction on a cycle are also stuck, even though they are not part of the deadlock itself.</p>
+
+<h3>Detection versus prevention with the graph</h3>
+<ul>
+  <li><strong>Detection:</strong> let waits happen; periodically search the graph for cycles; roll back a victim on each cycle.</li>
+  <li><strong>Prevention (the textbook's choice):</strong> maintain the graph at all times, and whenever a lock request would make the requester wait and thereby create a cycle, roll back that transaction immediately. The slide calls this aggressive: a cycle check on every wait is expensive when the graph is large.</li>
+</ul>
+
+<h2>4. The slides' example (slides 19–20, textbook Example 19.9)</h2>
+
+<p>Four transactions each read one element and write another, using a single lock mode:</p>
+<pre>T1: l1(A); r1(A); l1(B); w1(B); u1(A); u1(B);
+T2: l2(C); r2(C); l2(A); w2(A); u2(C); u2(A);
+T3: l3(B); r3(B); l3(C); w3(C); u3(B); u3(C);
+T4: l4(D); r4(D); l4(A); w4(A); u4(D); u4(A);</pre>
+<p>The schedule's first eight steps: each transaction locks and reads its first element, then T<sub>2</sub> asks for A (held by T<sub>1</sub>), T<sub>3</sub> for C (held by T<sub>2</sub>), T<sub>4</sub> for A (held by T<sub>1</sub>), and finally T<sub>1</sub> for B (held by T<sub>3</sub>). Step through it; the graph and lock table update with each request.</p>
+
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="ex"></div>
+</figure>
+
+<p>After step 7 the graph is T<sub>3</sub> → T<sub>2</sub> → T<sub>1</sub> ← T<sub>4</sub>: acyclic, so no deadlock (T<sub>1</sub> waits for nobody and could finish). Step 8 adds T<sub>1</sub> → T<sub>3</sub>, closing the cycle T<sub>1</sub> → T<sub>3</sub> → T<sub>2</sub> → T<sub>1</sub>. T<sub>4</sub> is not on the cycle but cannot finish either, because it waits for T<sub>1</sub>. Following the slide, T<sub>1</sub>'s request is denied and T<sub>1</sub> is rolled back. The graph right after the rollback is just T<sub>3</sub> → T<sub>2</sub>, with T<sub>4</sub> isolated, as on slide 20: the lock on A is free, so T<sub>2</sub> and T<sub>4</sub>, which were waiting for it, have no edges.</p>
+
+<p><strong>What happens next (slide 20).</strong> The lock on A can go to only one of T<sub>2</sub> and T<sub>4</sub> at a time (the animation gives it to T<sub>2</sub>, the first to ask, so T<sub>4</sub> now waits for T<sub>2</sub>). T<sub>2</sub> then completes and releases A and C. Now T<sub>3</sub> can get C and T<sub>4</sub> can get A, and both complete. At some point T<sub>1</sub> is restarted, but it cannot obtain its locks on A and B until T<sub>2</sub>, T<sub>3</sub> and T<sub>4</sub> have finished and released them. The slide's phrase "T<sub>2</sub> and T<sub>4</sub> can continue and finish" should be read in this sense: one after the other, not simultaneously.</p>
+
+<h2>5. Interactive tool: waits-for graph builder</h2>
+<p>Type a sequence of actions. Allowed: <code>l1(A)</code> (exclusive lock, the textbook's single lock mode), <code>sl1(A)</code> / <code>xl1(A)</code> (shared / exclusive), <code>u1(A)</code> (unlock), <code>c1</code> (commit, releases everything), <code>a1</code> (abort), and <code>r1(A)</code> / <code>w1(A)</code>. A read or write without a suitable lock first requests a shared lock (read) or an exclusive lock (write), as in the exam questions. Locks are held until an explicit unlock, commit or abort. Actions of a blocked transaction are delayed until it gets its lock. Choose when deadlocks are handled and how the victim is chosen; red edges and nodes form a cycle.</p>
+
+<figure class="wide">
+<span class="anim-tag">Interactive tool</span>
+<div id="tool"></div>
+</figure>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+
+<h3>Exam questions</h3>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 22-23 4c · 12 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-1 | 2022–23 · 12 marks</div>
+  <div class="exam-q"><p>Consider the following schedule of actions involving four transactions T<sub>1</sub>, T<sub>2</sub>, T<sub>3</sub> and T<sub>4</sub>:</p>
+  <p>r<sub>1</sub>(A); r<sub>2</sub>(B); w<sub>1</sub>(C); r<sub>3</sub>(D); w<sub>3</sub>(B); w<sub>2</sub>(C); w<sub>4</sub>(A); w<sub>1</sub>(D);</p>
+  <p>Assume that shared locks are requested immediately before each read action, and exclusive locks are requested immediately before every write action. Answer the following questions:<br>
+  (i) Show the wait-for graph after the execution of all actions.<br>
+  (ii) Determine if there is a deadlock. In case of a deadlock, choose the highest numbered (considering T<sub>4</sub> &gt; T<sub>3</sub> &gt; T<sub>2</sub> &gt; T<sub>1</sub>) transaction to rollback. Show the resulting wait-for graph after the rollback.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+  <p><strong>Trace</strong> (S = shared, X = exclusive; locks are held, since no unlocks are given):</p>
+  <div class="tbl"><table>
+    <tr><th>Action</th><th>Lock request</th><th>Result</th><th>Edge</th></tr>
+    <tr><td>r<sub>1</sub>(A)</td><td>S(A)</td><td>granted</td><td></td></tr>
+    <tr><td>r<sub>2</sub>(B)</td><td>S(B)</td><td>granted</td><td></td></tr>
+    <tr><td>w<sub>1</sub>(C)</td><td>X(C)</td><td>granted</td><td></td></tr>
+    <tr><td>r<sub>3</sub>(D)</td><td>S(D)</td><td>granted</td><td></td></tr>
+    <tr><td>w<sub>3</sub>(B)</td><td>X(B)</td><td>denied: T<sub>2</sub> holds S(B)</td><td>T<sub>3</sub> → T<sub>2</sub></td></tr>
+    <tr><td>w<sub>2</sub>(C)</td><td>X(C)</td><td>denied: T<sub>1</sub> holds X(C)</td><td>T<sub>2</sub> → T<sub>1</sub></td></tr>
+    <tr><td>w<sub>4</sub>(A)</td><td>X(A)</td><td>denied: T<sub>1</sub> holds S(A)</td><td>T<sub>4</sub> → T<sub>1</sub></td></tr>
+    <tr><td>w<sub>1</sub>(D)</td><td>X(D)</td><td>denied: T<sub>3</sub> holds S(D)</td><td>T<sub>1</sub> → T<sub>3</sub></td></tr>
+  </table></div>
+  <p><strong>(i)</strong> The waits-for graph after all actions:</p>
+  <figure><div id="q93a"></div><figcaption>Edges: T<sub>1</sub> → T<sub>3</sub> (D), T<sub>2</sub> → T<sub>1</sub> (C), T<sub>3</sub> → T<sub>2</sub> (B), T<sub>4</sub> → T<sub>1</sub> (A).</figcaption></figure>
+  <p><strong>(ii)</strong> There is a cycle T<sub>1</sub> → T<sub>3</sub> → T<sub>2</sub> → T<sub>1</sub>, so <b>there is a deadlock</b> among T<sub>1</sub>, T<sub>2</sub>, T<sub>3</sub>. T<sub>4</sub> is blocked (it waits for T<sub>1</sub>) but is not part of the cycle, so rolling back T<sub>4</sub> would not break the deadlock. The victim is therefore the highest-numbered transaction <em>on the cycle</em>: <b>T<sub>3</sub></b>. Rolling back T<sub>3</sub> releases its S(D) and cancels its request for B, removing T<sub>3</sub> → T<sub>2</sub> and T<sub>1</sub> → T<sub>3</sub>. D is now free, so T<sub>1</sub> gets X(D) and continues.</p>
+  <figure><div id="q93b"></div><figcaption>After rolling back T<sub>3</sub>: T<sub>2</sub> → T<sub>1</sub> (C) and T<sub>4</sub> → T<sub>1</sub> (A). No cycle. T<sub>1</sub> can finish, then T<sub>2</sub> and T<sub>4</sub>.</figcaption></figure>
+  <p>You can replay this in the tool above with "detect after the last action" and "highest-numbered on the cycle". The question bank's answer is correct.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 17-18 3c · 5 marks &nbsp;|&nbsp; BUET QBank · CSE 303 | L-3/T-1 | 2017–18, 2016–17, 2011–12 · 5 marks</div>
+  <div class="exam-q"><p>What is deadlock in database transaction? Explain with example.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+  <p>A <b>deadlock</b> is a state in which each transaction of a set is waiting for a lock held by another transaction of the same set, so none of them can ever proceed. It shows up as a cycle in the waits-for graph (edge T → U when T waits for a lock U holds).</p>
+  <p><strong>Example.</strong> T<sub>1</sub> transfers money from account A to B, T<sub>2</sub> from B to A, both under 2PL with exclusive locks:</p>
+  <div class="tbl"><table>
+    <tr><th>Step</th><th>T<sub>1</sub></th><th>T<sub>2</sub></th><th>Effect</th></tr>
+    <tr><td>1</td><td>l<sub>1</sub>(A); r<sub>1</sub>(A); w<sub>1</sub>(A)</td><td></td><td>T<sub>1</sub> holds A</td></tr>
+    <tr><td>2</td><td></td><td>l<sub>2</sub>(B); r<sub>2</sub>(B); w<sub>2</sub>(B)</td><td>T<sub>2</sub> holds B</td></tr>
+    <tr><td>3</td><td>l<sub>1</sub>(B) <b>denied</b></td><td></td><td>T<sub>1</sub> → T<sub>2</sub></td></tr>
+    <tr><td>4</td><td></td><td>l<sub>2</sub>(A) <b>denied</b></td><td>T<sub>2</sub> → T<sub>1</sub>: cycle</td></tr>
+  </table></div>
+  <p>After step 4, T<sub>1</sub> waits for T<sub>2</sub> to release B and T<sub>2</sub> waits for T<sub>1</sub> to release A. Neither can unlock early (2PL, and they have not finished), so they wait forever. The DBMS resolves it by rolling back one of them (the victim), which releases its lock so the other can finish; the victim is restarted later. Deadlocks can also be prevented in advance by locking elements in a fixed order (Chapter 6) or with wait-die / wound-wait timestamps (Chapter 7), or detected crudely with timeouts.</p>
+  </div></details>
+</div>
+
+<div class="key"><p><strong>Summary:</strong> a deadlock is a cycle of transactions each waiting for a lock held by the next. Timeouts detect it crudely (roll back anything that runs or waits too long). The waits-for graph has an edge T → U when T waits for a lock U holds; there is a deadlock exactly when the graph has a cycle. A detector rolls back a victim on each cycle; the textbook's prevention variant refuses (rolls back) any request that would close a cycle, as with T<sub>1</sub> at step 8 of the slides' example.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="lecture.js"></script>
+<script>
+// static deadlock illustrations
+document.querySelector('#dl1').innerHTML = s4table(['step', 'T<sub>1</sub>', 'T<sub>2</sub>'], [['1', 'l<sub>1</sub>(A)', ''], ['2', '', 'l<sub>2</sub>(B)'], ['3', 'l<sub>1</sub>(B) <b>waits</b>', ''], ['4', '', 'l<sub>2</sub>(A) <b>waits</b>']], { cls: { '2,1': 'del', '3,2': 'del' } });
+document.querySelector('#dl2').innerHTML = s4table(['step', 'T<sub>1</sub>', 'T<sub>2</sub>'], [['1', 'sl<sub>1</sub>(A)', ''], ['2', '', 'sl<sub>2</sub>(A)'], ['3', 'xl<sub>1</sub>(A) <b>waits</b>', ''], ['4', '', 'xl<sub>2</sub>(A) <b>waits</b>']], { cls: { '2,1': 'del', '3,2': 'del' } });
+
+// slides 19-20: Fig 19.4 with the detector run after step 8; victim = the transaction that closed the cycle (T1)
+const ex = 'l1(A); r1(A); l2(C); r2(C); l3(B); r3(B); l4(D); r4(D); l2(A); l3(C); l4(A); l1(B)';
+(() => {
+  const R = s4lockSim(s4parse(ex, 'lock').acts, { policy: 'detect', victim: 'closer' });
+  // group the 12 actions into the slide's 8 rows (rows 1-4 are lock + read)
+  const rowOf = st => st <= 8 ? Math.ceil(st / 2) : st - 4;
+  const keep = [];
+  R.frames.forEach(f => {
+    const row = f.step ? rowOf(f.step) : null, last = keep[keep.length - 1];
+    if (row && last && last.row === row) { last.f = f; last.lines = last.lines.concat(f.lines); }
+    else keep.push({ row, f, lines: f.lines });
+  });
+  stepper('#ex', keep.map(({ row, f, lines }) => ({
+    html: `<div class="s4-two"><div>${s4lockTable(f)}</div><div class="s4-side">${wfgSVG(f, R.txns)}</div></div>`,
+    cap: row ? `Slide step ${row}: ${lines.map(l => l.h).join(' ')}` +
+        (f.cyc.size ? ' <b>The graph now has a cycle: deadlock.</b>' : f.edges.length ? ' No cycle yet.' : '')
+      : lines.map(l => l.h).join(' ') + (f.extra === 'rollback' ? ' This is the slide\'s "waits-for graph after T<sub>1</sub> is rolled back".' : ''),
+  })), { interval: 2400 });
+})();
+
+waitsForTool('#tool', 'r1(A); r2(B); w1(C); r3(D); w3(B); w2(C); w4(A); w1(D)', { policy: 'detect', victim: 'highest' });
+
+(() => {
+  const R = s4lockSim(s4parse('r1(A); r2(B); w1(C); r3(D); w3(B); w2(C); w4(A); w1(D)', 'lock').acts, { policy: 'detect', victim: 'highest' });
+  document.querySelector('#q93a').innerHTML = wfgSVG(R.frames[7], R.txns);
+  document.querySelector('#q93b').innerHTML = wfgSVG(R.frames[R.frames.length - 1], R.txns);
+})();
+
+flashcards('#cards', [
+  { f: 'Deadlock', b: 'Each of several transactions waits for a lock held by another of them; none can proceed.' },
+  { f: 'Timeout', b: 'Roll back a transaction that is active (or waits for a lock) longer than a limit, assuming it is deadlocked.' },
+  { f: 'Waits-for graph edge T → U', b: 'U holds a lock on some X, T waits for a lock on X, and T cannot get it in its desired mode until U releases X.' },
+  { f: 'Deadlock test', b: 'Deadlock if and only if the waits-for graph has a cycle.' },
+  { f: 'Why no cycle ⇒ no deadlock', b: 'Some node has no outgoing edge; it finishes, its edges vanish, repeat.' },
+  { f: 'Prevention with the graph', b: 'Roll back any transaction whose request would close a cycle (textbook\'s version; "aggressive").' },
+  { f: 'Blocked but not deadlocked', b: 'A transaction waiting (directly or indirectly) for a deadlocked one, like T<sub>4</sub> in the slides\' example.' },
+]);
+quiz('#quiz', [
+  { q: 'T<sub>1</sub> holds S(A). T<sub>2</sub> requests S(A). Is there an edge T<sub>2</sub> → T<sub>1</sub>?', opts: ['Yes', 'No, shared locks are compatible, so T<sub>2</sub> does not wait', 'Only under 2PL', 'Only if T<sub>1</sub> is older'], a: 1, why: 'Condition 3: T<sub>2</sub> gets its lock without T<sub>1</sub> releasing anything.' },
+  { q: 'Edges: T<sub>1</sub>→T<sub>2</sub>, T<sub>2</sub>→T<sub>3</sub>, T<sub>4</sub>→T<sub>3</sub>. Deadlock?', opts: ['Yes', 'No: T<sub>3</sub> waits for nobody, so everything can finish', 'Only T<sub>4</sub> is deadlocked', 'Cannot tell'], a: 1, why: 'No cycle. T<sub>3</sub> finishes, then T<sub>2</sub> and T<sub>4</sub>, then T<sub>1</sub>.' },
+  { q: 'In the slides\' example, why is T<sub>4</sub> not deadlocked even though it cannot finish before T<sub>1</sub> is rolled back?', opts: ['It holds no locks', 'It is not on the cycle; it only waits for a transaction on the cycle', 'It is the youngest', 'It requested a shared lock'], a: 1, why: 'T<sub>4</sub> → T<sub>1</sub> leads into the cycle, but no edge leads back to T<sub>4</sub>.' },
+  { q: 'Main weakness of timeouts?', opts: ['They never detect deadlocks', 'They can roll back transactions that are slow but not deadlocked, and they react late', 'They need a waits-for graph', 'They cause starvation-free behaviour'], a: 1, why: 'A timeout only guesses deadlock from elapsed time.' },
+  { q: 'A waits-for graph has a cycle T<sub>2</sub>→T<sub>5</sub>→T<sub>2</sub> and an edge T<sub>7</sub>→T<sub>2</sub>. Rolling back which transaction ends the deadlock?', opts: ['T<sub>7</sub> only', 'T<sub>2</sub> or T<sub>5</sub>', 'Any of the three', 'None'], a: 1, why: 'The victim must be on the cycle. Removing T<sub>7</sub> leaves the cycle intact.' },
+]);
+ask('#try1', { q: 'In the slides\' example after step 7, how many edges does the waits-for graph have?', a: 3, why: 'T<sub>2</sub>→T<sub>1</sub> (A), T<sub>3</sub>→T<sub>2</sub> (C), T<sub>4</sub>→T<sub>1</sub> (A).' });
+</script>
+</body>
+</html>

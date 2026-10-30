@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Variable-Length Records · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 14 · Chapter 4 · Slides 11–13</div>
+<h1>Variable-Length Records</h1>
+<p class="lede">Real rows are not all the same size. This chapter explains where variable-length records come from, and how one record is laid out byte by byte using (offset, length) pairs and a null bitmap. It ends with the answer to Question w2-2.</p>
+
+<h2>1. Where variable-length records come from</h2>
+
+<p>Chapters 2 and 3 assumed every record has the same size. That assumption fails in three common situations, which the slide lists as a, b and c.</p>
+
+<h3>a. Several record types in one file</h3>
+<p>Sometimes two tables are stored in the same file (Chapter 7 shows why that can be useful). The slide's example stores <code>student</code> and <code>takes</code> records together:</p>
+<pre>student (id char(10), name char(30), address char(50), CGPA number(3,2), year-admit number(4))
+takes   (id char(10), course-id char(20), level char(1), term char(1))</pre>
+<p>Every field is fixed size, so each table's records have a fixed size. But a student record and a takes record are different sizes (roughly 97 bytes versus 32), so the <em>file</em> contains records of different lengths.</p>
+
+<h3>b. Fields that can vary in length</h3>
+<p>This is the most common case. <code>char(30)</code> always takes 30 bytes, padded with spaces. <code>varchar(30)</code> means “<em>up to</em> 30 characters”, and only stores the characters actually used. “Wu” takes 2 bytes and “Srinivasan” takes 10. The slide's example:</p>
+<pre>student (id char(10), name varchar(30), address varchar(50), CGPA number(3,2), year-admit number(4))</pre>
+<p>Two students with different name and address lengths now produce records of different sizes.</p>
+
+<h3>c. Repeating fields</h3>
+<p>Some older data models allowed a field to repeat a variable number of times inside one record, for example a list of phone numbers. A record with three phone numbers is longer than one with a single number. Modern relational databases avoid this by putting repeating values in a separate table, but the storage problem is the same.</p>
+
+<h2>2. How a variable-length record is laid out</h2>
+
+<p>The difficulty is simple: if “name” can be 2 bytes or 10 bytes, the database can no longer know where “dept_name” starts by counting. The slide's solution has three rules:</p>
+
+<ol>
+  <li><strong>Attributes are stored in order</strong>, but in two parts: a fixed-size part at the start and a variable-size part at the end.</li>
+  <li><strong>Each variable-length attribute is represented in the fixed part by an (offset, length) pair.</strong> The <b class="term">offset</b> is where its actual bytes start, measured from the beginning of the record. The <b class="term">length</b> is how many bytes it uses. The pair itself is fixed size (here 2 bytes + 2 bytes = 4 bytes). The actual characters are stored after all the fixed-length data.</li>
+  <li><strong>Null values are recorded in a null bitmap.</strong> A <b class="term">bitmap</b> is a row of bits, one per attribute. A bit is 1 if that attribute is <code>NULL</code> (has no value), and 0 if it has a value. One byte is enough for up to 8 attributes.</li>
+</ol>
+
+<p>The result: the fixed part always has the same size and layout, so the database can jump to the 2nd attribute's pair at byte 4 every time, read “offset 26, length 10”, and jump straight to the name.</p>
+
+<h2>3. Worked example (slide 12)</h2>
+
+<p>The relation is <code>instructor (id char(5), name varchar2(30), dept-name varchar2(20), salary number(8))</code>. The record to store is:</p>
+<figure><div id="rec1"></div></figure>
+
+<p>Following the textbook figure, the three text fields (id, name, dept-name) are stored as variable-length strings with (offset, length) pairs. Salary is a fixed 8-byte number, so it is stored directly in the fixed part. Here is the record, byte by byte:</p>
+
+<figure>
+<svg id="f-var1" role="img" aria-label="Variable-length record layout for 10101 Srinivasan"></svg>
+<figcaption><b>Figure 1.</b> The record for (10101, Srinivasan, Comp. Sci., 65000). Bytes 0–20 are the fixed part: three (offset, length) pairs, the salary, and the null bitmap. Bytes 21–45 are the variable part holding the actual strings.</figcaption>
+</figure>
+
+<div class="tbl"><table>
+<tr><th>Bytes</th><th>Contents</th><th>Meaning</th></tr>
+<tr><td class="num">0–3</td><td class="num">21, 5</td><td>id starts at byte 21 and is 5 bytes long (“10101”)</td></tr>
+<tr><td class="num">4–7</td><td class="num">26, 10</td><td>name starts at byte 26 and is 10 bytes long (“Srinivasan”)</td></tr>
+<tr><td class="num">8–11</td><td class="num">36, 10</td><td>dept-name starts at byte 36 and is 10 bytes long (“Comp. Sci.”)</td></tr>
+<tr><td class="num">12–19</td><td class="num">65000</td><td>salary, stored directly (fixed 8 bytes)</td></tr>
+<tr><td class="num">20</td><td class="num">0000</td><td>null bitmap: all four attributes have values</td></tr>
+<tr><td class="num">21–25</td><td>10101</td><td>id</td></tr>
+<tr><td class="num">26–35</td><td>Srinivasan</td><td>name</td></tr>
+<tr><td class="num">36–45</td><td>Comp. Sci.</td><td>dept-name</td></tr>
+</table></div>
+
+<p>Notice how the offsets chain together: each string starts where the previous one ended. id starts at 21 (right after the 21-byte fixed part), 21 + 5 = 26 for name, 26 + 10 = 36 for dept-name. The record ends at byte 45, so it is 46 bytes long.</p>
+
+<h3>What the null bitmap does</h3>
+<p>If this instructor had no department (<code>dept-name IS NULL</code>), the bit for dept-name in the bitmap would be set to 1, giving <code>0010</code> (reading the bits in attribute order id, name, dept, salary). The database checks the bitmap first and does not even look at the (offset, length) pair for a null attribute. This is cheaper than storing a special “null” value in every field.</p>
+
+<div class="q">
+<h4>Question w2-2 (worked answer)</h4>
+<p><em>Implement the variable-length record for the same relation for these records:</em></p>
+<div id="rec2"></div>
+<p>The first record is exactly the slide 12 example (Figure 1). The second record is (12121, Wu, Finance, 90000). The fixed part has the same shape (21 bytes), so the strings again start at byte 21:</p>
+<ul>
+  <li>id “12121” is 5 bytes → offset 21, length 5, bytes 21–25.</li>
+  <li>name “Wu” is 2 bytes → offset 26, length 2, bytes 26–27.</li>
+  <li>dept-name “Finance” is 7 bytes → offset 28, length 7, bytes 28–34.</li>
+  <li>salary 90000 in bytes 12–19. Null bitmap <code>0000</code> in byte 20.</li>
+</ul>
+<figure>
+<svg id="f-var2" role="img" aria-label="Variable-length record layout for 12121 Wu"></svg>
+<figcaption><b>Figure 2.</b> The record for (12121, Wu, Finance, 90000). It is only 35 bytes long (0–34), compared with 46 for Srinivasan. With <code>char</code> fields both records would have been padded to the same size.</figcaption>
+</figure>
+</div>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+<div id="try2"></div>
+
+<div class="key">
+<p><strong>Summary:</strong> records become variable length when a file mixes record types, when fields are <code>varchar</code>, or when fields repeat. Each record is stored as a fixed part (an (offset, length) pair per variable field, the fixed-size fields, and a null bitmap) followed by the variable part holding the actual strings.</p>
+</div>
+</main>
+<script src="../assets/book.js"></script>
+<script>
+recTable('#rec1', [{ cells: INSTR[0] }]);
+recTable('#rec2', [{ cells: INSTR[0] }, { cells: INSTR[1] }]);
+const fixed = (p1, p2, p3, sal) => [
+  { from: 0, to: 4, text: p1, over: 'id ptr' }, { from: 4, to: 8, text: p2, over: 'name ptr' },
+  { from: 8, to: 12, text: p3, over: 'dept ptr' }, { from: 12, to: 20, text: sal, over: 'salary' },
+  { from: 20, to: 21, text: '', cls: 'cell-hl', over: '↓nulls' }];
+byteStrip('#f-var1', [...fixed('21,5', '26,10', '36,10', '65000'),
+  { from: 21, to: 26, text: '10101', cls: 'cell-new' }, { from: 26, to: 36, text: 'Srinivasan', cls: 'cell-new' },
+  { from: 36, to: 46, text: 'Comp. Sci.', cls: 'cell-new' }], [0, 4, 8, 12, 20, 21, 26, 36, 46]);
+byteStrip('#f-var2', [...fixed('21,5', '26,2', '28,7', '90000'),
+  { from: 21, to: 26, text: '12121', cls: 'cell-new' }, { from: 26, to: 28, text: 'Wu', cls: 'cell-new' },
+  { from: 28, to: 35, text: 'Finance', cls: 'cell-new' }], [0, 4, 8, 12, 20, 21, 26, 28, 35], { scale: 16 });
+</script>
+<script>
+flashcards('#cards', [
+  { f: 'Three causes of variable-length records', b: 'Several record types in one file; variable-length fields (varchar); repeating fields.' },
+  { f: '(offset, length) pair', b: 'A fixed-size entry in the fixed part of a record saying where a variable-length value starts (from the record start) and how many bytes it has.' },
+  { f: 'Null bitmap', b: 'One bit per attribute; 1 means the attribute is NULL. One byte covers up to 8 attributes.' },
+  { f: 'Fixed part', b: 'The start of the record: (offset, length) pairs, fixed-size fields and the null bitmap. Same size in every record.' },
+  { f: 'Variable part', b: 'The actual bytes of the variable-length values, stored after the fixed part.' },
+]);
+quiz('#quiz', [
+  { q: 'In the slide layout, the fixed part of an instructor record is 21 bytes. Where does the id string start?', opts: ['Byte 0', 'Byte 20', 'Byte 21', 'Byte 4'], a: 2, why: 'Variable data starts right after the fixed part: byte 21.' },
+  { q: 'Record (22222, Einstein, Physics, 95000). What is the (offset, length) pair for dept-name?', opts: ['(34, 7)', '(26, 8)', '(34, 8)', '(21, 7)'], a: 0,
+    why: 'id 21–25, name “Einstein” (8 bytes) 26–33, so dept-name “Physics” starts at 34 with length 7.' },
+  { q: 'An instructor has a NULL salary. Which bitmap (id, name, dept, salary) is stored?', opts: ['1000', '0001', '1111', '0000'], a: 1, why: 'Only the 4th attribute is null, so only the 4th bit is 1.' },
+  { q: 'Why is salary stored directly in the fixed part, without an (offset, length) pair?', opts: ['It is never null', 'It is a number, so it is always 8 bytes', 'It is the key', 'It is stored last'], a: 1, why: 'Fixed-size values can live in the fixed part; only variable-length ones need a pair.' },
+  { q: 'Which is an example of case a (several record types in one file)?', opts: ['name varchar(30)', 'A list of phone numbers in one record', 'student and takes records in the same file', 'A NULL salary'], a: 2, why: 'Two relations with different record sizes share the file.' },
+]);
+ask('#try1', { q: 'Using the slide layout (21-byte fixed part), how many bytes is the record (22222, Einstein, Physics, 95000)?', a: 41,
+  hint: '21 + length of id + name + dept-name.', why: '21 + 5 + 8 + 7 = 41 bytes (bytes 0–40).' });
+ask('#try2', { q: 'For the same record, give the (offset, length) pair of name.', a: ['26,8', '26, 8', '(26,8)', '(26, 8)'],
+  hint: 'id takes bytes 21–25.', why: 'name “Einstein” starts at 26 and is 8 bytes long.' });
+</script>
+</body>
+</html>

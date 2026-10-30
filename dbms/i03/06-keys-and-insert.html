@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Keys, PRIMARY KEY, UNIQUE and INSERT · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="../i03/lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 03 (Ishrak) · Chapter 6 · Slides 35–44 · Book §2.3.6, §6.5.1</div>
+<h1>Keys, PRIMARY KEY, UNIQUE and INSERT</h1>
+<p class="lede">What a key is and how to find one (including the slide's "What is the key here?" question), how to declare a primary key and UNIQUE attributes in CREATE TABLE, what the DBMS does when an INSERT breaks them, and the full and partial forms of INSERT.</p>
+
+<h2>1. Keys (slide 35)</h2>
+<dl class="def">
+  <dt>Key</dt>
+  <dd>A <em>minimal</em> set of attributes whose values identify a tuple uniquely: no two tuples of the relation may agree on all of them. "Minimal" means that if you remove any attribute from the set, it stops being unique.</dd>
+  <dt>Superkey</dt>
+  <dd>Any set of attributes that identifies tuples uniquely, minimal or not. Every key is a superkey; adding attributes to a key gives a superkey that is not a key. (Sukarna sir's lectures on functional dependencies use the same terms.)</dd>
+</dl>
+<p>The red line on slide 35 is the most important part: <strong>a key is decided by considering every relation instance that could ever legally exist, not only the rows the table happens to contain now.</strong> The current data can prove that something is <em>not</em> a key (by showing two rows that agree on it), but it can never prove that something <em>is</em> a key. That decision comes from the meaning of the data.</p>
+<p>In slide 35's <code>Product(p_name, price, manufacturer)</code>, <code>p_name</code> is the key: each product name is used once. <code>manufacturer</code> is not a key (GizmoWorks makes two products), and neither is <code>price</code>: slide 37's version of the table shows Gizmo and Widget both at 19.99. (Slide 35 shows Widget at 29.99 and slide 37 at 19.99; the change is deliberate, to make the point that two products can share a price.)</p>
+
+<h2>2. What is the key here? (slide 36)</h2>
+<div class="q">
+<h4>Question (worked answer): the key of Course(dept, number, section, instructor)</h4>
+<p>Options: A. dept &nbsp; B. dept, number &nbsp; C. dept, number, section &nbsp; D. dept, number, section, instructor. The slide's answer is <strong>C</strong>. Check each option against the data, then against the meaning:</p>
+<figure><span class="anim-tag">Animation</span><div id="keyA"></div></figure>
+<ul>
+  <li><strong>A (dept):</strong> MATH appears three times. Not unique, so not a key.</li>
+  <li><strong>B (dept, number):</strong> (MATH, 101) appears twice, sections A and B. Not a key.</li>
+  <li><strong>C (dept, number, section):</strong> all five combinations differ, and by meaning a course offering has one row per section, so it stays unique for any legal data. Removing any attribute breaks uniqueness (B already fails; (dept, section) fails with (MATH, A) twice; (number, section) fails with (101, A) twice). So it is minimal: <strong>a key</strong>.</li>
+  <li><strong>D (all four):</strong> unique, because it contains C, but not minimal: instructor can be dropped. D is a <em>superkey</em>, not a key.</li>
+</ul>
+</div>
+
+<h2>3. Primary keys (slide 37)</h2>
+<dl class="def">
+  <dt>Primary key</dt>
+  <dd>The one key chosen to identify the rows of a table. Every table should have one. The DBMS then enforces two rules: (1) no two rows have the same primary-key value, and (2) no primary-key attribute is NULL. An INSERT or UPDATE that would break either rule fails.</dd>
+</dl>
+<p>In schema notation the primary key is underlined: Product(<u>p_name</u>, price, manufacturer). In Oracle, the duplicate case fails with <code>ORA-00001: unique constraint violated</code> and the NULL case with <code>ORA-01400: cannot insert NULL</code>.</p>
+<p>There are two ways to declare a primary key in CREATE TABLE (textbook §2.3.6):</p>
+<div class="figrow">
+<pre>-- (1) after the attribute
+CREATE TABLE Product (
+  p_name       VARCHAR2(20) PRIMARY KEY,
+  price        NUMBER(7,2),
+  manufacturer VARCHAR2(20)
+);</pre>
+<pre>-- (2) as a separate item
+CREATE TABLE Product (
+  p_name       VARCHAR2(20),
+  price        NUMBER(7,2),
+  manufacturer VARCHAR2(20),
+  PRIMARY KEY (p_name)
+);</pre>
+</div>
+<p>Form (1) only works for a one-attribute key. A key of several attributes must use form (2).</p>
+
+<h2>4. Class exercises: Movie and MovieStar (slides 38–41)</h2>
+<div class="q">
+<h4>Class exercise (worked answer): the key of Movie(title, year, length, genre)</h4>
+<p>The title alone is not a key, because films are remade under the same title: <i>King Kong</i> was made in 1933 and again in 2005 (our sample table contains both). Two films with the same title in the same year are not expected, so <strong>(title, year)</strong> is the key. Neither attribute alone is unique, so the pair is minimal. Slide 39's declaration, with the composite key as a separate item:</p>
+<pre>CREATE TABLE Movie (
+    title   VARCHAR2(50),
+    year    INTEGER,
+    length  INTEGER,
+    genre   CHAR(10),
+    PRIMARY KEY (title, year)
+);</pre>
+<p>(The slide omits the final semicolon; it is needed when several statements are run together.)</p>
+</div>
+<div class="q">
+<h4>Class exercise (worked answer): the key of MovieStar(name, address, gender, birthdate)</h4>
+<p>The key is <strong>name</strong>. Gender and birthdate are obviously shared by many people, and two stars could live at one address. Actors' unions do not let two members register the same professional name, so name identifies a star (the textbook makes the same assumption). Slide 41:</p>
+<pre>CREATE TABLE MovieStar (
+    name       VARCHAR2(50),
+    address    VARCHAR2(50),
+    gender     CHAR(1),
+    birthdate  DATE,
+    PRIMARY KEY (name)
+);</pre>
+</div>
+
+<h2>5. UNIQUE attributes (slides 42–43)</h2>
+<dl class="def">
+  <dt>UNIQUE</dt>
+  <dd>A constraint declaring that an attribute (or set of attributes) must have distinct values in every row. It declares another key besides the primary key. Unlike a primary key, a UNIQUE attribute <strong>may be NULL</strong>, and more than one row may have NULL there, because NULL is not equal to anything, including another NULL.</dd>
+</dl>
+<p>Slide 43 adds a <code>username</code> to <code>Students</code>. Each student who has a username must have a different one, but a student may have none yet:</p>
+<pre>CREATE TABLE Students (
+    sid       CHAR(10),
+    name      VARCHAR2(50),
+    email     VARCHAR2(50),
+    gpa       FLOAT,
+    dob       DATE,
+    username  CHAR(5) UNIQUE,
+    PRIMARY KEY (sid)
+);</pre>
+<div class="tbl"><table>
+<tr><th></th><th>PRIMARY KEY</th><th>UNIQUE</th></tr>
+<tr><td>Duplicate values</td><td>rejected</td><td>rejected</td></tr>
+<tr><td>NULL values</td><td>rejected</td><td>allowed, even in several rows</td></tr>
+<tr><td>How many per table</td><td>at most one</td><td>any number</td></tr>
+</table></div>
+<p>Watch the DBMS check each insert against both rules:</p>
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="insA"></div>
+</figure>
+<div id="p1"></div>
+
+<h2>6. Adding data with INSERT (slide 44)</h2>
+<pre>INSERT INTO &lt;table_name&gt; [(a1, a2, …, an)] VALUES (v1, v2, …, vn);</pre>
+<dl class="def">
+  <dt>Full insert</dt>
+  <dd>No attribute list: one value for every attribute, in the order the attributes were declared in CREATE TABLE.</dd>
+  <dt>Partial insert</dt>
+  <dd>An attribute list in brackets, followed by one value for each listed attribute, in the list's order. Attributes that are not listed get their default value, which is NULL unless a DEFAULT was declared (Lec 05, Chapter 4).</dd>
+</dl>
+<pre>-- full inserts: Student(id, first_name, last_name, city, state)
+INSERT INTO Student VALUES ('S123456789', 'John', 'Doe', 'Houston', 'TX');
+INSERT INTO Student VALUES ('S111111111', 'Mary', 'Jones', 'Houston', 'TX');
+-- partial insert: city and state become NULL
+INSERT INTO Student (id, first_name, last_name)
+VALUES ('S987654321', 'Jane', 'Smith');</pre>
+<p>A partial insert must still give every attribute that may not be NULL, in particular the primary key. Listing the attributes is also good practice for full inserts: the statement keeps working if someone later adds a column or changes the column order.</p>
+<div id="p2"></div>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div><div id="try2"></div>
+<h3>SQL exercises</h3>
+<div id="c1"></div><div id="c2"></div><div id="c3"></div><div id="c4"></div><div id="c5"></div>
+
+<div class="key"><p><strong>Summary:</strong> a key is a minimal set of attributes that is unique for every legal instance; data can disprove a key but never prove one. Each table picks one primary key: no duplicates, no NULLs; declare it after the attribute (single attribute) or as <code>PRIMARY KEY (a, b)</code> (any size). UNIQUE declares another key that forbids duplicates but allows NULLs. INSERT gives either all values in declaration order, or a column list and matching values; unlisted columns become NULL (or their DEFAULT).</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/sqlplay.js"></script>
+<script src="../i03/lecture.js"></script>
+<script>
+// "What is the key here?" animation
+(() => {
+  const H = ['dept', 'number', 'section', 'instructor'];
+  const R = [['MATH', 101, 'A', 'Jones'], ['MATH', 101, 'B', 'Smith'], ['MATH', 102, 'A', 'Williams'], ['PHYS', 101, 'A', 'Baker'], ['PHYS', 102, 'B', 'Baker']];
+  const test = (cols) => {
+    const seen = {}, dup = new Set();
+    R.forEach((r, i) => { const k = cols.map(j => r[j]).join('|'); if (k in seen) { dup.add(i); dup.add(seen[k]); } else seen[k] = i; });
+    return R.map((r, i) => ({ c: r, cls: dup.has(i) ? 'del' : '', side: cols.map(j => r[j]).join(', ') }));
+  };
+  const fr = (cols, cap) => ({ html: T(H, test(cols), { name: 'Course', hl: cols }), cap });
+  stepper('#keyA', [
+    fr([0], '<b>A. {dept}</b>: the outlined column. Struck-through rows share a value: MATH ×3, PHYS ×2. Not unique.'),
+    fr([0, 1], '<b>B. {dept, number}</b>: (MATH, 101) twice and nothing else repeats, but one repeat is enough. Not a key.'),
+    fr([0, 1, 2], '<b>C. {dept, number, section}</b>: all five values differ, and by meaning one row describes one section of one course. Every smaller subset repeats, so C is minimal: <b>the key</b>.'),
+    fr([0, 2], 'Minimality check for C: drop <code>number</code>. {dept, section} has (MATH, A) twice. Dropping dept or section fails similarly.'),
+    fr([0, 1, 2, 3], '<b>D. all four</b>: unique (it contains C) but not minimal, since instructor can be removed. D is a superkey, not a key.'),
+  ], { interval: 2600 });
+})();
+// INSERT checks against PRIMARY KEY (sid) and UNIQUE (username)
+(() => {
+  const H = ['sid', 'name', 'username'];
+  const base = [['1905001', 'Ayesha Rahman', 'ayesh'], ['1905002', 'Tanvir Hasan', 'tanvr'], ['2005011', 'Mahir Chowdhury', null]];
+  const tries = [
+    [['1905009', 'Nabila Karim', 'nabil'], true, 'new sid, new username: <b>accepted</b>.'],
+    [['1905001', 'Imran Khan', 'imrnk'], false, 'sid 1905001 already exists: <b>rejected</b> (ORA-00001, primary key violated).'],
+    [[null, 'No Id', 'noid1'], false, 'sid is NULL: <b>rejected</b> (ORA-01400, a primary key cannot be NULL).'],
+    [['1905010', 'Tasnim Ara', 'tanvr'], false, 'username tanvr is already used by Tanvir: <b>rejected</b> (ORA-00001, UNIQUE violated).'],
+    [['2305031', 'Fahim Shahriar', null], true, 'username NULL, and Mahir\'s is NULL too. NULL does not equal NULL, so UNIQUE is not violated: <b>accepted</b>.'],
+  ];
+  let cur = base.map(r => ({ c: r }));
+  const steps = [{ html: T(H, cur, { name: 'Students (sid is the PRIMARY KEY; username is UNIQUE)' }), cap: 'Three students. Now five INSERT statements arrive, one at a time.' }];
+  tries.forEach(([row, ok, why]) => {
+    const clash = cur.map((r, i) => (row[0] != null && r.c[0] === row[0]) || (row[2] != null && r.c[2] === row[2]) ? i : -1).filter(i => i >= 0);
+    steps.push({ html: T(H, [...cur.map((r, i) => ({ c: r.c, cls: clash.includes(i) ? 'hl' : '' })), { c: row, cls: ok ? 'new' : 'del', side: ok ? 'accepted' : 'rejected' }], { name: 'Students' }),
+      cap: `<code>INSERT INTO Students … VALUES (${row[0] ? `'${row[0]}'` : 'NULL'}, '${row[1]}', ${row[2] ? `'${row[2]}'` : 'NULL'})</code>: ${why}` });
+    if (ok) cur = [...cur.map(r => ({ c: r.c })), { c: row }];
+  });
+  steps.push({ html: T(H, cur, { name: 'Students' }), cap: 'Final table: two of the five inserts succeeded. The table never contains a duplicate sid, a NULL sid, or a duplicate non-NULL username.' });
+  stepper('#insA', steps, { interval: 2600 });
+})();
+sqlPlay('#p1', { setup: UNI, query: "INSERT INTO Students VALUES ('1905001', 'Imran Khan', NULL, 3.1, NULL, 'imrnk');", note: "The duplicate sid is rejected. Then try a duplicate username (<code>'tanvr'</code>), and a second NULL username. Note: SQLite, unlike Oracle, lets a NULL into a non-integer PRIMARY KEY column, so the NULL-key case cannot be shown here." });
+sqlPlay('#p2', { setup: UNI, query: STUDENT_ROWS + 'SELECT * FROM Student;', note: 'The partial insert left <code>city</code> and <code>state</code> NULL for Jane Smith.' });
+flashcards('#cards', [
+  { f: 'Key', b: 'Minimal set of attributes that is unique in every legal instance.' },
+  { f: 'Superkey', b: 'Any unique set of attributes (not necessarily minimal).' },
+  { f: 'Can data prove a key?', b: 'No. Data can only disprove one (two rows that agree).' },
+  { f: 'Primary key rules', b: 'No duplicate values, no NULLs. One per table.' },
+  { f: 'Composite key syntax', b: 'PRIMARY KEY (title, year) as a separate item in CREATE TABLE.' },
+  { f: 'UNIQUE', b: 'No duplicate non-NULL values; NULL allowed in many rows; many per table.' },
+  { f: 'Full insert', b: 'INSERT INTO T VALUES (…) with all values in declaration order.' },
+  { f: 'Partial insert', b: 'INSERT INTO T (a, b) VALUES (…); other columns get NULL or DEFAULT.' },
+]);
+quiz('#quiz', [
+  { q: 'Course(dept, number, section, instructor): which is a superkey but not a key?', opts: ['{dept}', '{dept, number}', '{dept, number, section}', '{dept, number, section, instructor}'], a: 3, why: 'It is unique but instructor is unnecessary.' },
+  { q: 'Why is title alone not the key of Movie?', opts: ['Titles are long strings', 'Remakes reuse titles (King Kong 1933 and 2005)', 'Titles can be NULL', 'Only numbers can be keys'], a: 1, why: 'Two films can share a title.' },
+  { q: 'Which INSERT fails if username is UNIQUE and two rows already have username NULL?', opts: ['A third row with username NULL', 'A row with a new username', 'A row whose username equals an existing non-NULL one', 'None'], a: 2, why: 'NULLs never clash; equal non-NULL values do.' },
+  { q: 'A table has PRIMARY KEY (title, year). Which pair of rows is allowed?', opts: ["('Up', 2009) and ('Up', 2009)", "('Up', 2009) and ('Up', 2011)", "(NULL, 2009) and ('Up', 2009)", "('Up', NULL)"], a: 1, why: 'Same title, different year: different keys. Key attributes cannot be NULL.' },
+  { q: 'INSERT INTO Student (id, first_name) VALUES (\'S1\', \'Ali\'); What is last_name?', opts: ["''", 'NULL (unless a DEFAULT exists)', "'Ali'", 'An error'], a: 1, why: 'Unlisted attributes get their default, NULL by default.' },
+  { q: 'How many PRIMARY KEY declarations can one table have?', opts: ['0 or 1', 'Exactly 2', 'Any number', 'One per column'], a: 0, why: 'One primary key (possibly composite); other keys use UNIQUE.' },
+]);
+ask('#try1', { q: 'In the Course data of slide 36, how many rows share their (dept, number) pair with another row?', a: 2, why: '(MATH, 101) appears in 2 rows.' });
+ask('#try2', { q: 'A table has PRIMARY KEY (a) and UNIQUE (b). Rows: (1, NULL), (2, NULL), (3, 7). Insert (4, NULL), then (5, 7), then (3, 8). How many of these three inserts succeed?', a: 1, hint: 'Check a for duplicates/NULL and b for duplicate non-NULL values.', why: '(4, NULL) succeeds; (5, 7) duplicates b = 7; (3, 8) duplicates a = 3. Only 1.' });
+chk('#c1', UNI, '<b>Easy.</b> Using the slide-44 <code>Student</code> table (empty), do the partial insert of Jane Smith (id S987654321) giving only id, first name and last name.', "INSERT INTO Student (id, first_name, last_name) VALUES ('S987654321', 'Jane', 'Smith');", { check: 'state', table: 'Student' });
+chk('#c2', UNI, '<b>Full and partial.</b> Insert all three students of slide 44 into <code>Student</code>: John Doe and Mary Jones (both Houston, TX) with full inserts, and Jane Smith with a partial insert.', STUDENT_ROWS, { check: 'state', table: 'Student' });
+chk('#c3', '', '<b>Composite key.</b> The database is empty. Create <code>Movie(title, year, length, genre)</code> with key (title, year), and insert both King Kong films: (1933, 100 minutes) and (2005, 187 minutes), genre adventure.', "CREATE TABLE Movie (\n  title  VARCHAR2(50),\n  year   INTEGER,\n  length INTEGER,\n  genre  CHAR(10),\n  PRIMARY KEY (title, year)\n);\nINSERT INTO Movie VALUES ('King Kong', 1933, 100, 'adventure');\nINSERT INTO Movie VALUES ('King Kong', 2005, 187, 'adventure');", { check: 'state', table: 'Movie', hint: 'A two-attribute key needs the separate PRIMARY KEY (…) item.' });
+chk('#c4', UNI, '<b>Finding rows by key.</b> Show the instructor of section B of MATH 101 in <code>Course</code> (the course number column is called <code>num</code>).', "SELECT instructor FROM Course WHERE dept = 'MATH' AND num = 101 AND section = 'B';", { hint: 'Give a value for every attribute of the key: dept, num and section.' });
+chk('#c5', '', '<b>Exam style.</b> The database is empty. Create <code>Employee(emp_id, nid, name, email)</code> where emp_id (a number of up to 6 digits) is the primary key, nid (10 characters) must be unique and is always known, and email (up to 50 characters) must be unique but may be missing. Insert (1, \'1234567890\', \'Karim\', NULL) and (2, \'2234567890\', \'Rahim\', NULL).', "CREATE TABLE Employee (\n  emp_id NUMBER(6) PRIMARY KEY,\n  nid    CHAR(10) NOT NULL UNIQUE,\n  name   VARCHAR2(50),\n  email  VARCHAR2(50) UNIQUE\n);\nINSERT INTO Employee VALUES (1, '1234567890', 'Karim', NULL);\nINSERT INTO Employee VALUES (2, '2234567890', 'Rahim', NULL);", { check: 'state', table: 'Employee', hint: 'UNIQUE allows NULL, so "always known" needs NOT NULL as well (Lec 06 covers NOT NULL). Two NULL emails do not clash.' });
+</script>
+</body>
+</html>

@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Exam Topics Beyond the Slides · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="../s07/lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 07–08 (Sukarna) · Chapter 7 · Beyond the slides · Book §15.5.6, §16.2, §16.4 · Silberschatz Ch. 15–16</div>
+<h1>Exam Topics Beyond the Slides: Query Optimization, Size Estimation, Index Selection, Hybrid Hash Join</h1>
+<p class="lede">Past exams ask about topics the Lec 07–08 slides only touch: rewriting logical plans with algebraic laws, estimating result sizes, the cost of selections that use indexes, and the hybrid hash join. Each topic gets a short explanation first, then its exam questions with full answers.</p>
+
+<h2>1. Logical-plan optimization with algebraic laws</h2>
+<p>Lec 07, Chapter 1 showed query rewrite: the parse tree becomes a relational-algebra tree, which is then improved by <b>equivalences</b>, laws that never change the answer. The laws used in exams:</p>
+<div class="tbl"><table>
+<tr><th>Law</th><th>Use</th></tr>
+<tr><td>σ<sub>C1 ∧ C2</sub>(E) = σ<sub>C1</sub>(σ<sub>C2</sub>(E))</td><td>split a selection so the parts can move separately</td></tr>
+<tr><td>σ<sub>C</sub>(E1 × E2) = σ<sub>C</sub>(E1) × E2 &nbsp; if C mentions only E1's attributes (same for ⋈)</td><td><b>push selections down</b>, as near the leaves as possible</td></tr>
+<tr><td>σ<sub>θ</sub>(E1 × E2) = E1 ⋈<sub>θ</sub> E2</td><td>turn a product plus a comparison between the two sides into a join</td></tr>
+<tr><td>π<sub>L</sub>(E1 ⋈<sub>θ</sub> E2) = π<sub>L</sub>(π<sub>L1</sub>(E1) ⋈<sub>θ</sub> π<sub>L2</sub>(E2)), L<sub>i</sub> = attributes of E<sub>i</sub> in L or in θ</td><td><b>push projections down</b>, keeping attributes still needed above</td></tr>
+<tr><td>⋈ and × are commutative and associative</td><td>choose the join order (smallest intermediate results first)</td></tr>
+<tr><td>σ<sub>C</sub>(δ(R)) = δ(σ<sub>C</sub>(R)); π<sub>L</sub>(R ∪ S) = π<sub>L</sub>(R) ∪ π<sub>L</sub>(S)</td><td>δ commutes with σ; π distributes over ∪ (also for bags)</td></tr>
+<tr><td>π does <b>not</b> commute with δ, and does <b>not</b> distribute over ∩ or −</td><td>projection can make different tuples equal</td></tr>
+</table></div>
+<p>The heuristic recipe: (1) split conjunctive selections; (2) push each selection to the lowest node that has all its attributes; (3) combine σ with × into joins; (4) push projections down, keeping join attributes; (5) order joins so the most selective come first.</p>
+
+<h3>Exam questions</h3>
+<div class="exam">
+  <div class="exam-src">DB QB · 23-24 5d · 7 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-1 | 2023–24 · 7 marks</div>
+  <div class="exam-q"><p>Given three relations R(a, b, c), S(d, e) and T(e, f, g), apply query optimization techniques to find the optimized logical plan for the expression given below: σ<sub>a&gt;100, b=20, c=d, f&lt;100</sub>((R × S) ⋈ T)</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+  <ol>
+    <li><b>Split</b> the selection: σ<sub>a&gt;100</sub> σ<sub>b=20</sub> σ<sub>c=d</sub> σ<sub>f&lt;100</sub>((R × S) ⋈ T).</li>
+    <li><b>Push down:</b> a &gt; 100 and b = 20 mention only R: apply them to R. f &lt; 100 mentions only T: apply it to T. c = d mentions R and S: it can go down to (R × S) but no further.</li>
+    <li><b>σ over × becomes a join:</b> σ<sub>c=d</sub>(σ<sub>a&gt;100 ∧ b=20</sub>(R) × S) = σ<sub>a&gt;100 ∧ b=20</sub>(R) ⋈<sub>c=d</sub> S.</li>
+  </ol>
+  <p class="formula">(σ<sub>a&gt;100 ∧ b=20</sub>(R) ⋈<sub>c=d</sub> S) ⋈ σ<sub>f&lt;100</sub>(T)</p>
+  <p>The outer ⋈ is still the natural join on e (the attribute S and T share). The product R × S, which could be huge, never exists; every relation is filtered before it enters a join.</p>
+  <figure><span class="anim-tag">Animation</span><div id="opt1"></div></figure>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 21-22 8b · 15 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-2 | 2021–22 · 15 marks</div>
+  <div class="exam-q"><p>Observe the Schema and SQL query shown in the following figure. Construct an optimized query plan for the query using the equivalence rules of the figure. You have to draw the query plan using expression tree and justify the plan with explanations.</p>
+  <p>Schema: Student(sid, name, major), Enroll(sid, course, section, term, grade), Class(course, section, term, instructor, room, time)</p>
+  <pre>SELECT S.name, C.instructor, C.term
+FROM Student S, Enroll E, Class C
+WHERE S.sid = E.sid AND E.course = C.course AND E.section = C.section
+  AND E.term = C.term AND C.instructor = 'Hinon' AND S.major = 'ML';</pre>
+  <p>Equivalence rules: (a) σ<sub>θ</sub>(E1 × E2) = E1 ⋈<sub>θ</sub> E2; (b) σ<sub>θ0</sub>(E1 ⋈<sub>θ</sub> E2) ≡ (σ<sub>θ0</sub>(E1)) ⋈<sub>θ</sub> E2; (c) σ<sub>θ1∧θ2</sub>(E1 ⋈<sub>θ</sub> E2) = (σ<sub>θ1</sub>(E1)) ⋈<sub>θ</sub> (σ<sub>θ2</sub>(E2)); (d) Π<sub>L1∪L2</sub>(E1 ⋈<sub>θ</sub> E2) = Π<sub>L1</sub>(E1) ⋈<sub>θ</sub> Π<sub>L2</sub>(E2); (e) Π<sub>L1∪L2</sub>(E1 ⋈<sub>θ</sub> E2) = Π<sub>L1∪L2</sub>(Π<sub>L1∪L3</sub>(E1) ⋈<sub>θ</sub> Π<sub>L2∪L4</sub>(E2)). (The DB QB copy lost the figure; this is the schema, query and rule list from the CSE 215 bank copy of the same exam.)</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+  <p><b>Initial plan:</b> Π<sub>name, instructor, term</sub>(σ<sub>θ</sub>((Student × Enroll) × Class)), with θ = all six conditions.</p>
+  <ol>
+    <li><b>Rule (a)</b>: the conditions S.sid = E.sid and E.course = C.course ∧ E.section = C.section ∧ E.term = C.term relate the operands of the products, so the products become joins: (Student ⋈<sub>sid</sub> Enroll) ⋈<sub>course, section, term</sub> Class, with σ<sub>major='ML' ∧ instructor='Hinon'</sub> still on top.</li>
+    <li><b>Rules (c) and (b)</b>: major = 'ML' mentions only Student, instructor = 'Hinon' only Class: push each down to its relation.</li>
+    <li><b>Join order</b> (associativity): σ<sub>instructor='Hinon'</sub>(Class) is probably tiny (one instructor's classes), so join it with Enroll first; that keeps only the enrollments in Hinon's classes. Then join with the ML students.</li>
+    <li><b>Rule (e)</b>: keep only needed attributes. From Student: sid (join), name (output). From Enroll: sid, course, section, term (joins). From Class: course, section, term (join), instructor, term (output). grade, room, time and major are dropped early.</li>
+  </ol>
+  <p class="formula">Π<sub>name, instructor, term</sub>( Π<sub>sid, name</sub>(σ<sub>major='ML'</sub>(Student)) ⋈<sub>sid</sub> Π<sub>sid, instructor, term</sub>( Π<sub>sid, course, section, term</sub>(Enroll) ⋈<sub>course, section, term</sub> Π<sub>course, section, term, instructor</sub>(σ<sub>instructor='Hinon'</sub>(Class)) ) )</p>
+  <figure><span class="anim-tag">Animation</span><div id="opt2"></div></figure>
+  <p><b>Justification:</b> selections first shrink the inputs of every join (rule c); joins replace products so no full cross product is built (rule a); projections shrink every intermediate tuple so more fit per block (rule e); the most selective join is done first so the intermediate results stay small.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 20-21 8b · 10 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-2 | 2020–21 · 10 marks</div>
+  <div class="exam-q"><p>Consider the following database schema: R(A,B), S(B, C), T(C, D). Write a Relational Algebra Plan for the SQL query below. Your answer must be in the form of an expression first. Then convert it to a tree. Finally find the most optimized tree by pushing down selection(s) and projection(s) as much as possible.</p>
+  <pre>SELECT R.A, T.D FROM T, S, R
+WHERE T.C=S.C AND S.B=R.B AND T.D&gt;20</pre></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+  <p><b>Expression</b> (direct translation of FROM, WHERE, SELECT):</p>
+  <p class="formula">π<sub>R.A, T.D</sub>(σ<sub>T.C=S.C ∧ S.B=R.B ∧ T.D&gt;20</sub>(T × S × R))</p>
+  <p><b>Optimization:</b> split the selection; T.D &gt; 20 mentions only T, so push it onto T; the two equalities turn the products into joins R ⋈<sub>B</sub> S and (…) ⋈<sub>C</sub> T. Push projections: after R ⋈<sub>B</sub> S only A (output) and C (next join) are needed, so add π<sub>A,C</sub>; T must keep C and D.</p>
+  <p class="formula">π<sub>A, D</sub>( π<sub>A, C</sub>(R ⋈<sub>B</sub> S) ⋈<sub>C</sub> σ<sub>D&gt;20</sub>(T) )</p>
+  <figure><span class="anim-tag">Animation</span><div id="opt3"></div></figure>
+  <p>(Projecting R or S alone gains nothing: R(A, B) and S(B, C) need all their attributes, A for the output, B and C for the joins.)</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 17-18 2b · 9 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-2 | 2017–18 · 9 marks</div>
+  <div class="exam-q"><p>Express following query using relational algebra and draw equivalent logical query tree:</p>
+  <pre>SELECT title FROM StarsIn
+WHERE starsName IN (
+    SELECT name FROM MovieStar
+    WHERE name LIKE "%Khan" and birthdate &gt; "18-MAR-1990" );</pre></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+  <p>An IN-subquery over one column becomes a join with the subquery's result (here a semijoin, written as a join followed by projection; since name is projected out, duplicates can arise if one star name matched several MovieStar tuples; δ removes them if set semantics are required):</p>
+  <p class="formula">π<sub>title</sub>( StarsIn ⋈<sub>starsName = name</sub> π<sub>name</sub>(σ<sub>name LIKE '%Khan' ∧ birthdate &gt; '18-MAR-1990'</sub>(MovieStar)) )</p>
+  <figure><svg viewBox="0 0 520 230" width="520" role="img" aria-label="StarsIn query tree"><g style="font-size:12.5px">
+    <text x="200" y="22" text-anchor="middle">π title</text><line x1="200" y1="28" x2="200" y2="52" class="s-fg"/>
+    <text x="200" y="68" text-anchor="middle">⋈ starsName = name</text>
+    <line x1="170" y1="74" x2="100" y2="110" class="s-fg"/><line x1="230" y1="74" x2="320" y2="110" class="s-fg"/>
+    <text x="100" y="126" text-anchor="middle">StarsIn</text><text x="320" y="126" text-anchor="middle">π name</text>
+    <line x1="320" y1="132" x2="320" y2="156" class="s-fg"/>
+    <text x="320" y="172" text-anchor="middle">σ name LIKE '%Khan' ∧ birthdate &gt; '18-MAR-1990'</text>
+    <line x1="320" y1="178" x2="320" y2="202" class="s-fg"/><text x="320" y="218" text-anchor="middle">MovieStar</text>
+  </g></svg></figure>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2012–13 · 8 marks</div>
+  <div class="exam-q"><p>Show a logical query plan for the following query:</p>
+  <pre>SELECT title FROM StarsIn
+WHERE starName IN ( SELECT name FROM MovieStar WHERE birthdate LIKE '%1960' );</pre></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+  <p>This is the textbook's own example (§16.3). The subquery becomes π<sub>name</sub>(σ<sub>birthdate LIKE '%1960'</sub>(MovieStar)); the IN condition becomes a join on starName = name; then project title:</p>
+  <p class="formula">π<sub>title</sub>( StarsIn ⋈<sub>starName = name</sub> π<sub>name</sub>(σ<sub>birthdate LIKE '%1960'</sub>(MovieStar)) )</p>
+  <p>The tree has the same shape as the previous answer's: π<sub>title</sub> on top, a join with StarsIn on the left and π<sub>name</sub> over σ<sub>birthdate LIKE '%1960'</sub> over MovieStar on the right. (The textbook first writes it as σ<sub>starName = name</sub>(StarsIn × …), then turns the σ over × into the join.)</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 23-24 6b · 9 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-1 | 2023–24 · 9 marks</div>
+  <div class="exam-q"><p>For each of the following statements, determine whether it is true. If it is not, provide a counterexample to justify your answer. (i) δ(π<sub>L</sub>(R)) = π<sub>L</sub>(δ(R)). (ii) δ(σ<sub>c</sub>(R)) = σ<sub>c</sub>(δ(R)) (iii) π<sub>L</sub>(R ∪ S) = π<sub>L</sub>(R) ∪ π<sub>L</sub>(S)</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+  <p>δ only matters for bags, so use bag semantics (π keeps duplicates).</p>
+  <p><b>(i) False.</b> R(A, B) = {(1, 1), (1, 2)}, L = A. Left: π<sub>A</sub>(R) = {1, 1}, then δ gives {1}. Right: δ(R) = R (no duplicates), then π<sub>A</sub> gives {1, 1}. {1} ≠ {1, 1}: projection can create new duplicates after δ has run.</p>
+  <p><b>(ii) True.</b> σ keeps or drops each tuple on its own and never changes a tuple. A tuple t appears in the left side once iff t satisfies c and occurs in R at least once; the same holds for the right side.</p>
+  <p><b>(iii) True,</b> for sets and for bags. If t occurs m times in R and n times in S, R ∪ S (bag) has it m + n times; each copy projects to π<sub>L</sub>(t), so both sides contain π<sub>L</sub>(t) with the same total count. (For sets: π<sub>L</sub>(t) is in the left side iff some t in R or S projects to it, iff it is in π<sub>L</sub>(R) or π<sub>L</sub>(S).)</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 20-21 8a · 5 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-2 | 2020–21 · 5 marks</div>
+  <div class="exam-q"><p>Using an example show that, π<sub>a</sub>(R ∩ S) ≠ π<sub>a</sub>(R) ∩ π<sub>a</sub>(S)</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+  <p>Let R(a, b) = {(1, 2)} and S(a, b) = {(1, 3)}. Then R ∩ S = ∅, so π<sub>a</sub>(R ∩ S) = ∅. But π<sub>a</sub>(R) = {1} and π<sub>a</sub>(S) = {1}, so π<sub>a</sub>(R) ∩ π<sub>a</sub>(S) = {1}. ∅ ≠ {1}. The tuples differ only in b; projecting first throws b away and makes them look equal. (So an optimizer may not push π below ∩.)</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 21-22 4c, 20-21 8d · 8 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-2 | 2021–22 · 8 marks</div>
+  <div class="exam-q"><p>Suppose we have two relations A and B with same set of attributes, Relation A has n<sub>a</sub> tuples and relation B has n<sub>b</sub> tuples. For each of the following relational algebra expressions, give the minimum and maximum number of tuples that can appear in the result. Assume that the produced results are the bags, not the sets. a. A ∩ B &nbsp; b. σ<sub>c</sub>(A) − B &nbsp; c. A ∪ B &nbsp; d. A ⟕ B, where ⟕ is the left outer join</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+  <div class="tbl"><table>
+  <tr><th>Expression</th><th>Min</th><th>Max</th><th>Why</th></tr>
+  <tr><td>A ∩ B</td><td class="num">0</td><td class="num">min(n<sub>a</sub>, n<sub>b</sub>)</td><td>min: no common tuple. max: each tuple appears min(count in A, count in B) times, at most the smaller size; reached when the smaller bag is contained in the larger.</td></tr>
+  <tr><td>σ<sub>c</sub>(A) − B</td><td class="num">0</td><td class="num">n<sub>a</sub></td><td>min: c selects nothing, or B cancels every selected tuple. max: c selects all of A and B shares no tuple with A.</td></tr>
+  <tr><td>A ∪ B</td><td class="num">n<sub>a</sub> + n<sub>b</sub></td><td class="num">n<sub>a</sub> + n<sub>b</sub></td><td>bag union keeps everything: always exactly n<sub>a</sub> + n<sub>b</sub>.</td></tr>
+  <tr><td>A ⟕ B</td><td class="num">n<sub>a</sub></td><td class="num">n<sub>a</sub> · max(n<sub>b</sub>, 1)</td><td>min: every A tuple appears at least once (padded if unmatched), e.g. when no tuple matches. max: A and B have the same attributes, so the natural join matches equal tuples; if every tuple of A and of B is the same tuple t, each A tuple matches all n<sub>b</sub> B tuples: n<sub>a</sub>·n<sub>b</sub> (if n<sub>b</sub> = 0, just n<sub>a</sub>).</td></tr>
+  </table></div>
+  </div></details>
+</div>
+
+<h2>2. Estimating the size of a join</h2>
+<p>Cost-based optimization (Lec 07, Ch. 1) needs the sizes of intermediate results. The textbook (§16.4) estimates them from T and V, under two assumptions: values are <b>uniformly distributed</b>, and <b>containment of value sets</b> (if V(R, Y) ≤ V(S, Y), every Y-value of R also appears in S).</p>
+<div class="key"><p class="formula">T(R ⋈ S) ≈ T(R)·T(S) / max(V(R, Y), V(S, Y)) &nbsp;&nbsp; (one join attribute Y)</p>
+<p style="text-align:center;margin:0">Reason: a tuple of the relation with fewer Y-values meets, on average, T(other)/V(other, Y) matching tuples. Also: T(σ<sub>A=c</sub>(R)) ≈ T(R)/V(R, A). Values of attributes not involved in the join keep their V (at most the size of the result).</p></div>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 21-22 5a · 15 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-2 | 2021–22 · 15 marks</div>
+  <div class="exam-q"><p>Consider the relations r1(A, B, C), r2(C, D, E), and r3(E, F). Assume that there are no primary keys. Let V(C, r1) be 900, V(C, r2) be 1100, V(E, r2) be 50, and V(E, r3) be 100. Assume that r1 has 1000 tuples, r2 has 1500 tuples, and r3 has 750 tuples. Compute the size r1 ⋈ r2 ⋈ r3.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+  <p><b>Step 1: r1 ⋈ r2</b> (join on C):</p>
+  <p class="formula">1000 × 1500 / max(900, 1100) = 1,500,000 / 1100 ≈ 1363.6</p>
+  <p>The intermediate result keeps r2's E-values: V(E, r1 ⋈ r2) = 50 (it cannot exceed V(E, r2)).</p>
+  <p><b>Step 2: (r1 ⋈ r2) ⋈ r3</b> (join on E):</p>
+  <p class="formula">1363.6 × 750 / max(50, 100) = 1,022,727 / 100 ≈ <b>10,227</b> tuples</p>
+  <p><b>Check with the other order:</b> r2 ⋈ r3 = 1500 × 750 / max(50, 100) = 11,250; then ⋈ r1 on C: 11,250 × 1000 / max(1100, 900) = 10,227. The same, as it should be: in one formula, 1000 × 1500 × 750 / (1100 × 100) ≈ 10,227.</p>
+  <p><i>Note:</i> the question bank's answer divides by 1100 at the end instead of by 100 and gets ≈ 1023, which is 10 times too small. The final division is by max(V(E, r12), V(E, r3)) = 100 only: 15,000/11 × 750/100 = 11,250,000/1,100 ≈ 10,227.</p>
+  </div></details>
+</div>
+
+<h2>3. Selections that use indexes (Silberschatz's cost model)</h2>
+<p>Some questions come from Silberschatz, which charges <b>t<sub>T</sub></b> per block transfer and <b>t<sub>S</sub></b> per seek, and calls the height of a B+ tree index h<sub>i</sub>. With an index, a selection can be an index seek (Lec 07, Ch. 3) instead of a table scan:</p>
+<ul>
+  <li>Each level of the B+ tree costs one seek and one transfer (nodes are scattered on disk).</li>
+  <li>With a <b>primary</b> (clustering) index, matching records are contiguous: one seek, then sequential transfers.</li>
+  <li>With a <b>secondary</b> index, each matching record may be in a different block: one seek and one transfer per record.</li>
+</ul>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2014–15 · 10 marks</div>
+  <div class="exam-q"><p>Let t<sub>r</sub> and t<sub>s</sub> be the time to transfer a block of data and the time to seek a block in a disk subsystem, respectively. Estimate the query processing cost for: (a) A primary B+ tree index and equality on key. (b) A primary B+ tree index and comparison on key.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+  <p>Let h<sub>i</sub> = height of the B+ tree.</p>
+  <p><b>(a) Equality on the key</b> (at most one matching record): traverse root to leaf, h<sub>i</sub> nodes, each one seek + one transfer; then fetch the one data block, one more seek + transfer:</p>
+  <p class="formula">Cost = (h<sub>i</sub> + 1)(t<sub>r</sub> + t<sub>s</sub>)</p>
+  <p><b>(b) Comparison on the key</b>, e.g. A ≥ v: traverse to the first leaf entry with key ≥ v (h<sub>i</sub>(t<sub>r</sub> + t<sub>s</sub>)), then, because the file is sorted on the key (primary index), read the b blocks holding the matching records sequentially: one seek and b transfers:</p>
+  <p class="formula">Cost = h<sub>i</sub>(t<sub>r</sub> + t<sub>s</sub>) + t<sub>s</sub> + b·t<sub>r</sub></p>
+  <p>(For A &lt; v the index is not needed: scan the file from the start until the first record with A ≥ v, at cost t<sub>s</sub> + b·t<sub>r</sub>.) Example: h<sub>i</sub> = 3, t<sub>s</sub> = 4 ms, t<sub>r</sub> = 0.1 ms: (a) 4 × 4.1 = 16.4 ms; (b) with b = 50: 3 × 4.1 + 4 + 5 = 21.3 ms.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 215 | L-2/T-2 | 2018–19 · 7 marks</div>
+  <div class="exam-q"><p>Explain the algorithm used to process the following SQL query given secondary indices on salary and district:</p>
+  <pre>SELECT * FROM employee WHERE salary = 50000 OR district = 'Comilla'</pre></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+  <p>A disjunctive (OR) selection can use indexes only if <em>every</em> disjunct has one; here both do, so the DBMS uses <b>disjunctive selection by union of record identifiers</b> (Silberschatz algorithm A10):</p>
+  <ol>
+    <li>Index seek on the salary index for 50000: collect the set P<sub>1</sub> of record pointers (RIDs).</li>
+    <li>Index seek on the district index for 'Comilla': collect the pointer set P<sub>2</sub>.</li>
+    <li>Compute P = P<sub>1</sub> ∪ P<sub>2</sub>. A record satisfying both conditions appears once, so it is fetched and output once.</li>
+    <li>Sort P by block address and fetch the records, reading each needed block once in disk order (fewer seeks than fetching in pointer order).</li>
+  </ol>
+  <p>Cost ≈ the two index lookups + one block read per distinct block in P. If the conditions match many rows (low selectivity), so that P covers a large part of the table, a single table scan testing "salary = 50000 OR district = 'Comilla'" on every row is cheaper, and the optimizer should choose it. If only one of the two attributes had an index, the index would be useless for the OR, and a table scan would be required.</p>
+  </div></details>
+</div>
+
+<h2>4. The hybrid hash join (textbook §15.5.6)</h2>
+<p>The two-pass hash join (Chapter 5) writes every bucket of both relations to disk. If memory is larger than one buffer per bucket, the <b>hybrid hash join</b> keeps some buckets of the smaller relation S in memory during phase 1, so the matching R tuples are joined immediately and neither side's bucket is ever written or reread.</p>
+<ul>
+  <li>Choose k buckets (k much less than M). Keep m of S's buckets entirely in memory and one buffer for each of the other k − m buckets: m·B(S)/k + k − m ≤ M.</li>
+  <li>Hash S: tuples of the m in-memory buckets stay in memory (with a search structure); the rest go to disk.</li>
+  <li>Hash R: a tuple whose bucket is in memory is <b>joined at once</b>; the rest go to disk buckets.</li>
+  <li>Phase 2: one-pass join of the k − m pairs of disk buckets.</li>
+</ul>
+<p>Savings: 2 I/Os for every block of the in-memory buckets of both relations: 2(m/k)(B(R) + B(S)). The best choice is m = 1 with k as small as possible (buckets of about M blocks, k ≈ B(S)/M), giving</p>
+<div class="key"><p class="formula">Hybrid hash join ≈ (3 − 2M/B(S))(B(R) + B(S)) disk I/Os; memory M ≥ √B(S)</p></div>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 23-24 5c · 11 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-1 | 2023–24 · 11 marks</div>
+  <div class="exam-q"><p>Describe the hybrid hash join algorithm. Compute the memory and I/O cost of the algorithm.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+  <p><b>Algorithm</b> for R ⋈ S, S the smaller relation, M buffers:</p>
+  <ol>
+    <li>Pick k buckets and keep m of them for S in memory, so that m·B(S)/k + (k − m) ≤ M (in-memory buckets plus one output buffer per disk bucket).</li>
+    <li><b>Hash S</b> on the join attributes Y. Tuples hashing to buckets 1…m stay in memory, organized for fast lookup on Y; tuples of buckets m+1…k go through their buffers to disk.</li>
+    <li><b>Hash R</b> with the same function. A tuple t of R that hashes to bucket i ≤ m is probed against the in-memory S bucket and joined immediately (output); otherwise t goes to R's disk bucket i.</li>
+    <li><b>Phase 2:</b> for i = m+1…k, read S<sub>i</sub> into memory and stream R<sub>i</sub> past it (one-pass join).</li>
+  </ol>
+  <p><b>I/O cost.</b> R and S are read once: B(R) + B(S). Only the fraction (k − m)/k of each is written and reread: 2(1 − m/k)(B(R) + B(S)). Total (3 − 2m/k)(B(R) + B(S)). Taking m = 1 and buckets of about M blocks (k ≈ B(S)/M): <b>(3 − 2M/B(S))(B(R) + B(S))</b>.</p>
+  <p><b>Memory:</b> as for the hash join, approximately M ≥ √B(S): each disk bucket of S must fit in memory in phase 2.</p>
+  <p><b>Example (textbook Example 15.9):</b> B(R) = 1000, B(S) = 500, M = 101. k = 5 would give S-buckets of 100 blocks, and 100 + 4 = 104 &gt; 101 buffers, so take k = 6: one bucket of about 500/6 ≈ 83 blocks stays in memory, using 83 + 5 = 88 ≤ 101 buffers. Phase 1: read S (500), write 5 buckets (417); read R (1000), write 5/6 of it (833). Phase 2: read 417 + 833 = 1250. Total 1500 + 1250 + 1250 = <b>4000</b>, against 4500 for the plain hash join. (Equivalently (3 − 2 × 1/6) × 1500 = 4000.)</p>
+  <p><b>Boundary cases:</b> if S fits in memory (k = m), the cost is B(R) + B(S), a one-pass join; if no bucket can be kept (m = 0), it is the plain 3(B(R) + B(S)).</p>
+  </div></details>
+</div>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+
+<div class="key"><p><strong>Summary:</strong> optimizers rewrite RA trees with laws (split and push σ, σ over × to ⋈, push π keeping join attributes; π does not commute with δ or distribute over ∩). Join sizes are estimated as T(R)T(S)/max(V(R, Y), V(S, Y)) (r1 ⋈ r2 ⋈ r3 ≈ 10,227, not 1023). With a primary B+ tree, an equality selection costs (h<sub>i</sub> + 1)(t<sub>T</sub> + t<sub>S</sub>) and a range h<sub>i</sub>(t<sub>T</sub> + t<sub>S</sub>) + t<sub>S</sub> + b·t<sub>T</sub>; an OR of indexed conditions uses a union of RIDs. Hybrid hash join keeps one S bucket in memory and costs about (3 − 2M/B(S))(B(R) + B(S)): 4000 for Example 15.9.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../s07/lecture.js"></script>
+<script>
+// small RA-tree drawer: node = [label, children]
+const tree = (t, hl = []) => {
+  const W = 760, nodes = [], edges = [];
+  const depth = n => 1 + Math.max(0, ...(n[1] || []).map(depth));
+  const leaves = n => (n[1] && n[1].length) ? n[1].reduce((a, c) => a + leaves(c), 0) : 1;
+  (function place(n, d, x0, x1, px, py) {
+    const x = (x0 + x1) / 2, y = 22 + d * 44;
+    nodes.push([n[0], x, y, hl.includes(n[0])]);
+    if (px != null) edges.push(`<line x1="${px}" y1="${py + 7}" x2="${x}" y2="${y - 15}" class="s-fg"/>`);
+    let cx = x0;
+    (n[1] || []).forEach(c => { const w = (x1 - x0) * leaves(c) / leaves(n); place(c, d + 1, cx, cx + w, x, y); cx += w; });
+  })(t, 0, 0, W);
+  const H = 22 + (depth(t) - 1) * 44 + 20;
+  return `<svg viewBox="0 0 ${W} ${H}" width="${W}" role="img" aria-label="relational algebra tree">${edges.join('')}` +
+    nodes.map(([l, x, y, h]) => `<text x="${x}" y="${y}" text-anchor="middle" style="font-size:12px" class="${h ? 'red' : ''}">${l}</text>`).join('') + '</svg>';
+};
+const SA = 'σ a>100 ∧ b=20', SF = 'σ f<100';
+stepper('#opt1', [
+  { html: tree(['σ a>100 ∧ b=20 ∧ c=d ∧ f<100', [['⋈ (on e)', [['×', [['R'], ['S']]], ['T']]]]]), cap: 'The given expression: the product R × S, joined with T, then one big selection.' },
+  { html: tree(['σ c=d', [['⋈ (on e)', [['×', [[SA, [['R']]], ['S']]], [SF, [['T']]]]]]], [SA, SF]), cap: 'Split the selection and push the parts that mention one relation down to it: a, b to R; f to T. c = d mentions R and S, so it waits above them.' },
+  { html: tree(['⋈ (on e)', [['⋈ c=d', [[SA, [['R']]], ['S']]], [SF, [['T']]]]], ['⋈ c=d']), cap: 'σ<sub>c=d</sub> over the product becomes the join ⋈<sub>c=d</sub>. No product is ever computed.' },
+]);
+const SM = "σ major='ML'", SH = "σ instructor='Hinon'";
+stepper('#opt2', [
+  { html: tree(['π name, instructor, term', [['σ θ (all six conditions)', [['×', [['×', [['Student'], ['Enroll']]], ['Class']]]]]]]), cap: 'Canonical translation: products of the FROM list, one selection, one projection.' },
+  { html: tree(['π name, instructor, term', [["σ major='ML' ∧ instructor='Hinon'", [['⋈ course,section,term', [['⋈ sid', [['Student'], ['Enroll']]], ['Class']]]]]]]), cap: 'Rule (a): the join conditions turn the products into joins.' },
+  { html: tree(['π name, instructor, term', [['⋈ sid', [[SM, [['Student']]], ['⋈ course,section,term', [['Enroll'], [SH, [['Class']]]]]]]]], [SM, SH]), cap: 'Rules (b), (c): push each constant condition down to its relation. Reorder the joins so the small σ(Class) meets Enroll first.' },
+  { html: tree(['π name, instructor, term', [['⋈ sid', [['π sid, name', [[SM, [['Student']]]]], ['π sid, instructor, term', [['⋈ course,section,term', [['π sid,course,section,term', [['Enroll']]], ['π course,section,term,instructor', [[SH, [['Class']]]]]]]]]]]]], ['π sid, name', 'π sid,course,section,term', 'π course,section,term,instructor', 'π sid, instructor, term']), cap: 'Rule (e): project away attributes no longer needed (grade, room, time, major) right above each relation and after the inner join.' },
+]);
+stepper('#opt3', [
+  { html: tree(['π A, D', [['σ T.C=S.C ∧ S.B=R.B ∧ T.D>20', [['×', [['×', [['T'], ['S']]], ['R']]]]]]]), cap: 'The expression as a tree.' },
+  { html: tree(['π A, D', [['⋈ C', [['⋈ B', [['R'], ['S']]], ['σ D>20', [['T']]]]]]], ['σ D>20']), cap: 'Push σ<sub>D&gt;20</sub> onto T; the two equalities make the products into joins (R ⋈<sub>B</sub> S first, then with T on C).' },
+  { html: tree(['π A, D', [['⋈ C', [['π A, C', [['⋈ B', [['R'], ['S']]]]], ['σ D>20', [['T']]]]]]], ['π A, C']), cap: 'Push projections: above R ⋈<sub>B</sub> S only A and C are needed, so B is dropped before the second join.' },
+]);
+
+flashcards('#cards', [
+  { f: 'Push selections down', b: 'Apply each condition at the lowest node that has all its attributes.' },
+  { f: 'σ over ×', b: 'σ_θ(E1 × E2) = E1 ⋈_θ E2.' },
+  { f: 'Push projections down', b: 'Keep only attributes needed for the output or for joins above.' },
+  { f: 'Join size estimate', b: 'T(R)T(S) / max(V(R,Y), V(S,Y)).' },
+  { f: 'Primary B+ tree, equality on key', b: '(h_i + 1)(t_T + t_S).' },
+  { f: 'Hybrid hash join', b: 'Keep one S bucket in memory in phase 1; ≈ (3 − 2M/B(S))(B(R)+B(S)).' },
+]);
+quiz('#quiz', [
+  { q: 'Which equivalence is FALSE in general?', opts: ['σ_C(δ(R)) = δ(σ_C(R))', 'π_L(R ∪ S) = π_L(R) ∪ π_L(S)', 'π_a(R ∩ S) = π_a(R) ∩ π_a(S)', 'σ_C1∧C2(E) = σ_C1(σ_C2(E))'], a: 2, why: 'Projection does not distribute over intersection (counterexample above).' },
+  { q: 'T(R) = 2000, T(S) = 3000, V(R, Y) = 100, V(S, Y) = 400. Estimated T(R ⋈ S)?', opts: ['15,000', '60,000', '6,000,000', '5'], a: 0, why: '2000 × 3000 / max(100, 400) = 15,000.' },
+  { q: 'Hybrid hash join for Example 15.9 costs…', opts: ['4500', '4000', '5500', '1500'], a: 1, why: 'Keeping one of 6 S-buckets in memory saves 2 × 1500/6 = 500 I/Os.' },
+  { q: 'An OR of two conditions, only one of which has an index. Best plan?', opts: ['Index seek on the indexed attribute', 'Table scan', 'Hash join', 'Union of RIDs'], a: 1, why: 'Rows matching the unindexed condition can be anywhere; the index cannot find them.' },
+]);
+ask('#try1', { q: 'B(R) = 1000, B(S) = 500, M = 101. Plain two-pass hash join I/Os, minus hybrid hash join I/Os (Example 15.9)?', a: 500, why: '4500 − 4000.' });
+</script>
+</body>
+</html>

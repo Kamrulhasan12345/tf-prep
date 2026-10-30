@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>B+ Tree Insertion · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 15 · Chapter 10 · Beyond the slides (asked in exams)</div>
+<h1>Inserting into a B+ Tree</h1>
+<p class="lede">The slides show how to search a B+ tree but not how it grows. Exams ask you to build one from a list of keys almost every year. This chapter teaches the standard insertion algorithm (Silberschatz, §14.3.3), node splits, the difference between copying a key up and pushing it up, and how to read the different “n / degree / order” conventions in exam papers. An interactive animator lets you insert your own keys.</p>
+
+<h2>1. The rules a B+ tree must keep</h2>
+
+<p>Chapter 8 gave the occupancy rules. Insertion and deletion exist to keep these rules true while keys come and go, so here they are again, for a tree whose nodes hold at most <i>n</i> pointers:</p>
+
+<div class="tbl"><table>
+<tr><th>Node</th><th>Keys</th><th>Pointers to children</th><th>n = 3</th><th>n = 4</th><th>n = 5</th></tr>
+<tr><td>Leaf (not the root)</td><td>⌈(n−1)/2⌉ to n − 1</td><td>(one record pointer per key, plus the next-leaf pointer)</td><td class="num">1–2</td><td class="num">2–3</td><td class="num">2–4</td></tr>
+<tr><td>Internal (not the root)</td><td>⌈n/2⌉ − 1 to n − 1</td><td>⌈n/2⌉ to n</td><td class="num">1–2 keys</td><td class="num">1–3 keys</td><td class="num">2–4 keys</td></tr>
+<tr><td>Root, as an internal node</td><td>1 to n − 1</td><td>2 to n</td><td class="num">1–2</td><td class="num">1–3</td><td class="num">1–4</td></tr>
+<tr><td>Root, as the only node</td><td>0 to n − 1</td><td>none</td><td class="num">0–2</td><td class="num">0–3</td><td class="num">0–4</td></tr>
+</table></div>
+
+<p>On top of occupancy there are three structural rules: keys inside a node are sorted, every root-to-leaf path has the same length, and an internal node with <i>m</i> pointers holds exactly <i>m</i> − 1 keys, where the subtree left of key K<sub>i</sub> holds keys &lt; K<sub>i</sub> and the subtree to its right holds keys ≥ K<sub>i</sub>.</p>
+
+<h3>Reading the exam's “n”, “degree” and “order”</h3>
+<p>Question papers describe node size in several ways. Translate each into <i>n</i>, the maximum number of pointers, before you start:</p>
+<div class="tbl"><table>
+<tr><th>The question says</th><th>Meaning</th><th>Use</th></tr>
+<tr><td>“n = 4”, “number of pointers that fit in one node is 4”</td><td>Silberschatz's n: at most 4 pointers, 3 keys</td><td>n = 4</td></tr>
+<tr><td>“degree 3”, “degree-5 B+ tree”, “order m = 4”</td><td>Maximum number of children (Knuth's order)</td><td>n = the number given</td></tr>
+<tr><td>“a 2-order B+ tree where a node must have 2 to 4 keys”</td><td>Ramakrishnan's order d: every non-root node holds d to 2d entries</td><td>n = 2d + 1 (here 5)</td></tr>
+<tr><td>“each node holds at most 3 keys”</td><td>Key capacity</td><td>n = keys + 1</td></tr>
+</table></div>
+<p>When the paper does not say, state your convention in the first line of the answer. Examiners accept any standard convention that you apply consistently.</p>
+
+<h2>2. Inserting a key: the idea</h2>
+
+<p>Every key lives in a leaf, so insertion always starts at the leaf where the key belongs. Find that leaf exactly as <code>find(v)</code> does (Chapter 9). Then one of two things happens:</p>
+<ol>
+  <li><strong>The leaf has room</strong> (fewer than n − 1 keys). Put the key in its sorted position. Nothing else changes. Most insertions end here.</li>
+  <li><strong>The leaf is full.</strong> After adding the key it holds n keys, one too many. This is an <b class="term">overflow</b>, and the leaf must <b class="term">split</b> into two leaves. The new leaf needs a pointer from the parent, and the parent needs a key to tell the two leaves apart. Adding that pointer can overflow the parent, which then splits too, and so on up the tree.</li>
+</ol>
+
+<dl class="def">
+  <dt>Overflow</dt><dd>A node that temporarily holds one entry more than allowed: n keys in a leaf, or n + 1 pointers in an internal node.</dd>
+  <dt>Split</dt><dd>Dividing an overflowing node into two nodes, each at least half full, and inserting a separator key plus a pointer to the new right-hand node into the parent.</dd>
+  <dt>Separator key</dt><dd>The key in the parent that sits between the pointers to two neighbouring children. Every key in the right child is ≥ the separator, every key in the left child is smaller.</dd>
+  <dt>Copy up (leaf split)</dt><dd>The smallest key of the new right leaf is <em>copied</em> into the parent as the separator. It stays in the leaf as well, because every key must appear at leaf level with its record pointer.</dd>
+  <dt>Push up (internal split)</dt><dd>The middle key of an overflowing internal node <em>moves</em> to the parent. It is removed from both halves, because an internal node with k pointers holds only k − 1 keys, and the middle key is the one left over.</dd>
+</dl>
+
+<h3>Where to split</h3>
+<p>Silberschatz splits a leaf that holds n keys so that the <strong>first ⌈n/2⌉ keys stay</strong> in the old leaf and the rest move to the new leaf. For n = 4 that is 2 + 2. For n = 3 it is 2 + 1, and for n = 5 it is 3 + 2. An internal node that holds n + 1 pointers keeps the <strong>first ⌈(n+1)/2⌉ pointers</strong>, the key just after them is pushed up, and the remaining pointers go to the new node. For n = 4 (5 pointers, keys K₁…K₄): keep 3 pointers and K₁, K₂, push up K₃, move 2 pointers and K₄.</p>
+<p>Some books put the extra key on the right instead (for n = 3, a 1 + 2 leaf split). Both keep the tree valid. The trees you draw will differ, so say which rule you use. This book always uses Silberschatz's.</p>
+
+<figure>
+<svg id="split" viewBox="0 0 760 270" width="760" role="img" aria-label="Leaf split copies the key up; internal split pushes it up"></svg>
+<figcaption><b>Figure 1.</b> n = 4. Left: the leaf [5, 7, 11, 17] overflows and splits into [5, 7] and [11, 17]; 11 is <b>copied</b> up and stays in the leaf. Right: the internal node [5, 11, 19, 29] (5 pointers) splits into [5, 11] and [29]; 19 is <b>pushed</b> up and disappears from that level.</figcaption>
+</figure>
+
+<h2>3. The algorithm (Silberschatz)</h2>
+
+<pre>procedure insert(value K, pointer P)
+    if (tree is empty) create an empty leaf node L, which is also the root
+    else Find the leaf node L that should contain key value K
+    if (L has less than n − 1 key values)
+        then insert_in_leaf(L, K, P)
+    else begin   /* L has n − 1 key values already, split it */
+        Create node L′
+        Copy L.P₁ … L.Kₙ₋₁ to a memory block T that holds n (pointer, key) pairs
+        insert_in_leaf(T, K, P)
+        Set L′.Pₙ = L.Pₙ;  Set L.Pₙ = L′          /* fix the leaf chain */
+        Erase L.P₁ through L.Kₙ₋₁ from L
+        Copy T.P₁ through T.K⌈n/2⌉ from T into L starting at L.P₁
+        Copy T.P⌈n/2⌉+1 through T.Kₙ from T into L′ starting at L′.P₁
+        Let K′ be the smallest key-value in L′
+        insert_in_parent(L, K′, L′)
+    end
+
+procedure insert_in_leaf(node L, value K, pointer P)
+    if (K &lt; L.K₁) then insert P, K into L just before L.P₁
+    else begin
+        Let Kᵢ be the highest value in L that is less than or equal to K
+        Insert P, K into L just after L.Kᵢ
+    end
+
+procedure insert_in_parent(node N, value K′, node N′)
+    if (N is the root of the tree) then begin
+        Create a new node R containing N, K′, N′    /* N and N′ are pointers */
+        Make R the root of the tree
+        return
+    end
+    Let P = parent(N)
+    if (P has less than n pointers) then insert (K′, N′) in P just after N
+    else begin   /* split P */
+        Copy P to a block of memory T that can hold P and (K′, N′)
+        Insert (K′, N′) into T just after N
+        Erase all entries from P;  Create node P′
+        Copy T.P₁ … T.P⌈(n+1)/2⌉ into P
+        Let K″ = T.K⌈(n+1)/2⌉
+        Copy T.P⌈(n+1)/2⌉+1 … T.Pₙ₊₁ into P′
+        insert_in_parent(P, K″, P′)
+    end</pre>
+
+<p>Three things to notice. First, the leaf split copies K′ (it is still in L′), while the internal split hands K″ to the parent and copies it into neither P nor P′. Second, the recursion only goes upward along the search path, so an insertion touches at most one node per level: the cost is O(height). Third, the only place the tree grows taller is <code>insert_in_parent</code> at the root, where a new root is created above the old one. That is why all leaves always stay at the same depth.</p>
+
+<h2>4. Watch a tree grow</h2>
+
+<p>The animator below starts from an empty tree with n = 4 and inserts 2, 3, 5, 7, 11, 17, 19, 23, 29, 31 (the keys of the 2024–25 exam question). Search paths are outlined in blue, the node that changed is orange, a new node has a green border, and an overflowing node has a red border. The key just inserted or moved is outlined in red. Step through it, then change n or type your own keys.</p>
+
+<figure class="wide">
+<span class="anim-tag">Interactive animation</span>
+<div id="tool"></div>
+</figure>
+
+<p>What to see in the run: inserting 7 overflows the root leaf, and the split creates the first internal node (the tree becomes two levels high). Inserting 17 and 23 split leaves and add separators 11 and 19 to the root. Inserting 31 splits the leaf [19, 23, 29, 31], copies 29 up, the root [5, 11, 19, 29] overflows with 5 pointers, and its split pushes 19 up into a brand-new root. The tree is now three levels high.</p>
+
+<h3>Two habits worth knowing</h3>
+<p><strong>Sorted input leaves nodes half full.</strong> When keys arrive in increasing order, every split leaves the left node behind with ⌈n/2⌉ keys, and it never receives another key. A tree built from sorted data therefore uses about twice as many nodes as necessary. Real systems avoid this with <b class="term">bulk loading</b>: sort the entries, then fill leaves completely from left to right and build the upper levels on top (Silberschatz §14.5.3). Exam questions that say “you do not need to create the index step by step” often expect such a tightly packed tree.</p>
+<p><strong>Splits are rare.</strong> With n = 100, a leaf splits about once every 50 insertions, and an internal node far less often. A typical insertion reads one node per level and writes one leaf.</p>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+<div id="try2"></div>
+<div id="try3"></div>
+
+<h3>Exam questions</h3>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 215 | L-2/T-2 | 2019–20 · 20 marks &nbsp;·&nbsp; DB QB · 19-20 2b · 20 marks</div>
+  <div class="exam-q">
+    <p>A relation schema R(A, B, C) and a relation r(R) are given. The relation is physically sorted on the primary key A.</p>
+    <div class="tbl"><table style="width:auto"><tr><th>A</th><th>B</th><th>C</th></tr>
+    <tr><td>a1</td><td>b1</td><td>c1</td></tr><tr><td>a2</td><td>b2</td><td>c1</td></tr><tr><td>a3</td><td>b3</td><td>c1</td></tr>
+    <tr><td>a4</td><td>b1</td><td>c1</td></tr><tr><td>a5</td><td>b2</td><td>c1</td></tr><tr><td>a7</td><td>b2</td><td>c1</td></tr><tr><td>a8</td><td>b3</td><td>c1</td></tr></table></div>
+    <p>Construct a B+ tree primary index for the relation r with n = 3 by insertion of search keys incrementally in sorted order and splitting of nodes. After construction of the tree, insert a6 and show the tree structure.</p>
+  </div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><strong>Rules for n = 3.</strong> A node has at most 3 pointers and 2 keys. A leaf holds 1 to 2 keys (⌈2/2⌉ = 1). An internal node has 2 to 3 pointers. A leaf that reaches 3 keys splits 2 + 1 (⌈3/2⌉ = 2 stay left) and the first key of the right leaf is copied up. An internal node that reaches 4 pointers keeps ⌈4/2⌉ = 2 pointers, pushes up its 2nd key, and gives 2 pointers to the new node. The keys a1 … a8 compare as text, so a1 &lt; a2 &lt; … &lt; a8.</p>
+    <ol>
+      <li><strong>a1, a2:</strong> the root leaf becomes [a1, a2]. It is now full.</li>
+      <li><strong>a3:</strong> [a1, a2, a3] overflows. Split into [a1, a2] and [a3]; copy a3 up into a new root [a3].</li>
+      <li><strong>a4:</strong> goes right (a4 ≥ a3) into [a3] → [a3, a4].</li>
+      <li><strong>a5:</strong> [a3, a4, a5] overflows. Split into [a3, a4] and [a5]; copy a5 up. Root [a3, a5] has 3 pointers, which is allowed.</li>
+      <li><strong>a7:</strong> [a5] → [a5, a7].</li>
+      <li><strong>a8:</strong> [a5, a7, a8] overflows. Split into [a5, a7] and [a8]; copy a8 up. The root becomes [a3, a5, a8] with 4 pointers, an overflow. Split the root: [a3] keeps 2 pointers, <strong>a5 is pushed up</strong> into a new root, [a8] gets the other 2 pointers.</li>
+    </ol>
+    <div id="q6figs"></div>
+    <p><strong>Insert a6.</strong> At the root [a5], a6 ≥ a5, go right to [a8]; a6 &lt; a8, go left to leaf [a5, a7]. It becomes [a5, a6, a7], an overflow. Split into [a5, a6] and [a7] and copy a7 up. The parent [a8] becomes [a7, a8] with 3 pointers, which fits. No further change.</p>
+    <div id="q6fig2"></div>
+    <p>The question bank's answer is correct.</p>
+    <p>Replay it in the animator (n = 3):</p>
+    <div id="q6tool"></div>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2015–16 · 20 marks</div>
+  <div class="exam-q"><p>Show the final B+ tree index structure for the search key values 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24 with 4 leaf nodes and n = 4. (You do not need to create this index step by step.) Then show the index structure after insertion of 15.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><strong>Final structure.</strong> With n = 4 a leaf holds at most 3 keys. Twelve keys in exactly four leaves means every leaf is full: [2, 4, 6], [8, 10, 12], [14, 16, 18], [20, 22, 24]. One internal node with 4 pointers can point to all four leaves, so it is the root. Its keys are the smallest keys of leaves 2, 3 and 4: [8, 14, 20]. This is a tightly packed, bulk-loaded tree; building it by inserting the keys one at a time would give 6 half-full leaves instead, which is why the question says not to build it step by step.</p>
+    <div id="q10a"></div>
+    <p><strong>Insert 15.</strong> Root [8, 14, 20]: 15 ≥ 14 and 15 &lt; 20, so go to the third leaf [14, 16, 18]. It becomes [14, 15, 16, 18], 4 keys, an overflow. Split: [14, 15] stays, [16, 18] is the new leaf, and 16 is copied up. The root becomes [8, 14, 16, 20] with 5 pointers, an overflow. Split the root: keep the first ⌈5/2⌉ = 3 pointers with keys [8, 14], push 16 up into a new root, and the new node [20] gets the last 2 pointers. The tree is now three levels high.</p>
+    <div id="q10b"></div>
+    <p>The question bank's answer is correct.</p>
+    <div id="q10tool"></div>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2010–11 · 10 marks</div>
+  <div class="exam-q"><p>Construct a B+ tree for the set of key values {2, 4, 6, 8, 12, 18, 20, 24, 30, 32} with n = 4. Assume that the tree is initially empty and values are added in the given order.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><strong>Rules for n = 4.</strong> Leaves hold 2 to 3 keys (⌈3/2⌉ = 2), internal nodes 2 to 4 pointers. A full leaf that receives a 4th key splits 2 + 2 and copies the right leaf's first key up. An internal node with 5 pointers keeps 3, pushes its 3rd key up and gives 2 pointers to the new node.</p>
+    <ol>
+      <li><strong>2, 4, 6:</strong> root leaf [2, 4, 6], full.</li>
+      <li><strong>8:</strong> [2, 4, 6, 8] overflows → [2, 4] and [6, 8]; copy 6 up to a new root [6].</li>
+      <li><strong>12:</strong> [6, 8, 12].</li>
+      <li><strong>18:</strong> [6, 8, 12, 18] overflows → [6, 8] and [12, 18]; copy 12 up. Root [6, 12].</li>
+      <li><strong>20:</strong> [12, 18, 20].</li>
+      <li><strong>24:</strong> [12, 18, 20, 24] overflows → [12, 18] and [20, 24]; copy 20 up. Root [6, 12, 20], 4 pointers (full but legal).</li>
+      <li><strong>30:</strong> [20, 24, 30].</li>
+      <li><strong>32:</strong> [20, 24, 30, 32] overflows → [20, 24] and [30, 32]; copy 30 up. The root [6, 12, 20, 30] now has 5 pointers and overflows. Split it: [6, 12] keeps 3 pointers, <strong>20 is pushed up</strong> to a new root, [30] gets 2 pointers.</li>
+    </ol>
+    <div id="q16figs"></div>
+    <p>Final tree: root [20]; internal nodes [6, 12] and [30]; leaves [2, 4] → [6, 8] → [12, 18] → [20, 24] → [30, 32].</p>
+    <p>Note: the question bank's tree is correct, but its list of rules says the minimum number of keys in a leaf is ⌈(n−1)/2⌉ = 1. For n = 4 that is ⌈3/2⌉ = 2.</p>
+    <div id="q16tool"></div>
+  </div></details>
+</div>
+
+<div class="key"><p><strong>Summary:</strong> to insert, find the leaf, and if it has room just add the key. A full leaf splits: the first ⌈n/2⌉ keys stay, the rest move to a new leaf, and the new leaf's smallest key is <em>copied</em> into the parent. If the parent overflows (n + 1 pointers) it splits too, keeping ⌈(n+1)/2⌉ pointers and <em>pushing</em> its middle key up. A split of the root creates a new root, which is the only way the tree gets taller, so it always stays balanced. Translate “degree”, “order” or “2 to 4 keys” into n, the maximum number of pointers, before you start, and state the convention you use.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="lecture.js"></script>
+<script>
+// Figure 1: copy up vs push up (n = 4)
+(() => {
+  const leafBefore = { k: ['5', '7', '11', '17'], hl: 'del' }, leafAfter = { k: ['11'], c: [{ k: ['5', '7'] }, { k: ['11', '17'], hl: 'new', hk: '11' }] };
+  leafAfter.hk = '11'; leafAfter.hl = 'hl';
+  const inBefore = { k: ['5', '11', '19', '29'], hl: 'del' }, inAfter = { k: ['19'], hl: 'hl', hk: '19', c: [{ k: ['5', '11'] }, { k: ['29'], hl: 'new' }] };
+  const g = (svg, x, y, s) => `<g transform="translate(${x} ${y}) scale(${s})">${svg.replace(/^<svg[^>]*>/, '').replace(/<\/svg>$/, '')}</g>`;
+  let s = '';
+  s += `<text x="10" y="16" class="big">Leaf split: copy up</text><text x="400" y="16" class="big">Internal split: push up</text>`;
+  s += g(bptSVG(leafBefore, 5), 10, 30, 1);
+  s += `<text x="10" y="90" class="lbl">overflow: 4 keys, max 3 ↓</text>`;
+  s += g(bptSVG(leafAfter, 4, { noChain: false }), 10, 104, 1);
+  s += `<text x="10" y="262" class="lbl">11 is in the parent AND in the leaf</text>`;
+  s += g(bptSVG(inBefore, 5), 400, 30, 1);
+  s += `<text x="400" y="90" class="lbl">overflow: 5 pointers, max 4 ↓</text>`;
+  s += g(bptSVG(inAfter, 4, { noChain: true }), 400, 104, 1);
+  s += `<text x="400" y="262" class="lbl">19 moved up: it is not in [5, 11] or [29]</text>`;
+  s += `<text x="400" y="248" class="lbl">(children of [5, 11] and [29] not drawn)</text>`;
+  document.querySelector('#split').innerHTML = s;
+})();
+
+bptTool('#tool', { n: 4, ops: 'insert 2 3 5 7 11 17 19 23 29 31' });
+
+flashcards('#cards', [
+  { f: 'Overflow', b: 'A node with one entry too many after an insertion: n keys in a leaf, or n + 1 pointers in an internal node.' },
+  { f: 'Leaf split (n keys)', b: 'First ⌈n/2⌉ keys stay, the rest go to a new leaf. The new leaf\'s smallest key is copied up to the parent.' },
+  { f: 'Internal split (n + 1 pointers)', b: 'First ⌈(n+1)/2⌉ pointers stay, the next key is pushed up (moved), the remaining pointers go to a new node.' },
+  { f: 'Copy up vs push up', b: 'Leaf split: the separator stays in the leaf too (every key lives at leaf level). Internal split: the middle key moves up and leaves its level.' },
+  { f: 'How does a B+ tree get taller?', b: 'Only when the root splits: a new root is created above it. So all leaves stay at the same depth.' },
+  { f: '“2 to 4 keys per node”', b: 'Ramakrishnan order d = 2. Maximum 4 keys means n = 5 pointers.' },
+  { f: 'Bulk loading', b: 'Sort all entries, fill leaves completely left to right, then build the upper levels. Avoids the half-full nodes that sorted insertion leaves behind.' },
+]);
+
+quiz('#quiz', [
+  { q: 'With n = 4, which leaf insertion causes a split?', opts: ['Inserting into a leaf with 2 keys', 'Inserting into a leaf with 3 keys', 'Inserting into a leaf with 4 keys', 'Only inserting into the root'], a: 1,
+    why: 'A leaf holds at most n − 1 = 3 keys. A 4th key overflows it.' },
+  { q: 'n = 4. The leaf [20, 24, 30] receives 32. What happens at the leaf level?', opts: ['[20, 24] and [30, 32], 30 copied up', '[20, 24, 30] and [32], 32 copied up', '[20] and [24, 30, 32], 24 pushed up', '[20, 24] and [30, 32], 30 pushed up and removed from the leaf'], a: 0,
+    why: 'Keep the first ⌈4/2⌉ = 2 keys. The new leaf\'s first key, 30, is copied up and stays in the leaf.' },
+  { q: 'n = 4. An internal node becomes [5, 11, 19, 29] (5 pointers). After the split, where is 19?', opts: ['In the left node', 'In the right node', 'Only in the parent', 'In the parent and in the right node'], a: 2,
+    why: 'Internal splits push the middle key up. The halves are [5, 11] and [29], and 19 lives only in the parent.' },
+  { q: 'Why does a B+ tree stay balanced during insertions?', opts: ['Leaves are rotated like an AVL tree', 'New levels are only ever added at the root', 'The tree is rebuilt after each insert', 'Keys are inserted only at the rightmost leaf'], a: 1,
+    why: 'Splits push entries upward. The height grows only when the root splits, which lengthens every path by one at the same time.' },
+  { q: 'A question says “degree-3 B+ tree”. What is n?', opts: ['2', '3', '4', '7'], a: 1,
+    why: 'Degree (or Knuth order) is the maximum number of children, which is Silberschatz\'s n.' },
+  { q: 'At most how many nodes does one insertion split, in a tree of height h (levels)?', opts: ['1', '2', 'h', 'Every node in the tree'], a: 2,
+    why: 'Splits propagate only up the search path: at worst the leaf, every internal node on the path, and the root split, one per level.' },
+]);
+
+ask('#try1', { q: 'n = 6. How many keys stay in the left leaf when a full leaf splits?', a: 3, hint: 'The overflowing leaf holds n = 6 keys. Keep ⌈n/2⌉.', why: '⌈6/2⌉ = 3 keys stay, 3 move to the new leaf.' });
+ask('#try2', { q: 'n = 5. An internal node overflows with 6 pointers. How many pointers stay in the left node?', a: 3, hint: 'Keep ⌈(n+1)/2⌉ pointers.', why: '⌈6/2⌉ = 3 pointers (2 keys) stay; the 3rd key is pushed up; 3 pointers (2 keys) form the new node.' });
+ask('#try3', { q: 'n = 4, start empty, insert 10, 20, 30, 40. What key is in the root afterwards?', a: 30, hint: 'The 4th key overflows the root leaf [10, 20, 30, 40]. Split 2 + 2.', why: 'The leaf splits into [10, 20] and [30, 40]; 30 is copied up into a new root [30].' });
+
+// exam figures
+bptStages('#q6figs', null, 3, [['After a1, a2', 'a1 a2'], ['After a3 (first split)', 'a1 a2 a3'], ['After a5', 'a1 a2 a3 a4 a5'], ['After a8: the root splits, a5 is pushed up', 'a1 a2 a3 a4 a5 a7 a8']]);
+bptStages('#q6fig2', null, 3, [['After inserting a6', 'a1 a2 a3 a4 a5 a7 a8 a6']]);
+bptTool('#q6tool', { n: 3, ops: 'a1 a2 a3 a4 a5 a7 a8 a6' });
+const T10 = { k: ['8', '14', '20'], c: [{ k: ['2', '4', '6'] }, { k: ['8', '10', '12'] }, { k: ['14', '16', '18'] }, { k: ['20', '22', '24'] }] };
+bptStages('#q10a', T10, 4, [['Packed tree with 4 leaves', '']]);
+bptStages('#q10b', T10, 4, [['After inserting 15', '15']]);
+bptTool('#q10tool', { n: 4, ops: 'insert 15', start: T10, startLabel: 'the 4-leaf tree' });
+bptStages('#q16figs', null, 4, [['After 8', '2 4 6 8'], ['After 18', '2 4 6 8 12 18'], ['After 24', '2 4 6 8 12 18 20 24'], ['After 32 (final)', '2 4 6 8 12 18 20 24 30 32']]);
+bptTool('#q16tool', { n: 4, ops: '2 4 6 8 12 18 20 24 30 32' });
+</script>
+</body>
+</html>

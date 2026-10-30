@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Aggregate Functions · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 10 (Ishrak) · Chapter 2 · Slides 13–18</div>
+<h1>Aggregate Functions</h1>
+<p class="lede">An aggregate function turns a whole column of values into one value: a sum, a count, an average, a minimum or a maximum. This chapter defines the five aggregates, explains exactly how they treat NULLs (the difference between COUNT(*) and COUNT(column) is animated), shows COUNT(DISTINCT …), and points out two slips on slides 16 and 18.</p>
+
+<h2>1. The five aggregates (slide 13)</h2>
+<dl class="def">
+<dt>Aggregate function</dt>
+<dd>A function that takes a <em>bag of values</em> (one per row) and returns a single value. SQL has SUM, AVG, MIN, MAX and COUNT. Without GROUP BY, the aggregate is computed over all rows that pass the WHERE clause, and the query returns exactly one row.</dd>
+</dl>
+<div class="tbl"><table>
+<tr><th>Function</th><th>Returns</th><th>Works on</th></tr>
+<tr><td>SUM(x)</td><td>total of the non-NULL values</td><td>numbers</td></tr>
+<tr><td>AVG(x)</td><td>SUM(x) / COUNT(x), the mean of the non-NULL values</td><td>numbers</td></tr>
+<tr><td>MIN(x), MAX(x)</td><td>smallest / largest non-NULL value</td><td>numbers, strings, dates</td></tr>
+<tr><td>COUNT(x)</td><td>number of rows where x is not NULL</td><td>any type</td></tr>
+<tr><td>COUNT(*)</td><td>number of rows, whatever they contain</td><td>whole rows</td></tr>
+</table></div>
+<p>The slide's two examples use a car-style Product table (with columns maker and year, different from the computer database):</p>
+<pre>SELECT AVG(price) FROM Product WHERE maker = 'Toyota';
+SELECT COUNT(*)   FROM Product WHERE year &gt; 1995;</pre>
+<p>The WHERE clause runs first (it filters rows), then the aggregate summarises what is left. Slide 13 states two rules:</p>
+<ol>
+<li><strong>An aggregate applies to a single attribute</strong>, but that attribute may be a formula over several columns (e.g. <code>SUM(price*quantity)</code>). COUNT(*) is the exception: it counts rows, not values.</li>
+<li><strong>NULL values are ignored</strong>, again except by COUNT(*).</li>
+</ol>
+<div id="p13"></div>
+
+<h2>2. COUNT(*) versus COUNT(column) (slides 14–15)</h2>
+<p>With the Marks table of Chapter 1 (one mark is NULL):</p>
+<pre>SELECT COUNT(*)    FROM Marks;     -- 4: there are 4 rows
+SELECT COUNT(mark) FROM Marks;     -- 3: only 3 rows have a mark</pre>
+<p>Slide 15 adds a fifth row in which <em>both</em> columns are NULL. COUNT(*) becomes 5, because a row of NULLs is still a row. COUNT(mark) stays 3. (The slides repeat Chapter 1's sentence "any NULL in a formula will cause a NULL result" at the top of these slides; it is about formulas, not about aggregates, which skip NULLs instead of turning NULL.)</p>
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="cnt"></div>
+</figure>
+<p>The same rule affects AVG: it divides by the number of <em>non-NULL</em> values. AVG(mark) = (43 + 57 + 72) / 3 = 57.33, not 172 / 4 = 43. If you want missing marks counted as 0, write <code>AVG(NVL(mark, 0))</code>, which gives 43. Two edge cases: over zero rows (or only NULLs) COUNT returns 0 while SUM, AVG, MIN and MAX return NULL.</p>
+<div id="p15"></div>
+
+<h2>3. COUNT and duplicates: COUNT(DISTINCT …) (slide 16)</h2>
+<p>COUNT counts values <em>with</em> duplicates, unless told otherwise:</p>
+<pre>SELECT COUNT(category) FROM Product WHERE year &gt; 1995;            -- counts rows with a category
+SELECT COUNT(DISTINCT category) FROM Product WHERE year &gt; 1995;   -- counts different categories</pre>
+<p>If the question is "how many categories?", the first query is wrong: three sedans count as three. <code>COUNT(DISTINCT x)</code> removes duplicates (and NULLs) first. DISTINCT also works inside SUM and AVG, though that is rarely what you want.</p>
+<p>Slide 16 says COUNT(category) is "same as COUNT(*)". That is true only when category is never NULL. In our sample data the Mitsubishi Lancer has no category, so for year &gt; 1995 COUNT(*) = 7 but COUNT(category) = 6, and COUNT(DISTINCT category) = 3 (sedan, SUV, hybrid).</p>
+<div id="p16"></div>
+
+<h2>4. Totals from the Purchase table (slides 17–18)</h2>
+<p><em>Find total sales.</em> An aggregate over a formula (slide 17):</p>
+<pre>SELECT SUM(price * quantity)
+FROM   Purchase;                     -- 20 + 5 + 10 + 30 = 65</pre>
+<p>The formula is evaluated for each row, then summed. <em>Find total sales of product Bagel</em> (slide 18):</p>
+<pre>SELECT SUM(price * quantity)
+FROM   Purchase
+WHERE  product = 'Bagel';            -- 20 + 30 = 50</pre>
+<p>The slide writes <code>product = 'bagel'</code> with a lower-case b. In Oracle, string comparison is case-sensitive, so 'bagel' does not equal 'Bagel', no row qualifies, and SUM over no rows returns <strong>NULL</strong>, not 50. Write the literal exactly as stored, or compare <code>UPPER(product) = 'BAGEL'</code>.</p>
+<div id="p18"></div>
+
+<h3>Two rules you will need in Chapter 3</h3>
+<ul>
+<li><strong>No plain columns next to aggregates</strong> (without GROUP BY). <code>SELECT product, SUM(quantity) FROM Purchase</code> is an error in Oracle (<code>ORA-00937: not a single-group group function</code>): SUM produces one row for the whole table, and there is no single product to print beside it. GROUP BY (next chapter) is the fix.</li>
+<li><strong>No aggregates in WHERE.</strong> WHERE tests one row at a time, before any aggregate has been computed, so <code>WHERE SUM(quantity) &gt; 30</code> is an error (<code>ORA-00934: group function is not allowed here</code>). Conditions on aggregates go in HAVING, or in a subquery (Lecture 11).</li>
+</ul>
+<p>(The playground's SQLite is more lenient about the first rule and returns an arbitrary product; Oracle is not, so always write it the Oracle way.)</p>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div><div id="try2"></div>
+<h3>Try it in SQL</h3>
+<p>Exercises 1–2 use Purchase and Marks, 3–4 the computer database, 5–6 the HR schema (COMMISSIONPCT is NULL for everyone outside sales).</p>
+<div id="c1"></div><div id="c2"></div><div id="c3"></div><div id="c4"></div><div id="c5"></div><div id="c6"></div>
+
+<div class="key"><p><strong>Summary:</strong> SUM, AVG, MIN, MAX and COUNT reduce a column (or a formula) to one value; without GROUP BY a query with aggregates returns one row. All aggregates ignore NULLs except COUNT(*), which counts rows: COUNT(*) ≥ COUNT(col), and AVG divides by the number of non-NULL values. COUNT(DISTINCT col) counts different values. Plain columns cannot sit beside aggregates without GROUP BY, and aggregates cannot appear in WHERE. Oracle compares strings case-sensitively, so slide 18's 'bagel' matches nothing.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/sqlplay.js"></script>
+<script src="../i08/lecture.js"></script>
+<script>
+const M5 = [['Paul Smith', 43], ['Rachel Sewell', 57], ['Helen Treacy', 72], ['Pinder Surree', null], [null, null]];
+const cs = [{ html: row2(rel('Marks (slide 15)', ['student', 'mark'], M5), rel('counters', ['COUNT(*)', 'COUNT(mark)'], [[0, 0]])), cap: 'Scan the rows. COUNT(*) adds 1 for every row; COUNT(mark) adds 1 only when mark is not NULL.' }];
+let a = 0, b = 0;
+M5.forEach((r, i) => { a++; if (r[1] !== null) b++;
+  cs.push({ html: row2(rel('Marks (slide 15)', ['student', 'mark'], M5, { cls: { [i]: r[1] === null ? 'hl' : 'new' }, side: { [i]: r[1] === null ? 'mark NULL: COUNT(mark) skips' : 'counted by both' } }), rel('counters', ['COUNT(*)', 'COUNT(mark)'], [[a, b]], { cls: { 0: 'new' } })),
+    cap: `Row ${i + 1}: ${r[0] === null ? 'a row of NULLs' : r[0]}, mark ${r[1] === null ? 'NULL' : r[1]}. COUNT(*) = ${a}, COUNT(mark) = ${b}.` }); });
+cs.push({ html: row2(rel('results', ['COUNT(*)', 'COUNT(mark)', 'SUM(mark)', 'AVG(mark)'], [[5, 3, 172, '57.33']])), cap: 'Final: COUNT(*) = 5, COUNT(mark) = 3 (slide 15). SUM skips NULLs too (172), and AVG = 172 / 3 = 57.33, dividing by the 3 non-NULL marks.' });
+stepper('#cnt', cs);
+sqlPlay('#p13', { setup: AGG, query: "SELECT AVG(price) FROM Product WHERE maker = 'Toyota';", note: 'Slide 13 (invented car data). Also try: SELECT COUNT(*) FROM Product WHERE year > 1995;' });
+sqlPlay('#p15', { setup: AGG, query: 'INSERT INTO Marks VALUES (NULL, NULL);   -- slide 15\'s extra row\nSELECT COUNT(*), COUNT(mark), SUM(mark), AVG(mark), AVG(NVL(mark, 0))\nFROM   Marks;', note: 'Remove the INSERT line (and press Reset) for slide 14\'s 4 and 3.' });
+sqlPlay('#p16', { setup: AGG, query: 'SELECT COUNT(*), COUNT(category), COUNT(DISTINCT category)\nFROM   Product\nWHERE  year > 1995;' });
+sqlPlay('#p18', { setup: AGG, query: "SELECT SUM(price * quantity)\nFROM   Purchase\nWHERE  product = 'bagel';", note: "As on slide 18: NULL. Change 'bagel' to 'Bagel' to get 50." });
+flashcards('#cards', [
+  { f: 'Aggregate function', b: 'SUM, AVG, MIN, MAX, COUNT: many values in, one value out.' },
+  { f: 'COUNT(*)', b: 'Number of rows, including rows full of NULLs.' },
+  { f: 'COUNT(col)', b: 'Number of rows where col is not NULL.' },
+  { f: 'COUNT(DISTINCT col)', b: 'Number of different non-NULL values.' },
+  { f: 'AVG and NULLs', b: 'AVG = SUM / COUNT(col): NULLs are left out of both.' },
+  { f: 'Aggregates over zero rows', b: 'COUNT = 0; SUM, AVG, MIN, MAX = NULL.' },
+  { f: 'ORA-00937', b: 'Plain column next to an aggregate without GROUP BY.' },
+  { f: 'ORA-00934', b: 'Aggregate used in WHERE; use HAVING or a subquery.' },
+]);
+quiz('#quiz', [
+  { q: 'Values 10, NULL, 20, NULL. COUNT(*), COUNT(x), AVG(x)?', opts: ['4, 2, 15', '4, 4, 7.5', '2, 2, 15', '4, 2, 7.5'], a: 0, why: 'AVG = 30 / 2.' },
+  { q: 'SUM(x) over a table where every x is NULL returns…', opts: ['0', 'NULL', 'error', 'the row count'], a: 1, why: 'Aggregates other than COUNT return NULL when there are no values.' },
+  { q: 'Categories sedan, sedan, SUV, NULL. COUNT(DISTINCT category)?', opts: ['4', '3', '2', '1'], a: 2, why: 'sedan and SUV; NULL is not counted.' },
+  { q: 'Which is legal Oracle?', opts: ['SELECT product, SUM(quantity) FROM Purchase', 'SELECT SUM(quantity) FROM Purchase WHERE SUM(price) > 5', 'SELECT MAX(price) - MIN(price) FROM Purchase', 'SELECT COUNT(*) FROM Purchase WHERE COUNT(*) > 1'], a: 2, why: 'A formula of aggregates is fine; the others mix a plain column with an aggregate or use aggregates in WHERE.' },
+  { q: 'Slide 18 (product = \'bagel\') returns in Oracle…', opts: ['50', '0', 'NULL', 'error'], a: 2, why: 'Case-sensitive: no row matches, and SUM of nothing is NULL.' },
+]);
+ask('#try1', { q: 'Purchase rows (price, quantity): (1, 20), (0.5, 10), (1, 10), (1.5, 20). What is AVG(price * quantity)?', a: 16.25, why: '(20 + 5 + 10 + 30) / 4 = 65 / 4 = 16.25.' });
+ask('#try2', { q: 'HR: 20 employees, 5 with a commission. What does COUNT(COMMISSIONPCT) return?', a: 5, why: 'The other 15 are NULL.' });
+sqlCheck('#c1', { setup: AGG, task: '1. (Easy) Return the total quantity sold over all purchases.', solution: 'SELECT SUM(quantity) FROM Purchase;' });
+sqlCheck('#c2', { setup: AGG, task: '2. Return the highest mark, the lowest mark and the number of students who have a mark, in one row.', solution: 'SELECT MAX(mark), MIN(mark), COUNT(mark) FROM Marks;' });
+sqlCheck('#c3', { setup: PCDB, task: '3. Return the average price of the laptops with a 15.4-inch screen.', solution: 'SELECT AVG(price) FROM Laptop WHERE screen = 15.4;' });
+sqlCheck('#c4', { setup: PCDB, task: '4. How many different makers produce printers? Return one number.', solution: "SELECT COUNT(DISTINCT maker) FROM Product WHERE type = 'printer';" });
+sqlCheck('#c5', { setup: HR, task: '5. Return, in one row: the number of employees, the number who earn a commission, and the average commission percentage of those who earn one.', solution: 'SELECT COUNT(*), COUNT(COMMISSIONPCT), AVG(COMMISSIONPCT) FROM EMPLOYEE;' });
+sqlCheck('#c6', { setup: HR, task: '6. (Exam style) Return the total monthly salary bill of the IT department (department name \'IT\'), using a join with DEPARTMENT.', solution: "SELECT SUM(e.SALARY) FROM EMPLOYEE e, DEPARTMENT d WHERE e.DEPARTMENTID = d.DEPARTMENTID AND d.DEPARTMENTNAME = 'IT';" });
+</script>
+</body>
+</html>

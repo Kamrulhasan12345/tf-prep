@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Recovery Using an Undo Log · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 05 (Sukarna) · Chapter 6 · Slides 25–30 · Book §17.2.3</div>
+<h1>Recovery Using an Undo Log</h1>
+<p class="lede">After a crash, the recovery manager reads the undo log backward and resets every change of every incomplete transaction. This chapter gives the algorithm, explains why the scan must go backward and why ABORT records are written, shows that recovery can safely crash and restart, and analyses the slide's four crash points. The recovery simulator replays any undo log you type.</p>
+
+<h2>1. The problem (slide 25)</h2>
+
+<p>Suppose the system fails while transaction T is running. Some of T's changes may have reached disk and others not. T did not complete, so it was not executed atomically, and the database may be inconsistent. The solution: the recovery manager uses the log records to <em>revert</em> the partial changes of T. Once all of them are reversed, the database is back in a consistent state, as if T never ran.</p>
+
+<h2>2. Committed or not? (slides 26–27)</h2>
+
+<p><strong>Step 1:</strong> for each transaction T, the recovery manager decides whether T committed.</p>
+<ul>
+  <li><strong>Step 2a: &lt;COMMIT T&gt; is on the log on disk.</strong> Then T is committed. By rule U2 the COMMIT record was written only after all of T's updates were on disk, so T cannot have left the database inconsistent. <em>Nothing needs to be done for T.</em></li>
+  <li><strong>Step 2b: &lt;START T&gt; is on the log but &lt;COMMIT T&gt; is not.</strong> Then T is treated as uncommitted (aborted). Some of its updates may be on disk; it is incomplete and may have left the database inconsistent. The recovery manager looks at every record &lt;T, X, v&gt; and resets X to its old value v. Rule U1 makes this complete: if the new X was written to disk, then &lt;T,X,v&gt; reached disk before it, so the record is there to be found.</li>
+</ul>
+
+<p>Note that recovery does not check whether X actually changed on disk. It simply writes v. If X already had value v, the write is redundant and harmless.</p>
+
+<h2>3. The recovery algorithm (slide 28)</h2>
+
+<p>When several uncommitted transactions are on the log, all their updates are undone, and the order matters. The algorithm:</p>
+<pre>Scan the log BACKWARD from the end. For each log record l:
+    if l is &lt;COMMIT T&gt; (or &lt;ABORT T&gt;):  record T as completed
+    if l is &lt;T, X, v&gt; and T is completed:  do nothing
+    if l is &lt;T, X, v&gt; and T is not completed:  write X = v on disk
+At the end: write &lt;ABORT T&gt; for every incomplete T that was not already aborted,
+            then FLUSH LOG.</pre>
+
+<p>Scanning backward has a nice side effect: when the scan meets an update record of T, it has already passed everything that comes after it, including T's COMMIT if there is one. So the single backward pass both classifies transactions and undoes them.</p>
+
+<div class="q">
+<h4>Why is the order of reverting important?</h4>
+<p>Suppose two incomplete transactions both changed X: the log contains <code>&lt;T1, X, 5&gt;</code> (X was 5 before T1) and later <code>&lt;T2, X, 7&gt;</code> (X was 7, the value T1 wrote, before T2). The correct result is X = 5, the value before <em>either</em> transaction. Backward: first X = 7, then X = 5. Correct. Forward: first X = 5, then X = 7, which leaves T1's uncommitted value in the database. Undoing latest-first peels changes off in the reverse order they were made. (With proper concurrency control two uncommitted transactions should not both write X, as Lectures 02–04 show, but the backward order is correct regardless.)</p>
+</div>
+
+<div class="q">
+<h4>Slide 28 question: why write &lt;ABORT T&gt; at the end?</h4>
+<p>It marks T as finished in the log, so no later recovery treats it as incomplete again. That matters for correctness. Suppose recovery undoes T (X = 5) but writes no ABORT. Normal work resumes: transaction U changes X from 5 to 9, commits, and X = 9 reaches disk. Another crash. The next recovery scans backward, skips U's records (U committed), reaches the old record <code>&lt;T, X, 5&gt;</code>, sees no COMMIT for T, and writes X = 5, destroying U's committed update. With <code>&lt;ABORT T&gt;</code> on the log, the backward scan meets the ABORT first and ignores T's records. ABORT records are also needed for checkpointing (next chapter), which requires every transaction before a checkpoint to have a COMMIT or ABORT record. The log is flushed so the ABORT records themselves survive a crash.</p>
+</div>
+
+<h3>The recovery simulator</h3>
+<p>Type or paste any log (records in angle brackets), choose the method, and press <b>Recover</b>. Each step highlights the record being examined (▲ marks a backward scan), shows what the recovery manager does with it, and keeps the list of complete and incomplete transactions and of the disk writes so far. The simulator also handles checkpoints (next chapter) and redo and undo/redo logs (Lecture 06). Optionally give the disk values at the crash to see the final database.</p>
+<figure class="wide">
+<span class="anim-tag">Interactive animation</span>
+<div id="rv"></div>
+</figure>
+
+<h2>4. Crashes during recovery (slide 29)</h2>
+
+<dl class="def">
+  <dt>Idempotent</dt><dd>An operation is idempotent if doing it several times has exactly the same effect as doing it once.</dd>
+</dl>
+<p>What if the system crashes again while it is recovering? Undoing &lt;T,X,v&gt; means “write v into X”. It does not matter what X currently holds; we just write v. Writing v twice leaves X = v, the same as writing it once. So the whole recovery procedure is idempotent: if it is interrupted at any point, it is simply started again from the beginning, and the outcome is the same as one uninterrupted run. This works because undo records store the <em>old value</em>, not the <em>change</em>. A record “X was decreased by 100” would add 100 each time it was replayed. (The same argument holds for redo and undo/redo logging.)</p>
+
+<h2>5. Analysing crash points (slide 30)</h2>
+
+<p>Slide 30 repeats the 12-step undo-logging table of the previous chapter and asks what the recovery manager does for four crash points. Recall: step 4 logs &lt;T,A,8&gt;, step 7 logs &lt;T,B,8&gt;, step 8 flushes the log, steps 9–10 output A and B, step 11 writes &lt;COMMIT T&gt; and step 12 flushes it.</p>
+
+<div class="q">
+<h4>Slide 30 (worked answers)</h4>
+<p><strong>Crash after step 12.</strong> &lt;COMMIT T&gt; is on disk. T is committed; recovery ignores all its records. By U2, A = 16 and B = 16 are already on disk. Result: A = B = 16.</p>
+<p><strong>Crash before step 11</strong> (anywhere from just after step 8 up to step 10). The COMMIT record was never written, so T is incomplete. The log on disk has &lt;START T&gt;, &lt;T,A,8&gt;, &lt;T,B,8&gt; (flushed at step 8). Scanning backward: &lt;T,B,8&gt; → write B = 8; &lt;T,A,8&gt; → write A = 8. Then write &lt;ABORT T&gt; and flush. Whether the crash came before step 9, between 9 and 10 or after 10, some, none or all of the 16s were on disk; recovery writes 8 for both anyway. Result: A = B = 8. (Between steps 11 and 12 the COMMIT may or may not have reached disk, for instance because another transaction flushed the log. If it did, the case is the same as “after step 12”, otherwise the same as this one.)</p>
+<p><strong>Crash before step 6.</strong> No FLUSH LOG and no OUTPUT has happened yet (both come at step 8 or later), so the disk has A = B = 8. The log on disk may be empty, or, if some other transaction flushed the log, may contain &lt;START T&gt; and &lt;T,A,8&gt;. In the first case recovery finds nothing about T. In the second it writes A = 8 (redundant) and logs &lt;ABORT T&gt;. Either way A = B = 8.</p>
+<p><strong>Crash before step 4.</strong> T has not written anything, not even to memory. At most &lt;START T&gt; is on the log on disk. If it is, T is incomplete with no update records, so recovery only writes &lt;ABORT T&gt;. A = B = 8.</p>
+</div>
+
+<p>Animated, the “before step 11” case: the log on disk is &lt;START T&gt; &lt;T,A,8&gt; &lt;T,B,8&gt;, and the crash happened after step 9, so disk holds A = 16, B = 8.</p>
+<figure>
+<span class="anim-tag">Animation</span>
+<div id="case11"></div>
+</figure>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+<div id="try2"></div>
+
+<h3>Exam questions</h3>
+<div class="exam">
+  <div class="exam-src">DB QB · 22-23 2c · 9 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-1 | 2022–23 · 9 marks</div>
+  <div class="exam-q"><p>The following is a sequence of undo-log records written by two transactions T and U:</p>
+  <pre>&lt;START T&gt;; &lt;T, A, 10&gt;; &lt;START U&gt;; &lt;U, B, 20&gt;; &lt;T, C, 30&gt;; &lt;U, D, 40&gt;;
+&lt;COMMIT U&gt;; &lt;T, E, 50&gt;; &lt;COMMIT T&gt;.</pre>
+  <p>Assume that the recovery manager takes an action &lt;X, V&gt; meaning database element X is restored to the value V in the disk. Determine the actions that will be taken by the recovery manager, if there is a crash and the last log record to appear on disk is one of the following: (i) &lt;COMMIT U&gt; (ii) &lt;T, E, 50&gt; (iii) &lt;COMMIT T&gt;</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+  <p>Undo recovery scans backward from the last record on disk, remembers committed transactions, and restores the old value of every update of an uncommitted transaction.</p>
+  <p><strong>(i) Last record &lt;COMMIT U&gt;.</strong> Backward: &lt;COMMIT U&gt;: U committed. &lt;U,D,40&gt;: U committed, ignore. &lt;T,C,30&gt;: T has no COMMIT, undo → <strong>&lt;C, 30&gt;</strong>. &lt;U,B,20&gt;: ignore. &lt;START U&gt;. &lt;T,A,10&gt;: undo → <strong>&lt;A, 10&gt;</strong>. &lt;START T&gt;. Actions: <strong>&lt;C,30&gt;, &lt;A,10&gt;</strong>, then &lt;ABORT T&gt; is written to the log and flushed.</p>
+  <p><strong>(ii) Last record &lt;T, E, 50&gt;.</strong> Backward: &lt;T,E,50&gt;: T uncommitted → <strong>&lt;E, 50&gt;</strong>. &lt;COMMIT U&gt;: U committed. Then as in (i): <strong>&lt;C, 30&gt;</strong>, <strong>&lt;A, 10&gt;</strong>. Actions: <strong>&lt;E,50&gt;, &lt;C,30&gt;, &lt;A,10&gt;</strong>, then &lt;ABORT T&gt;.</p>
+  <p><strong>(iii) Last record &lt;COMMIT T&gt;.</strong> Both T and U have COMMIT records, so by U2 all their changes are on disk. <strong>No actions</strong>; nothing is written to the log either.</p>
+  <p>Case (ii), animated:</p>
+  <div id="ex114"></div>
+  <p><em>Note:</em> the CSE215 question bank copies this question with &lt;COMMIT T&gt; and &lt;COMMIT U&gt; swapped (“…&lt;U,D,40&gt;; &lt;COMMIT T&gt;; &lt;T,E,50&gt;; &lt;COMMIT U&gt;”) and asks about &lt;START T&gt; instead of &lt;COMMIT U&gt;. That version has T writing E after its own COMMIT, which a transaction never does, and its answers (&lt;E,50&gt;, &lt;D,40&gt;, &lt;B,20&gt;) do not answer the real question. The question above is the textbook's Exercise 17.2.4 as set in the exam.</p>
+  </div></details>
+</div>
+
+<div class="key"><p><strong>Summary:</strong> a transaction with &lt;COMMIT T&gt; on disk needs nothing (U2). Every other transaction is undone by scanning the log backward and writing the old value of each of its update records (U1 guarantees they are there). Backward order restores the earliest old value. Afterwards &lt;ABORT T&gt; is logged and flushed so no later recovery undoes T again. Recovery is idempotent, so a crash during recovery is handled by just starting again.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="lecture.js"></script>
+<script>
+recoveryTool('#rv', { log: '<START T1>\n<T1,A,8>\n<START T2>\n<T2,B,20>\n<COMMIT T1>\n<T2,C,30>\n<T2,A,16>', mode: 'undo' });
+recoveryAnim('#case11', '<START T> <T,A,8> <T,B,8>', 'undo', { A: 16, B: 8 });
+recoveryAnim('#ex114', '<START T>; <T,A,10>; <START U>; <U,B,20>; <T,C,30>; <U,D,40>; <COMMIT U>; <T,E,50>', 'undo');
+flashcards('#cards', [
+  { f: 'Committed transaction (undo log)', b: '&lt;COMMIT T> is on disk; by U2 all its changes are on disk, so recovery ignores it.' },
+  { f: 'Incomplete transaction', b: '&lt;START T&gt; (or an update of T) on the log but no COMMIT/ABORT. Its changes must be undone.' },
+  { f: 'Undo scan direction', b: 'Backward, from the latest record to the earliest.' },
+  { f: 'Undo action for &lt;T,X,v&gt;', b: 'Write v (the old value) into X on disk, without checking X\'s current value.' },
+  { f: 'Why &lt;ABORT T> after recovery', b: 'So a later recovery does not undo T again (which could overwrite later committed values), and for checkpointing.' },
+  { f: 'Idempotent recovery', b: 'Running recovery twice has the same effect as once, so a crash during recovery is harmless.' },
+]);
+quiz('#quiz', [
+  { q: 'Undo recovery meets &lt;T,X,v> and has not seen &lt;COMMIT T>. It…', opts: ['ignores the record', 'writes X = v', 'writes the new value', 'stops'], a: 1, why: 'Scanning backward, any COMMIT of T would already have been seen, so T is incomplete; restore the old value.' },
+  { q: 'Why can undo recovery ignore committed transactions completely?', opts: ['Their log records are deleted', 'Rule U2: their changes were on disk before the COMMIT was', 'They will be redone later', 'Rule U1'], a: 1, why: 'U2 makes a COMMIT on disk a guarantee that all the transaction\'s data is on disk.' },
+  { q: 'Log: &lt;START T>, &lt;T,X,5>, &lt;START U>, &lt;U,X,7>, crash. Undo recovery leaves X = ?', opts: ['5', '7', 'unchanged', 'depends on the disk'], a: 0, why: 'Backward: X = 7 (undo U), then X = 5 (undo T). Final 5.' },
+  { q: 'Which property makes it safe to restart recovery after a crash during recovery?', opts: ['Durability', 'Idempotence', 'Isolation', 'Write-ahead logging'], a: 1, why: 'Writing the same old values again gives the same result.' },
+  { q: 'Slide 30: crash after step 12. What does recovery do?', opts: ['Undo A and B', 'Nothing for T', 'Redo A and B', 'Write &lt;ABORT T>'], a: 1, why: '&lt;COMMIT T> is on disk; by U2 A = B = 16 are already on disk.' },
+]);
+ask('#try1', { q: 'Undo log on disk: &lt;START T>; &lt;T,A,10>; &lt;START U>; &lt;U,B,20>; &lt;T,C,30>; &lt;U,D,40>; &lt;COMMIT U>. How many elements does recovery write?', a: 2, why: 'Only T is incomplete: C = 30 and A = 10.' });
+ask('#try2', { q: 'Same log. Which transaction gets an ABORT record? (name)', a: ['T'], why: 'T has no COMMIT; U committed.' });
+</script>
+</body>
+</html>

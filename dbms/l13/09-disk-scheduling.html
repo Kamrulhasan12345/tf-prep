@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Disk-Arm Scheduling · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 13 · Chapter 9 · Beyond the slides · Book §13.3</div>
+<h1>Speeding Up Disk Access: Disk-Arm Scheduling and the Elevator Algorithm</h1>
+<p class="lede">The slides stop at single requests, but several exam questions ask how a disk should order many waiting requests. This chapter teaches the ways to speed up a disk system and the scheduling algorithms FCFS, SSTF, SCAN (the elevator), C-SCAN, LOOK and C-LOOK, with two tools that animate them on your own input.</p>
+
+<h2>1. Ways to speed up a disk system (textbook §13.3)</h2>
+
+<p>An average random block access takes around 10 ms. If requests arrive faster than that, they queue up and wait, and the waiting time can be much larger than the access time itself. The textbook lists five ways to cut the average time per access and so raise <b class="term">throughput</b> (block accesses per second):</p>
+<ol>
+  <li><strong>Organise data by cylinders.</strong> Put blocks that are accessed together on one cylinder (or adjacent cylinders). Then only the first access needs a seek and a rotational latency; the rest run at the full transfer rate. Reading a whole cylinder of the Megatron 747 this way takes about 139 ms instead of about 11 s for the same 1024 blocks scattered at random (Example 13.4).</li>
+  <li><strong>Use several disks.</strong> Several independent arms can serve several requests at once, and striping (Chapter 5) speeds up large reads.</li>
+  <li><strong>Mirror disks.</strong> Besides protecting data (Chapter 6), two copies let two reads proceed at once, from whichever copy's head is closer.</li>
+  <li><strong>Schedule the disk arm.</strong> When several requests wait, choose the order that keeps arm movement small. This chapter.</li>
+  <li><strong>Prefetch and buffer.</strong> If the blocks a query will need can be predicted (e.g. a scan), load them into main-memory buffers before they are asked for (also called double buffering). This also gives the scheduler more requests to choose from.</li>
+</ol>
+
+<h2>2. The scheduling problem</h2>
+
+<dl class="def">
+  <dt>Disk-arm scheduling</dt><dd>Choosing the order in which pending requests are served so that the head moves as little as possible. It is done by the disk controller, the operating system or the DBMS, and is allowed only when the requests are independent (they come from different transactions or are prefetches), so their order does not matter.</dd>
+  <dt>Total head movement</dt><dd>The sum of the distances (in tracks or cylinders) between successive head positions. Seek time grows with distance, so less movement means less time.</dd>
+</dl>
+
+<p>The running example (the standard textbook one): cylinders 0–199, the head at cylinder 53 moving towards higher cylinders, and the queue 98, 183, 37, 122, 14, 124, 65, 67.</p>
+
+<dl class="def">
+  <dt>FCFS (first come, first served)</dt><dd>Serve requests in arrival order. Fair and simple, but the head may zig-zag across the disk: 640 cylinders in the example.</dd>
+  <dt>SSTF (shortest seek time first)</dt><dd>Always serve the pending request closest to the current head position. Much less movement (236), but a request far from where the head is busy may wait indefinitely: <b class="term">starvation</b>.</dd>
+  <dt>SCAN (the elevator algorithm)</dt><dd>The head sweeps in one direction to the end of the disk, serving every request it passes, then reverses and sweeps back, like a lift serving floors on its way up and then on its way down.</dd>
+  <dt>LOOK</dt><dd>SCAN, but the head turns around at the last request in the current direction instead of running on to the end of the disk. The textbook's description of the elevator algorithm (“when the heads reach a position where there are no requests ahead of them in their direction of travel, they reverse direction”) is this variant.</dd>
+  <dt>C-SCAN (circular SCAN)</dt><dd>Serve requests only while moving in one direction. At the end of the disk the head returns at once to the other end without serving anything, then sweeps again in the same direction. Waiting times are more uniform than SCAN's, because every cylinder is visited once per cycle.</dd>
+  <dt>C-LOOK</dt><dd>C-SCAN that turns at the last request and jumps back only as far as the lowest pending request.</dd>
+</dl>
+
+<h2>3. Scheduling animator</h2>
+<p>Type a queue, the head position, its direction and the last cylinder, and pick an algorithm. Each step shows one move with its distance and the running total; the table compares all six algorithms on the same input. Points mark served requests; a small grey point marks the end of the disk; dashed red lines are C-SCAN/C-LOOK return jumps.</p>
+<figure class="wide">
+<span class="anim-tag">Interactive tool</span>
+<div id="sched"></div>
+</figure>
+
+<p>With the default queue, SCAN moving up travels 53 → 65 → 67 → 98 → 122 → 124 → 183 → 199 (end) → 37 → 14: (199 − 53) + (199 − 14) = 146 + 185 = 331 cylinders. LOOK turns at 183 instead: 130 + 169 = 299. C-SCAN counts 146 + 199 (the return) + 37 = 382. Some books leave the return jump out of the total because it is a fast move with no reads; the tool shows both numbers.</p>
+
+<h2>4. The elevator algorithm with arrival times (textbook §13.3.5)</h2>
+
+<p>In a real disk, requests keep arriving while others are being served, and each access also needs rotational latency and transfer time. The textbook's model:</p>
+<ul>
+  <li>Seek time from one cylinder to another = (a fixed start/stop time) + (distance ÷ cylinders per ms). For the Megatron 747: 1 ms + 1 ms per 4000 cylinders. A request on the cylinder where the head already is needs no seek.</li>
+  <li>Each access adds average rotational latency plus transfer time (4.17 + 0.13 = 4.3 ms for the Megatron 747).</li>
+  <li>When an access finishes, the scheduler looks at the requests that have arrived by then and picks the next one in the current direction; if there is none ahead, it reverses.</li>
+</ul>
+<p>The tool starts with the textbook's Example 13.6: head at 8000; requests 8000, 24000, 56000 at time 0; 16000 at 10 ms; 64000 at 20 ms; 40000 at 30 ms. The elevator finishes them at 4.3, 13.6, 26.9, 34.2, 45.5 and 56.8 ms. Switch to FCFS to see 4.3, 13.6, 26.9, 42.2, 59.5, 70.8: FCFS goes back to 16000 too early.</p>
+<figure class="wide">
+<span class="anim-tag">Interactive tool</span>
+<div id="timed"></div>
+</figure>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+
+<h3>Exam questions</h3>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 21-22 8c · 10 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-2 | 2021–22 · 10 marks</div>
+  <div class="exam-q"><p>Suppose a Megatron 800 disk has the following pending disk requests (listed by track number). If the head is currently at track 71 and moving towards the higher track number, calculate average disk seek times for both the SCAN and C-SCAN algorithms. Disk requests: 21, 98, 12, 80, 85 and 10.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>No timing data is given for the “Megatron 800”, so seek time is measured as seek <em>distance</em> in tracks (time is proportional to it). The number of tracks is not given either; SCAN and C-SCAN run to the end of the disk, so assume tracks 0–99 (the largest request is 98). Sorted requests: 10, 12, 21, 80, 85, 98.</p>
+    <p><strong>SCAN</strong> (up to the end, then back):</p>
+    <p class="formula">71 → 80 → 85 → 98 → 99 → 21 → 12 → 10</p>
+    <p>Distances 9 + 5 + 13 + 1 + 78 + 9 + 2 = <strong>117 tracks</strong>, i.e. (99 − 71) + (99 − 10). Average per request = 117 ÷ 6 = <strong>19.5 tracks</strong>.</p>
+    <p><strong>C-SCAN</strong> (up to the end, return to track 0, sweep up again):</p>
+    <p class="formula">71 → 80 → 85 → 98 → 99 → (return) 0 → 10 → 12 → 21</p>
+    <p>Distances 28 up + 99 return + 21 up = <strong>148 tracks</strong>; average = 148 ÷ 6 ≈ <strong>24.67 tracks</strong>. If the return jump is not counted (it is fast and reads nothing), 49 tracks, average ≈ 8.17.</p>
+    <p>For comparison, LOOK (turning at 98) needs 27 + 88 = 115 (average 19.17) and C-LOOK needs 27 + 88 + 11 = 126. If the disk had tracks 0–199, SCAN would need (199 − 71) + (199 − 10) = 317. To turn distance into milliseconds, multiply by the time per track (or use a seek formula such as 1 ms + distance ÷ 500 if one is given). Check every number with the animator above (queue 21, 98, 12, 80, 85, 10; head 71; up; last cylinder 99).</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 17-18 3b · 9 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-2 | 2017–18 · 9 marks</div>
+  <div class="exam-q"><p>Consider the following cylinder requests:</p>
+  <div class="tbl"><table style="max-width:420px"><tr><th>Cylinder of request</th><th>Request arrival time (ms)</th></tr>
+  <tr><td class="num">2000</td><td class="num">0</td></tr><tr><td class="num">5000</td><td class="num">10</td></tr><tr><td class="num">1000</td><td class="num">15</td></tr>
+  <tr><td class="num">8000</td><td class="num">25</td></tr><tr><td class="num">9000</td><td class="num">35</td></tr><tr><td class="num">4000</td><td class="num">50</td></tr></table></div>
+  <p>Schedule these requests according to the elevator algorithm showing the total time needed for serving. Use data from question 17-18 1d and assume moving the head assembly requires 1 ms (to start and stop) + 1 ms for every 500 cylinders and the head assembly is initially on the 1st cylinder.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>From question 17-18 1d (Chapter 3): average rotational latency 7.8 ms and transfer 0.5 ms, so each access costs <strong>8.3 ms</strong> after its seek. Seek = 1 + distance ÷ 500 ms. The head starts at cylinder 1 at t = 0, moving up.</p>
+    <div class="tbl"><table>
+      <tr><th>#</th><th>Decision time (ms)</th><th>Waiting requests</th><th>Serve</th><th>Seek (ms)</th><th>Finished (ms)</th></tr>
+      <tr><td>1</td><td class="num">0</td><td>2000</td><td>2000</td><td class="num">1 + 1999/500 = 4.998</td><td class="num">13.298</td></tr>
+      <tr><td>2</td><td class="num">13.298</td><td>5000</td><td>5000</td><td class="num">1 + 3000/500 = 7</td><td class="num">28.598</td></tr>
+      <tr><td>3</td><td class="num">28.598</td><td>1000, 8000</td><td>8000 (up)</td><td class="num">7</td><td class="num">43.898</td></tr>
+      <tr><td>4</td><td class="num">43.898</td><td>1000, 9000</td><td>9000 (up)</td><td class="num">3</td><td class="num">55.198</td></tr>
+      <tr><td>5</td><td class="num">55.198</td><td>1000, 4000</td><td>reverse; 4000</td><td class="num">1 + 5000/500 = 11</td><td class="num">74.498</td></tr>
+      <tr><td>6</td><td class="num">74.498</td><td>1000</td><td>1000</td><td class="num">7</td><td class="num">89.798</td></tr>
+    </table></div>
+    <p>Order 2000, 5000, 8000, 9000, 4000, 1000; all requests are served by <strong>89.798 ms ≈ 89.8 ms</strong>. (FCFS would finish at 99.798 ms.) Two remarks: the request for 1000 waits from t = 15 to the very end because the head keeps going up; and cylinder 9000 lies beyond the Megatron 747's 8192 cylinders, so the question's numbers are only an exercise. If the latency and transfer were ignored, the order would change (the head would reach 5000 at t = 17, before 8000 arrives, and turn down to 1000 first).</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2016–17 · 10 marks</div>
+  <div class="exam-q"><p>Another Megatron 777 disk incurs an average rotational latency of 8.3 ms. Moving the head takes 1 ms to start/stop plus 1 ms per 500 cylinders. The disk controller receives the following requests: cylinder 1000 (first available at 0 ms), 3000 (0), 7000 (0), 2000 (20), 8000 (30), 5000 (40). Show the finishing time and latency for each request using the elevator algorithm.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>Assumptions (the question does not state them): the head is at cylinder 1 at t = 0 moving up, as in the previous question; transfer time is negligible, so each access costs 8.3 ms after its seek; latency of a request = finishing time − time it became available.</p>
+    <div class="tbl"><table>
+      <tr><th>Order</th><th>Cylinder</th><th>Available</th><th>Seek (ms)</th><th>Finished (ms)</th><th>Latency (ms)</th></tr>
+      <tr><td>1</td><td class="num">1000</td><td class="num">0</td><td class="num">1 + 999/500 = 2.998</td><td class="num">11.298</td><td class="num">11.298</td></tr>
+      <tr><td>2</td><td class="num">3000</td><td class="num">0</td><td class="num">5</td><td class="num">24.598</td><td class="num">24.598</td></tr>
+      <tr><td>3</td><td class="num">7000</td><td class="num">0</td><td class="num">9</td><td class="num">41.898</td><td class="num">41.898</td></tr>
+      <tr><td>4</td><td class="num">8000</td><td class="num">30</td><td class="num">3</td><td class="num">53.198</td><td class="num">23.198</td></tr>
+      <tr><td>5</td><td class="num">5000</td><td class="num">40</td><td class="num">7</td><td class="num">68.498</td><td class="num">28.498</td></tr>
+      <tr><td>6</td><td class="num">2000</td><td class="num">20</td><td class="num">7</td><td class="num">83.798</td><td class="num">63.798</td></tr>
+    </table></div>
+    <p>At t = 24.598 (head at 3000) the request for 2000 is waiting, but it is behind the head, so the elevator continues up to 7000 and 8000 and serves 2000 only on the way down. If the head instead starts at cylinder 1000, the first request needs no seek and every time is 2.998 ms earlier (finishing at 8.3, 21.6, 38.9, 50.2, 65.5, 80.8 ms). Enter <code>1000@0, 3000@0, 7000@0, 2000@20, 8000@30, 5000@40</code> in the tool above with 1 ms start/stop, 500 cylinders per ms and 8.3 ms service to replay it.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2013–14 · 5 marks</div>
+  <div class="exam-q"><p>What are the different ways to improve the performance of a disk-based system?</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <ol>
+      <li><strong>Place data accessed together on the same cylinder</strong> (or adjacent cylinders), so a scan pays one seek and one latency and then reads at the full transfer rate.</li>
+      <li><strong>Use multiple disks</strong>: more arms serve more requests at once; striping spreads large reads over all disks.</li>
+      <li><strong>Mirror disks</strong>: two copies let two reads run in parallel (and protect the data).</li>
+      <li><strong>Disk-arm scheduling</strong>, e.g. the elevator algorithm, to reduce the seek distance when many requests wait.</li>
+      <li><strong>Prefetching and large-scale buffering</strong>: read blocks into memory before they are needed and keep frequently used blocks in the buffer, avoiding disk accesses altogether.</li>
+    </ol>
+    <p>Related measures from the slides: read whole blocks (4–16 KB) rather than sectors, prefer sequential to random access, and use faster media such as flash SSDs for hot data.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2013–14 · 5 marks</div>
+  <div class="exam-q"><p>Write down the pros and cons of an elevator algorithm.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><strong>Pros.</strong></p>
+    <ul>
+      <li>Much less head movement than FCFS: requests are served in cylinder order along a sweep, so average seek time drops and throughput rises.</li>
+      <li>The more requests wait, the better it works: the seek per request approaches the minimum (track-to-track) seek time.</li>
+      <li>No starvation: every request is served within at most two sweeps, unlike SSTF, which can postpone a distant request forever.</li>
+      <li>Simple to implement: keep the queue sorted by cylinder and a direction flag.</li>
+    </ul>
+    <p><strong>Cons.</strong></p>
+    <ul>
+      <li>Unequal waiting: a request just behind the head waits for the head to reach the end and come back; cylinders in the middle are passed twice per cycle and the ends only once (C-SCAN fixes this).</li>
+      <li>Gains little when only one or two requests are pending, and cannot be used when requests must be performed in a fixed order.</li>
+      <li>Requests are not served in arrival order, so individual response times are less predictable than with FCFS.</li>
+      <li>Plain SCAN wastes movement running to the end of the disk when no request is there (LOOK fixes this).</li>
+    </ul>
+  </div></details>
+</div>
+
+<div class="key"><p><strong>Summary:</strong> Disk systems are sped up by keeping related data on one cylinder, using several disks, mirroring, scheduling the arm and prefetching. FCFS serves requests in arrival order; SSTF picks the nearest (low movement, possible starvation); SCAN, the elevator, sweeps to one end and back serving requests on the way; LOOK turns at the last request; C-SCAN and C-LOOK serve in one direction only and jump back. With arrival times, the elevator decides after each access among the requests that have arrived, using seek = start/stop time + distance ÷ speed, plus latency and transfer per access.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="lecture.js"></script>
+<script>
+schedTool('#sched');
+timedTool('#timed');
+
+flashcards('#cards', [
+  { f: 'FCFS', b: 'Serve in arrival order. Fair, but the arm may zig-zag.' },
+  { f: 'SSTF', b: 'Serve the nearest pending request. Little movement; may starve distant requests.' },
+  { f: 'SCAN (elevator)', b: 'Sweep to the end in one direction serving requests, then reverse.' },
+  { f: 'LOOK', b: 'Like SCAN but turn at the last request instead of the disk end.' },
+  { f: 'C-SCAN', b: 'Serve only while moving one way; at the end jump back to the start.' },
+  { f: 'Prefetching', b: 'Loading blocks into buffers before they are requested, when the access order is predictable.' },
+  { f: 'Megatron 747 seek rule', b: '1 ms start/stop + 1 ms per 4000 cylinders (1 ms per 500 in the older edition).' },
+]);
+quiz('#quiz', [
+  { q: 'Which algorithm can starve a request?', opts: ['FCFS', 'SSTF', 'SCAN', 'C-SCAN'], a: 1, why: 'If new requests keep arriving near the head, a distant request may never be the nearest.' },
+  { q: 'Head at 50 moving up, requests 40 and 60, disk 0–99. SCAN total movement?', opts: ['30', '108', '59', '69'], a: 1, why: '50 → 60 → 99 (end of disk) → 40: 10 + 39 + 59 = 108. LOOK would turn at 60: 10 + 20 = 30.' },
+  { q: 'What is the difference between SCAN and LOOK?', opts: ['LOOK serves in one direction only', 'LOOK reverses at the last request instead of the disk end', 'LOOK picks the nearest request', 'There is none'], a: 1, why: 'LOOK looks ahead for requests before continuing.' },
+  { q: 'Why does the elevator algorithm work better under heavy load?', opts: ['The disk spins faster', 'More waiting requests means shorter distances between stops', 'It skips rotational latency', 'It uses mirrors'], a: 1, why: 'With many requests the head stops often and each seek is short.' },
+]);
+ask('#try1', { q: 'Head at 53 moving up, queue 98, 183, 37, 122, 14, 124, 65, 67, cylinders 0–199. Total movement for LOOK?', a: 299, hint: 'Up to 183, then down to 14.', why: '(183 − 53) + (183 − 14) = 130 + 169 = 299.' });
+</script>
+</body>
+</html>

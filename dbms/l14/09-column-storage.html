@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Column-Oriented Storage · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<style>
+.strip { display: flex; flex-wrap: wrap; gap: 0; font: 12px/1 var(--mono); margin: 4px 0 12px; }
+.strip span { border: 1px solid var(--fg); margin: 0 -1px -1px 0; padding: 6px 7px; background: var(--cell); white-space: nowrap; }
+.strip span.c0 { background: var(--cell); } .strip span.c1 { background: var(--bg); }
+.strip span.c2 { background: var(--cell-new); } .strip span.c3 { background: var(--cell-hl); }
+.strip span.gap { border: 0; background: none; padding: 6px 4px; color: var(--muted); }
+</style>
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 14 · Chapter 9 · Slides 23–26</div>
+<h1>Column-Oriented Storage</h1>
+<p class="lede">Everything so far stored a table row by row. Column-oriented storage turns that sideways and stores each column on its own. This chapter explains how, and works through each “How?” and “What?” on the slides.</p>
+
+<h2>1. Row storage versus column storage</h2>
+
+<p>Every chapter so far used <b class="term">row-oriented storage</b>: all the fields of one record are stored together, then all the fields of the next record, and so on. A block of the instructor file holds a few complete rows.</p>
+
+<p><b class="term">Column-oriented storage</b>, also called the <b class="term">columnar representation</b>, does the opposite: <em>each attribute of a relation is stored separately</em>. All the IDs are stored together, then all the names together, then all the departments, then all the salaries. Each column is effectively its own file.</p>
+
+<figure>
+<div class="figlabel">ROW-ORIENTED: bytes on disk, in order</div>
+<div class="strip" id="rowstrip"></div>
+<div class="figlabel">COLUMN-ORIENTED: bytes on disk, in order</div>
+<div class="strip" id="colstrip"></div>
+<figcaption><b>Figure 1.</b> The same first four instructors stored two ways. Colours mark the four attributes. Row storage interleaves them; column storage keeps each attribute in one run.</figcaption>
+</figure>
+
+<figure>
+<div id="cols"></div>
+<figcaption><b>Figure 2.</b> The slide's picture: the instructor relation stored as four separate columns.</figcaption>
+</figure>
+
+<p>How does the database know which name belongs to which ID? By <b class="term">position</b>. The 5th value of every column belongs to the same row, the 5th instructor. The position number is called the <b class="term">tuple-id</b> (a tuple is a row). Row 5 is (32343, El Said, History, 60000) because those are the 5th entries of the four columns.</p>
+
+<h2>2. Benefits (slide 24)</h2>
+
+<h3>Reduced I/O when only some attributes are accessed. How?</h3>
+<p>Take <code>SELECT id, salary FROM instructor</code>. In row storage, ID and salary are mixed in with name and department in every block, so the database has to read <em>every block of the whole table</em> just to pick two fields out of each row. In column storage, it reads only the ID column and the salary column. The name and department columns are never touched.</p>
+<p>With the field sizes from Chapter 1 (id 5, name 20, dept 20, salary 8 bytes), a row is 53 bytes but id + salary is only 13 bytes. Column storage reads about 13/53 ≈ <strong>25%</strong> of the data. Since block transfers are the main cost of a query, that is roughly 4 times faster. Real analytical tables often have 50 to 100 columns while a query uses 3 or 4, so the saving is much larger.</p>
+
+<figure>
+<div id="cols-io"></div>
+<figcaption><b>Figure 3.</b> <code>SELECT id, salary</code> reads only the two highlighted columns. The greyed-out columns stay on disk.</figcaption>
+</figure>
+
+<h3>Improved CPU cache performance. How?</h3>
+<p>The CPU does not read memory one value at a time. It pulls in a chunk of neighbouring bytes (a <b class="term">cache line</b>, typically 64 bytes) into its small, very fast <b class="term">cache</b>. When summing salaries in row storage, each cache line contains one salary plus an ID, a name and a department the query does not need, so most of each cache line is wasted. In column storage, a cache line holds 8 salaries in a row, all useful. The CPU waits for memory far less often.</p>
+
+<h3>Improved compression. How?</h3>
+<p>Compression works best on data that is similar and repetitive. A column holds values of one type, and often the same values repeat. In the slide's dept column, “Comp. Sci.” appears 3 times, “Physics”, “History” and “Finance” twice each. Each department name could be replaced by a small code (Chapter 10 shows exactly how). A row mixes numbers, names and departments together, so much less repetition is visible to a compressor. Compressed columns take less disk space and need fewer block transfers.</p>
+
+<h3>Vector processing</h3>
+<p>Modern CPUs have <b class="term">vector</b> (SIMD, “single instruction, multiple data”) instructions that perform the same operation on several values at once. For example, one instruction can compare 8 salaries with 70000 in a single step. That only works if the 8 values sit next to each other in memory, which is exactly what a column provides.</p>
+
+<h2>3. Drawbacks (slides 25–26)</h2>
+
+<h3>Cost of tuple reconstruction. What?</h3>
+<p><b class="term">Tuple reconstruction</b> means putting a complete row back together from its separate columns. The slide's example:</p>
+<pre>SELECT * FROM instructor WHERE id = 32343;</pre>
+<ol>
+  <li>Search the ID column for 32343. It is the 5th value, so the tuple-id is 5.</li>
+  <li>Fetch the 5th value of the name column (El Said).</li>
+  <li>Fetch the 5th value of the dept-name column (History).</li>
+  <li>Fetch the 5th value of the salary column (60000).</li>
+  <li>Combine them into the result (32343, El Said, History, 60000).</li>
+</ol>
+<figure>
+<span class="anim-tag">Animation</span>
+<div id="cols-rec"></div>
+<figcaption><b>Figure 4.</b> Reconstructing tuple 5 needs one value from each of the four columns, which are stored in four different places.</figcaption>
+</figure>
+<p>In row storage the whole row sits in one block, so this is one block read. In column storage the four values are in four different column files, which can mean four separate block reads (and possibly four seeks). For queries that want whole rows, column storage is slower.</p>
+
+<h3>Cost of tuple deletion and update. What?</h3>
+<p>The slide's example:</p>
+<pre>DELETE FROM instructor WHERE dept_name = 'History';</pre>
+<ol>
+  <li>Search the dept-name column for ‘History’. Found at tuple-ids 5 and 8 (El Said and Califieri).</li>
+  <li>Delete position 5 and position 8 from <em>all four</em> columns.</li>
+</ol>
+<figure>
+<span class="anim-tag">Animation</span>
+<div id="cols-del"></div>
+<figcaption><b>Figure 5.</b> Deleting the two History instructors touches all four columns.</figcaption>
+</figure>
+<p>In row storage, each deleted row is one record in one place. Here every deletion has to be applied in four places, and the positions of all later values must stay aligned across the columns, so they cannot be shifted independently. An update is similar: <em>“Similar is update”</em>. Changing a whole row means writing to every column. For tables with frequent small changes, this is expensive.</p>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+
+<div class="key">
+<p><strong>Summary:</strong> columnar storage keeps each attribute separately and matches values across columns by position (the tuple-id). It reads less data when a query uses few columns, uses the CPU cache better, compresses better and allows vector processing. It is slower when a query needs whole rows (reconstruction) and when rows are deleted or updated, because every column must be changed.</p>
+</div>
+</main>
+<script src="../assets/book.js"></script>
+<script>
+const four = INSTR.slice(0, 4);
+document.querySelector('#rowstrip').innerHTML = four.map(r => r.map((v, c) => `<span class="c${c}">${v}</span>`).join('')).join('');
+document.querySelector('#colstrip').innerHTML = [0, 1, 2, 3].map(c => four.map(r => `<span class="c${c}">${r[c]}</span>`).join('')).join('');
+columns('#cols');
+// highlight id + salary columns by drawing them separately
+(() => {
+  const el = document.querySelector('#cols-io');
+  columns('#cols-io');
+  el.querySelectorAll('td.col').forEach((td, c) => td.querySelectorAll('div:not(.h)').forEach(d => d.classList.add(c === 0 || c === 3 ? 'hl' : 'dim')));
+})();
+// mark one column's cells: colMarks = [{col, row, cls}]
+const colView = (marks) => {
+  const html = columns(null);
+  const el = document.createElement('div'); el.innerHTML = html;
+  const cols = el.querySelectorAll('td.col');
+  marks.forEach(({ col, row, cls }) => cols[col].querySelectorAll('div:not(.h)')[row].classList.add(cls));
+  return el.innerHTML;
+};
+const scanId = k => [...Array(k).keys()].map(r => ({ col: 0, row: r, cls: 'dim' }));
+stepper('#cols-rec', [
+  { html: colView([]), cap: 'Four separate columns. We want the whole row with id = 32343.' },
+  { html: colView([...scanId(4), { col: 0, row: 4, cls: 'hl' }]), cap: 'Search the <b>id column</b> for 32343. It is the 5th value, so the <b>tuple-id is 5</b>.' },
+  { html: colView([{ col: 0, row: 4, cls: 'hl' }, { col: 1, row: 4, cls: 'hl' }]), cap: 'Go to the <b>name column</b> and take its 5th value: El Said. (A separate place on disk.)' },
+  { html: colView([{ col: 0, row: 4, cls: 'hl' }, { col: 1, row: 4, cls: 'hl' }, { col: 2, row: 4, cls: 'hl' }]), cap: 'Go to the <b>dept-name column</b> and take its 5th value: History.' },
+  { html: colView([{ col: 0, row: 4, cls: 'hl' }, { col: 1, row: 4, cls: 'hl' }, { col: 2, row: 4, cls: 'hl' }, { col: 3, row: 4, cls: 'hl' }]),
+    cap: 'Go to the <b>salary column</b> and take its 5th value: 60000. Result: <code>(32343, El Said, History, 60000)</code>, assembled from 4 different places.' },
+]);
+stepper('#cols-del', [
+  { html: colView([]), cap: 'Delete every instructor whose dept-name is History.' },
+  { html: colView([{ col: 2, row: 4, cls: 'hl' }, { col: 2, row: 7, cls: 'hl' }]), cap: 'Scan the <b>dept-name column</b>: History is at positions <b>5 and 8</b> (tuple-ids 5 and 8).' },
+  { html: colView([0, 1, 2, 3].flatMap(c => [{ col: c, row: 4, cls: 'del' }, { col: c, row: 7, cls: 'del' }])), cap: 'Delete positions 5 and 8 from <b>all four columns</b>: 8 deletions in 4 places for 2 rows.' },
+  { html: columns(null, {}, ['ID', 'Name', 'Dept.', 'Salary'], INSTR.filter((_, i) => i !== 4 && i !== 7)),
+    cap: 'Every column shrinks the same way, so the positions stay aligned: the new 5th value of each column still belongs to the same row (Gold).' },
+]);
+</script>
+<script>
+flashcards('#cards', [
+  { f: 'Columnar representation', b: 'Each attribute of a relation is stored separately; values of one row are matched by position.' },
+  { f: 'Tuple-id', b: 'The position of a row; the k-th value of every column belongs to tuple k.' },
+  { f: 'Benefits', b: 'Less I/O when few attributes are used; better CPU cache use; better compression; vector (SIMD) processing.' },
+  { f: 'Tuple reconstruction', b: 'Rebuilding a full row by fetching the same position from every column. Costly in a column store.' },
+  { f: 'Deletion and update cost', b: 'A deleted or updated row must be changed in every column.' },
+  { f: 'Vector processing', b: 'One CPU instruction operating on several neighbouring values at once.' },
+]);
+quiz('#quiz', [
+  { q: 'Instructor row = 53 bytes, id + salary = 13 bytes. Roughly what fraction of the data does SELECT id, salary read in a column store?', opts: ['100%', 'about 50%', 'about 25%', 'about 5%'], a: 2, why: '13 ÷ 53 ≈ 0.25.' },
+  { q: 'Which query is slower in a column store than in a row store?', opts: ['SELECT avg(salary) FROM instructor', 'SELECT * FROM instructor WHERE id = 32343', 'SELECT count(*) FROM instructor', 'SELECT dept_name FROM instructor'], a: 1, why: 'Fetching one whole row needs tuple reconstruction from 4 columns.' },
+  { q: 'DELETE FROM instructor WHERE dept_name = ‘History’ deletes 2 rows. How many column values are removed?', opts: ['2', '4', '6', '8'], a: 3, why: '2 rows × 4 columns = 8 values.' },
+  { q: 'Why do columns compress better than rows?', opts: ['Columns are shorter', 'A column holds values of one type, often repeated', 'Rows cannot be compressed', 'Columns are sorted'], a: 1, why: 'Similar, repetitive data compresses well.' },
+]);
+ask('#try1', { q: 'A table has 40 columns of 8 bytes each and a query reads 2 of them. What fraction of the data does a column store read? (decimal)', a: 0.05, tol: 0.001, why: '2 × 8 ÷ (40 × 8) = 0.05, i.e. 5%.' });
+</script>
+</body>
+</html>

@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Archiving and Media Failures · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="../s05/lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 06 (Sukarna) · Chapter 5 · Slides 19–23 · Book §17.5</div>
+<h1>Protecting Against Media Failures: Archiving</h1>
+<p class="lede">The log repairs system failures, where the disk survives. When the disk itself is lost, we need an archive: a copy of the database kept elsewhere, plus the log since the copy was made. This chapter covers full and incremental dumps, the nonquiescent dump, and recovery from an archive, using the slides' example.</p>
+
+<h2>1. The archive (slide 19)</h2>
+
+<dl class="def">
+  <dt>Archive</dt><dd>A copy of the database kept separately from the database itself, for example on tape or optical disk, stored at a secure remote location.</dd>
+  <dt>Archiving (dump)</dt><dd>Making that copy.</dd>
+</dl>
+<p>The simplest way: shut the database down, copy its state to the backup medium, and store it far away. After a media failure the database can be restored to the state at the time of the copy. To get to a more recent state we also need the log since the archive was made, and the log must survive the failure too. So:</p>
+<ul>
+  <li>keep all log files written since the archived copy; replaying them on the archived copy brings the database up to date;</li>
+  <li>once a log block is written to disk, also write it to the archive medium;</li>
+  <li>to survive the loss of the whole site, send the log to a remote site almost as soon as it is created. Then, even if both data and local log are lost, the archive plus the remote log recover the database up to the last log record sent.</li>
+</ul>
+
+<div class="q">
+<h4>Why not just back up the log? (textbook sidebar)</h4>
+<p>If we never archived the data, we would have to keep the log forever and replay it from the very first transaction. A large database changes only a small fraction of itself per day, but over a year the logged changes become much larger than the database. An archive lets us throw away the log before it.</p>
+</div>
+
+<h2>2. Full and incremental dumps (slide 20)</h2>
+<dl class="def">
+  <dt>Full dump</dt><dd>The entire database is copied.</dd>
+  <dt>Incremental dump</dt><dd>Only the database elements changed since the previous dump are copied. (The slide says “since the previous full dump”; the textbook says since the previous full or incremental dump. The textbook also allows several levels: a full dump is level 0, and a level-i dump copies everything changed since the last dump at level ≤ i.)</dd>
+</dl>
+<p>To restore: copy back the most recent full dump, then apply the later incremental dumps in order, earliest first. This is much like replaying a redo log.</p>
+
+<h2>3. Nonquiescent archiving (slides 21–22)</h2>
+
+<p>Most databases cannot be shut down for the hours a dump takes. A <b class="term">nonquiescent dump</b> copies the database while transactions keep running. It is the counterpart of a nonquiescent checkpoint:</p>
+<figure>
+<svg id="analogy" viewBox="0 0 640 150" width="640" role="img" aria-label="Checkpoint moves data from memory to disk; dump moves data from disk to archive"></svg>
+<figcaption><b>Figure 1.</b> The analogy (textbook Fig. 17.11). A checkpoint gets data from memory to disk, and the log allows recovery from a system failure. A dump gets data from disk to the archive, and the archive plus the log allow recovery from a media failure.</figcaption>
+</figure>
+
+<p>Because elements change while they are being copied, the archive may hold a state that <em>never existed</em>. Textbook Example 17.13: the database has A, B, C, D = 1, 2, 3, 4 when the dump begins; during the dump A becomes 5, C becomes 6, B becomes 7, and the copying runs in order A, B, C, D:</p>
+<figure>
+<span class="anim-tag">Animation</span>
+<div id="dump"></div>
+</figure>
+<p>The archive holds (1, 2, 6, 4), although the database was (1, 2, 3, 4) at the start and (5, 7, 6, 4) at the end. That is fine, as long as the log written during the dump is kept: it records every change, so recovery can fix the archive.</p>
+
+<p>The algorithm (slide 21, textbook §17.5.2). The textbook adds that the log must be a redo or undo/redo log; an undo log is not suitable for archiving, because it lacks the new values needed to bring the archive forward.</p>
+<pre>1. Write a log record &lt;START DUMP&gt;.
+2. Perform a checkpoint appropriate for the logging method in use.
+3. Perform a full or incremental dump of the data disk(s), making sure the
+   copy has reached the secure remote site.
+4. Make sure enough of the log has been copied to the remote site that at least
+   the log up to and including the checkpoint of step 2 will survive a media
+   failure of the database.
+5. Write a log record &lt;END DUMP&gt;.</pre>
+
+<p>The slides' example (textbook Example 17.14): T1 writes A and B, T2 writes C; both are active when the dump begins. A possible undo/redo log during the dump:</p>
+<pre class="log">&lt;START DUMP&gt;
+&lt;START CKPT(T1,T2)&gt;
+&lt;T1,A,1,5&gt;
+&lt;T2,C,3,6&gt;
+&lt;COMMIT T2&gt;
+&lt;T1,B,2,7&gt;
+&lt;END CKPT&gt;
+Dump completes
+&lt;END DUMP&gt;</pre>
+
+<div class="q">
+<h4>Slide 22 question: why is it safe to ignore the log records before &lt;START CKPT(T1,T2)&gt;?</h4>
+<p>The checkpoint of step 2 is an undo/redo checkpoint: between &lt;START CKPT&gt; and &lt;END CKPT&gt; it flushes every dirty buffer to disk. So every change logged before &lt;START CKPT(T1,T2)&gt; is on the data disk by the time the dump copies it, and therefore in the archive. Everything that may be missing from, or wrong in, the archive was logged after the START CKPT: those are the changes made while the copy was being taken. To recover from this archive we only need the log from &lt;START CKPT(T1,T2)&gt; onward (plus, for undo, the START records of transactions in its list). The textbook is a little more cautious, since the copying can overlap the checkpoint: after the dump completes it keeps the log back to the start of the checkpoint <em>previous</em> to the one in step 2, and deletes only what lies before that.</p>
+</div>
+
+<h2>4. Recovery from an archive (slide 23)</h2>
+<pre>Step 1: Restore the database from the archive.
+        (a) Find the most recent full dump and copy it into the database.
+        (b) If there are later incremental dumps, apply each of them, earliest first.
+Step 2: Modify the database using the surviving log, with the recovery method
+        of the logging method in use.</pre>
+
+<div class="q">
+<h4>Slide 23: crash (media failure) at the end of the dump (textbook Example 17.15)</h4>
+<p>The log above survives, but, to make it interesting, it has no &lt;COMMIT T1&gt; record. T2 has committed.</p>
+<ol>
+  <li><strong>Restore the archive:</strong> A, B, C, D = (1, 2, 6, 4).</li>
+  <li><strong>Redo T2</strong> (committed): <strong>C = 6</strong>. Here C is already 6 in the archive, but the archive could have copied C before T2 changed it, so the redo is needed in general.</li>
+  <li><strong>Undo T1</strong> (no COMMIT), latest first: <strong>B = 2</strong>, then <strong>A = 1</strong>. They happen to be 2 and 1 in the archive already, but the copy could have caught the new values 5 or 7.</li>
+</ol>
+<p>Result: (1, 2, 6, 4), and &lt;ABORT T1&gt; is logged. <strong>Note on the slide:</strong> it lists “Undo &lt;T1,A,1,5&gt;. Undo &lt;T1,B,2,7&gt;” in that order. Undo works latest-first, so B (the later record) is restored before A. With two different elements the result is the same either way.</p>
+</div>
+<figure>
+<span class="anim-tag">Animation</span>
+<div id="ex1715"></div>
+<figcaption>Recovery of Example 17.15 from the restored archive (A, B, C, D) = (1, 2, 6, 4). (The log fragment starts at the dump, so the transactions' START records are not part of it.)</figcaption>
+</figure>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+
+<div class="key"><p><strong>Summary:</strong> media failures are survived with an archive (full or incremental dumps, kept remotely) plus a log copied to the remote site. A nonquiescent dump runs while transactions continue, bracketed by &lt;START DUMP&gt; and &lt;END DUMP&gt; with a checkpoint inside; the archive may hold a state that never existed, and the log fixes it. Recovery restores the latest full dump, applies incremental dumps earliest first, then runs normal (redo or undo/redo) recovery on the surviving log.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../s05/lecture.js"></script>
+<script>
+(() => {
+  const b = (x, t, cls) => `<rect x="${x}" y="50" width="140" height="50" rx="6" class="${cls}"/><text x="${x + 70}" y="80" text-anchor="middle" class="big">${t}</text>`;
+  let s = b(10, 'Memory', 'cell-hl') + b(250, 'Disk', 'cell') + b(490, 'Archive', 'cell-new');
+  s += `<path d="M150 75 H246" class="s-acc" marker-end="url(#m-acc)"/><text x="198" y="38" text-anchor="middle" class="lbl acc" style="font-weight:600">checkpoint</text><text x="198" y="125" text-anchor="middle" class="lbl">log → system failures</text>`;
+  s += `<path d="M390 75 H486" class="s-red" marker-end="url(#m-red)"/><text x="438" y="38" text-anchor="middle" class="lbl red" style="font-weight:600">dump</text><text x="438" y="125" text-anchor="middle" class="lbl">archive + log → media failures</text>`;
+  document.querySelector('#analogy').innerHTML = s;
+
+  const fr = (disk, arch, ev, hot) => {
+    const row = (y, lab, vals, hl) => `<text x="10" y="${y + 20}" class="big">${lab}</text>` + 'ABCD'.split('').map((k, i) =>
+      `<rect x="${90 + i * 60}" y="${y}" width="54" height="30" rx="3" class="${vals[i] === '' ? 'cell-plain' : hl === k ? 'cell-hl' : 'cell'}"/><text x="${117 + i * 60}" y="${y + 20}" text-anchor="middle" style="font-size:13px">${vals[i] === '' ? '' : k + '=' + vals[i]}</text>`).join('');
+    return `<svg viewBox="0 0 520 120" width="520">${row(14, 'Disk', disk, hot && hot[0] === 'd' ? hot[1] : '')}${row(64, 'Archive', arch, hot && hot[0] === 'a' ? hot[1] : '')}<text x="350" y="34" class="lbl" style="font-size:12px">${ev}</text></svg>`;
+  };
+  stepper('#dump', [
+    { html: fr([1, 2, 3, 4], ['', '', '', ''], 'dump begins'), cap: 'The dump begins. Disk: (1, 2, 3, 4). The archive is empty.' },
+    { html: fr([1, 2, 3, 4], [1, '', '', ''], 'Copy A', 'aA'), cap: 'Copy A: the archive gets A = 1.' },
+    { html: fr([5, 2, 3, 4], [1, '', '', ''], 'A := 5', 'dA'), cap: 'A transaction sets A = 5 on disk. A was already copied, so the archive keeps 1.' },
+    { html: fr([5, 2, 3, 4], [1, 2, '', ''], 'Copy B', 'aB'), cap: 'Copy B: the archive gets B = 2.' },
+    { html: fr([5, 2, 6, 4], [1, 2, '', ''], 'C := 6', 'dC'), cap: 'C is set to 6 on disk, before it is copied.' },
+    { html: fr([5, 2, 6, 4], [1, 2, 6, ''], 'Copy C', 'aC'), cap: 'Copy C: the archive gets the <em>new</em> value C = 6.' },
+    { html: fr([5, 7, 6, 4], [1, 2, 6, ''], 'B := 7', 'dB'), cap: 'B is set to 7 on disk, after it was copied.' },
+    { html: fr([5, 7, 6, 4], [1, 2, 6, 4], 'Copy D', 'aD'), cap: 'Copy D. The archive is (1, 2, 6, 4): neither the starting state (1, 2, 3, 4) nor the final one (5, 7, 6, 4). The log written during the dump is what lets recovery sort this out.' },
+  ]);
+  recoveryAnim('#ex1715', '<START DUMP> <START CKPT(T1,T2)> <T1,A,1,5> <T2,C,3,6> <COMMIT T2> <T1,B,2,7> <END CKPT> <END DUMP>', 'undoredo', { A: 1, B: 2, C: 6, D: 4 });
+
+  flashcards('#cards', [
+    { f: 'Archive', b: 'A copy of the database stored separately (e.g. tape at a remote site).' },
+    { f: 'Full dump', b: 'Copies the entire database.' },
+    { f: 'Incremental dump', b: 'Copies only the elements changed since the previous dump.' },
+    { f: 'Nonquiescent dump', b: 'A dump taken while transactions run: &lt;START DUMP&gt;, checkpoint, copy, ship log, &lt;END DUMP&gt;.' },
+    { f: 'Restore order', b: 'Latest full dump, then incremental dumps earliest first, then log recovery.' },
+    { f: 'Which logs work with archiving?', b: 'Redo or undo/redo logs; an undo log lacks the new values.' },
+  ]);
+  quiz('#quiz', [
+    { q: 'Why must the log be sent to a remote site?', opts: ['To make commits faster', 'So it survives a failure that destroys the database site', 'To save local disk space', 'Because checkpoints require it'], a: 1, why: 'Archive and log together restore the database; both must survive.' },
+    { q: 'Example 17.13: what does the archive hold?', opts: ['(1,2,3,4)', '(5,7,6,4)', '(1,2,6,4)', '(5,2,6,4)'], a: 2, why: 'A and B were copied before changing, C after.' },
+    { q: 'Restoring from a full dump and two incremental dumps, the order is…', opts: ['incrementals first, then full', 'full, then incrementals latest first', 'full, then incrementals earliest first', 'any order'], a: 2, why: 'Each incremental dump updates the state produced by the earlier ones.' },
+    { q: 'Example 17.15: T1 has no COMMIT on the surviving log. Recovery writes…', opts: ['A = 5, B = 7', 'B = 2, A = 1', 'nothing for T1', 'C = 3'], a: 1, why: 'T1 is undone latest first; T2 is redone (C = 6).' },
+  ]);
+  ask('#try1', { q: 'Example 17.15 but the surviving log also contains <COMMIT T1> (after <T1,B,2,7>). Final value of B after recovery?', a: 7, why: 'Now T1 is committed and redone: A = 5, B = 7 (and C = 6).' });
+})();
+</script>
+</body>
+</html>

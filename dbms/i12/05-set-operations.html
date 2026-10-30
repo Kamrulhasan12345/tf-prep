@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Set Operations and Division · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 12 (Ishrak) · Chapter 5 · Slides 21–24 · Book §2.4.4</div>
+<h1>Union, Difference, Intersection, and Division</h1>
+<p class="lede">The set operators combine two relations with the same attributes. Union and difference are basic; intersection is derived from difference (slide 24). Division, which the slides do not cover but the exam questions use for every "for all" query, is built from the same pieces.</p>
+
+<h2>1. The second half of the RA slides (slides 21–22)</h2>
+<p>Slide 21 opens "Advanced Relational Algebra" with three topics: set operations, "fancier" RA (the theta and equi-joins of <a href="06-theta-outer-joins.html">Chapter 6</a>), and extensions and limitations (<a href="09-extended-ra.html">Chapter 9</a>). Slide 22 repeats the operator list from slide 4, now highlighting union and difference, and adds the <b>semi-join</b> to the derived joins (also in Chapter 6).</p>
+
+<h2>2. Union and difference (slide 23)</h2>
+
+<dl class="def">
+  <dt>Union-compatible</dt>
+  <dd>Two relations are union-compatible when they have the same set of attributes (same names, and the same domain for each). Under the named perspective the attributes must match by name; SQL only requires the same number of columns with compatible types, matched by position. ∪, ∩ and − are defined only for union-compatible inputs.</dd>
+  <dt>Union R ∪ S</dt>
+  <dd>The tuples that are in R, in S, or in both. Each tuple appears once. SQL: <code>UNION</code>.</dd>
+  <dt>Difference R − S</dt>
+  <dd>The tuples that are in R but not in S. SQL: <code>MINUS</code> in Oracle (<code>EXCEPT</code> in the SQL standard and in PostgreSQL).</dd>
+</dl>
+
+<figure>
+<svg id="venn" viewBox="0 0 760 170" width="760" role="img" aria-label="Venn diagrams of union, difference and intersection"></svg>
+<figcaption><b>Figure 1.</b> The shaded region is the result (slides 23–24). Union and intersection are symmetric; difference is not: R − S ≠ S − R.</figcaption>
+</figure>
+
+<p>Slide 23's examples: <i>ActiveEmployees ∪ RetiredEmployees</i> is everyone who is active or retired; <i>AllEmployees − RetiredEmployees</i> is everyone who is not retired. Both make sense only because the relations have the same schema. π<sub>name</sub>(Employee) ∪ Department would be rejected: different attributes. Project both sides onto the same attributes first, and rename (ρ) if the names differ.</p>
+
+<p>Useful facts: ∪ and ∩ are commutative and associative, so R ∪ S = S ∪ R and (R ∪ S) ∪ T = R ∪ (S ∪ T). Difference is neither: R − S and S − R are different relations, and (R − S) − T ≠ R − (S − T) in general. Sizes: max(|R|, |S|) ≤ |R ∪ S| ≤ |R| + |S|, and 0 ≤ |R − S| ≤ |R|.</p>
+
+<h2>3. Intersection is derived (slide 24)</h2>
+
+<div class="q"><h4>Slide 24: R1 ∩ R2 = ?</h4>
+<p>The tuples in both R1 and R2 are the tuples of R1 that are <em>not</em> in the part of R1 outside R2:</p>
+<p class="formula">R1 ∩ R2 = R1 − (R1 − R2)</p>
+<p>Why: R1 − R2 is the crescent of R1 that does not overlap R2 (slide 24's lower picture). Removing that crescent from R1 leaves exactly the overlap. Because ∩ can be written with −, it is not a basic operator. (It can also be written R1 ⋈ R2 when the two have the same attributes, <a href="04-natural-join.html">Chapter 4</a>.) Slide 24's example, <i>UnionizedEmployees ∩ RetiredEmployees</i>, is evaluated below exactly in this way.</p>
+</div>
+
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="inter"></div>
+<figcaption><b>Figure 2.</b> Unionized ∩ Retired computed as Unionized − (Unionized − Retired).</figcaption>
+</figure>
+
+<h2>4. Division ÷ (beyond the slides)</h2>
+<p>The question bank often asks queries with "every" or "all": <i>suppliers who supply every part</i>, <i>employees who borrowed all books by Carl Hamacher</i>. The operator made for these is <b>division</b>. The slides do not list it, but it is in the standard algebra (Silberschatz §2.6; the GMUW textbook expresses the same queries with − and ×).</p>
+
+<dl class="def">
+  <dt>Division R ÷ S</dt>
+  <dd>Let R have attributes A ∪ B and S have attributes B. R ÷ S is the set of A-values a such that, for <b>every</b> tuple b of S, the tuple (a, b) is in R. Result attributes: A.</dd>
+</dl>
+<p>Think of R(sid, pid) as "who supplies what" and S(pid) as "the list of parts". Then R ÷ S is "suppliers that appear with every part on the list". Division is derived; in basic operators:</p>
+<p class="formula">R ÷ S = π<sub>A</sub>(R) − π<sub>A</sub>((π<sub>A</sub>(R) × S) − R)</p>
+<ol>
+  <li>π<sub>A</sub>(R) × S: every candidate a paired with every required b, the pairs that <em>should</em> be in R.</li>
+  <li>Minus R: the required pairs that are <em>missing</em>.</li>
+  <li>π<sub>A</sub> of that: the candidates missing at least one required b.</li>
+  <li>Remove those from all candidates: what remains has every b.</li>
+</ol>
+
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="div1"></div>
+<figcaption><b>Figure 3.</b> π<sub>sid,pid</sub>(Catalog) ÷ π<sub>pid</sub>(Parts): suppliers who supply every part. The caption of the ÷ step lists, for each supplier, which parts are missing.</figcaption>
+</figure>
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="div2"></div>
+<figcaption><b>Figure 4.</b> The same answer built from basic operators with assignment (the formula above, step by step).</figcaption>
+</figure>
+
+<p>Two things to watch. First, project R onto exactly A ∪ B before dividing: if Catalog(sid, pid, cost) were divided directly, the cost column would become part of A and spoil the result. Second, if S is empty, every candidate qualifies (there is nothing it can miss), so π<sub>A</sub>(R) ÷ ∅ = π<sub>A</sub>(R).</p>
+
+<p>In SQL there is no division keyword. The usual Oracle pattern is "there is no required part that this supplier does not supply":</p>
+<pre>SELECT s.sid FROM Suppliers s
+WHERE NOT EXISTS (
+  SELECT pid FROM Parts
+  MINUS
+  SELECT pid FROM Catalog c WHERE c.sid = s.sid);</pre>
+
+<figure class="wide">
+<span class="anim-tag">Interactive tool</span>
+<div id="lab"></div>
+</figure>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+<div id="try2"></div>
+<h3>Write it yourself</h3>
+<p>Suppliers(sid, sname, address), Parts(pid, pname, color), Catalog(sid, pid, cost). Press <b>Show relations</b> for the data.</p>
+<div id="ex1"></div>
+<div id="ex2"></div>
+<div id="ex3"></div>
+<div id="ex4"></div>
+<div id="ex5"></div>
+
+<h3>Exam questions</h3>
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2014–15 · 20 marks</div>
+  <div class="exam-q"><p>Consider the following schema: Suppliers(sid: integer, sname: string, address: string), Parts(pid: integer, pname: string, color: string), Catalog(sid: integer, pid: integer, cost: real). Write relational algebra expressions for the following:</p>
+  <p>(a) Find the sids of suppliers who supply some red or green part.<br>(b) Find the sids of suppliers who supply some red parts and are at the address '221 Packer Street'.<br>(c) Find the sids of suppliers who supply some red parts and some green parts.<br>(d) Find the sids of suppliers who supply every part.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>Catalog and Parts share pid; Catalog and Suppliers share sid; Suppliers and Parts share nothing, so natural joins are safe here.</p>
+    <p><b>(a)</b> One part can be red <em>or</em> green, so a single selection with ∨ works:</p>
+    <p class="ra-big">π<sub>sid</sub>(σ<sub>color='red' ∨ color='green'</sub>(Parts) ⋈ Catalog)</p>
+    <p>(Equivalently π<sub>sid</sub>(σ<sub>color='red'</sub>(Parts) ⋈ Catalog) ∪ π<sub>sid</sub>(σ<sub>color='green'</sub>(Parts) ⋈ Catalog).)</p>
+    <p><b>(b)</b> Both conditions are about the same supplier, so join the three relations and select on both:</p>
+    <p class="ra-big">π<sub>sid</sub>(σ<sub>address='221 Packer Street'</sub>(Suppliers) ⋈ Catalog ⋈ σ<sub>color='red'</sub>(Parts))</p>
+    <p><b>(c)</b> Here ∧ inside one selection is <b>wrong</b>: σ<sub>color='red' ∧ color='green'</sub> asks for a single part that is both colours, which is always empty. The supplier needs one red part and one (other) green part, so compute the two sets of suppliers and intersect them:</p>
+    <p class="ra-big">π<sub>sid</sub>(σ<sub>color='red'</sub>(Parts) ⋈ Catalog) ∩ π<sub>sid</sub>(σ<sub>color='green'</sub>(Parts) ⋈ Catalog)</p>
+    <p><b>(d)</b> "Every part" is division. Project Catalog onto (sid, pid) first so that cost does not take part in the division:</p>
+    <p class="ra-big">π<sub>sid,pid</sub>(Catalog) ÷ π<sub>pid</sub>(Parts)</p>
+    <p>Without ÷: π<sub>sid</sub>(Catalog) − π<sub>sid</sub>((π<sub>sid</sub>(Catalog) × π<sub>pid</sub>(Parts)) − π<sub>sid,pid</sub>(Catalog)).</p>
+    <p><b>Check on sample data</b> (the evaluator below; parts 10 and 12 are red, 11 and 14 green): (a) {1, 2, 3, 5}; (b) {1} (supplier 4 is also at 221 Packer Street but supplies only a blue part); (c) {1, 5} (supplier 2 has only red, 3 only green); (d) {1}. The SQL box gives the same rows.</p>
+    <div id="q11"></div>
+  </div></details>
+</div>
+<p>Two more "every" questions are worked in <a href="09-extended-ra.html">Chapter 9</a> (suppliers who supply every part, together with a counting query; employees who borrowed all books by an author).</p>
+
+<div class="key"><p><strong>Summary:</strong> ∪, −, ∩ need union-compatible inputs (same attributes). ∪ (UNION) and − (Oracle MINUS) are basic; ∩ (INTERSECT) is derived: R ∩ S = R − (R − S). "Some red and some green" needs ∩ of two sets, never ∧ in one selection. Division R(A,B) ÷ S(B) keeps the A-values paired with every tuple of S; it answers "for all / every" queries and equals π<sub>A</sub>(R) − π<sub>A</sub>((π<sub>A</sub>(R) × S) − R).</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/sqlplay.js"></script>
+<script src="lecture.js"></script>
+<script>
+// Venn diagrams
+(() => {
+  const c = (x, y, r, cls) => `<circle cx="${x}" cy="${y}" r="${r}" class="${cls}"/>`;
+  let s = `<defs><clipPath id="vR1"><circle cx="70" cy="80" r="52"/></clipPath><clipPath id="vR2"><circle cx="330" cy="80" r="52"/></clipPath><clipPath id="vR3"><circle cx="590" cy="80" r="52"/></clipPath><mask id="vm2"><rect x="0" y="0" width="760" height="170" fill="white"/><circle cx="385" cy="80" r="52" fill="black"/></mask></defs>`;
+  // union
+  s += `<circle cx="70" cy="80" r="52" style="fill:var(--accent);opacity:.55"/><circle cx="125" cy="80" r="52" style="fill:var(--accent);opacity:.55"/>`;
+  s += c(70, 80, 52, 's-fg') + c(125, 80, 52, 's-fg');
+  // difference
+  s += `<circle cx="330" cy="80" r="52" style="fill:var(--accent);opacity:.55" mask="url(#vm2)"/>` + c(330, 80, 52, 's-fg') + c(385, 80, 52, 's-fg');
+  // intersection
+  s += `<circle cx="645" cy="80" r="52" style="fill:var(--accent);opacity:.55" clip-path="url(#vR3)"/>` + c(590, 80, 52, 's-fg') + c(645, 80, 52, 's-fg');
+  [[70, 'R'], [125, 'S'], [330, 'R'], [385, 'S'], [590, 'R'], [645, 'S']].forEach(([x, t], i) => { s += `<text x="${x + (i % 2 ? 18 : -18)}" y="84" text-anchor="middle" class="big">${t}</text>`; });
+  s += `<text x="97" y="158" text-anchor="middle" class="big">R ∪ S</text><text x="357" y="158" text-anchor="middle" class="big">R − S</text><text x="617" y="158" text-anchor="middle" class="big">R ∩ S</text>`;
+  document.querySelector('#venn').innerHTML = s;
+})();
+
+const EMPS = raDB(`
+Unionized(name)
+Akash
+Bina
+Chanchal
+Dipu
+
+Retired(name)
+Bina
+Dipu
+Emon
+
+Active(name)
+Akash
+Chanchal
+Farid
+
+AllEmployees(name)
+Akash
+Bina
+Chanchal
+Dipu
+Emon
+Farid
+`);
+raSteps('#inter', EMPS, 'Unionized - (Unionized - Retired)', { sql: 'SELECT name FROM Unionized MINUS SELECT name FROM (SELECT name FROM Unionized MINUS SELECT name FROM Retired);' });
+raSteps('#div1', DB_SPC, 'project[sid, pid](Catalog) / project[pid](Parts)', { sql: 'SELECT s.sid FROM Suppliers s WHERE s.sid IN (SELECT sid FROM Catalog) AND NOT EXISTS (SELECT pid FROM Parts MINUS SELECT pid FROM Catalog c WHERE c.sid = s.sid);' });
+raSteps('#div2', DB_SPC, `A := project[sid](Catalog)
+Required := A x project[pid](Parts)
+Missing := Required - project[sid, pid](Catalog)
+A - project[sid](Missing)`, { interval: 3000 });
+
+raLab('#lab', { db: { ...EMPS, ...DB_SPC }, presets: [
+  { label: 'Slide 23: Active ∪ Retired', ra: 'Active union Retired', sql: 'SELECT name FROM Active\nUNION\nSELECT name FROM Retired;' },
+  { label: 'Slide 23: AllEmployees − Retired', ra: 'AllEmployees - Retired', sql: 'SELECT name FROM AllEmployees\nMINUS\nSELECT name FROM Retired;' },
+  { label: 'Slide 24: Unionized ∩ Retired', ra: 'Unionized intersect Retired', sql: 'SELECT name FROM Unionized\nINTERSECT\nSELECT name FROM Retired;' },
+  { label: 'Difference is not symmetric: Retired − Unionized', ra: 'Retired - Unionized', sql: 'SELECT name FROM Retired\nMINUS\nSELECT name FROM Unionized;' },
+  { label: 'π_sid ∪ π_pid: same arity, different names (read the note)', ra: 'project[sid](Suppliers) union project[pid](Parts)', sql: 'SELECT sid FROM Suppliers\nUNION\nSELECT pid FROM Parts;' },
+  { label: 'Division: suppliers of every green part', ra: "project[sid, pid](Catalog) / project[pid](select[color = 'green'](Parts))", sql: "SELECT s.sid FROM Suppliers s\nWHERE s.sid IN (SELECT sid FROM Catalog)\n  AND NOT EXISTS (\n    SELECT pid FROM Parts WHERE color = 'green'\n    MINUS\n    SELECT pid FROM Catalog c WHERE c.sid = s.sid);" },
+] });
+
+raLab('#q11', { db: DB_SPC, presets: [
+  { label: '(a) red or green', ra: "project[sid](select[color = 'red' or color = 'green'](Parts) join Catalog)", sql: "SELECT DISTINCT c.sid\nFROM Parts p, Catalog c\nWHERE p.pid = c.pid AND (p.color = 'red' OR p.color = 'green');" },
+  { label: '(b) red and at 221 Packer Street', ra: "project[sid](select[address = '221 Packer Street'](Suppliers) join Catalog join select[color = 'red'](Parts))", sql: "SELECT DISTINCT s.sid\nFROM Suppliers s, Catalog c, Parts p\nWHERE s.sid = c.sid AND c.pid = p.pid\n  AND s.address = '221 Packer Street' AND p.color = 'red';" },
+  { label: '(c) some red and some green', ra: "project[sid](select[color = 'red'](Parts) join Catalog) intersect project[sid](select[color = 'green'](Parts) join Catalog)", sql: "SELECT c.sid FROM Catalog c, Parts p WHERE c.pid = p.pid AND p.color = 'red'\nINTERSECT\nSELECT c.sid FROM Catalog c, Parts p WHERE c.pid = p.pid AND p.color = 'green';" },
+  { label: '(c) the wrong way: ∧ in one σ gives nothing', ra: "project[sid](select[color = 'red' and color = 'green'](Parts) join Catalog)", sql: "SELECT DISTINCT c.sid FROM Catalog c, Parts p\nWHERE c.pid = p.pid AND p.color = 'red' AND p.color = 'green';" },
+  { label: '(d) every part', ra: 'project[sid, pid](Catalog) / project[pid](Parts)', sql: "SELECT s.sid FROM Suppliers s\nWHERE s.sid IN (SELECT sid FROM Catalog)\n  AND NOT EXISTS (SELECT pid FROM Parts\n                  MINUS\n                  SELECT pid FROM Catalog c WHERE c.sid = s.sid);" },
+] });
+
+flashcards('#cards', [
+  { f: 'Union-compatible', b: 'Same attributes (names and domains) on both sides. Required for ∪, ∩, −.' },
+  { f: 'R ∪ S', b: 'Tuples in R or S (once each). SQL UNION.' },
+  { f: 'R − S', b: 'Tuples in R and not in S. Oracle MINUS. Not symmetric.' },
+  { f: 'R ∩ S', b: 'Tuples in both. Derived: R − (R − S). SQL INTERSECT.' },
+  { f: 'R(A,B) ÷ S(B)', b: 'A-values paired in R with every tuple of S. For "every / all" queries.' },
+  { f: 'Division from basic operators', b: 'π<sub>A</sub>(R) − π<sub>A</sub>((π<sub>A</sub>(R) × S) − R).' },
+  { f: '"some red and some green"', b: 'Intersect the red-supplier set with the green-supplier set. ∧ in one σ is always empty.' },
+]);
+quiz('#quiz', [
+  { q: 'Which expression equals R ∩ S?', opts: ['R − (S − R)', 'R − (R − S)', '(R ∪ S) − R', 'S − R'], a: 1, why: 'Slide 24. Remove from R the part not in S.' },
+  { q: 'Which operator is <b>not</b> commutative?', opts: ['∪', '∩', '−', '⋈'], a: 2, why: 'R − S keeps R\'s tuples; S − R keeps S\'s.' },
+  { q: '|R| = 5, |S| = 3. What is the largest possible |R ∪ S|?', opts: ['3', '5', '8', '15'], a: 2, why: 'When they share no tuple: 5 + 3.' },
+  { q: 'R(A, B) = {(1,x), (1,y), (2,x)}, S(B) = {x, y}. R ÷ S = ?', opts: ['{1, 2}', '{1}', '{2}', '∅'], a: 1, why: '1 appears with both x and y; 2 lacks y.' },
+  { q: 'What is wrong with Catalog(sid, pid, cost) ÷ π<sub>pid</sub>(Parts)?', opts: ['Nothing', 'cost becomes part of the quotient, so a supplier qualifies only if one cost value pairs with every part', 'Division needs three relations', 'Parts has no pid'], a: 1, why: 'Project the dividend onto (sid, pid) first.' },
+  { q: 'Oracle\'s keyword for set difference is…', opts: ['EXCEPT', 'MINUS', 'DIFFERENCE', 'NOT IN'], a: 1, why: 'Oracle uses MINUS; standard SQL and PostgreSQL use EXCEPT.' },
+]);
+ask('#try1', { q: 'Unionized = {Akash, Bina, Chanchal, Dipu}, Retired = {Bina, Dipu, Emon}. How many tuples in Unionized − Retired?', a: 2, why: 'Akash and Chanchal.' });
+ask('#try2', { q: 'With π<sub>A</sub>(R) holding 4 candidates and S holding 3 tuples, how many tuples does π<sub>A</sub>(R) × S have (step 1 of the division formula)?', a: 12, why: 'Every candidate with every required tuple: 4 × 3.' });
+
+raCheck('#ex1', { db: DB_SPC, task: '1. (Easy) The pids of parts that are red or blue, written with ∪ of two selections.', solution: "project[pid](select[color = 'red'](Parts)) union project[pid](select[color = 'blue'](Parts))" });
+raCheck('#ex2', { db: DB_SPC, task: '2. The sids of suppliers who supply nothing at all (no Catalog row).', solution: 'project[sid](Suppliers) - project[sid](Catalog)', hint: 'All supplier ids minus the ids that appear in Catalog.' });
+raCheck('#ex3', { db: DB_SPC, task: '3. The sids of suppliers who supply a green part but no red part.', solution: "project[sid](select[color = 'green'](Parts) join Catalog) - project[sid](select[color = 'red'](Parts) join Catalog)" });
+raCheck('#ex4', { db: DB_SPC, task: '4. (Exam style) The sids of suppliers who supply every green part. Use ÷.', solution: "project[sid, pid](Catalog) / project[pid](select[color = 'green'](Parts))", hint: 'Divide π<sub>sid,pid</sub>(Catalog) by the pids of green parts.' });
+sqlCheck('#ex5', { setup: raSetup(DB_SPC), task: '5. (Exam style) Write exercise 3 in Oracle SQL with MINUS.', solution: "SELECT c.sid FROM Catalog c, Parts p WHERE c.pid = p.pid AND p.color = 'green'\nMINUS\nSELECT c.sid FROM Catalog c, Parts p WHERE c.pid = p.pid AND p.color = 'red';" });
+</script>
+</body>
+</html>

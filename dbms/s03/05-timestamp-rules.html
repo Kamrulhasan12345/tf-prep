@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Timestamp Scheduling Rules · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="../s02/lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 03 (Sukarna) · Chapter 5 · Slides 24–28 · Book §18.8.4</div>
+<h1>The Rules of Timestamp-Based Scheduling</h1>
+<p class="lede">Four rules decide every read, write, commit and abort under timestamp ordering. This chapter states them exactly as the textbook does, runs the slides' two examples, and gives a scheduler simulator that applies the rules to any schedule, with or without commit bits. All exam questions on timestamp ordering are worked with it.</p>
+
+<h2>1. The scheduler's three choices</h2>
+<p>For each read or write request from T, a timestamp scheduler can:</p>
+<ol type="a">
+  <li><strong>grant</strong> the request;</li>
+  <li><strong>abort</strong> T, if the request would violate physical reality, and restart it with a new timestamp (abort followed by restart is called <b class="term">rollback</b>);</li>
+  <li><strong>delay</strong> T and decide later whether to grant or abort (when the outcome depends on whether an uncommitted writer commits).</li>
+</ol>
+<p>Writes are tentative: when T writes X, the scheduler keeps the old value of X and its previous WT(X), and sets C(X) = false, so the write can be undone if T aborts.</p>
+
+<h2>2. The rules (slides 24–26)</h2>
+<div class="key">
+<p><strong>R1. T requests a read r<sub>T</sub>(X).</strong></p>
+<ol type="a">
+  <li>If TS(T) ≥ WT(X), the read is physically realizable.
+    <ol type="i">
+      <li>If C(X) is true, <b>grant</b> the request. If TS(T) &gt; RT(X), set RT(X) := TS(T); otherwise leave RT(X) unchanged.</li>
+      <li>If C(X) is false, <b>delay</b> T until C(X) becomes true or the transaction that wrote X aborts.</li>
+    </ol></li>
+  <li>If TS(T) &lt; WT(X), the read is physically unrealizable: <b>roll back</b> T (abort, restart with a new, larger timestamp).</li>
+</ol>
+<p><strong>R2. T requests a write w<sub>T</sub>(X).</strong></p>
+<ol type="a">
+  <li>If TS(T) ≥ RT(X) and TS(T) ≥ WT(X), the write is physically realizable and is performed: write the new value of X, set WT(X) := TS(T), and set C(X) := false.</li>
+  <li>If TS(T) ≥ RT(X) but TS(T) &lt; WT(X), the write is realizable but a later value is already in X (Thomas write rule). If C(X) is true, <b>ignore</b> T's write and let T proceed. If C(X) is false, <b>delay</b> T as in R1(a)(ii).</li>
+  <li>If TS(T) &lt; RT(X), the write is physically unrealizable: <b>roll back</b> T.</li>
+</ol>
+<p><strong>R3. T commits.</strong> Set C(X) := true for every element X written by T (those with WT(X) = TS(T)). Transactions waiting for these commit bits may proceed.</p>
+<p><strong>R4. T aborts</strong> (or is rolled back by R1(b) or R2(c)). T's writes are cancelled (old values and write times restored). Any transaction waiting on an element X that T wrote must repeat its read or write attempt and see whether it is now legal.</p>
+</div>
+<p>Order of checks for a write: first compare with RT(X) (is it too late?), then with WT(X) (perform, or skip/wait). Order for a read: compare with WT(X), then check C(X).</p>
+
+<h2>3. Slide 27: three transactions on A, B, C</h2>
+<p>Timestamps: TS(T₁) = 200, TS(T₂) = 150, TS(T₃) = 175 (T₂ registered first, then T₃, then T₁, even though T₁ makes the first access). All read and write times start at 0. As in the slide and the textbook's Fig. 18.39, commits are not shown, so this run treats each write as committed at once (commit bits off).</p>
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="f39"></div>
+<figcaption><b>Figure 1.</b> Textbook Fig. 18.39. The element columns show the timestamps that change at each step.</figcaption>
+</figure>
+<div class="q">
+<h4>Slide 27 questions: why is T₂ aborted, and why does w₃(A) not update WT(A)?</h4>
+<p><strong>T₂ is aborted</strong> at w₂(C): C has already been read by T₃ (RT(C) = 175), which in the serial order comes after T₂ (150). T₃ should have read the value T₂ is now writing, but read the old one. TS(T₂) = 150 &lt; RT(C) = 175: write too late, rule R2(c).</p>
+<p><strong>w₃(A) does not change WT(A)</strong> because of the Thomas write rule, R2(b): TS(T₃) = 175 ≥ RT(A) = 150, so no later transaction has read A, but TS(T₃) = 175 &lt; WT(A) = 200: T₁, later in the serial order, has already written A. In the serial order (T₂, T₃, T₁) T₃'s value of A would be overwritten by T₁'s before anyone read it, so the write is skipped; T₃ is not rolled back, and WT(A) stays 200.</p>
+<p><strong>With commit bits.</strong> T₁ never commits in the slide. Under the full rules C(A) is false when w₃(A) arrives, so R2(b) <em>delays</em> T₃ until T₁ commits; only then is the write skipped. Run the same schedule with c₁ added (<code>… w₂(C) w₃(A) c₁</code>) in the simulator below with “use commit bits” ticked to see the wait.</p>
+</div>
+
+<h2>4. Slide 28: a read that is too late</h2>
+<p>TS(T₁) = 150, TS(T₂) = 200, TS(T₃) = 175, TS(T₄) = 225, all on element A (textbook Fig. 18.40). The slide's “issues RT(X)” means T issues a read of X.</p>
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="f40"></div>
+<figcaption><b>Figure 2.</b> T₃ must abort: TS(T₃) = 175 &lt; WT(A) = 200.</figcaption>
+</figure>
+<p>When T₃ reads A, the current value was written by T₂ (WT(A) = 200), which is later than T₃ in the serial order: read too late, R1(b), T₃ is aborted. Notice that an old value of A, written by T₁ at time 150, would have been exactly right for T₃. Keeping such old versions is the idea of the next chapter (MVCC), where T₃ would not need to abort.</p>
+
+<h2>5. Timestamp scheduler simulator</h2>
+<p>Type a schedule of reads, writes, commits (<code>c1</code>), aborts (<code>a1</code>) and optional starts (<code>st1</code>, which assign timestamps in start order). Give timestamps explicitly (<code>T1=200, T2=150</code>) or leave the box blank for TS(T<sub>i</sub>) = i. With “use commit bits” ticked the full rules apply, including delays; unticked, every write counts as committed immediately (as in the slides' examples). A rolled-back transaction's later actions are ignored (its restart would be a new transaction).</p>
+<figure class="wide">
+<span class="anim-tag">Interactive</span>
+<div id="tool"></div>
+</figure>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+<div id="try2"></div>
+
+<h3>Exam questions</h3>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 23-24 8b · 12 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-1 | 2023–24 · 12 marks</div>
+  <div class="exam-q"><p>Suppose, timestamp-based concurrency control is used in a database management system (DBMS). For each read or write action, the DBMS takes one of the following actions: Wait: Put the transaction to sleep; Abort: Abort the transaction (does not restart); Execute: Execute the action and continue; Skip: Skip the action and continue. For each of the operations in the schedule given below, write down the actions of the DBMS according to the timestamp-based concurrency control protocol:<br>r₂(A), w₁(A), w₄(B), r₃(B), w₂(A), r₄(A), w₆(C), w₅(C)<br>Assume that the timestamps (TS) of the transactions are as follows: TS(T₁) &lt; TS(T₂) &lt; TS(T₃) &lt; TS(T₄) &lt; TS(T₅) &lt; TS(T₆)</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+  <p>Take TS(T<sub>i</sub>) = i. All RT = WT = 0, all C = true initially. The “Wait” option tells us commit bits are in use (no transaction commits in the schedule).</p>
+  <div class="tbl"><table>
+  <tr><th>action</th><th>check</th><th>DBMS action</th><th>after</th></tr>
+  <tr><td>r₂(A)</td><td>2 ≥ WT(A) = 0, C(A) true</td><td class="good">Execute</td><td>RT(A) = 2</td></tr>
+  <tr><td>w₁(A)</td><td>1 &lt; RT(A) = 2 (write too late)</td><td class="bad">Abort T₁</td><td>—</td></tr>
+  <tr><td>w₄(B)</td><td>4 ≥ RT(B) = 0, 4 ≥ WT(B) = 0</td><td class="good">Execute</td><td>WT(B) = 4, C(B) = false</td></tr>
+  <tr><td>r₃(B)</td><td>3 &lt; WT(B) = 4 (read too late)</td><td class="bad">Abort T₃</td><td>—</td></tr>
+  <tr><td>w₂(A)</td><td>2 ≥ RT(A) = 2, 2 ≥ WT(A) = 0</td><td class="good">Execute</td><td>WT(A) = 2, C(A) = false</td></tr>
+  <tr><td>r₄(A)</td><td>4 ≥ WT(A) = 2, but C(A) false (T₂ uncommitted)</td><td class="mid">Wait</td><td>T₄ sleeps until T₂ commits/aborts</td></tr>
+  <tr><td>w₆(C)</td><td>6 ≥ RT(C) = 0, 6 ≥ WT(C) = 0</td><td class="good">Execute</td><td>WT(C) = 6, C(C) = false</td></tr>
+  <tr><td>w₅(C)</td><td>5 ≥ RT(C) = 0, 5 &lt; WT(C) = 6, C(C) false</td><td class="mid">Wait</td><td>T₅ sleeps; skipped later if T₆ commits</td></tr>
+  </table></div>
+  <p><b>Answer:</b> Execute, Abort, Execute, Abort, Execute, Wait, Execute, Wait. (If commit bits were ignored, r₄(A) would Execute and w₅(C) would be Skipped by the Thomas write rule.) The question bank's answer agrees. Figure 3 steps through it.</p>
+  <figure class="wide"><div id="q101"></div><figcaption><b>Figure 3.</b> The schedule in the simulator (commit bits on).</figcaption></figure>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 22-23 4a · 12 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-1 | 2022–23 · 12 marks</div>
+  <div class="exam-q"><p>Consider the following schedule of four transactions T₁, T₂, T₃ and T₄ in a system with timestamp-based concurrency control: r₁(A); w₂(A); r₂(B); r₄(C); r₃(B); w₂(B); w₃(B); r₄(A); w₄(C); r₁(C); Assume that the start timestamps of the four transactions are TS(T₁) = 1, TS(T₂) = 2, TS(T₃) = 3 and TS(T₄) = 4. The read and write timestamps are all initialized to 0 at the start of the schedule, i.e., RT(X) = 0 and WT(X) = 0 for X ∈ {A, B, C}. Answer the following questions:<br>(i) For each action of the given schedule, show the timestamp which is updated and show the updated values.<br>(ii) Show the actions for which the scheduler rollbacks the relevant transaction.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+  <div class="tbl"><table>
+  <tr><th>action</th><th>check</th><th>result / updated timestamp</th></tr>
+  <tr><td>r₁(A)</td><td>1 ≥ WT(A) = 0</td><td>RT(A) = 1</td></tr>
+  <tr><td>w₂(A)</td><td>2 ≥ RT(A) = 1, 2 ≥ WT(A) = 0</td><td>WT(A) = 2</td></tr>
+  <tr><td>r₂(B)</td><td>2 ≥ WT(B) = 0</td><td>RT(B) = 2</td></tr>
+  <tr><td>r₄(C)</td><td>4 ≥ WT(C) = 0</td><td>RT(C) = 4</td></tr>
+  <tr><td>r₃(B)</td><td>3 ≥ WT(B) = 0</td><td>RT(B) = 3</td></tr>
+  <tr><td>w₂(B)</td><td>2 &lt; RT(B) = 3</td><td class="bad">rollback T₂ (write too late); T₂'s write of A is undone, so WT(A) returns to 0</td></tr>
+  <tr><td>w₃(B)</td><td>3 ≥ RT(B) = 3, 3 ≥ WT(B) = 0</td><td>WT(B) = 3</td></tr>
+  <tr><td>r₄(A)</td><td>4 ≥ WT(A) = 0</td><td>RT(A) = 4</td></tr>
+  <tr><td>w₄(C)</td><td>4 ≥ RT(C) = 4, 4 ≥ WT(C) = 0</td><td>WT(C) = 4</td></tr>
+  <tr><td>r₁(C)</td><td>1 &lt; WT(C) = 4</td><td class="bad">rollback T₁ (read too late)</td></tr>
+  </table></div>
+  <p><b>(ii)</b> Rollbacks happen at <b>w₂(B)</b> (T₂: TS 2 &lt; RT(B) = 3, T₃ already read B) and at <b>r₁(C)</b> (T₁: TS 1 &lt; WT(C) = 4, C was written by the later T₄).</p>
+  <p>Final values: RT(A) = 4, WT(A) = 0; RT(B) = 3, WT(B) = 3; RT(C) = 4, WT(C) = 4. Note on r₄(A): since T₂ was rolled back, its tentative write of A is cancelled and WT(A) goes back to 0. If one ignores that undo, WT(A) = 2 and r₄(A) still succeeds (4 ≥ 2), so the actions are the same either way. With commit bits on, the run is also the same (no read meets an uncommitted value: the only uncommitted write of A was cancelled before r₄(A)).</p>
+  <figure class="wide"><div id="q104"></div><figcaption><b>Figure 4.</b> The schedule in the simulator.</figcaption></figure>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2015–16 · 15 marks</div>
+  <div class="exam-q"><p>A set of transactions with their timestamps and instructions is given. The timestamp values of data item A are: W-timestamp(A) = 10, R-timestamp(A) = 20. The transactions are: T1, timestamp 5, READ(A); T2, timestamp 15, READ(A); T3, timestamp 25, WRITE(A); T4, timestamp 12, WRITE(A). Find the status (rollback or executed) of each transaction and the corresponding timestamp values of data item A using the timestamp-based protocol.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+  <p>Process the instructions in the order given, starting from WT(A) = 10, RT(A) = 20 (the value of A is committed).</p>
+  <div class="tbl"><table>
+  <tr><th>T</th><th>TS</th><th>instr.</th><th>check</th><th>status</th><th>WT(A), RT(A) after</th></tr>
+  <tr><td>T₁</td><td>5</td><td>READ(A)</td><td>5 &lt; WT(A) = 10: read too late</td><td class="bad">rolled back</td><td>10, 20</td></tr>
+  <tr><td>T₂</td><td>15</td><td>READ(A)</td><td>15 ≥ 10: read OK; 15 &lt; RT = 20 so RT unchanged</td><td class="good">executed</td><td>10, 20</td></tr>
+  <tr><td>T₃</td><td>25</td><td>WRITE(A)</td><td>25 ≥ RT = 20 and ≥ WT = 10</td><td class="good">executed</td><td>25, 20</td></tr>
+  <tr><td>T₄</td><td>12</td><td>WRITE(A)</td><td>12 &lt; RT = 20: write too late</td><td class="bad">rolled back</td><td>25, 20</td></tr>
+  </table></div>
+  <p>Final: W-timestamp(A) = 25, R-timestamp(A) = 20. (T₄ would be rolled back even before T₃'s write, since a transaction with timestamp 20 already read A.) In Figure 5 the starting values are produced by two earlier committed transactions, T₉ (TS 10) writing A and T₈ (TS 20) reading it.</p>
+  <figure class="wide"><div id="q33"></div><figcaption><b>Figure 5.</b> T₁–T₄ after the setup.</figcaption></figure>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2010–11 · 10 marks</div>
+  <div class="exam-q"><p>Explain the rules of performing read and write operations in the timestamp ordering protocol. What are the advantages and disadvantages of this protocol? How is the protocol improved by the Thomas Write Rule?</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+  <p><b>Rules.</b> Every transaction T gets a unique increasing timestamp TS(T); every element X keeps RT(X), WT(X) (and commit bit C(X)). The schedule must be equivalent to the serial order of timestamps.</p>
+  <ul>
+    <li><b>Read</b> r<sub>T</sub>(X): if TS(T) &lt; WT(X), roll back T (X was overwritten by a later transaction). Otherwise grant (waiting first if C(X) is false), and set RT(X) := max(RT(X), TS(T)).</li>
+    <li><b>Write</b> w<sub>T</sub>(X): if TS(T) &lt; RT(X), roll back T (a later transaction already read X). Else if TS(T) &lt; WT(X), basic timestamp ordering also rolls back T; with the Thomas write rule the write is ignored instead. Otherwise perform it and set WT(X) := TS(T) (C(X) := false until T commits).</li>
+  </ul>
+  <p><b>Advantages.</b> Conflict-serializable (basic version) schedules in a known order; no locks, so no lock waits: in the basic protocol a transaction is never blocked, only granted or rolled back (with commit-bit delays waits do occur, and in rare cases two transactions can even wait for each other, e.g. TS(T₁) = 1, TS(T₂) = 2: w₁(Y); w₂(X); w₁(X) waits for T₂; r₂(Y) waits for T₁, cf. textbook Exercise 18.8.3); read-only and low-conflict workloads run with little overhead; optimistic, no blocking for most operations.</p>
+  <p><b>Disadvantages.</b> Frequent <b>rollbacks</b> when transactions conflict, wasting work; possible <b>starvation</b> of a long transaction that keeps being restarted; overhead of storing and updating RT/WT for every element (a read becomes a write of RT); without commit bits, schedules may be unrecoverable or cause cascading rollback.</p>
+  <p><b>Thomas write rule.</b> When RT(X) ≤ TS(T) &lt; WT(X), T's write is obsolete: a later transaction has already written X and no later transaction read the value T would have written. Instead of rolling T back, simply skip the write. This avoids unnecessary aborts (more concurrency) and still gives a schedule equivalent to the timestamp order, though not always conflict-serializable. Example: TS(T₁) = 1, TS(T₂) = 2: r₁(A); w₂(A); w₁(A): w₁(A) is skipped instead of aborting T₁; the effect equals (T₁, T₂).</p>
+  </div></details>
+</div>
+
+<div class="key"><p><strong>Summary:</strong> reads: abort if TS(T) &lt; WT(X); otherwise wait while C(X) is false, then grant and raise RT(X). Writes: abort if TS(T) &lt; RT(X); perform (WT := TS, C := false) if TS(T) ≥ WT(X); otherwise skip by the Thomas write rule once C(X) is true, waiting while it is false. Commit sets C(X) for the transaction's writes and releases waiters; abort cancels its writes and makes waiters retry.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../s02/lecture.js"></script>
+<script>
+const run = (sel, s, o) => stepper(sel, CC.tsSteps(CC.parse(s).acts, o).steps, { interval: 2300 });
+run('#f39', 'r1(B) r2(A) r3(C) w1(B) w1(A) w2(C) w3(A)', { ts: { 1: 200, 2: 150, 3: 175 }, commitBits: false });
+run('#f40', 'r1(A) w1(A) r2(A) w2(A) r3(A) r4(A)', { ts: { 1: 150, 2: 200, 3: 175, 4: 225 }, commitBits: false });
+CC.tsTool('#tool', 'r1(B) r2(A) r3(C) w1(B) w1(A) w2(C) w3(A) c1 c3', { ts: 'T1=200, T2=150, T3=175' });
+run('#q101', 'r2(A) w1(A) w4(B) r3(B) w2(A) r4(A) w6(C) w5(C)', {});
+run('#q104', 'r1(A); w2(A); r2(B); r4(C); r3(B); w2(B); w3(B); r4(A); w4(C); r1(C)', {});
+run('#q33', 'w9(A) c9 r8(A) c8 r1(A) r2(A) w3(A) w4(A)', { ts: { 9: 10, 8: 20, 1: 5, 2: 15, 3: 25, 4: 12 } });
+flashcards('#cards', [
+  { f: 'R1(a)', b: 'TS(T) ≥ WT(X): grant if C(X) true (RT := max), else delay.' },
+  { f: 'R1(b)', b: 'TS(T) < WT(X): roll back T.' },
+  { f: 'R2(a)', b: 'TS(T) ≥ RT(X) and ≥ WT(X): write, WT := TS(T), C := false.' },
+  { f: 'R2(b)', b: 'RT(X) ≤ TS(T) < WT(X): skip if C(X) true (Thomas), else delay.' },
+  { f: 'R2(c)', b: 'TS(T) < RT(X): roll back T.' },
+  { f: 'R3 commit', b: 'C(X) := true for all X written by T; waiting transactions proceed.' },
+  { f: 'R4 abort', b: 'Cancel T\'s writes; transactions waiting on those elements retry.' },
+  { f: 'Rollback', b: 'Abort and restart with a new, larger timestamp.' },
+]);
+quiz('#quiz', [
+  { q: 'TS(T) = 7, RT(X) = 7, WT(X) = 3, C(X) = true. T writes X.', opts: ['Abort', 'Perform the write; WT := 7', 'Skip', 'Wait'], a: 1, why: 'TS ≥ RT and TS ≥ WT (T itself may have done the read).' },
+  { q: 'TS(T) = 7, RT(X) = 2, WT(X) = 9, C(X) = false. T writes X.', opts: ['Abort', 'Perform', 'Skip', 'Wait'], a: 3, why: 'Thomas case, but the later writer has not committed.' },
+  { q: 'TS(T) = 7, WT(X) = 5, C(X) = false. T reads X.', opts: ['Grant', 'Abort', 'Wait', 'Skip'], a: 2, why: 'Realizable but dirty; delay until the writer commits or aborts.' },
+  { q: 'In Fig. 18.39, what is RT(A) at the end?', opts: ['0', '150', '175', '200'], a: 1, why: 'Only T₂ (150) read A.' },
+  { q: 'In Fig. 18.40, after T₃ aborts, T₄ (225) reads A. RT(A) becomes…', opts: ['200', '175', '225', 'T₄ aborts'], a: 2, why: '225 ≥ WT(A) = 200, and 225 > RT(A) = 200.' },
+]);
+ask('#try1', { q: 'TS(T₁)=1, TS(T₂)=2, commit bits off. Schedule r₂(X) w₂(X) w₁(X). How many transactions are rolled back?', a: 1, why: 'w₁(X): TS 1 < RT(X) = 2: write too late, T₁ rolled back (the Thomas rule needs TS ≥ RT).' });
+ask('#try2', { q: 'TS(T₁)=1, TS(T₂)=2, commit bits off. Schedule w₂(X) w₁(X) r₂(X). What is WT(X) at the end?', a: 2, why: 'w₁(X) is skipped by the Thomas rule (RT(X) = 0 ≤ 1 < 2), so WT stays 2.' });
+</script>
+</body>
+</html>

@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Recoverable and ACR Schedules · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 04 (Sukarna) · Chapter 2 · Slides 6–9 · Book §19.1.3–19.1.4</div>
+<h1>Recoverable Schedules and Schedules that Avoid Cascading Rollback</h1>
+<p class="lede">Two conditions on the order of commits and reads. A recoverable schedule makes cascading rollback always possible; an ACR schedule makes it never necessary. This chapter answers every "Why?" on slides 6–9, gives a step-by-step test you can run on any schedule, and works the question-bank problems.</p>
+
+<h2>1. The reads-from relation</h2>
+
+<p>Both conditions in this chapter are about who reads from whom, so we name that first.</p>
+<dl class="def">
+  <dt>T<sub>j</sub> reads from T<sub>i</sub></dt><dd>T<sub>j</sub> reads an element X, and the last write of X before that read was done by T<sub>i</sub> (i ≠ j), and T<sub>i</sub> has not aborted in between. T<sub>j</sub> then depends on T<sub>i</sub>'s value.</dd>
+</dl>
+<p>To find it, scan left from each read <i>r<sub>j</sub>(X)</i> to the nearest earlier <i>w<sub>?</sub>(X)</i>. If there is none, T<sub>j</sub> reads the original, committed value, and depends on nobody.</p>
+
+<h2>2. Recoverable schedules (slide 6)</h2>
+
+<dl class="def">
+  <dt>Recoverable schedule</dt><dd>A schedule in which each transaction commits only after each transaction from which it has read has committed. In symbols: if T<sub>j</sub> reads from T<sub>i</sub> and T<sub>j</sub> commits, then c<sub>i</sub> comes before c<sub>j</sub>.</dd>
+</dl>
+
+<div class="q">
+<h4>Slide 6: "T<sub>1</sub> reads T<sub>2</sub>'s written data. T<sub>1</sub> commits before T<sub>2</sub> commits. The schedule is not recoverable. Why?"</h4>
+<p>Suppose T<sub>2</sub> now aborts. Its write is cancelled, so the value T<sub>1</sub> read never officially existed, and T<sub>1</sub>'s read is <b>inconsistent</b>. (The slide says "consistent" here, which is a typo; the argument only works with "inconsistent".) The normal remedy would be a cascading rollback of T<sub>1</sub>. But T<sub>1</sub> has already committed, and a committed transaction is permanent by definition: its effects may already be visible to users and other transactions. So there is no way to roll T<sub>1</sub> back, and the database cannot be brought back to a consistent state. That is what "not recoverable" means.</p>
+</div>
+
+<p>The slide's <b>requirement</b> says the same thing from the recovery manager's point of view. After a crash, the recovery manager decides which transactions count as committed (those whose <code>COMMIT</code> record is on disk). That set must be consistent: <em>if T<sub>1</sub> remains committed after recovery and T<sub>1</sub> read a value written by T<sub>2</sub>, then T<sub>2</sub> must also remain committed after recovery.</em></p>
+
+<p>The textbook adds one assumption that makes recoverable schedules truly recoverable: <strong>the log's commit records reach disk in the order in which they are written.</strong> If c<sub>1</sub> is written before c<sub>2</sub> but c<sub>2</sub>'s log block happens to be flushed first, a crash in between would leave T<sub>2</sub> committed and T<sub>1</sub> not, even though the schedule itself was recoverable. Chapter 4 (group commit) builds on exactly this assumption.</p>
+
+<h2>3. The three examples (slide 7)</h2>
+
+<p>Recoverability and serializability are <b>independent</b> ("orthogonal") properties: a schedule can have either, both, or neither. Slide 7 shows this with three schedules of the same actions, differing only in order.</p>
+
+<div class="q">
+<h4>Example 1 (Why?): S<sub>1</sub>: w<sub>1</sub>(A); w<sub>1</sub>(B); w<sub>2</sub>(A); r<sub>2</sub>(B); c<sub>1</sub>; c<sub>2</sub> is recoverable and conflict-serializable</h4>
+<p><strong>Recoverable:</strong> the only read is r<sub>2</sub>(B), and the last write of B before it is w<sub>1</sub>(B), so T<sub>2</sub> reads from T<sub>1</sub>. T<sub>2</sub> commits after T<sub>1</sub> (c<sub>1</sub> before c<sub>2</sub>), which is exactly the condition.</p>
+<p><strong>Conflict-serializable:</strong> the conflicting pairs are w<sub>1</sub>(A) … w<sub>2</sub>(A) and w<sub>1</sub>(B) … r<sub>2</sub>(B). Both give the edge T<sub>1</sub> → T<sub>2</sub> in the precedence graph, which has no cycle. In fact all of T<sub>1</sub>'s actions come before T<sub>2</sub>'s, so S<sub>1</sub> is a serial schedule.</p>
+</div>
+
+<div class="q">
+<h4>Example 2 (Why?): S<sub>2</sub>: w<sub>2</sub>(A); w<sub>1</sub>(B); w<sub>1</sub>(A); r<sub>2</sub>(B); c<sub>1</sub>; c<sub>2</sub> is recoverable but not conflict-serializable</h4>
+<p><strong>Recoverable:</strong> T<sub>2</sub> reads B from T<sub>1</sub> (w<sub>1</sub>(B) is the last write of B before r<sub>2</sub>(B)), and c<sub>1</sub> comes before c<sub>2</sub>.</p>
+<p><strong>Not conflict-serializable:</strong> w<sub>2</sub>(A) comes before w<sub>1</sub>(A), giving T<sub>2</sub> → T<sub>1</sub>. w<sub>1</sub>(B) comes before r<sub>2</sub>(B), giving T<sub>1</sub> → T<sub>2</sub>. The precedence graph has the cycle T<sub>1</sub> → T<sub>2</sub> → T<sub>1</sub>. In words: T<sub>2</sub> must come first because of A, and T<sub>1</sub> must come first because of B.</p>
+</div>
+
+<div class="q">
+<h4>Example 3 (Why?): S<sub>3</sub>: w<sub>1</sub>(A); w<sub>1</sub>(B); w<sub>2</sub>(A); r<sub>2</sub>(B); c<sub>2</sub>; c<sub>1</sub> is conflict-serializable but not recoverable</h4>
+<p><strong>Conflict-serializable:</strong> the actions are in the same order as S<sub>1</sub>, so the graph is again just T<sub>1</sub> → T<sub>2</sub>.</p>
+<p><strong>Not recoverable:</strong> T<sub>2</sub> reads B from T<sub>1</sub> but commits first. The textbook's crash scenario: T<sub>2</sub>'s commit record reaches disk, then the system crashes before T<sub>1</sub>'s commit record does. Whatever logging method is used (undo, redo or undo/redo), T<sub>2</sub> is committed after recovery and T<sub>1</sub> is not. T<sub>2</sub>'s effects are permanent, yet they were computed from a value of B that recovery has just erased.</p>
+</div>
+
+<h2>4. Schedules that avoid cascading rollback (slides 8–9)</h2>
+
+<p>Slide 8 says "recoverable schedules require cascading rollback". The textbook's wording is more precise: they <em>sometimes</em> require it. Take S<sub>1</sub> again. If T<sub>1</sub> has to roll back right after the first four steps, then T<sub>2</sub>, which read B from T<sub>1</sub>, must be rolled back too. That is possible, because T<sub>2</sub> has not committed yet. Recoverability guarantees the cascade <em>can</em> be done; it does not prevent the cascade from being needed.</p>
+
+<dl class="def">
+  <dt>ACR schedule (avoids cascading rollback, also called cascadeless)</dt><dd>A schedule in which transactions may read only values written by committed transactions. Equivalently, it has no dirty reads: if T<sub>j</sub> reads from T<sub>i</sub>, then c<sub>i</sub> comes before that read.</dd>
+</dl>
+<p>As before, "committed" means the commit log record is on disk. If nobody ever reads uncommitted data, an abort never affects anyone else, so no cascade is ever needed.</p>
+
+<div class="q">
+<h4>Slide 9: which of S<sub>1</sub>, S<sub>2</sub>, S<sub>3</sub> are ACR? Answer: none. Why?</h4>
+<p>In all three, r<sub>2</sub>(B) reads the value written by w<sub>1</sub>(B), and in all three this read happens before c<sub>1</sub>. Every one of them contains the dirty read r<sub>2</sub>(B).</p>
+</div>
+
+<div class="q">
+<h4>Slide 9: is S<sub>4</sub>: w<sub>1</sub>(A); w<sub>1</sub>(B); w<sub>2</sub>(A); c<sub>1</sub>; r<sub>2</sub>(B); c<sub>2</sub> ACR? Yes. Why?</h4>
+<p>The only read is r<sub>2</sub>(B), and it now comes after c<sub>1</sub>. T<sub>1</sub>, the last writer of B, has committed (and its commit record is on disk), so T<sub>2</sub> reads committed data. There is no dirty read. S<sub>4</sub> is also recoverable, since c<sub>1</sub> precedes c<sub>2</sub>.</p>
+<p>Notice that w<sub>2</sub>(A) still overwrites A while T<sub>1</sub> is uncommitted. ACR only restricts <em>reads</em>, so that is allowed. Chapter 3 shows that the stricter class of "strict" schedules forbids it too.</p>
+</div>
+
+<h3>Every ACR schedule is recoverable</h3>
+<p>Suppose a schedule is ACR and T<sub>j</sub> reads from T<sub>i</sub>. By ACR, c<sub>i</sub> comes before that read. T<sub>j</sub> can only commit after its own read, so c<sub>i</sub> comes before c<sub>j</sub>. That is the recoverability condition. The converse fails: S<sub>1</sub> is recoverable but not ACR.</p>
+
+<figure>
+<svg viewBox="0 0 520 190" width="520" role="img" aria-label="ACR inside recoverable">
+  <ellipse cx="260" cy="95" rx="245" ry="85" class="cell-plain"/>
+  <ellipse cx="300" cy="105" rx="150" ry="55" class="cell"/>
+  <text x="60" y="70" class="big">Recoverable</text>
+  <text x="70" y="90" class="lbl">S1, S2: commit order right,</text>
+  <text x="70" y="104" class="lbl">but dirty reads</text>
+  <text x="300" y="100" text-anchor="middle" class="big">ACR</text>
+  <text x="300" y="120" text-anchor="middle" class="lbl">S4: reads only committed data</text>
+</svg>
+<figcaption><b>Figure 1.</b> ACR schedules are a subset of recoverable schedules. S<sub>3</sub> lies outside both.</figcaption>
+</figure>
+
+<h2>5. How to test a schedule (exam procedure)</h2>
+<ol>
+  <li><strong>List the reads-from pairs.</strong> For each read r<sub>j</sub>(X), find the last earlier write of X by another transaction T<sub>i</sub> (ignoring transactions that aborted before the read).</li>
+  <li><strong>Recoverable?</strong> For each pair, if T<sub>j</sub> commits, check c<sub>i</sub> &lt; c<sub>j</sub>. One violation makes the schedule not recoverable.</li>
+  <li><strong>ACR?</strong> For each pair, check c<sub>i</sub> &lt; r<sub>j</sub>(X). One dirty read makes it not ACR.</li>
+  <li><strong>Strict?</strong> (Chapter 3) Also check that no write w<sub>j</sub>(X) happens while the last writer of X is uncommitted.</li>
+</ol>
+
+<h2>6. Interactive tool: classify any schedule</h2>
+<p>Type a schedule with <code>r1(A)</code>, <code>w2(B)</code>, <code>c1</code> (commit) and <code>a1</code> (abort), separated by semicolons, commas or spaces. The tool marks every dirty read, decides recoverable / ACR / strict / conflict-serializable with reasons, and steps through the schedule. Below it, pick a transaction and watch the cascading rollback its abort would cause. If that transaction committed, the tool assumes it aborts at the moment it would have committed. Try S<sub>1</sub> to S<sub>4</sub>, or the exam schedules below.</p>
+
+<figure class="wide">
+<span class="anim-tag">Interactive tool</span>
+<div id="tool"></div>
+</figure>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+
+<h3>Exam questions</h3>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 24-25 3a · 9 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-1 | 2024–25 · 12 marks</div>
+  <div class="exam-q"><p>Determine whether each of the following schedules is recoverable or ACR (avoids cascading rollback). Assume that c<sub>i</sub> represents the commit action of transaction T<sub>i</sub>.</p>
+  <p>(i) S<sub>1</sub>: r<sub>1</sub>(A); w<sub>1</sub>(A); r<sub>2</sub>(A); w<sub>2</sub>(A); c<sub>2</sub>; r<sub>1</sub>(B); w<sub>1</sub>(B); c<sub>1</sub><br>
+  (ii) S<sub>2</sub>: r<sub>1</sub>(A); w<sub>1</sub>(A); r<sub>2</sub>(B); w<sub>2</sub>(B); c<sub>2</sub>; r<sub>1</sub>(B); w<sub>1</sub>(B); c<sub>1</sub><br>
+  (iii) S<sub>3</sub>: r<sub>1</sub>(A); w<sub>1</sub>(A); r<sub>2</sub>(B); w<sub>2</sub>(B); r<sub>1</sub>(B); c<sub>2</sub>; w<sub>1</sub>(B); c<sub>1</sub></p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+  <div class="tbl"><table>
+    <tr><th>Schedule</th><th>Reads-from</th><th>Recoverable?</th><th>ACR?</th></tr>
+    <tr><td>S<sub>1</sub></td><td>r<sub>2</sub>(A) reads from T<sub>1</sub> (w<sub>1</sub>(A) at step 2)</td><td class="bad">No: T<sub>2</sub> commits (step 5) before T<sub>1</sub> (step 8)</td><td class="bad">No: r<sub>2</sub>(A) at step 3 is before c<sub>1</sub></td></tr>
+    <tr><td>S<sub>2</sub></td><td>r<sub>1</sub>(B) reads from T<sub>2</sub> (w<sub>2</sub>(B) at step 4)</td><td class="good">Yes: c<sub>2</sub> (step 5) before c<sub>1</sub> (step 8)</td><td class="good">Yes: r<sub>1</sub>(B) at step 6 is after c<sub>2</sub></td></tr>
+    <tr><td>S<sub>3</sub></td><td>r<sub>1</sub>(B) reads from T<sub>2</sub> (w<sub>2</sub>(B) at step 4)</td><td class="good">Yes: c<sub>2</sub> (step 6) before c<sub>1</sub> (step 8)</td><td class="bad">No: r<sub>1</sub>(B) at step 5 is before c<sub>2</sub> at step 6</td></tr>
+  </table></div>
+  <p><strong>S<sub>1</sub>:</strong> T<sub>2</sub> reads A from T<sub>1</sub> and commits first. If T<sub>1</sub> later aborted, T<sub>2</sub> (already committed) could not be rolled back, so S<sub>1</sub> is not recoverable. A non-recoverable schedule is never ACR (every ACR schedule is recoverable), and indeed r<sub>2</sub>(A) is a dirty read.</p>
+  <p><strong>S<sub>2</sub>:</strong> T<sub>1</sub> reads B only after T<sub>2</sub> has committed, so it reads committed data: ACR, and therefore recoverable. (T<sub>2</sub>'s read r<sub>2</sub>(B) reads the original B, and nobody reads A from T<sub>1</sub>.)</p>
+  <p><strong>S<sub>3</sub>:</strong> T<sub>1</sub> reads B while T<sub>2</sub> is still uncommitted (dirty read), so it is not ACR: if T<sub>2</sub> aborted between steps 5 and 6, T<sub>1</sub> would have to be rolled back too. But T<sub>2</sub> commits before T<sub>1</sub> does, so the cascade would always be possible: recoverable.</p>
+  <p>The question bank's answer gives the same results and is correct. You can paste each schedule into the tool above to see the dirty reads highlighted.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 23-24 8c · 10 marks</div>
+  <div class="exam-q"><p>Consider the given schedule where c<sub>i</sub> represents a commit action for transaction T<sub>i</sub>:</p>
+  <p>w<sub>1</sub>(A), r<sub>2</sub>(A), w<sub>2</sub>(A), w<sub>2</sub>(B), r<sub>3</sub>(B), w<sub>3</sub>(C), c<sub>3</sub>, c<sub>2</sub>, c<sub>1</sub></p>
+  <p>(i) Does the given schedule preserve database consistency in case of system failure? Justify your answer.<br>
+  (ii) Rearrange the commit statements in the given schedule so that it preserves database consistency in case of system failure.<br>
+  (iii) Rearrange the commit statements in the given schedule so that it avoids cascading rollback.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+  <p><strong>Reads-from pairs.</strong> r<sub>2</sub>(A) (step 2) reads A written by w<sub>1</sub>(A): T<sub>2</sub> reads from T<sub>1</sub>. r<sub>3</sub>(B) (step 5) reads B written by w<sub>2</sub>(B): T<sub>3</sub> reads from T<sub>2</sub>. So T<sub>3</sub> depends on T<sub>2</sub>, which depends on T<sub>1</sub>.</p>
+  <p><strong>(i) No.</strong> "Preserving consistency in case of failure" means the schedule is recoverable, and it is not: T<sub>3</sub> commits (step 7) before T<sub>2</sub> (step 8), and T<sub>2</sub> commits before T<sub>1</sub> (step 9). Concretely, suppose the system crashes after c<sub>3</sub>'s commit record reaches disk but before c<sub>2</sub>'s and c<sub>1</sub>'s do. Recovery keeps T<sub>3</sub> (committed) and undoes T<sub>1</sub> and T<sub>2</sub>. Then C holds a value that T<sub>3</sub> computed from B written by T<sub>2</sub>, which itself came from A written by T<sub>1</sub>, and both of those writes have been erased. The database is inconsistent, and T<sub>3</sub> cannot be rolled back because it committed.</p>
+  <p><strong>(ii) Recoverable version:</strong> each transaction must commit after the one it read from, so the order must be c<sub>1</sub>, c<sub>2</sub>, c<sub>3</sub>:</p>
+  <p class="formula">w<sub>1</sub>(A), r<sub>2</sub>(A), w<sub>2</sub>(A), w<sub>2</sub>(B), r<sub>3</sub>(B), w<sub>3</sub>(C), c<sub>1</sub>, c<sub>2</sub>, c<sub>3</sub></p>
+  <p>It is still not ACR (r<sub>2</sub>(A) and r<sub>3</sub>(B) are dirty reads), so a crash or abort may cause a cascading rollback, but the cascade is always possible.</p>
+  <p><strong>(iii) ACR version:</strong> each read must come after the commit of the transaction it reads from. c<sub>1</sub> must move before r<sub>2</sub>(A), and c<sub>2</sub> must move before r<sub>3</sub>(B) (and after T<sub>2</sub>'s last action w<sub>2</sub>(B)):</p>
+  <p class="formula">w<sub>1</sub>(A), c<sub>1</sub>, r<sub>2</sub>(A), w<sub>2</sub>(A), w<sub>2</sub>(B), c<sub>2</sub>, r<sub>3</sub>(B), w<sub>3</sub>(C), c<sub>3</sub></p>
+  <p>Every read now sees committed data. This schedule is also recoverable, and in fact serial. (Checked with the tool: the original is not recoverable, (ii) is recoverable but not ACR, (iii) is ACR.)</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 22-23 4b · 11 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-1 | 2022–23 · 11 marks</div>
+  <div class="exam-q"><p>Consider the following two transactions T<sub>1</sub> and T<sub>2</sub>:</p>
+  <p>T<sub>1</sub>: r<sub>1</sub>(A); w<sub>1</sub>(A); c<sub>1</sub>;<br>T<sub>2</sub>: r<sub>2</sub>(A); c<sub>2</sub>;</p>
+  <p>(i) Construct a concurrent schedule of T<sub>1</sub> and T<sub>2</sub> that is recoverable but not ACR (avoids cascading rollback).<br>
+  (ii) Construct a concurrent schedule of T<sub>1</sub> and T<sub>2</sub> that is serializable but not recoverable.<br>
+  (iii) Construct a schedule of T<sub>1</sub> and T<sub>2</sub> that is ACR (avoids cascading rollback).</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+  <p>The only way to create a dependency is for r<sub>2</sub>(A) to come after w<sub>1</sub>(A), so that T<sub>2</sub> reads from T<sub>1</sub>. Then the position of r<sub>2</sub>(A) relative to c<sub>1</sub>, and the order of the commits, decide everything.</p>
+  <p><strong>(i)</strong> r<sub>1</sub>(A); w<sub>1</sub>(A); r<sub>2</sub>(A); c<sub>1</sub>; c<sub>2</sub>. T<sub>2</sub> reads A from the uncommitted T<sub>1</sub> (dirty read, so not ACR: if T<sub>1</sub> aborted before c<sub>1</sub>, T<sub>2</sub> would cascade). T<sub>2</sub> commits after T<sub>1</sub>, so it is recoverable.</p>
+  <p><strong>(ii)</strong> r<sub>1</sub>(A); w<sub>1</sub>(A); r<sub>2</sub>(A); c<sub>2</sub>; c<sub>1</sub>. T<sub>2</sub> never writes, so the only conflicting pair is w<sub>1</sub>(A) before r<sub>2</sub>(A), giving the single edge T<sub>1</sub> → T<sub>2</sub>: no cycle, so it is conflict-serializable (equivalent to T<sub>1</sub>, T<sub>2</sub>). T<sub>2</sub> read from T<sub>1</sub> but commits first, so it is not recoverable.</p>
+  <p><strong>(iii)</strong> r<sub>1</sub>(A); w<sub>1</sub>(A); c<sub>1</sub>; r<sub>2</sub>(A); c<sub>2</sub> (T<sub>2</sub> reads only after T<sub>1</sub> committed). A concurrent alternative is r<sub>2</sub>(A); r<sub>1</sub>(A); w<sub>1</sub>(A); c<sub>1</sub>; c<sub>2</sub>, where T<sub>2</sub> reads the original committed A before T<sub>1</sub> writes it, so there is no dirty read at all.</p>
+  <p>All five schedules were checked with the tool. The question bank's answer matches.</p>
+  </div></details>
+</div>
+
+<div class="key"><p><strong>Summary:</strong> T<sub>j</sub> reads from T<sub>i</sub> when it reads a value T<sub>i</sub> wrote. A schedule is <b>recoverable</b> if every transaction commits after all transactions it read from (so a cascading rollback is always possible), assuming commit records reach disk in order. It is <b>ACR</b> if transactions read only committed values (so no cascade is ever needed). ACR ⊂ recoverable, and both are independent of serializability: slide 7's S<sub>1</sub>, S<sub>2</sub>, S<sub>3</sub> show all combinations.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="lecture.js"></script>
+<script>
+scheduleTool('#tool', 'w1(A); w1(B); w2(A); r2(B); c2; c1', { victim: 1 });
+flashcards('#cards', [
+  { f: 'Reads from', b: 'T<sub>j</sub> reads from T<sub>i</sub> if T<sub>j</sub> reads X and the last earlier write of X was by T<sub>i</sub> (not aborted).' },
+  { f: 'Recoverable schedule', b: 'Each transaction commits only after every transaction it read from has committed.' },
+  { f: 'ACR schedule', b: 'Transactions read only values written by committed transactions. No dirty reads, so no cascading rollback.' },
+  { f: 'ACR vs recoverable', b: 'Every ACR schedule is recoverable; the converse is false (S<sub>1</sub> is recoverable but not ACR).' },
+  { f: 'Commit-record order assumption', b: 'Commit log records reach disk in the order they were written. Needed for recoverable schedules to really be recoverable.' },
+  { f: 'Orthogonal', b: 'Recoverability and serializability are independent: S<sub>2</sub> is recoverable but not serializable, S<sub>3</sub> is serializable but not recoverable.' },
+]);
+quiz('#quiz', [
+  { q: 'w<sub>1</sub>(A); r<sub>2</sub>(A); c<sub>2</sub>; c<sub>1</sub> is…', opts: ['recoverable and ACR', 'recoverable, not ACR', 'not recoverable', 'ACR, not recoverable'], a: 2, why: 'T<sub>2</sub> reads A from T<sub>1</sub> and commits first.' },
+  { q: 'w<sub>1</sub>(A); r<sub>2</sub>(A); c<sub>1</sub>; c<sub>2</sub> is…', opts: ['recoverable and ACR', 'recoverable, not ACR', 'not recoverable', 'neither'], a: 1, why: 'Commit order is right (c<sub>1</sub> before c<sub>2</sub>) but r<sub>2</sub>(A) is a dirty read.' },
+  { q: 'w<sub>1</sub>(A); c<sub>1</sub>; r<sub>2</sub>(A); c<sub>2</sub> is…', opts: ['recoverable and ACR', 'recoverable, not ACR', 'not recoverable', 'ACR, not recoverable'], a: 0, why: 'T<sub>2</sub> reads committed data. ACR implies recoverable.' },
+  { q: 'Can a schedule be ACR but not recoverable?', opts: ['Yes, if it is not serializable', 'Yes, if a transaction aborts', 'No: reading after c<sub>i</sub> forces c<sub>i</sub> before c<sub>j</sub>', 'Only with more than two transactions'], a: 2, why: 'T<sub>j</sub> commits after its read, which is after c<sub>i</sub>.' },
+  { q: 'r<sub>1</sub>(A); w<sub>2</sub>(A); c<sub>2</sub>; c<sub>1</sub>: does T<sub>1</sub> read from T<sub>2</sub>?', opts: ['Yes', 'No, T<sub>1</sub> read A before T<sub>2</sub> wrote it', 'Only if T<sub>2</sub> aborts', 'It depends on the timestamps'], a: 1, why: 'Reads-from looks at the last write <em>before</em> the read. Here there is none, so T<sub>1</sub> read the original value; the schedule is recoverable and ACR.' },
+  { q: 'Slide 8 says recoverable schedules "require" cascading rollback. Most precisely, they…', opts: ['always cause a cascade', 'may need a cascade, and the cascade is always possible', 'never need a cascade', 'cannot be rolled back'], a: 1, why: 'Textbook: recoverable schedules <em>sometimes</em> require cascading rollback. Recoverability guarantees no committed transaction has to be undone.' },
+]);
+ask('#try1', { q: 'In w<sub>1</sub>(A); w<sub>2</sub>(B); r<sub>3</sub>(A); r<sub>3</sub>(B); c<sub>3</sub>; c<sub>1</sub>; c<sub>2</sub>, how many reads-from pairs violate recoverability?', a: 2, why: 'T<sub>3</sub> reads A from T<sub>1</sub> and B from T<sub>2</sub>, and commits before both of them.', hint: 'List the pairs, then compare each writer\'s commit with c<sub>3</sub>.' });
+</script>
+</body>
+</html>

@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Why B+ Trees · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 15 · Chapter 7 · Slides 24–25</div>
+<h1>Why B+ Trees</h1>
+<p class="lede">The indices in Chapters 2–6 work well on a file that does not change. On a file that keeps growing, they slowly fall apart. This chapter shows how (with an animation of overflow blocks piling up), and what a B+ tree does differently.</p>
+
+<h2>1. Indexed-sequential files and their weakness (slide 24)</h2>
+
+<p>An <b class="term">indexed-sequential file</b> is what Chapters 2–5 built: a data file kept sorted on a key, plus a (possibly multilevel) index on that key. Lookups are fast as long as the file stays in sorted order, block after block.</p>
+
+<p>The slide names the disadvantage: <em>performance degrades as the file grows, since many overflow blocks get created.</em> And: <em>periodic reorganization of the entire file is required.</em></p>
+
+<h3>How do overflow blocks get created?</h3>
+<p>Records must stay in key order. When a new record belongs inside a block that is already full, there are two options. Splitting the block and shifting all later blocks along would mean rewriting much of the file. So instead, the system attaches an <b class="term">overflow block</b> to the full block: an extra block, stored wherever there is free space on disk, linked from the full block by a pointer. The new record goes there. Watch what happens as more records arrive in the same key range:</p>
+
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="ovf"></div>
+</figure>
+
+<p>Three things went wrong, and they get worse the more the file grows:</p>
+<ol>
+  <li><strong>Lookups get slower.</strong> The index only knows about the main blocks. To find a key in the overflow range, the system reads the main block and then follows the chain, one block read per overflow block, each one possibly a random seek.</li>
+  <li><strong>Sequential scans get slower.</strong> The file is no longer physically in order. Reading it “in order” means jumping out to overflow blocks and back.</li>
+  <li><strong>The only cure is a full reorganization:</strong> rewrite the entire file in order without overflow blocks, and rebuild the index. On a big table that takes a long time, and the table may be unavailable meanwhile.</li>
+</ol>
+
+<h2>2. The B+ tree answer (slide 25)</h2>
+
+<p>A <b class="term">B+ tree</b> is a multilevel index (Chapter 4) designed so that it never needs a full reorganization. Its advantages, from the slide:</p>
+<ul>
+  <li><strong>It automatically reorganizes itself with small, local changes</strong> when records are inserted and deleted. When a node is full, it splits into two half-full nodes and adds one entry to its parent. When a node becomes too empty, it borrows from or merges with a neighbour. Only a few nodes on one root-to-leaf path change.</li>
+  <li><strong>Reorganization of the entire file is not required</strong> to maintain performance. There are no overflow chains, so lookup cost stays the same however many inserts happen.</li>
+</ul>
+<p>And its (minor) disadvantages:</p>
+<ul>
+  <li><strong>Extra insertion and deletion overhead:</strong> occasionally an insert or delete has to split or merge nodes, which costs a few extra block writes.</li>
+  <li><strong>Space overhead:</strong> nodes are kept between half full and full, so up to half of each node can be empty space.</li>
+</ul>
+<p>The slide's conclusion: <em>the advantages of B+ trees outweigh the disadvantages, and B+ trees are used extensively.</em> In practice, almost every relational database (PostgreSQL, MySQL, Oracle, SQL Server, SQLite) uses a B+ tree as its default index.</p>
+
+<div class="tbl"><table>
+<tr><th></th><th>Indexed-sequential file</th><th>B+ tree</th></tr>
+<tr><td>Inserting into a full block</td><td class="bad">Overflow block chained on</td><td class="good">Split the node, update the parent</td></tr>
+<tr><td>Lookup cost as the file grows</td><td class="bad">Rises (overflow chains)</td><td class="good">Stays at the tree height</td></tr>
+<tr><td>Maintenance</td><td class="bad">Periodic full reorganization</td><td class="good">Small, local changes on every update</td></tr>
+<tr><td>Cost</td><td class="good">No extra work per update</td><td class="mid">Some splits/merges, nodes up to half empty</td></tr>
+</table></div>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+
+<div class="key">
+<p><strong>Summary:</strong> indexed-sequential files degrade as they grow, because inserts into full blocks create overflow chains that slow lookups and scans, until the whole file is reorganized. A B+ tree keeps itself balanced with small local splits and merges, so it never needs reorganizing. It costs a little extra on updates and some empty space, which is well worth it.</p>
+</div>
+</main>
+<script src="../assets/book.js"></script>
+<script>
+// main blocks (vertical) with overflow chains (horizontal) off block 1; 3 slots per block
+function ovfSVG(main, chains, o = {}) {
+  const cw = 54, bh = 26, bw = 3 * cw, gapY = 18, x0 = 110, ox = x0 + bw + 70;
+  let s = `<text x="10" y="16" class="lbl">index</text><text x="${x0}" y="16" class="lbl">main data blocks (sorted)</text><text x="${ox}" y="16" class="lbl">overflow blocks (elsewhere on disk)</text>`;
+  const blockSVG = (x, y, keys, hl) => [0, 1, 2].map(j => {
+    const k = keys[j], cls = !k ? 'cell-plain' : hl.includes(k) ? 'cell-new' : (o.read || []).includes(k) ? 'cell-hl' : 'cell';
+    return `<rect class="${cls}" x="${x + j * cw}" y="${y}" width="${cw}" height="${bh}"/>${k ? `<text x="${x + j * cw + 8}" y="${y + 17}" style="font-size:12px">${k}</text>` : ''}`;
+  }).join('');
+  main.forEach((b, i) => {
+    const y = 28 + i * (bh + gapY);
+    s += `<rect class="${(o.readMain || []).includes(i) ? 'cell-hl' : 'cell-plain'}" x="10" y="${y}" width="56" height="${bh}"/><text x="16" y="${y + 17}" style="font-size:12px">${b[0]}</text>`;
+    s += `<path d="M66 ${y + bh / 2} H${x0 - 2}" class="s-fg" marker-end="url(#m-fg)"/>`;
+    s += blockSVG(x0, y, b, o.hl || []);
+    (chains[i] || []).forEach((c, k) => {
+      const x = ox + k * (bw + 40), from = k === 0 ? x0 + bw : ox + (k - 1) * (bw + 40) + bw;
+      s += `<path d="M${from} ${y + bh / 2} H${x - 2}" class="s-red" marker-end="url(#m-red)"/>`;
+      s += blockSVG(x, y, c, o.hl || []);
+    });
+  });
+  const W = ox + 3 * (bw + 40) + 10, H = 28 + main.length * (bh + gapY);
+  return `<svg viewBox="0 0 ${W} ${H}" width="${W}" role="img" aria-label="blocks with overflow chains">${s}</svg>`;
+}
+const M = [['10101', '12121', '15151'], ['22222', '32343', '33456'], ['45565', '58583', '76543'], ['76766', '83821', '98345']];
+stepper('#ovf', [
+  { html: ovfSVG(M, {}), cap: 'A sorted file with a sparse index, 3 records per block. Every block is full. Lookup for any key: 1 block read.' },
+  { html: ovfSVG(M, { 1: [['32400']] }, { hl: ['32400'] }), cap: 'Insert <b>32400</b>. It belongs in block 1 (between 32343 and 33456), but block 1 is full. An <b>overflow block</b> is allocated and chained to block 1.' },
+  { html: ovfSVG(M, { 1: [['32400', '32500', '32600']] }, { hl: ['32500', '32600'] }), cap: 'Insert <b>32500</b> and <b>32600</b>. They also belong in block 1, so they go into the overflow block, which is now full too.' },
+  { html: ovfSVG(M, { 1: [['32400', '32500', '32600'], ['32700', '32800']] }, { hl: ['32700', '32800'] }), cap: 'Insert <b>32700</b> and <b>32800</b>. A second overflow block is chained on. The chain keeps growing as inserts arrive.' },
+  { html: ovfSVG(M, { 1: [['32400', '32500', '32600'], ['32700', '32800']] }, { readMain: [1], read: ['22222', '32343', '33456', '32400', '32500', '32600', '32700', '32800'] }),
+    cap: 'Look up <b>32800</b>: the index leads to block 1 (read 1), not there, follow the chain to overflow 1 (read 2), then overflow 2 (read 3). <b>3 block reads instead of 1</b>, and each overflow block may need a seek.' },
+  { html: ovfSVG([['10101', '12121', '15151'], ['22222', '32343', '32400'], ['32500', '32600', '32700'], ['32800', '33456', ''], ['45565', '58583', '76543'], ['76766', '83821', '98345']], {}),
+    cap: '<b>Reorganization</b>: the whole file is rewritten in order with no overflow blocks, and the index is rebuilt. Lookups are 1 read again, but on a large table this takes a long time, and must be repeated as overflow builds up again.' },
+], { interval: 2300 });
+flashcards('#cards', [
+  { f: 'Indexed-sequential file', b: 'A file kept sorted on a key, with a (possibly multilevel) index on that key.' },
+  { f: 'Overflow block', b: 'An extra block chained to a full block to hold records that belong in it. Breaks physical order.' },
+  { f: 'Why indexed-sequential files degrade', b: 'Inserts into full blocks build overflow chains: more block reads per lookup and scattered scans.' },
+  { f: 'Reorganization', b: 'Rewriting the whole file in order and rebuilding the index; slow and must be repeated.' },
+  { f: 'B+ tree advantage', b: 'Reorganizes itself with small local splits and merges; never needs a full reorganization.' },
+  { f: 'B+ tree costs', b: 'Some extra work on inserts/deletes (splits, merges) and space overhead (nodes may be half empty).' },
+]);
+quiz('#quiz', [
+  { q: 'A key sits in the second overflow block chained to its main block. How many block reads does a lookup need (index in memory)?', opts: ['1', '2', '3', '4'], a: 2, why: 'Main block, overflow 1, overflow 2.' },
+  { q: 'What does a B+ tree do when a node is full and a key must be inserted?', opts: ['Adds an overflow block', 'Splits the node and adds one entry to the parent', 'Rebuilds the tree', 'Rejects the insert'], a: 1, why: 'A local split keeps all leaves at the same depth.' },
+  { q: 'Which is a disadvantage of B+ trees according to slide 25?', opts: ['Periodic reorganization', 'Overflow chains', 'Space overhead and extra insert/delete work', 'Cannot answer range queries'], a: 2, why: 'Nodes may be up to half empty, and splits/merges cost extra writes.' },
+  { q: 'After reorganizing an indexed-sequential file, lookups cost 1 block again. Why is that not a lasting fix?', opts: ['The index is lost', 'New inserts build overflow chains again', 'Blocks become larger', 'It deletes records'], a: 1, why: 'The structure has no local way to make room, so chains regrow.' },
+]);
+ask('#try1', { q: 'A main block has 3 overflow blocks chained to it. Each block read costs 8 ms. How many ms does the worst-case lookup in that range cost (index in memory)?', a: 32, why: '4 block reads (main + 3 overflow) × 8 ms = 32 ms, against 8 ms without overflow.' });
+
+</script>
+</body>
+</html>

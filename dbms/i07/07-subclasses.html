@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Subclasses and isA · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 07 (Ishrak) · Chapter 7 · Slides 72–77</div>
+<h1>Subclasses, isA, and the Limits of Key Notation</h1>
+<p class="lede">Some entities are special cases of others: every software product is a product, with extra facts of its own. This chapter explains subclasses and the isA connection, the two design questions (overlapping or disjoint, total or partial), and what ER notation cannot say about keys.</p>
+
+<h2>1. Modeling subclasses (slide 72)</h2>
+<p>Some entities in an entity set may be <em>special cases</em>: they have everything the general entity has, plus more. A shop sells products; some products are software (with supported platforms), some are educational (with a target age group).</p>
+<dl class="def">
+<dt>Subclass</dt><dd>An entity set whose entities are all members of another entity set, the <b class="term">superclass</b> (or parent). A subclass <strong>inherits</strong> every attribute and relationship of its parent and may add its own attributes or relationships.</dd>
+<dt>isA</dt><dd>The connection from a subclass to its superclass. "A isA B" means every A is also a B. The slides draw it as a diamond labelled <em>isA</em> joining the parent (above) to its subclasses (below). The textbook (Garcia-Molina et al. §4.1.11) and many exam papers draw a small triangle labelled <em>isa</em> pointing at the parent; Elmasri–Navathe draw a circle with <em>d</em> (disjoint) or <em>o</em> (overlapping). All mean the same thing.</dd>
+</dl>
+<figure><span class="anim-tag">Animation</span><div id="sub"></div></figure>
+
+<h2>2. Subclass attributes (slide 73)</h2>
+<p><strong>Parent attributes apply to every subclass entity. Subclass attributes apply only to entities in that subclass.</strong> Every product has name and price; only software products have platforms; only educational products have an ageGroup. The key comes from the parent: a software product is identified by the same key as the product it is. Subclasses therefore normally have no key attribute of their own.</p>
+<p>Why not just give Product the attributes platforms and ageGroup? Because most products would have no value for them (a chair has no platform), and because a subclass can also take part in relationships that the general entity set does not, for example SoftwareProduct <em>runsOn</em> OperatingSystem. Slide 76 lists both uses.</p>
+
+<h2>3. Subclass design questions (slides 74–75)</h2>
+<p>Each hierarchy needs answers to three questions, which become constraints in the design:</p>
+<ol>
+<li><strong>Disjoint or overlapping?</strong> Can an entity belong to several subclasses at once?</li>
+<li><strong>Total or partial?</strong> Does every parent entity have to belong to some subclass?</li>
+<li><strong>Where does each attribute go?</strong> On the parent if it applies to every entity; on a subclass if it applies only there.</li>
+</ol>
+<dl class="def">
+<dt>Overlapping subclasses</dt><dd>An entity may belong to more than one subclass. Slide 75: in ER modeling <strong>subclasses may overlap unless the design says otherwise</strong>. A product may be both a software product and an educational product.</dd>
+<dt>Disjoint subclasses</dt><dd>An entity belongs to at most one subclass (an account is savings or checking, never both). Must be stated explicitly.</dd>
+<dt>Total (complete) specialization</dt><dd>Every parent entity belongs to at least one subclass. Partial: some parent entities belong to no subclass.</dd>
+</dl>
+<p>Slide 75's example: <strong>KidPix</strong>, a drawing program for children, is in Product, in SoftwareProduct and in EducationalProduct. This differs from many object-oriented class systems, where an object belongs to exactly one most-specific class, so the classes are effectively disjoint; in Java a KidPix object could not be both a <code>SoftwareProduct</code> and an <code>EducationalProduct</code> without a third class that extends both.</p>
+<figure class="wide"><span class="anim-tag">Animation</span><div id="kid"></div></figure>
+
+<h2>4. isA review (slide 76)</h2>
+<ul>
+<li>If A isA B, then every A is also a B. (The reverse need not hold.)</li>
+<li>Use isA to add descriptive attributes to a subclass.</li>
+<li>Use isA when a subclass connects to a relationship differently (e.g. only Faculty, a subclass of Employee, can advise students).</li>
+<li><strong>isA is a modeling connection, not an ordinary relationship.</strong> It has no multiplicity arrows and no attributes, and it does not pair two different entities: a KidPix entity in SoftwareProduct <em>is</em> the KidPix entity in Product, viewed with more attributes. Chapter 12 shows the three ways to turn it into tables.</li>
+</ul>
+
+<h2>5. Keys: limits of ER notation (slide 77)</h2>
+<p>ER diagrams show keys by underlining attributes, and a key may have one attribute or several. But an entity set can have several <b class="term">candidate keys</b>: a student is identified by student_id and also by email, and also by national ID. Basic ER notation underlines one key (the primary key) and has no clean way to show the others. <strong>Record extra candidate-key constraints in accompanying design notes</strong>, for example "email is also unique". In Oracle they become <code>UNIQUE</code> constraints (Lec 06):</p>
+<pre>CREATE TABLE Student (
+  student_id NUMBER(9)    PRIMARY KEY,
+  email      VARCHAR2(60) NOT NULL UNIQUE,  -- design note: 2nd candidate key
+  name       VARCHAR2(40)
+);</pre>
+<p>The same holds for any rule the diagram cannot express (Chapter 5): keep design notes beside the diagram.</p>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+
+<h3>Exam questions</h3>
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2014–15 · 9 marks</div>
+  <div class="exam-q"><p>Show an example of specialization hierarchy in the context of ERD with disjoint and overlapping subtypes.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><strong>Specialization</strong> is the top-down process of defining subclasses (subtypes) of an entity set; each subtype inherits the supertype's attributes and relationships and adds its own. Example, a university:</p>
+    <ul>
+    <li><strong>Person</strong>(<u>nid</u>, name, address) is the root.</li>
+    <li>Person → {Student(major), Employee(salary)} is <strong>overlapping</strong> and <strong>partial</strong>: a teaching assistant is both a student and an employee; an alumnus is a person who is neither.</li>
+    <li>Employee → {Faculty(rank), Staff(position)} is <strong>disjoint</strong> and <strong>total</strong>: every employee is exactly one of faculty or staff.</li>
+    </ul>
+    <figure class="wide"><div id="exSpec"></div><figcaption>In the slides' notation the constraints are written beside each isA as design notes. Elmasri–Navathe notation would put <em>o</em> or <em>d</em> in a circle instead of the isA diamond and draw a double line from the parent for a total specialization; the double line is drawn here too.</figcaption></figure>
+    <p>Reading it: nid 101 may appear in Person, Student and Employee at once (overlapping), but under Employee it is in Faculty or in Staff, not both (disjoint), and it must be in one of them (total). Faculty inherits nid, name, address from Person and salary from Employee, and adds rank.</p>
+  </div></details>
+</div>
+
+<div class="key">
+<p><strong>Summary:</strong> a subclass (A isA B) contains special cases of its parent: it inherits the parent's attributes, key and relationships and adds its own. Ask whether subclasses are disjoint or overlapping (in ER they overlap unless stated) and whether the specialization is total or partial. isA is a modeling connection, not a relationship. Extra candidate keys and other rules the diagram cannot show go in design notes and become UNIQUE constraints.</p>
+</div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="lecture.js"></script>
+<script>
+const PROD = { n: [['Product', 'E', 0, 0], ['isA', 'D', 0, 95, 'isA'], ['Software', 'E', -150, 180, 'Software\nProduct'], ['Educational', 'E', 150, 180, 'Educational\nProduct']],
+  a: [['Product', 'name', -85, -45], ['Product', 'price', 85, -45], ['Software', 'platforms', -40, 70], ['Educational', 'ageGroup', 40, 70]],
+  l: [['Product', 'isA'], ['Software', 'isA'], ['Educational', 'isA']] };
+erdSteps('#sub', PROD, [
+  { set: ['Product', 'Product.name', 'Product.price'], cap: 'Product with the attributes every product has.' },
+  { add: ['isA', 'Software', 'Educational'], cap: 'Slide 72: two subclasses joined to Product by isA. Every SoftwareProduct is a Product.' },
+  { add: ['Software.platforms', 'Educational.ageGroup'], hl: ['Software.platforms', 'Educational.ageGroup'], cap: 'Slide 73: each subclass adds attributes that apply only to its own entities. name and price are inherited.' },
+]);
+// KidPix: sets view
+(() => {
+  const venn = (hlSW, hlED, items) => {
+    let s = `<svg class="erd" viewBox="0 0 520 250" width="520"><rect x="10" y="10" width="500" height="230" rx="14" class="er-ent" style="fill:var(--plate)"/><text x="24" y="32" class="er-et">Product</text>`;
+    s += `<ellipse cx="200" cy="140" rx="135" ry="80" class="${hlSW ? 'er-hl ' : ''}er-att" style="fill:var(--cell);fill-opacity:.6"/><text x="110" y="85" class="er-rt">SoftwareProduct</text>`;
+    s += `<ellipse cx="330" cy="140" rx="135" ry="80" class="${hlED ? 'er-hl ' : ''}er-att" style="fill:var(--cell-new);fill-opacity:.6"/><text x="320" y="85" class="er-rt">EducationalProduct</text>`;
+    for (const [n, x, y, c] of items) s += `<circle cx="${x}" cy="${y}" r="4" style="fill:var(--${c || 'fg'})"/><text x="${x + 8}" y="${y + 4}" style="font-size:12px">${n}</text>`;
+    return s + '</svg>';
+  };
+  const base = [['Chair', 40, 215], ['Photoshop', 110, 150], ['Atlas book', 400, 160]];
+  stepper('#kid', [
+    { html: venn(0, 0, base), cap: 'The entity set Product as a set. Photoshop is also a software product; the atlas is an educational product; a chair is in neither (partial specialization).' },
+    { html: venn(1, 1, [...base, ['KidPix', 245, 140, 'red']]), cap: '<b>KidPix</b> is in both subclasses at once: <b>overlapping</b> subclasses (slide 75). It has a price, platforms <em>and</em> an ageGroup.' },
+    { html: venn(0, 0, [...base, ['KidPix', 245, 140, 'red']]).replace('</svg>', '<text x="260" y="232" text-anchor="middle" class="er-note red">if the design said "disjoint", KidPix could not be here</text></svg>'), cap: 'If the requirements say subclasses are <b>disjoint</b>, the overlap region must stay empty. In ER the default is overlapping, so disjointness must be stated in a design note.' },
+  ]);
+})();
+$('#exSpec').innerHTML = erd({
+  n: [['Person', 'E', 0, 0], ['isa1', 'D', 0, 90, 'isA'], ['Student', 'E', -170, 170], ['Employee', 'E', 170, 170], ['isa2', 'D', 170, 260, 'isA'], ['Faculty', 'E', 60, 345], ['Staff', 'E', 280, 345]],
+  a: [['Person', '_nid', -110, -35], ['Person', 'name', 0, -60], ['Person', 'address', 115, -35], ['Student', 'major', -40, 60], ['Employee', 'salary', 115, -20], ['Faculty', 'rank', 0, 55], ['Staff', 'position', 0, 55]],
+  l: [['Person', 'isa1'], ['Student', 'isa1'], ['Employee', 'isa1'], ['Employee', 'isa2', { total: true }], ['Faculty', 'isa2'], ['Staff', 'isa2']],
+  t: [[105, 90, 'overlapping, partial', 'acc'], [290, 262, 'disjoint, total', 'acc']],
+});
+flashcards('#cards', [
+  { f: 'A isA B', b: 'Every A is also a B; A inherits B\'s attributes, key and relationships.' },
+  { f: 'Overlapping subclasses', b: 'An entity may be in several subclasses (KidPix). The default in ER.' },
+  { f: 'Disjoint subclasses', b: 'An entity is in at most one subclass; must be stated.' },
+  { f: 'Total specialization', b: 'Every parent entity belongs to some subclass. Partial: not necessarily.' },
+  { f: 'Why use a subclass?', b: 'To add attributes that apply only to some entities, or relationships only they take part in.' },
+  { f: 'Several candidate keys', b: 'ER underlines one; record the others in design notes (UNIQUE constraints).' },
+]);
+quiz('#quiz', [
+  { q: 'In ER modeling, unless stated otherwise, subclasses are…', opts: ['disjoint', 'overlapping', 'total', 'weak'], a: 1, why: 'Slide 75.' },
+  { q: 'Which attribute belongs on SoftwareProduct rather than Product?', opts: ['price', 'name', 'platforms', 'product_id'], a: 2, why: 'Only software products have platforms (slide 73).' },
+  { q: 'What is the key of SoftwareProduct?', opts: ['platforms', 'The key of Product', 'A new software_id', 'It has none'], a: 1, why: 'A subclass entity is a parent entity; it is identified by the parent\'s key.' },
+  { q: 'Is isA an ordinary relationship?', opts: ['Yes, many-to-many', 'Yes, one-to-one', 'No, it is a modeling connection between a class and its subclass', 'Only when disjoint'], a: 2, why: 'Slide 76.' },
+  { q: '"Every employee is either salaried or hourly, never both." The specialization is…', opts: ['overlapping, partial', 'disjoint, partial', 'disjoint, total', 'overlapping, total'], a: 2, why: '"Never both" = disjoint; "every … either" = total.' },
+]);
+ask('#try1', { q: 'A Product hierarchy has subclasses Software and Educational, overlapping and partial. How many different combinations of subclasses can a product entity have? (count "neither" too)', a: 4, hint: 'Each subclass: in or out.', why: 'Neither, Software only, Educational only, both: 2 × 2 = 4. (This number matters for the object-oriented conversion in Chapter 12.)' });
+</script>
+</body>
+</html>

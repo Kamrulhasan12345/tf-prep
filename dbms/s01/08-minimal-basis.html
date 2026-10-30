@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Minimal Basis · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 01 (Sukarna) · Chapter 8 · Slides 34–36 · Book §3.2.7</div>
+<h1>Minimal Basis (Canonical Cover)</h1>
+<p class="lede">A set of FDs can be written in many equivalent ways. A minimal basis is a cleaned-up version with no redundant FD and no unnecessary attribute on any left side. The 3NF algorithm (Chapter 14) starts from one. This chapter explains the algorithm, runs the slide's example, and gives a tool that shows every check.</p>
+
+<h2>1. Basis and minimal basis (slide 34)</h2>
+<dl class="def">
+  <dt>Basis</dt><dd>Given a set S of FDs that hold on R, any set of FDs equivalent to S (Chapter 7) is a basis for S.</dd>
+  <dt>Minimal basis</dt><dd>A basis B that satisfies:
+    <br><b>Condition 1, singleton right sides:</b> every FD in B has one attribute on the right.
+    <br><b>Condition 2, no redundant FD:</b> if any FD is removed from B, the result is no longer a basis (no longer equivalent to S).
+    <br><b>Condition 3, no extraneous left-side attribute:</b> if one or more attributes are removed from the left side of any FD in B, the result is no longer a basis.</dd>
+  <dt>Canonical cover</dt><dd>Another name for a minimal basis (Korth). Korth's version also merges FDs with equal left sides, as step 2 of 3NF synthesis does.</dd>
+</dl>
+<p>No trivial FD can be in a minimal basis: a trivial FD follows from nothing, so removing it never changes the meaning, which violates condition 2.</p>
+
+<h2>2. The algorithm (slide 35)</h2>
+<pre>minimal_basis(S):
+  Step 1. T := S.
+  Step 2. Split every FD of T so its right side is one attribute.
+  Step 3. Remove redundant FDs: for an FD X → Y in T, compute X⁺ using
+          T − {X → Y}.  If X⁺ contains Y, X → Y is redundant: delete it.
+  Step 4. Remove extraneous attributes: for an FD Y → B in T with at least
+          two attributes in Y, write Y = ZA (A one attribute). Compute Z⁺
+          using T (all of it). If Z⁺ contains B, A is extraneous:
+          replace Y → B by Z → B.
+  Step 5. Repeat steps 3 and 4 until nothing changes.</pre>
+<p>Two details trip students up:</p>
+<ul>
+  <li>In step 3 the FD being tested is <em>removed</em> before computing the closure. Otherwise it would always prove itself.</li>
+  <li>In step 4 the closure uses <em>all</em> of T, including Y → B itself. We are asking whether the weaker-looking FD Z → B already follows; if it does, swapping it in changes nothing.</li>
+</ul>
+<div class="q">
+<h4>Small example of step 4</h4>
+<p>T = {A → B, AB → C}. Is A extraneous in AB → C? Z = B, B⁺ = {B}: no C, so A is needed. Is B extraneous? Z = A, A⁺ = {A, B, C} (A → B, then AB → C): contains C, so <strong>B is extraneous</strong> and AB → C becomes A → C. Minimal basis: {A → B, A → C}.</p>
+</div>
+
+<h2>3. Slide 36's example</h2>
+<p>Find a minimal basis for A → B, A → C, B → A, B → C, C → A, C → B, AB → C, AC → B, BC → A. Here each of A, B, C determines the other two.</p>
+<ul>
+  <li>All right sides are already single attributes.</li>
+  <li>First remove AB → C, AC → B and BC → A: each follows from the single-attribute FDs (e.g. A → C alone gives AB → C by left augmentation).</li>
+  <li>Then remove A → C (it follows from A → B and B → C), B → A (from B → C and C → A), and C → B (from C → A and A → B).</li>
+  <li>Result: <strong>A → B, B → C, C → A</strong>. No left side has two attributes, so step 4 has nothing to do.</li>
+</ul>
+<p><strong>The answer depends on the order</strong> in which FDs are tried, and the slide notes that “other sets are also possible”. The textbook (Example 3.11) gives two minimal bases for this same relation: {A → B, B → A, B → C, C → B} and {A → B, B → C, C → A}. Both are correct: they are equivalent to S and satisfy the three conditions. A minimal basis is minimal in the sense of “nothing can be removed”, not “fewest FDs”.</p>
+
+<figure class="wide">
+<span class="anim-tag">Interactive tool</span>
+<div id="tool"></div>
+<figcaption><b>Tool 3: minimal basis builder.</b> FDs are tried in the order you type them. This preset lists them in the slide's order of removal, so the tool reproduces the slide's answer A → B, B → C, C → A. Type them in the slide's original order (A → B first) and you get the other valid answer A → C, B → C, C → B, C → A.</figcaption>
+</figure>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+
+<h3>Exam questions</h3>
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2016–17 · 9 marks</div>
+  <div class="exam-q"><p>Given a set F of functional dependencies on R(A, B, C): A → BC, B → C, A → B, AB → C. (a) Compute the canonical cover for F. (b) Decompose R into R₁ and R₂ such that the decomposition is lossless. What are the normal forms of the decomposed relations?</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><strong>(a)</strong> Step 2, split: A → B, A → C, B → C, A → B, AB → C. The two copies of A → B are the same FD; keep one. T = {A → B, A → C, B → C, AB → C}.</p>
+    <p>Step 3, redundant FDs (each tested without itself):</p>
+    <ul>
+      <li>A → B: A⁺ under {A → C, B → C, AB → C} = {A, C}. No B: keep.</li>
+      <li>A → C: A⁺ under {A → B, B → C, AB → C} = {A, B, C}. Contains C: <strong>remove</strong>.</li>
+      <li>B → C: B⁺ under {A → B, AB → C} = {B}. Keep.</li>
+      <li>AB → C: (AB)⁺ under {A → B, B → C} = {A, B, C}. Contains C: <strong>remove</strong>.</li>
+    </ul>
+    <p>Step 4: no left side has two attributes. Another pass changes nothing. <strong>Canonical cover F_c = {A → B, B → C}.</strong></p>
+    <p><strong>(b)</strong> The key of R is A (A⁺ = ABC). B → C violates BCNF (B⁺ = {B, C}, not a superkey). Decompose on it: <strong>R₁(B, C)</strong> with B → C, and <strong>R₂(A, B)</strong> with A → B. Lossless: R₁ ∩ R₂ = {B} and B → C, so the common attribute is a key of R₁ (Chapter 12's test). Dependencies are preserved too: A → B lives in R₂ and B → C in R₁. Normal forms: each is a two-attribute relation whose only FD has a key on the left, so both are in <strong>BCNF</strong> (hence also 3NF, 2NF and 1NF). The original R was only in 2NF (B → C is a transitive dependency).</p>
+  </div></details>
+</div>
+
+<div class="key"><p><strong>Summary:</strong> a minimal basis is an equivalent FD set with single right sides, no redundant FD and no extraneous left-side attribute. Build it by splitting, then repeatedly deleting any FD X → A that follows from the others (X⁺ without it still has A) and shrinking any left side when the smaller left side still determines the right side (closure using all FDs). Different orders can give different, equally valid, minimal bases.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="lecture.js"></script>
+<script>
+FD.basisTool('#tool', { attrs: 'A B C', fds: 'AB -> C; AC -> B; BC -> A; A -> C; B -> A; C -> B; A -> B; B -> C; C -> A' });
+flashcards('#cards', [
+  { f: 'Basis for S', b: 'Any FD set equivalent to S.' },
+  { f: 'Minimal basis: 3 conditions', b: 'Singleton right sides; no redundant FD; no extraneous left-side attribute.' },
+  { f: 'Redundant FD test', b: 'Remove X → A, compute X⁺ with the rest; redundant if A ∈ X⁺.' },
+  { f: 'Extraneous attribute test', b: 'For Y → B with Y = ZA: compute Z⁺ with all FDs; A is extraneous if B ∈ Z⁺.' },
+  { f: 'Canonical cover', b: 'Korth\'s name for a minimal basis (left sides merged).' },
+  { f: 'Is the minimal basis unique?', b: 'No; it depends on the order of checks.' },
+]);
+quiz('#quiz', [
+  { q: 'Can a trivial FD be in a minimal basis?', opts: ['Yes', 'No'], a: 1, why: 'It is always redundant (condition 2).' },
+  { q: 'T = {A → B, B → C, A → C}. Which FD is redundant?', opts: ['A → B', 'B → C', 'A → C', 'none'], a: 2, why: 'A⁺ without A → C is ABC.' },
+  { q: 'T = {A → C, AB → C}. In AB → C, which attribute is extraneous?', opts: ['A', 'B', 'neither'], a: 1, why: 'A⁺ = AC contains C. (Afterwards AB → C has become A → C, a duplicate, so it is removed.)' },
+  { q: 'When testing whether X → A is redundant, X⁺ is computed with…', opts: ['all of T', 'T without X → A', 'only X → A', 'the original S'], a: 1, why: 'Otherwise the FD would always prove itself.' },
+]);
+ask('#try1', { q: 'Minimal basis of {AB → C, A → B, B → A}? Give the FD that replaces AB → C.', a: ['A->C', 'A→C', 'B->C', 'B→C'], hint: 'Both A⁺ and B⁺ contain C once A → B and B → A are there.', show: 'A → C (or B → C, depending on which attribute you try to remove first)', why: 'Removing B: A⁺ = {A, B, C} ∋ C, so AB → C becomes A → C. Minimal basis {A → C, A → B, B → A}.' });
+</script>
+</body>
+</html>

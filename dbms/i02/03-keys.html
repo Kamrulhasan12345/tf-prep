@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Keys: Identifying and Connecting Rows · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<style>
+.kt label { display: inline-flex; gap: 5px; align-items: center; margin: 0 12px 6px 0; font: 14px var(--mono); cursor: pointer; }
+.kt .out { margin-top: 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); font-size: .95rem; }
+</style>
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 02 (Ishrak) · Chapter 3 · Slides 5–7 · Book §2.2.7, §2.3.6</div>
+<h1>Keys: Identifying and Connecting Rows</h1>
+<p class="lede">Slide 2 says “tables are connected using keys”, and slide 5 says “sid uniquely identifies each student”. This chapter makes those two sentences precise: super keys, candidate keys, primary keys and foreign keys, with a tool to test attribute sets yourself, and the exam questions on key definitions and on whether a primary key should carry meaning.</p>
+
+<h2>1. Identifying a row</h2>
+
+<p>Every row of Students describes a different student, so we need some attribute (or combination) whose value is different for every row that could ever be stored. Name will not do: two students can both be called Karim. sid will: the university never gives two students the same ID. That is exactly what slide 5's notes say.</p>
+
+<dl class="def">
+<dt>Super key</dt><dd>A set of attributes whose values are guaranteed to be different for every two tuples the relation may ever contain. Knowing the values of a super key identifies at most one tuple. {sid}, {sid, name} and {sid, name, email} are super keys of Students.</dd>
+<dt>Candidate key (key)</dt><dd>A <em>minimal</em> super key: a super key from which no attribute can be removed without losing uniqueness. {sid} is a candidate key; {sid, name} is not, because {sid} alone already works. If emails are unique, {email} is a second candidate key.</dd>
+<dt>Primary key</dt><dd>The one candidate key the designer chooses as the main identifier of the table. Its attributes may not be NULL (<b class="term">entity integrity</b>). Students' primary key is sid. In the textbook's notation it is underlined: Students(<u>sid</u>, name, email).</dd>
+<dt>Alternate key</dt><dd>A candidate key that was not chosen as primary key, such as email. Declared with <code>UNIQUE</code> in SQL.</dd>
+<dt>Composite key</dt><dd>A key made of more than one attribute. Enrolled's key is {sid, cid, term}.</dd>
+<dt>Foreign key</dt><dd>A set of attributes in one table whose values must appear as the primary key (or a unique key) of another table. Enrolled.sid is a foreign key referencing Students.sid (slide 6). This rule is <b class="term">referential integrity</b>.</dd>
+</dl>
+
+<p>The relationships between these terms: every candidate key is a super key; the primary key is one of the candidate keys; adding any attribute to a super key gives another super key.</p>
+
+<figure>
+<svg id="sets" role="img" aria-label="Nested sets of keys"></svg>
+<figcaption><b>Figure 1.</b> Primary key ⊆ candidate keys ⊆ super keys, for Students(sid, name, email) with sid and email unique.</figcaption>
+</figure>
+
+<h2>2. A key is a rule about every possible instance</h2>
+
+<p>A key is part of the <em>schema</em>. It says “no two tuples will <em>ever</em> share this value”, which is a fact about the real world (the university assigns unique IDs), not about today's rows. Looking at one instance can <em>disprove</em> a key (two rows with the same value) but never prove one.</p>
+
+<div class="q">
+<h4>Is {sid, cid} a key of Enrolled?</h4>
+<p>In slide 6's six rows, no two rows share the same (sid, cid) pair, so the current instance does not contradict it. But a student who fails DB in Jan26 and retakes it in a later term would produce a second row (2405190, 215, …) with the same sid and cid. The rule “a pair may appear only once” is false in the real world, so {sid, cid} is <strong>not</strong> a key. {sid, cid, term} is: a student enrolls in a course at most once per term. Try both in the tool below.</p>
+</div>
+
+<h2>3. Try it: is this a key?</h2>
+
+<p>Tick attributes and the tool classifies the set. First relation: the exam's STUDENT(Roll_No, Reg_No, Email, Name, Age, Branch), where Roll_No, Reg_No and Email are each unique and the others can repeat.</p>
+<figure><span class="anim-tag">Interactive</span><div id="kt1" class="kt"></div></figure>
+<p>Second relation: slide 6's Enrolled, with the real-world key {sid, cid, term}. The tool also checks the current six rows, to show that “unique today” is not the same as “a key”.</p>
+<figure><span class="anim-tag">Interactive</span><div id="kt2" class="kt"></div></figure>
+
+<h2>4. Keys in Oracle SQL</h2>
+
+<p>Keys are declared when the table is created, and the DBMS then rejects any change that would break them:</p>
+<pre>CREATE TABLE Students (
+  sid   NUMBER(7) PRIMARY KEY,          -- primary key: unique and NOT NULL
+  name  VARCHAR2(30) NOT NULL,
+  email VARCHAR2(40) UNIQUE              -- alternate key
+);
+CREATE TABLE Enrolled (
+  sid  NUMBER(7) REFERENCES Students(sid),   -- foreign key
+  cid  NUMBER(3) REFERENCES Courses(cid),    -- foreign key
+  term VARCHAR2(6),
+  PRIMARY KEY (sid, cid, term)               -- composite primary key
+);</pre>
+<p>Run the statements below one at a time (select a line and delete the others, or run them all and read the first error). Each one breaks a key rule, so the DBMS refuses it.</p>
+<div id="viol"></div>
+<p>The constraints lecture (Lec 06) covers named constraints, <code>ON DELETE CASCADE</code> and the other options.</p>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+<div id="try2"></div>
+
+<h3>Exam questions</h3>
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 215 | L-2/T-1 | 2024–25 · 9 marks</div>
+  <div class="exam-q"><p>Define super key, candidate key, and primary key with examples.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+<p>Use STUDENT(Roll_No, Reg_No, Email, Name, Age, Branch), where Roll_No, Reg_No and Email are each unique for every student, while Name, Age and Branch can repeat.</p>
+<p><strong>Super key.</strong> A set of attributes K of relation R such that no two tuples of any legal instance of R agree on all attributes of K; equivalently, K functionally determines every attribute of R (K → R). Examples: {Roll_No}, {Reg_No, Name}, {Email, Age, Branch}, and the set of all six attributes. Any set containing Roll_No, Reg_No or Email is a super key: there are 2<sup>6</sup> − 2<sup>3</sup> = 64 − 8 = <strong>56</strong> super keys (all subsets except the 8 subsets of {Name, Age, Branch}).</p>
+<p><strong>Candidate key.</strong> A minimal super key: a super key K such that no proper subset of K is a super key. Here the candidate keys are {Roll_No}, {Reg_No} and {Email}. {Reg_No, Name} is a super key but not a candidate key, because its subset {Reg_No} is already a super key. {Name, Age} is not a super key at all: two students can share a name and an age.</p>
+<p><strong>Primary key.</strong> The candidate key chosen by the designer to identify tuples. It must be unique and must not contain NULL (entity integrity), and there is exactly one per table. Choosing Roll_No: STUDENT(<u>Roll_No</u>, Reg_No, Email, Name, Age, Branch). The remaining candidate keys, {Reg_No} and {Email}, are alternate keys, declared UNIQUE.</p>
+<p>Relationship: primary key ⊆ candidate keys ⊆ super keys (Figure 1). In Oracle:</p>
+<pre>CREATE TABLE student (
+  roll_no NUMBER(7)    PRIMARY KEY,
+  reg_no  VARCHAR2(12) UNIQUE NOT NULL,
+  email   VARCHAR2(40) UNIQUE NOT NULL,
+  name    VARCHAR2(30), age NUMBER(3), branch VARCHAR2(10)
+);</pre>
+<p>The bank's answer is correct. One detail in its comparison table: it says a super key “may contain NULLs”; in the textbook definition, keys are about identifying tuples, and SQL only forbids NULL in the primary key (a UNIQUE column in Oracle may hold several NULLs).</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2014–15 · 6 marks</div>
+  <div class="exam-q"><p>Should a primary key have any semantic meaning? Explain your answer.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+<p><strong>Generally no.</strong> A primary key's job is to identify a row permanently and to be copied into every foreign key that refers to it. A key with real-world meaning (a <b>natural key</b>: email, phone number, NID, a course code) tends to break that job; a meaningless, system-generated key (a <b>surrogate key</b>: a sequence number) does not.</p>
+<ol>
+<li><strong>Meaningful values change.</strong> If email is the primary key of Students and a student changes email, the new value must be written into the student row and into every Enrolled, Grade and Payment row that references it. A surrogate value never needs to change.</li>
+<li><strong>Formats change.</strong> If course codes change from “CSE 215” to “CSE 2105” in a new curriculum, a meaningful key forces a change to every referencing table (and possibly to column sizes).</li>
+<li><strong>Meaning can be wrong or missing.</strong> A natural value may be unknown when the row is created (a new applicant without an NID yet), but a primary key cannot be NULL. Real-world identifiers are also sometimes reused (phone numbers).</li>
+<li><strong>Privacy and size.</strong> Keys appear in URLs, logs and many tables; a meaningful key such as an NID spreads personal data, and long strings make indexes and joins slower than a short number.</li>
+</ol>
+<p><strong>But keep the natural key as a constraint.</strong> Uniqueness of email or NID is still a real rule, so declare it as an alternate key with <code>UNIQUE</code>. In Oracle:</p>
+<pre>CREATE TABLE customer (
+  cust_id NUMBER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,  -- surrogate (Oracle 12c+)
+  email   VARCHAR2(60) NOT NULL UNIQUE,                      -- natural key kept unique
+  name    VARCHAR2(40)
+);</pre>
+<p><strong>When a meaningful key is fine:</strong> when the value is stable, short, always known and assigned by the organization itself, such as BUET's student ID (it never changes for a student). For a relationship table such as Enrolled, the composite of the foreign keys, (sid, cid, term), is the natural and usual primary key.</p>
+<p>The bank's answer is correct.</p>
+  </div></details>
+</div>
+
+<div class="key"><p><strong>Summary:</strong> a super key is any attribute set that identifies a tuple; a candidate key is a minimal super key; the primary key is the chosen candidate key (unique, not NULL); the other candidate keys are alternate keys (UNIQUE). A foreign key refers to another table's key and connects the tables. Keys are rules about every possible instance: one instance can disprove a key but not prove it. Primary keys are best kept free of real-world meaning (surrogate keys), with natural identifiers kept UNIQUE.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/sqlplay.js"></script>
+<script src="lecture.js"></script>
+<script>
+(() => {
+  let s = `<ellipse cx="300" cy="120" rx="290" ry="108" class="cell"/>` + T(300, 34, 'super keys', { w: 1, size: 13 }) +
+    T(300, 52, '{sid, name}, {email, name}, {sid, email}, …', { cls: 'lbl' });
+  s += `<ellipse cx="300" cy="140" rx="190" ry="70" class="cell-hl"/>` + T(300, 92, 'candidate keys (minimal)', { w: 1, size: 13 });
+  s += `<ellipse cx="240" cy="155" rx="70" ry="34" class="cell-new"/>` + T(240, 150, 'primary key', { w: 1, size: 12 }) + T(240, 168, '{sid}', { size: 12 });
+  s += T(390, 150, 'alternate key', { w: 1, size: 12 }) + T(390, 168, '{email}', { size: 12 });
+  const el = $('#sets'); el.setAttribute('viewBox', '0 0 600 240'); el.setAttribute('width', 600); el.innerHTML = s;
+})();
+// Key tester. keys: list of candidate keys (arrays). rows: optional instance to test uniqueness on.
+function keyTool(sel, name, attrs, keys, rows, initial = []) {
+  const host = $(sel);
+  host.innerHTML = `<div><b>${name}</b>(${attrs.join(', ')}) · candidate keys: ${keys.map(k => '{' + k.join(', ') + '}').join(', ')}</div><div style="margin-top:8px">` +
+    attrs.map(a => `<label><input type="checkbox" value="${a}"${initial.includes(a) ? ' checked' : ''}> ${a}</label>`).join('') + '</div><div class="out" aria-live="polite"></div>';
+  const out = host.querySelector('.out');
+  const isSuper = S => keys.some(k => k.every(a => S.includes(a)));
+  const upd = () => {
+    const S = [...host.querySelectorAll('input:checked')].map(i => i.value);
+    if (!S.length) { out.innerHTML = 'Tick at least one attribute.'; return; }
+    let h = `<b>{${S.join(', ')}}</b>: `;
+    if (!isSuper(S)) h += '<span class="bad">not a super key</span>. It contains no candidate key, so two different tuples could agree on all of these attributes.';
+    else {
+      const extra = S.filter(a => isSuper(S.filter(b => b !== a)));
+      if (!extra.length) h += `<span class="good">candidate key</span> (a minimal super key): removing any attribute breaks uniqueness.`;
+      else h += `<span class="mid">super key, but not a candidate key</span>: you can remove ${extra.join(' or ')} and it still identifies tuples.`;
+    }
+    if (rows) {
+      const idx = S.map(a => attrs.indexOf(a)), seen = new Map(); let dup = null;
+      rows.forEach((r, i) => { const k = idx.map(j => r[j]).join('|'); if (seen.has(k) && !dup) dup = [seen.get(k), i]; seen.set(k, i); });
+      h += '<br>In slide 6\'s six rows: ' + (dup ? `<span class="bad">rows ${dup[0] + 1} and ${dup[1] + 1} share the same values</span>, so this instance already disproves it.` :
+        `all values are distinct.${isSuper(S) ? '' : ' <i>This instance does not contradict it, but it is still not a key: a retake in a later term would repeat these values.</i>'}`);
+    }
+    out.innerHTML = h;
+  };
+  host.addEventListener('change', upd); upd();
+}
+keyTool('#kt1', 'STUDENT', ['Roll_No', 'Reg_No', 'Email', 'Name', 'Age', 'Branch'], [['Roll_No'], ['Reg_No'], ['Email']], null, ['Reg_No', 'Name']);
+keyTool('#kt2', 'Enrolled', ['sid', 'cid', 'term'], [['sid', 'cid', 'term']],
+  [['2405190', '215', 'Jan26'], ['2405190', '205', 'Jan26'], ['2405191', '215', 'Jan26'], ['2505200', '101', 'Jan26'], ['2405190', '101', 'Jan25'], ['2505200', '102', 'Jan26']], ['sid', 'cid']);
+sqlPlay('#viol', { setup: CMS, query: `-- 1. duplicate primary key: sid 2405190 already exists
+INSERT INTO Students VALUES (2405190, 'Another Jalil', 'aj@university.edu');
+
+-- 2. NULL primary key (entity integrity)
+-- INSERT INTO Students VALUES (NULL, 'Nobody', 'no@university.edu');
+
+-- 3. foreign key to a student who does not exist (referential integrity)
+-- INSERT INTO Enrolled VALUES (9999999, 215, 'Jan26');
+
+-- 4. allowed: a retake in a new term has a different (sid, cid, term)
+-- INSERT INTO Enrolled VALUES (2405190, 215, 'Jul26');`, note: 'Uncomment one statement at a time (remove the <code>--</code>) and Run. Statements 1 and 3 fail with a constraint error and statement 4 succeeds. Oracle also rejects statement 2; the in-browser SQLite engine has a historical quirk that lets a non-INTEGER primary key column hold NULL, so here it may be accepted.' });
+flashcards('#cards', [
+  { f: 'Super key', b: 'Any set of attributes that identifies at most one tuple in every legal instance.' },
+  { f: 'Candidate key', b: 'A minimal super key: no attribute can be removed.' },
+  { f: 'Primary key', b: 'The chosen candidate key; unique and NOT NULL; one per table.' },
+  { f: 'Alternate key', b: 'A candidate key not chosen as primary; declared UNIQUE.' },
+  { f: 'Foreign key', b: 'Attributes whose values must exist as a key in another table (Enrolled.sid → Students.sid).' },
+  { f: 'Entity integrity', b: 'No primary-key attribute may be NULL.' },
+  { f: 'Referential integrity', b: 'Every foreign-key value must match an existing referenced key (or be NULL).' },
+  { f: 'Surrogate key', b: 'A meaningless system-generated identifier used as primary key.' },
+]);
+quiz('#quiz', [
+  { q: 'Students(sid, name, email) with sid and email unique. Which is a candidate key?', opts: ['{sid, email}', '{name}', '{email}', '{sid, name}'], a: 2,
+    why: '{email} is unique and minimal. {sid, email} and {sid, name} are super keys but not minimal.' },
+  { q: 'Which statement is always true?', opts: ['Every super key is a candidate key', 'Every candidate key is a super key', 'A table has exactly one candidate key', 'A primary key may contain NULL'], a: 1,
+    why: 'Candidate keys are the minimal super keys, so each is a super key.' },
+  { q: 'An instance has no duplicate values in column X. What can you conclude?', opts: ['X is a key', 'X is a primary key', 'Nothing certain: X might still repeat in a future instance', 'X is a foreign key'], a: 2,
+    why: 'A key is a rule about all possible instances. One instance can only disprove it.' },
+  { q: 'Why is {sid, cid} not a key of Enrolled?', opts: ['sid repeats', 'A student can take the same course again in another term', 'cid is a foreign key', 'Keys cannot be composite'], a: 1,
+    why: 'A retake gives two rows with the same (sid, cid), different term.' },
+  { q: 'Inserting Enrolled(9999999, 215, \'Jan26\') when no student 9999999 exists violates…', opts: ['entity integrity', 'referential integrity', 'a domain', 'nothing'], a: 1,
+    why: 'Enrolled.sid is a foreign key; its value must exist in Students.sid.' },
+]);
+ask('#try1', { q: 'R(A, B, C, D) has exactly one candidate key, {A}. How many super keys does R have?', a: 8, hint: 'Count the subsets that contain A.', why: 'Any subset containing A: 2³ = 8.' });
+ask('#try2', { q: 'STUDENT has 6 attributes and three single-attribute candidate keys (Roll_No, Reg_No, Email). How many super keys?', a: 56, hint: 'All subsets minus those containing none of the three keys.', why: '2⁶ − 2³ = 64 − 8 = 56.' });
+</script>
+</body>
+</html>

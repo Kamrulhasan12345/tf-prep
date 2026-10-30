@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Exam Topics Beyond the Slides · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 07 (Ishrak) · Chapter 17 · Exam topics beyond the slides</div>
+<h1>Exam Topics Beyond the Slides: Materialized Views and Object Types</h1>
+<p class="lede">The ER part of the question banks also asks about views versus materialized views, and about turning composite, multivalued attributes and subclasses into SQL:1999/2003 object types. None of this is on the Lec 07 slides; this chapter teaches enough to answer those questions in Oracle.</p>
+
+<h2>1. Views and materialized views</h2>
+<dl class="def">
+<dt>View</dt><dd>A named query, <code>CREATE VIEW v AS SELECT …</code>. Only the definition is stored. Each time a query uses the view, the DBMS runs (or merges in) the defining query on the current base tables, so a view is always up to date and takes no space.</dd>
+<dt>Materialized view (MV)</dt><dd>A view whose <em>result</em> is computed and stored as a table. Queries read the stored rows, which is fast for expensive joins and aggregates, but the stored result becomes stale when the base tables change and must be <b class="term">refreshed</b>.</dd>
+<dt>Refresh</dt><dd><em>Complete</em>: recompute the whole query. <em>Fast (incremental)</em>: apply only the changes recorded since the last refresh (in Oracle, from a <em>materialized view log</em> on each base table). Timing: <code>ON COMMIT</code> (immediately, as part of each transaction) or <code>ON DEMAND</code> / on a schedule.</dd>
+</dl>
+<p>In Oracle:</p>
+<pre>CREATE MATERIALIZED VIEW LOG ON Sales WITH ROWID, SEQUENCE (store_id, amount) INCLUDING NEW VALUES;
+
+CREATE MATERIALIZED VIEW store_totals
+  REFRESH FAST ON COMMIT
+AS SELECT store_id, COUNT(*) AS n, COUNT(amount) AS n_amt, SUM(amount) AS total
+   FROM Sales GROUP BY store_id;</pre>
+<p>The browser playground (SQLite) has ordinary views but no materialized views. The box below imitates one: a table filled by a query, which goes stale when the base table changes, next to a real view that does not.</p>
+<div id="mvplay"></div>
+
+<h2>2. Object-relational SQL: types for ER structures</h2>
+<p>SQL:1999 and SQL:2003 added user-defined structured types, so some ER constructs can be stored without flattening (Chapter 11 flattens them for plain relational tables):</p>
+<div class="tbl"><table>
+<tr><th>ER construct</th><th>SQL:1999/2003</th><th>Oracle</th></tr>
+<tr><td>Composite attribute</td><td><code>CREATE TYPE Name AS (first VARCHAR(20), …)</code></td><td><code>CREATE TYPE Name_t AS OBJECT (first VARCHAR2(20), …)</code></td></tr>
+<tr><td>Multivalued attribute</td><td><code>VARCHAR(15) ARRAY[10]</code> or <code>MULTISET</code></td><td><code>CREATE TYPE Phones_t AS VARRAY(10) OF VARCHAR2(15)</code> or a nested table type</td></tr>
+<tr><td>Derived attribute</td><td>a method: <code>METHOD age() RETURNS INTEGER</code></td><td><code>MEMBER FUNCTION age RETURN NUMBER</code> in the type body</td></tr>
+<tr><td>Subclass (isA)</td><td><code>CREATE TYPE T2 UNDER T1 (…)</code>; <code>CREATE TABLE t2 OF T2 UNDER t1</code></td><td><code>CREATE TYPE T2 UNDER T1 (…)</code> with T1 declared <code>NOT FINAL</code>; one object table of T1 holds rows of all subtypes</td></tr>
+<tr><td>Constructor</td><td>generated automatically: <code>Name('Ann', 'K', 'Roy')</code>; <code>ARRAY['1','2']</code></td><td>generated automatically: <code>Name_t('Ann','K','Roy')</code>, <code>Phones_t('1','2')</code></td></tr>
+</table></div>
+<p>These statements are Oracle-specific and do not run in the SQLite playground; they are shown as code.</p>
+
+<h2>Practice</h2>
+<h3>Quick check</h3><div id="quiz"></div>
+
+<h3>Exam questions</h3>
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 215 | L-2/T-2 | 2019–20 · 10 marks</div>
+  <div class="exam-q"><p>What do you mean by materialized view? Explain with examples the problems associated with materialized view. What restrictions do most database implementations have to allow updates on materialized views?</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><strong>Materialized view:</strong> a view whose result is computed once and stored physically, like a table, instead of being recomputed on every use. Example: <code>CREATE MATERIALIZED VIEW dept_pay AS SELECT dept_id, SUM(salary) total FROM Employee GROUP BY dept_id</code>. Reports read dept_pay directly instead of summing the whole Employee table each time.</p>
+    <p><strong>Problems:</strong></p>
+    <ol>
+    <li><strong>Staleness (view maintenance).</strong> After <code>UPDATE Employee SET salary = salary + 1000 WHERE emp_id = 7</code>, dept_pay still shows the old total until it is refreshed. Queries can return out-of-date answers.</li>
+    <li><strong>Maintenance cost.</strong> Refreshing ON COMMIT makes every update of Employee slower (the transaction also updates dept_pay); refreshing ON DEMAND keeps updates fast but lets the MV be stale between refreshes. A complete refresh of a big join is expensive.</li>
+    <li><strong>Storage</strong> for the stored result, and for the logs needed for incremental refresh.</li>
+    <li><strong>Some changes cannot be propagated incrementally.</strong> Deleting the employee with the maximum salary from a MAX(salary) view requires rescanning the department; deleting from a view without COUNT(*) cannot tell when a group becomes empty.</li>
+    <li><strong>Updating through the view</strong> raises the general view-update problem: a change to an aggregated or joined row has no unique translation into base-table changes.</li>
+    </ol>
+    <p><strong>Restrictions</strong> (Oracle's rules for fast refresh and for updatable MVs are typical):</p>
+    <ul>
+    <li>Fast refresh needs a <strong>materialized view log</strong> on every base table, and the MV must include the rowids or primary keys of the base rows (for join MVs).</li>
+    <li>Aggregate MVs must include <code>COUNT(*)</code>, and <code>COUNT(x)</code> for every <code>SUM(x)</code> or <code>AVG(x)</code>; only SUM, COUNT, AVG, (VARIANCE, STDDEV) are fast-refreshable on all changes; MIN/MAX only for inserts.</li>
+    <li>No non-deterministic expressions (SYSDATE, ROWNUM), no set operations in some forms (only UNION ALL with markers), restricted outer joins and subqueries; no references to other remote/complex views.</li>
+    <li>An MV may be <strong>updated directly</strong> (<code>FOR UPDATE</code>, an "updatable MV") only if it is a simple selection/projection of a <em>single</em> table that includes its primary key, with no aggregates, DISTINCT, GROUP BY, joins or set operations, so that every MV row maps to exactly one base row. Otherwise MVs are read-only and changes go to the base tables.</li>
+    </ul>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 215 | L-2/T-1 | 2023–24 · 10 marks</div>
+  <div class="exam-q"><p>What is the difference between a view and a materialized view? Draw an example diagram of a disjoint specialization.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <div class="tbl"><table><tr><th></th><th>View</th><th>Materialized view</th></tr>
+    <tr><td>What is stored</td><td>only the query</td><td>the query and its result rows</td></tr>
+    <tr><td>Freshness</td><td>always current</td><td>current only after a refresh</td></tr>
+    <tr><td>Query speed</td><td>recomputed each time</td><td>fast: reads stored rows, can be indexed</td></tr>
+    <tr><td>Cost</td><td>none on updates</td><td>storage + refresh work on or after updates</td></tr>
+    <tr><td>Typical use</td><td>security, simpler queries, hiding joins</td><td>reports, data warehouses, expensive aggregates, remote data</td></tr></table></div>
+    <p><strong>Disjoint specialization.</strong> An Account is either a SavingsAccount (interest_rate) or a CheckingAccount (overdraft_limit), never both; every account is one of them (total).</p>
+    <figure class="wide"><div id="disj"></div><figcaption>Slides' notation: isA diamond with a design note "disjoint, total"; the double line from Account shows total specialization. In Elmasri–Navathe notation the diamond would be a circle containing <em>d</em>.</figcaption></figure>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2016–17 · 20 marks</div>
+  <div class="exam-q"><p>A car rental company maintains a database for all vehicles. For all vehicles: vehicle identification number, license number, manufacturer, size (height, width, length) and color. Special data for certain types: Trucks: load capacity, type; Sports car: power, renter age; Bus: number of passengers, seat-type (array of 40 seats of different types). (a) Construct an SQL:99 schema definition for this database using appropriate inheritance. (b) Write constructor functions for the above schema and an insert statement to insert data.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>The ER view: Vehicle(<u>vin</u>, license_no, manufacturer, size(height, width, length), color) with subclasses Truck(load_capacity, truck_type), SportsCar(power, renter_age), Bus(num_passengers, {seat_type} with at most 40 values). Size is composite → a structured type; seat types are multivalued → an array; subclasses → <code>UNDER</code>.</p>
+    <figure class="wide"><div id="veh"></div></figure>
+    <p><strong>(a) SQL:1999</strong>:</p>
+<pre>CREATE TYPE Size_T AS (height DECIMAL(5,2), width DECIMAL(5,2), length DECIMAL(5,2)) NOT FINAL;
+CREATE TYPE Vehicle_T AS (
+  vin VARCHAR(17), license_no VARCHAR(15), manufacturer VARCHAR(30),
+  size Size_T, color VARCHAR(15)) NOT FINAL;
+CREATE TYPE Truck_T     UNDER Vehicle_T AS (load_capacity DECIMAL(8,2), truck_type VARCHAR(20)) NOT FINAL;
+CREATE TYPE SportsCar_T UNDER Vehicle_T AS (power INTEGER, renter_age INTEGER) NOT FINAL;
+CREATE TYPE Bus_T       UNDER Vehicle_T AS (num_passengers INTEGER, seat_type VARCHAR(20) ARRAY[40]) NOT FINAL;
+
+CREATE TABLE vehicle   OF Vehicle_T (PRIMARY KEY (vin));
+CREATE TABLE truck     OF Truck_T     UNDER vehicle;
+CREATE TABLE sportscar OF SportsCar_T UNDER vehicle;
+CREATE TABLE bus       OF Bus_T       UNDER vehicle;</pre>
+    <p>A row inserted into <code>truck</code> is also visible in <code>vehicle</code> (a subtable's rows belong to its supertable), which is exactly isA. renter_age is a minimum age requirement of the car (a property of the vehicle), as the question lists it under sports cars.</p>
+    <p><strong>(b) Constructors and insert.</strong> The system generates a constructor for every type, named like the type, that takes no arguments and sets all attributes to NULL; values are set with mutators, or we define a constructor that takes all values:</p>
+<pre>CREATE FUNCTION Size_T(h DECIMAL(5,2), w DECIMAL(5,2), l DECIMAL(5,2)) RETURNS Size_T
+BEGIN
+  DECLARE s Size_T;
+  SET s = NEW Size_T();          -- system constructor, all NULL
+  SET s.height = h; SET s.width = w; SET s.length = l;
+  RETURN s;
+END;
+
+INSERT INTO truck (vin, license_no, manufacturer, size, color, load_capacity, truck_type)
+VALUES ('1HTMMAAL57H123456', 'DHAKA-TA-11-2233', 'Tata', Size_T(3.2, 2.4, 9.0), 'red', 12000, 'covered van');
+
+INSERT INTO bus (vin, license_no, manufacturer, size, color, num_passengers, seat_type)
+VALUES ('JTDBR32E720654321', 'DHAKA-BA-15-0042', 'Hino', Size_T(3.4, 2.5, 12.0), 'white', 40,
+        ARRAY['window','aisle','window','aisle' /* … up to 40 values */]);</pre>
+    <p><strong>The same in Oracle</strong> (the course's DBMS): types are <code>CREATE TYPE … AS OBJECT</code>, the array is a <code>VARRAY</code>, inheritance is <code>UNDER</code> with the parent <code>NOT FINAL</code>, and one object table of the root type stores every subtype:</p>
+<pre>CREATE TYPE Size_T  AS OBJECT (height NUMBER(5,2), width NUMBER(5,2), length NUMBER(5,2));
+/
+CREATE TYPE Seats_T AS VARRAY(40) OF VARCHAR2(20);
+/
+CREATE TYPE Vehicle_T AS OBJECT (vin VARCHAR2(17), license_no VARCHAR2(15), manufacturer VARCHAR2(30),
+                                 vsize Size_T, color VARCHAR2(15)) NOT FINAL;
+/
+CREATE TYPE Truck_T     UNDER Vehicle_T (load_capacity NUMBER(8,2), truck_type VARCHAR2(20));
+/
+CREATE TYPE SportsCar_T UNDER Vehicle_T (power NUMBER(5), renter_age NUMBER(3));
+/
+CREATE TYPE Bus_T       UNDER Vehicle_T (num_passengers NUMBER(3), seat_type Seats_T);
+/
+CREATE TABLE Vehicles OF Vehicle_T (PRIMARY KEY (vin));
+
+INSERT INTO Vehicles VALUES (Truck_T('1HTMMAAL57H123456', 'DHAKA-TA-11-2233', 'Tata',
+                                     Size_T(3.2, 2.4, 9.0), 'red', 12000, 'covered van'));
+INSERT INTO Vehicles VALUES (Bus_T('JTDBR32E720654321', 'DHAKA-BA-15-0042', 'Hino',
+                                   Size_T(3.4, 2.5, 12.0), 'white', 40, Seats_T('window', 'aisle')));
+SELECT v.vin, TREAT(VALUE(v) AS Bus_T).num_passengers FROM Vehicles v WHERE VALUE(v) IS OF (Bus_T);</pre>
+    <p>Oracle's default constructor takes all attributes in order, including inherited ones, as the inserts show.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2010–11 · 10 marks</div>
+  <div class="exam-q"><p>Consider the E-R diagram (Figure 2) which contains composite, multivalued and derived attributes. (a) Give an SQL:2003 schema definition corresponding to the E-R diagram. (b) Give constructors for each of the structured types defined above.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>Figure 2 is lost from the bank. The question is Silberschatz's exercise on its figure of an <em>instructor</em> entity with composite, multivalued and derived attributes, so we use that figure: instructor(<u>ID</u>, name(first_name, middle_initial, last_name), address(street(street_number, street_name, apt_number), city, state, zip), {phone_number}, date_of_birth, age()).</p>
+    <figure class="wide"><div id="inst"></div></figure>
+    <p><strong>(a) SQL:2003.</strong> Composite → structured types (nested for street); multivalued → a multiset (or array); derived → a method:</p>
+<pre>CREATE TYPE Name AS (first_name VARCHAR(20), middle_initial CHAR(1), last_name VARCHAR(20)) NOT FINAL;
+CREATE TYPE Street AS (street_number VARCHAR(10), street_name VARCHAR(30), apt_number VARCHAR(10)) NOT FINAL;
+CREATE TYPE Address AS (street Street, city VARCHAR(20), state VARCHAR(20), zip VARCHAR(10)) NOT FINAL;
+CREATE TYPE InstructorType AS (
+  ID            VARCHAR(5),
+  name          Name,
+  address       Address,
+  phone_number  VARCHAR(15) MULTISET,
+  date_of_birth DATE)
+  NOT FINAL
+  METHOD age() RETURNS INTEGER;
+
+CREATE METHOD age() RETURNS INTEGER FOR InstructorType
+BEGIN
+  RETURN EXTRACT(YEAR FROM CURRENT_DATE) - EXTRACT(YEAR FROM SELF.date_of_birth);
+END;
+
+CREATE TABLE instructor OF InstructorType (PRIMARY KEY (ID));</pre>
+    <p><strong>(b) Constructors</strong> (SQL:2003 constructors are written as functions with the type's name that set each attribute and return SELF):</p>
+<pre>CREATE CONSTRUCTOR METHOD Name(fn VARCHAR(20), mi CHAR(1), ln VARCHAR(20)) RETURNS Name
+BEGIN SET SELF.first_name = fn; SET SELF.middle_initial = mi; SET SELF.last_name = ln; RETURN SELF; END;
+
+CREATE CONSTRUCTOR METHOD Street(sno VARCHAR(10), sname VARCHAR(30), apt VARCHAR(10)) RETURNS Street
+BEGIN SET SELF.street_number = sno; SET SELF.street_name = sname; SET SELF.apt_number = apt; RETURN SELF; END;
+
+CREATE CONSTRUCTOR METHOD Address(s Street, c VARCHAR(20), st VARCHAR(20), z VARCHAR(10)) RETURNS Address
+BEGIN SET SELF.street = s; SET SELF.city = c; SET SELF.state = st; SET SELF.zip = z; RETURN SELF; END;
+
+CREATE CONSTRUCTOR METHOD InstructorType(i VARCHAR(5), n Name, a Address, p VARCHAR(15) MULTISET, d DATE)
+  RETURNS InstructorType
+BEGIN SET SELF.ID = i; SET SELF.name = n; SET SELF.address = a; SET SELF.phone_number = p;
+      SET SELF.date_of_birth = d; RETURN SELF; END;
+
+INSERT INTO instructor VALUES (NEW InstructorType('10101',
+   NEW Name('Rafiq', 'A', 'Islam'),
+   NEW Address(NEW Street('12', 'Lake Road', '3B'), 'Dhaka', 'Dhaka', '1205'),
+   MULTISET['01711000001', '01911000002'], DATE '1980-04-12'));</pre>
+    <p>In Oracle the same design uses <code>AS OBJECT</code> types, a nested-table or VARRAY type for phone numbers, and a <code>MEMBER FUNCTION age RETURN NUMBER</code> implemented in a <code>CREATE TYPE BODY</code> (computing <code>TRUNC(MONTHS_BETWEEN(SYSDATE, date_of_birth)/12)</code>); Oracle generates the attribute-value constructors automatically. The question bank's answer invents a different figure and uses a generated column with CURRENT_DATE for age, which standard SQL and Oracle reject (generated columns must be deterministic); a method is the correct tool.</p>
+  </div></details>
+</div>
+
+<div class="key">
+<p><strong>Summary:</strong> a view stores a query and is always current; a materialized view stores the result, is fast but must be refreshed, and supports fast refresh or direct updates only for restricted queries. Object-relational SQL maps composite attributes to structured types, multivalued ones to arrays or multisets, derived ones to methods, and isA to UNDER; constructors create the values.</p>
+</div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/sqlplay.js"></script>
+<script src="lecture.js"></script>
+<script>
+sqlPlay('#mvplay', { setup: `CREATE TABLE Sales (sale_id NUMBER PRIMARY KEY, store_id NUMBER, amount NUMBER(8,2));
+INSERT INTO Sales VALUES (1, 10, 500);
+INSERT INTO Sales VALUES (2, 10, 300);
+INSERT INTO Sales VALUES (3, 20, 900);
+CREATE OR REPLACE VIEW store_totals_v AS SELECT store_id, SUM(amount) AS total FROM Sales GROUP BY store_id;
+-- imitation of a materialized view: the result is copied into a table now
+CREATE TABLE store_totals_mv AS SELECT store_id, SUM(amount) AS total FROM Sales GROUP BY store_id;`,
+  query: `INSERT INTO Sales VALUES (4, 10, 1000);
+SELECT 'view' AS source, store_id, total FROM store_totals_v
+UNION ALL
+SELECT 'stale copy', store_id, total FROM store_totals_mv
+ORDER BY 2, 1;`, note: 'After the insert, the view shows store 10 = 1800, the stored copy still says 800 until it is refreshed (recomputed).' });
+$('#disj').innerHTML = erd({ n: [['Account', 'E', 0, 0], ['isA', 'D', 0, 100, 'isA'], ['Savings', 'E', -150, 200, 'SavingsAccount'], ['Checking', 'E', 150, 200, 'CheckingAccount']],
+  a: [['Account', '_acc_no', -110, -40], ['Account', 'balance', 0, -65], ['Account', 'open_date', 115, -40], ['Savings', 'interest_rate', 0, 60], ['Checking', 'overdraft_limit', 0, 60]],
+  l: [['Account', 'isA', { total: true }], ['Savings', 'isA'], ['Checking', 'isA']], t: [[115, 100, 'disjoint, total', 'acc']] });
+$('#veh').innerHTML = erd({ n: [['Vehicle', 'E', 0, 0], ['isA', 'D', 0, 110, 'isA'], ['Truck', 'E', -230, 210], ['SportsCar', 'E', 0, 210], ['Bus', 'E', 230, 210]],
+  a: [['Vehicle', '_vin', -160, -30], ['Vehicle', 'license_no', -100, -75], ['Vehicle', 'manufacturer', 20, -85], ['Vehicle', 'color', 150, -40], ['Vehicle', 'size', 140, 30], ['Vehicle.size', 'height', 100, -30], ['Vehicle.size', 'width', 120, 15], ['Vehicle.size', 'length', 90, 55],
+      ['Truck', 'load_capacity', -70, 60], ['Truck', 'truck_type', 60, 70], ['SportsCar', 'power', -40, 70], ['SportsCar', 'renter_age', 70, 55], ['Bus', 'num_passengers', 0, 65], ['Bus', '{seat_type}', 120, 30]],
+  l: [['Vehicle', 'isA'], ['Truck', 'isA'], ['SportsCar', 'isA'], ['Bus', 'isA']] });
+$('#inst').innerHTML = erd({ n: [['instructor', 'E', 0, 0]],
+  a: [['instructor', '_ID', -170, 0], ['instructor', 'name', -110, -80], ['instructor.name', 'first_name', -80, -50], ['instructor.name', 'middle_initial', 30, -65], ['instructor.name', 'last_name', 140, -45],
+      ['instructor', 'address', 150, -60], ['instructor.address', 'street', 40, -55], ['instructor.address.street', 'street_number', -90, -45], ['instructor.address.street', 'street_name', 30, -60], ['instructor.address.street', 'apt_number', 140, -35],
+      ['instructor.address', 'city', 140, -30], ['instructor.address', 'state', 160, 15], ['instructor.address', 'zip', 130, 55],
+      ['instructor', '{phone_number}', -140, 70], ['instructor', 'date_of_birth', 0, 85], ['instructor', '/age()', 130, 70]] });
+quiz('#quiz', [
+  { q: 'Which is always up to date without any refresh?', opts: ['A view', 'A materialized view', 'Both', 'Neither'], a: 0, why: 'A view is recomputed from the base tables.' },
+  { q: 'An Oracle aggregate MV with SUM(amount) is fast-refreshable only if it also includes…', opts: ['ORDER BY', 'COUNT(*) and COUNT(amount)', 'DISTINCT', 'ROWNUM'], a: 1, why: 'The counts let the DBMS maintain sums and detect empty groups.' },
+  { q: 'A multivalued attribute in SQL:2003 object types becomes…', opts: ['a method', 'an ARRAY or MULTISET', 'a subtype', 'a constructor'], a: 1, why: 'Collection types hold several values.' },
+  { q: 'A subclass in SQL:1999 is declared with…', opts: ['INHERITS', 'UNDER', 'EXTENDS', 'ISA'], a: 1, why: 'CREATE TYPE T2 UNDER T1, CREATE TABLE t2 OF T2 UNDER t1.' },
+]);
+</script>
+</body>
+</html>

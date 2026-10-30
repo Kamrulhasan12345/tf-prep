@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Naming and Altering Constraints · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 06 (Ishrak) · Chapter 7 · Slides 51–52 · Textbook §7.3</div>
+<h1>Naming, Adding, Dropping and Disabling Constraints</h1>
+<p class="lede">A constraint you want to change later needs a name. This chapter covers the CONSTRAINT keyword (slide 51, with its three examples repaired for Oracle), ALTER TABLE … ADD / DROP CONSTRAINT and DROP ASSERTION (slide 52), and the Oracle practice around them: what happens when existing rows break a new constraint, ENABLE and DISABLE, and how to find constraints in Oracle's data dictionary.</p>
+
+<h2>1. Giving names to constraints (slide 51)</h2>
+<p>"Why give names? In order to be able to alter constraints." To drop or change a constraint you must say which one, and the handle is its name. Add the keyword <code>CONSTRAINT</code> and a name in front of any constraint, column or table form:</p>
+<pre>ssn CHAR(9) CONSTRAINT ssnIsKey PRIMARY KEY                    -- slide 51 (1); the slide writes CHAR(50)</pre>
+<p>If you do not name a constraint, Oracle invents a name such as <code>SYS_C007123</code>. It appears in error messages (<code>ORA-02290: check constraint (SCOTT.SYS_C007123) violated</code>), where it tells you nothing, and to drop the constraint you would first have to look the name up in the data dictionary (section 5). A good name says what was violated: <code>ORA-02290: check constraint (SCOTT.POSITIVEPRICE) violated</code>. A common convention is <i>table_column_type</i>, e.g. <code>emp_dept_fk</code>, <code>pc_price_ck</code>. Names must be unique within a schema (all tables together), and Oracle stores them in upper case.</p>
+<p>Slide 51's other two examples need repairs before Oracle accepts them:</p>
+<div class="q">
+<h4>Slide 51 (2): <code>CONSTRAINT ninedigits CHECK (VALUE &gt;= 100000000 AND VALUE &lt;= 999999999)</code></h4>
+<p><code>VALUE</code> is the keyword of a <em>domain</em> constraint in standard SQL: <code>CREATE DOMAIN SSNType AS INT CHECK (VALUE BETWEEN …)</code> defines a reusable type, and VALUE stands for "the value of whatever column has this type". Oracle has no CREATE DOMAIN, and in a table CHECK there is no VALUE; write the column name:</p>
+<pre>ssn NUMBER(9) CONSTRAINT ninedigits CHECK (ssn BETWEEN 100000000 AND 999999999)</pre>
+</div>
+<div class="q">
+<h4>Slide 51 (3): <code>CONSTRAINT rightage CHECK (age &gt;= 0 OR status = "dead")</code></h4>
+<p>In SQL, double quotes mark an <em>identifier</em> (a column or table name), not a string. Oracle reads <code>"dead"</code> as a column called dead and fails with <code>ORA-00904: "dead": invalid identifier</code>. String literals take single quotes: <code>status = 'dead'</code>. Read as a rule: the age must be non-negative unless the person is dead (perhaps age is stored as a negative number of years since death, or is meaningless then). It is a tuple-based CHECK because it uses two columns.</p>
+</div>
+<div id="p1"></div>
+
+<h2>2. ALTER TABLE … ADD / DROP CONSTRAINT and DROP ASSERTION (slide 52)</h2>
+<pre>ALTER TABLE Product DROP CONSTRAINT positivePrice;
+ALTER TABLE Product ADD CONSTRAINT positivePrice CHECK (price &gt;= 0);
+DROP ASSERTION assert1;</pre>
+<p>The pair of ALTER statements is how you <em>change</em> a constraint: there is no "modify constraint", so you drop the old one and add the new one under the same name. (The slide's Product has a price column; in this lecture's Product(maker, model, type) the price lives in PC, Laptop and Printer, so read it as one of those.) DROP ASSERTION removes an assertion; it is standard SQL, and like CREATE ASSERTION it does not exist in Oracle.</p>
+<p>Oracle's ALTER TABLE can add every kind of table constraint, and has a few extra forms:</p>
+<pre>ALTER TABLE PC ADD CONSTRAINT pc_pk PRIMARY KEY (model);
+ALTER TABLE PC ADD CONSTRAINT pc_model_fk FOREIGN KEY (model) REFERENCES Product(model) ON DELETE CASCADE;
+ALTER TABLE PC ADD CONSTRAINT pc_slow_ck CHECK (speed &gt;= 2.0 OR price &lt;= 800);
+ALTER TABLE PC MODIFY (ram NOT NULL);        -- NOT NULL is a column property: MODIFY, not ADD
+ALTER TABLE PC DROP PRIMARY KEY;             -- no name needed for the primary key
+ALTER TABLE Product DROP CONSTRAINT product_pk CASCADE;   -- also drops the foreign keys that reference it</pre>
+
+<h3>Adding a constraint to a table that already has rows</h3>
+<p>When a constraint is added, Oracle checks every existing row first (this is called <i>validating</i> the constraint). If any row breaks it, the ALTER fails and nothing is added:</p>
+<div class="tbl"><table>
+<tr><th>Constraint added</th><th>Existing rows break it</th><th>Oracle error</th></tr>
+<tr><td>CHECK</td><td>some row makes the condition false</td><td>ORA-02293: cannot validate (…) - check constraint violated</td></tr>
+<tr><td>PRIMARY KEY / UNIQUE</td><td>duplicate values (or NULL for a primary key)</td><td>ORA-02437: cannot validate (…) - primary key violated; ORA-02299: cannot validate (…) - duplicate keys found (UNIQUE); ORA-01449 if a primary-key column holds NULL</td></tr>
+<tr><td>FOREIGN KEY</td><td>dangling values</td><td>ORA-02298: cannot validate (…) - parent keys not found</td></tr>
+<tr><td>NOT NULL (MODIFY)</td><td>a NULL in the column</td><td>ORA-02296: cannot enable (…) - null values found</td></tr>
+</table></div>
+<p>So the routine is: find the offending rows with a query (the negation of the condition, exactly as in Chapters 5 and 6), fix or delete them, then add the constraint. Exercise 5 practises this.</p>
+
+<h3>The playground and ALTER TABLE</h3>
+<p>SQLite's ALTER TABLE cannot add or drop constraints at all (<code>near "CONSTRAINT": syntax error</code>). In SQLite the only way is to rebuild the table: create a new table with the constraint, copy the rows, drop the old table and rename the new one. The box below does exactly that. <strong>This is SQLite-only; in Oracle you write the one-line ALTER TABLE.</strong></p>
+<div id="p2"></div>
+
+<h2>3. Disabling and enabling constraints (Oracle)</h2>
+<p>The slides do not cover this, but you meet it in every Oracle project. A constraint can be switched off without dropping it, and switched on again later:</p>
+<pre>ALTER TABLE Department DISABLE CONSTRAINT dept_head_fk;    -- rows are no longer checked
+-- … bulk load or repair data …
+ALTER TABLE Department ENABLE CONSTRAINT dept_head_fk;     -- re-validates ALL rows (ORA-02298 if some dangle)
+ALTER TABLE Department ENABLE NOVALIDATE CONSTRAINT dept_head_fk;  -- check only future changes</pre>
+<p>Why disable? Loading millions of rows is faster without a check per row, and loading tables that refer to each other is easier when the order does not matter. The danger: while a constraint is disabled, bad rows can get in, and ENABLE (which by default means ENABLE VALIDATE) then fails until they are fixed. ENABLE NOVALIDATE skips the old rows, which leaves the database in a state where the rule is not guaranteed for them. A primary key or unique constraint that is disabled also loses its index (by default), and you cannot disable a primary key that enabled foreign keys still reference unless you write <code>DISABLE CONSTRAINT … CASCADE</code>.</p>
+
+<h2>4. Constraints in Oracle's data dictionary</h2>
+<p>Oracle records every constraint in the view <code>USER_CONSTRAINTS</code> (and the columns involved in <code>USER_CONS_COLUMNS</code>). The column <code>CONSTRAINT_TYPE</code> is a letter: <b>P</b> primary key, <b>U</b> unique, <b>R</b> foreign key ("referential"), <b>C</b> check (NOT NULL constraints are also stored as type C, with search condition <code>"COL" IS NOT NULL</code>). <code>R_CONSTRAINT_NAME</code> gives, for a foreign key, the name of the primary/unique key it references, <code>DELETE_RULE</code> is NO ACTION, CASCADE or SET NULL, and <code>STATUS</code> is ENABLED or DISABLED.</p>
+<pre>SELECT constraint_name, constraint_type, search_condition, status
+FROM   user_constraints
+WHERE  table_name = 'DEPARTMENT';          -- table names are stored in upper case</pre>
+<p>The playground has no Oracle dictionary, so the box below creates a <strong>mock</strong> USER_CONSTRAINTS table with the rows Oracle would show for the slides' Employee/Department schema plus the PC table (with a few named and a few system-named constraints). Query it as you would in Oracle.</p>
+<div id="p3"></div>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+<h3>Write it yourself</h3>
+<p>Exercises 1, 2 and 6 check both the rows your table accepts and that the constraint names appear in your CREATE TABLE. Exercises 1 and 2 end with the SQLite-only <code>INSERT OR IGNORE</code> helper line explained in Chapter 5.</p>
+<div id="c1"></div><div id="c2"></div><div id="c3"></div><div id="c4"></div><div id="c5"></div><div id="c6"></div>
+
+<div class="key"><p><strong>Summary:</strong> Name constraints with <code>CONSTRAINT name …</code> so that errors are readable and the constraint can be dropped. Change a constraint by <code>ALTER TABLE t DROP CONSTRAINT name</code> then <code>ADD CONSTRAINT name …</code>; existing rows must satisfy a new constraint or the ALTER fails. Oracle can also DISABLE/ENABLE a constraint, lists constraints in USER_CONSTRAINTS (types P, U, R, C), and has no domains, assertions or DROP ASSERTION. Fix slide 51 for Oracle: no VALUE keyword, single quotes for strings.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/sqlplay.js"></script>
+<script src="lecture.js"></script>
+<script>
+sqlPlay('#p1', { setup: "CREATE TABLE Person (\n  ssn    NUMBER(9) CONSTRAINT ssnIsKey PRIMARY KEY\n                   CONSTRAINT ninedigits CHECK (ssn BETWEEN 100000000 AND 999999999),\n  name   VARCHAR2(30),\n  age    NUMBER(3),\n  status VARCHAR2(10),\n  CONSTRAINT rightage CHECK (age >= 0 OR status = 'dead')\n);",
+  query: "INSERT INTO Person VALUES (123456789, 'Ann', 30, 'alive');   -- OK\nINSERT INTO Person VALUES (987654321, 'Bob', -1, 'dead');    -- OK: dead\nINSERT INTO Person VALUES (555555555, 'Cy', -4, 'alive');    -- breaks rightage",
+  note: 'SQLite prints the constraint name: <code>CHECK constraint failed: rightage</code>, just as Oracle prints <code>ORA-02290: check constraint (SCHEMA.RIGHTAGE) violated</code>. Try an ssn with 8 digits to trigger ninedigits.' });
+sqlPlay('#p2', { setup: PCDB + "INSERT INTO PC VALUES ('1099', 2.0, 512, 80, -5);",
+  query: "-- Oracle: ALTER TABLE PC ADD CONSTRAINT positivePrice CHECK (price >= 0);\n-- SQLite rebuild (SQLite-only):\nDELETE FROM PC WHERE price < 0;            -- 1. fix the rows that break the rule\nCREATE TABLE PC_new (\n  model CHAR(4) PRIMARY KEY, speed NUMBER(3,2), ram INT, hd INT, price NUMBER(7,2),\n  CONSTRAINT positivePrice CHECK (price >= 0)\n);                                         -- 2. new table with the constraint\nINSERT INTO PC_new SELECT * FROM PC;      -- 3. copy\nDROP TABLE PC;                            -- 4. drop the old table\nALTER TABLE PC_new RENAME TO PC;          -- 5. rename\nINSERT INTO PC VALUES ('1100', 2.0, 512, 80, -1);   -- now rejected by positivePrice",
+  note: 'Remove step 1 and press Reset then Run: step 3 fails with <code>CHECK constraint failed: positivePrice</code>, the SQLite counterpart of Oracle\'s ORA-02293 (cannot validate).' });
+const UC = `CREATE TABLE user_constraints (constraint_name VARCHAR2(30), constraint_type CHAR(1), table_name VARCHAR2(30),
+  search_condition VARCHAR2(200), r_constraint_name VARCHAR2(30), delete_rule VARCHAR2(10), status VARCHAR2(8));
+INSERT INTO user_constraints VALUES ('EMP_PK', 'P', 'EMPLOYEE', NULL, NULL, NULL, 'ENABLED');
+INSERT INTO user_constraints VALUES ('SYS_C007311', 'C', 'EMPLOYEE', '"NAME" IS NOT NULL', NULL, NULL, 'ENABLED');
+INSERT INTO user_constraints VALUES ('EMP_GENDER_CK', 'C', 'EMPLOYEE', 'gender IN (''M'', ''F'')', NULL, NULL, 'ENABLED');
+INSERT INTO user_constraints VALUES ('DEPT_PK', 'P', 'DEPARTMENT', NULL, NULL, NULL, 'ENABLED');
+INSERT INTO user_constraints VALUES ('DEPT_HEAD_FK', 'R', 'DEPARTMENT', NULL, 'EMP_PK', 'SET NULL', 'ENABLED');
+INSERT INTO user_constraints VALUES ('SYS_C007318', 'U', 'DEPARTMENT', NULL, NULL, NULL, 'ENABLED');
+INSERT INTO user_constraints VALUES ('PC_PK', 'P', 'PC', NULL, NULL, NULL, 'ENABLED');
+INSERT INTO user_constraints VALUES ('PC_MODEL_FK', 'R', 'PC', NULL, 'PRODUCT_PK', 'CASCADE', 'DISABLED');
+INSERT INTO user_constraints VALUES ('POSITIVEPRICE', 'C', 'PC', 'price >= 0', NULL, NULL, 'ENABLED');
+INSERT INTO user_constraints VALUES ('PC_SLOW_CK', 'C', 'PC', 'speed >= 2.0 OR price <= 800', NULL, NULL, 'DISABLED');
+INSERT INTO user_constraints VALUES ('PRODUCT_PK', 'P', 'PRODUCT', NULL, NULL, NULL, 'ENABLED');`;
+sqlPlay('#p3', { setup: UC, query: "SELECT constraint_name, constraint_type, search_condition, status\nFROM user_constraints\nWHERE table_name = 'DEPARTMENT';",
+  note: 'Mock data, shaped like Oracle\'s view. In real Oracle, SEARCH_CONDITION is a LONG column and cannot be used in WHERE with LIKE.' });
+
+flashcards('#cards', [
+  { f: 'CONSTRAINT name', b: 'Names a constraint, so errors show the name and ALTER TABLE can drop/disable it.' },
+  { f: 'SYS_Cnnnnnn', b: 'The name Oracle invents for an unnamed constraint.' },
+  { f: 'ALTER TABLE t ADD CONSTRAINT', b: 'Adds a constraint; all existing rows are validated first.' },
+  { f: 'ALTER TABLE t DROP CONSTRAINT', b: 'Removes a constraint by name (CASCADE also drops FKs that depend on a key).' },
+  { f: 'DISABLE / ENABLE CONSTRAINT', b: 'Oracle: switch checking off/on; ENABLE re-validates existing rows unless NOVALIDATE.' },
+  { f: 'USER_CONSTRAINTS', b: 'Oracle dictionary view of your constraints; types P, U, R (FK), C (check / not null).' },
+  { f: 'VALUE (slide 51)', b: 'Keyword of standard SQL domain constraints (CREATE DOMAIN); not valid in an Oracle table CHECK.' },
+  { f: '"dead" vs \'dead\'', b: 'Double quotes = identifier, single quotes = string. Oracle needs \'dead\'.' },
+]);
+quiz('#quiz', [
+  { q: 'Why give names to constraints (slide 51)?', opts: ['Unnamed constraints are not enforced', 'To be able to alter (drop, disable) them and to get readable error messages', 'Names make checks faster', 'Oracle requires names for CHECK'], a: 1, why: 'Unnamed constraints work but get SYS_C… names.' },
+  { q: 'How do you change the condition of the CHECK named positivePrice in Oracle?', opts: ['ALTER TABLE PC MODIFY CONSTRAINT positivePrice CHECK (price > 0)', 'DROP CONSTRAINT positivePrice, then ADD CONSTRAINT positivePrice CHECK (price > 0)', 'UPDATE user_constraints SET search_condition = …', 'It cannot be changed'], a: 1, why: 'Drop and re-add (slide 52). The dictionary views are read-only.' },
+  { q: 'PC contains a row with price -5. <code>ALTER TABLE PC ADD CONSTRAINT positivePrice CHECK (price &gt;= 0)</code>…', opts: ['adds the constraint and deletes the row', 'adds the constraint; only new rows are checked', 'fails with ORA-02293 (cannot validate)', 'sets the price to 0'], a: 2, why: 'Existing rows are validated by default. (ENABLE NOVALIDATE would skip them.)' },
+  { q: 'Which of slide 51\'s lines is valid Oracle as written?', opts: ['(1) ssn CHAR(50) CONSTRAINT ssnIsKey PRIMARY KEY', '(2) CHECK (VALUE >= 100000000 …)', '(3) CHECK (age >= 0 OR status = "dead")', 'none'], a: 0, why: '(2) uses the domain keyword VALUE; (3) uses double quotes for a string.' },
+  { q: 'In USER_CONSTRAINTS, a foreign key has CONSTRAINT_TYPE…', opts: ['F', 'R', 'K', 'U'], a: 1, why: 'R for "referential integrity".' },
+  { q: 'How is NOT NULL added to an existing column in Oracle?', opts: ['ALTER TABLE PC ADD CONSTRAINT nn NOT NULL (ram)', 'ALTER TABLE PC MODIFY (ram NOT NULL)', 'ALTER TABLE PC ADD NOT NULL ram', 'It cannot be added later'], a: 1, why: 'NOT NULL is a column constraint, changed with MODIFY.' },
+]);
+ask('#try1', { q: 'In the mock USER_CONSTRAINTS above, how many constraints are DISABLED?', a: 2, why: 'PC_MODEL_FK and PC_SLOW_CK.' });
+
+const NAMED = (t, ...names) => `(SELECT x.*, (SELECT count(*) FROM sqlite_master WHERE type = 'table' AND lower(name) = '${t.toLowerCase()}' AND ${names.map(n => `sql LIKE '%${n}%'`).join(' AND ')}) AS named FROM ${t} x)`;
+sqlCheck('#c1', { setup: PCDB + "CREATE TABLE PrinterIn AS SELECT * FROM Printer;\nINSERT INTO PrinterIn VALUES ('3010', 'T', 'laser', -20);",
+  check: 'state', table: NAMED('Printer2', 'positivePrice'),
+  task: 'Easy. Create Printer2(model CHAR(4) PRIMARY KEY, color CHAR(1), type VARCHAR2(10), price NUMBER(7,2)) with a CHECK named <code>positivePrice</code> requiring price ≥ 0 (slide 52\'s constraint).<br><i>End your answer with:</i> <code>INSERT OR IGNORE INTO Printer2 SELECT * FROM PrinterIn;</code>',
+  solution: "CREATE TABLE Printer2 (\n  model CHAR(4) PRIMARY KEY, color CHAR(1), type VARCHAR2(10), price NUMBER(7,2),\n  CONSTRAINT positivePrice CHECK (price >= 0)\n);\nINSERT OR IGNORE INTO Printer2 SELECT * FROM PrinterIn;" });
+sqlCheck('#c2', { setup: "CREATE TABLE PersonIn (ssn NUMBER(9), name VARCHAR2(30), age NUMBER(3), status VARCHAR2(10));\nINSERT INTO PersonIn VALUES (123456789, 'Ann', 30, 'alive');\nINSERT INTO PersonIn VALUES (987654321, 'Bob', -1, 'dead');\nINSERT INTO PersonIn VALUES (555555555, 'Cy', -4, 'alive');\nINSERT INTO PersonIn VALUES (12345, 'Di', 40, 'alive');\nINSERT INTO PersonIn VALUES (123456789, 'Ed', 22, 'alive');",
+  check: 'state', table: NAMED('Person', 'ssnIsKey', 'ninedigits', 'rightage'),
+  task: 'Write slide 51\'s three constraints correctly for Oracle in Person(ssn NUMBER(9), name VARCHAR2(30), age NUMBER(3), status VARCHAR2(10)): primary key <code>ssnIsKey</code> on ssn, <code>ninedigits</code> (ssn has exactly 9 digits), <code>rightage</code> (age ≥ 0 unless status is \'dead\').<br><i>End your answer with:</i> <code>INSERT OR IGNORE INTO Person SELECT * FROM PersonIn;</code>',
+  solution: "CREATE TABLE Person (\n  ssn    NUMBER(9) CONSTRAINT ssnIsKey PRIMARY KEY\n                   CONSTRAINT ninedigits CHECK (ssn BETWEEN 100000000 AND 999999999),\n  name   VARCHAR2(30),\n  age    NUMBER(3),\n  status VARCHAR2(10),\n  CONSTRAINT rightage CHECK (age >= 0 OR status = 'dead')\n);\nINSERT OR IGNORE INTO Person SELECT * FROM PersonIn;" });
+sqlCheck('#c3', { setup: UC,
+  task: 'Using the mock USER_CONSTRAINTS: list the name and type of every constraint of table PC.',
+  solution: "SELECT constraint_name, constraint_type FROM user_constraints WHERE table_name = 'PC';" });
+sqlCheck('#c4', { setup: UC,
+  task: 'Using the mock USER_CONSTRAINTS: list the name, table and delete rule of every <b>foreign key</b>.',
+  solution: "SELECT constraint_name, table_name, delete_rule FROM user_constraints WHERE constraint_type = 'R';" });
+sqlCheck('#c5', { setup: PCDB + "INSERT INTO Laptop VALUES ('2011', 2.4, 1024, 0, 14.0, 1400);\nINSERT INTO Laptop VALUES ('2012', 1.9, -512, 120, 15.6, 800);\nINSERT INTO Laptop VALUES ('2013', 2.1, 2048, 256, 15.6, -1);",
+  task: 'Exam level. You are about to run <code>ALTER TABLE Laptop ADD CONSTRAINT laptop_nonneg CHECK (ram &gt;= 0 AND hd &gt; 0 AND price &gt;= 0)</code>, and Oracle answers ORA-02293. List the models of the rows that block it (invented rows were added).',
+  hint: 'Rows where NOT (ram >= 0 AND hd > 0 AND price >= 0).',
+  solution: 'SELECT model FROM Laptop WHERE NOT (ram >= 0 AND hd > 0 AND price >= 0);' });
+sqlCheck('#c6', { setup: PCDB + "INSERT INTO PC VALUES ('1099', 2.0, 512, 80, -5);",
+  check: 'state', table: NAMED('PC', 'positivePrice'),
+  task: 'Exam level, SQLite rebuild. Give PC the constraint <code>positivePrice CHECK (price &gt;= 0)</code>. PC has one row with a negative price: delete it first. Then rebuild PC with the constraint (create PC_new, copy, drop PC, rename) as in the playground of section 2.',
+  solution: "DELETE FROM PC WHERE price < 0;\nCREATE TABLE PC_new (\n  model CHAR(4) PRIMARY KEY, speed NUMBER(3,2), ram INT, hd INT, price NUMBER(7,2),\n  CONSTRAINT positivePrice CHECK (price >= 0)\n);\nINSERT INTO PC_new SELECT * FROM PC;\nDROP TABLE PC;\nALTER TABLE PC_new RENAME TO PC;" });
+</script>
+</body>
+</html>

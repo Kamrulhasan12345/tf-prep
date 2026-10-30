@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Answering Questions with Outer Joins · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 09 (Ishrak) · Chapter 2 · Slides 7–19</div>
+<h1>Answering Questions with Outer Joins</h1>
+<p class="lede">Slides 7–19 use the four join types to answer four questions about makers: PCs and laptops, PCs but not laptops, laptops but not PCs, and PCs or laptops. The key pattern is the anti-join: an outer join followed by IS NULL. The chapter ends with slide 19's puzzle, "Can you write it? Why or why not?", worked in full.</p>
+
+<p>All queries use the tables of slide 3: PC = {(1001, A), (1002, B), (1003, C)} and Laptop = {(2001, A), (2002, B), (2003, D)}. So A and B make both, C makes only PCs and D makes only laptops.</p>
+
+<h2>1. Makers of both PCs and laptops: inner join (slides 7–9)</h2>
+<p>A maker sells both exactly when some PC row and some laptop row have that maker, that is, when the PC row survives an inner join on maker (slide 8's result has rows for A and B). Slide 9 projects onto the maker:</p>
+<pre>SELECT DISTINCT PC.maker
+FROM   PC INNER JOIN Laptop
+       ON PC.maker = Laptop.maker;          -- A, B</pre>
+<p>DISTINCT matters as soon as a maker has several models: a maker with 3 PCs and 3 laptops produces 3 · 3 = 9 joined rows. On the full computer database of Lecture 08 this same question was answered with INTERSECT; both give the same set.</p>
+<div id="p9"></div>
+
+<h2>2. Makers of PCs but not laptops: the anti-join (slides 10–12)</h2>
+<p>The left outer join of slide 11 keeps every PC. A PC whose maker has a laptop is matched, so its Laptop columns are filled in. A PC whose maker has <em>no</em> laptop is dangling, so its Laptop columns are NULL. Therefore "maker has no laptop" is the same as "Laptop.maker IS NULL in the left join":</p>
+<pre>SELECT DISTINCT PC.maker
+FROM   PC LEFT OUTER JOIN Laptop
+       ON PC.maker = Laptop.maker
+WHERE  PC.maker IS NOT NULL
+AND    Laptop.maker IS NULL;                -- C</pre>
+<dl class="def">
+<dt>Anti-join</dt>
+<dd>The rows of one table that have <em>no</em> match in another. Pattern: <code>A LEFT JOIN B ON condition WHERE B.key IS NULL</code>. The IS NULL test must be on a column of B that can never be NULL in a real B row (its key, or the join column), so that NULL can only mean "padded".</dd>
+</dl>
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="anti"></div>
+</figure>
+<p>Why does slide 12 also test <code>PC.maker IS NOT NULL</code>? On this data it changes nothing, since every PC row has a maker. It protects against a PC stored with an unknown maker: that row would be dangling too (NULL = anything is never true), and without the test the answer would contain a NULL "maker". You must use <code>IS NULL</code>, never <code>= NULL</code>: a comparison with NULL is unknown, so <code>Laptop.maker = NULL</code> would be true for no row at all (Lecture 10, Chapter 1).</p>
+<div id="p12"></div>
+
+<h2>3. Makers of laptops but not PCs (slides 13–15)</h2>
+<p>The mirror image: the right outer join keeps every laptop, and the laptops whose maker has no PC have NULL in the PC columns (slide 14's last row).</p>
+<pre>SELECT DISTINCT Laptop.maker
+FROM   PC RIGHT OUTER JOIN Laptop
+       ON PC.maker = Laptop.maker
+WHERE  PC.maker IS NULL
+AND    Laptop.maker IS NOT NULL;            -- D</pre>
+<p>Writing <code>FROM Laptop LEFT OUTER JOIN PC ON …</code> with the same WHERE gives the same answer. This is the outer-join version of Lecture 08's <code>laptop MINUS pc</code>.</p>
+<div id="p15"></div>
+
+<h2>4. Makers of laptops or PCs or both (slides 16–19)</h2>
+<p>The full outer join (slide 17) contains every maker somewhere: A and B in matched rows, C in a row whose Laptop columns are NULL, D in a row whose PC columns are NULL. The difficulty is that the maker's name sits in <em>different columns</em> in different rows. Slide 18 collects it from both columns with two queries and a UNION:</p>
+<pre>SELECT DISTINCT PC.maker
+FROM   PC FULL OUTER JOIN Laptop ON PC.maker = Laptop.maker
+WHERE  PC.maker IS NOT NULL
+UNION
+SELECT DISTINCT Laptop.maker
+FROM   PC FULL OUTER JOIN Laptop ON PC.maker = Laptop.maker
+WHERE  Laptop.maker IS NOT NULL;            -- A, B, C, D</pre>
+<p>(The DISTINCTs are not needed, because UNION removes duplicates anyway; they do no harm.)</p>
+<div id="p18"></div>
+
+<div class="q">
+<h4>Question (worked answer): slide 19, "Can you write it? Why or why not?"</h4>
+<p>Slide 19 proposes a single query instead of the union:</p>
+<pre>SELECT DISTINCT PC.maker
+FROM   PC FULL OUTER JOIN Laptop ON PC.maker = Laptop.maker
+WHERE  PC.maker IS NOT NULL
+OR     Laptop.maker IS NOT NULL;</pre>
+<p><strong>No, this is wrong.</strong> The WHERE clause is fine: every row of the full join has at least one maker, so all 4 rows pass. The problem is the SELECT list. It always outputs <code>PC.maker</code>, and in the row for D (the laptop-only maker) PC.maker is NULL. The result is A, B, C, <strong>NULL</strong>: D is lost and a NULL appears in its place. The slide's circle around <code>PC.maker</code> marks exactly this.</p>
+<figure class="wide"><span class="anim-tag">Animation</span><div id="s19"></div></figure>
+<p><strong>The fix</strong> is to output whichever of the two maker columns is not NULL. Oracle's <code>NVL(a, b)</code> returns a unless it is NULL, in which case it returns b (<code>COALESCE(a, b)</code> is the standard equivalent):</p>
+<pre>SELECT DISTINCT NVL(PC.maker, Laptop.maker) AS maker
+FROM   PC FULL OUTER JOIN Laptop ON PC.maker = Laptop.maker;   -- A, B, C, D</pre>
+<p>No WHERE clause is needed, since every row of the full join has a maker in at least one column. Of course, the simplest correct answer needs no join at all: <code>SELECT maker FROM PC UNION SELECT maker FROM Laptop</code>.</p>
+</div>
+<div id="p19"></div>
+
+<h3>The four questions side by side</h3>
+<div class="tbl"><table>
+<tr><th>Question</th><th>Outer-join form</th><th>Set-operator form (Lec 08)</th><th>Answer</th></tr>
+<tr><td>PCs and laptops</td><td>INNER JOIN</td><td>INTERSECT</td><td>A, B</td></tr>
+<tr><td>PCs, not laptops</td><td>LEFT JOIN … WHERE Laptop.maker IS NULL</td><td>pc MINUS laptop</td><td>C</td></tr>
+<tr><td>laptops, not PCs</td><td>RIGHT JOIN … WHERE PC.maker IS NULL</td><td>laptop MINUS pc</td><td>D</td></tr>
+<tr><td>PCs or laptops</td><td>FULL JOIN with NVL(PC.maker, Laptop.maker)</td><td>UNION</td><td>A, B, C, D</td></tr>
+</table></div>
+<p>Lecture 11 adds a third way to write the "not" questions: <code>NOT EXISTS</code> and <code>NOT IN</code> subqueries.</p>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<h3>Try it in SQL</h3>
+<p>Exercise 1 uses PC/Laptop of slide 3; 2–3 the computer database; 4–6 the HR schema.</p>
+<div id="c1"></div><div id="c2"></div><div id="c3"></div><div id="c4"></div><div id="c5"></div><div id="c6"></div>
+
+<div class="key"><p><strong>Summary:</strong> "both" is an inner join; "A but not B" is an anti-join, a left (or right) outer join keeping only the rows where B's columns are NULL (test with IS NULL on a B column that is never NULL in real rows); "either" is a full outer join, where the value may sit in either table's columns, so output NVL(left.col, right.col). Slide 19's single query fails because it always prints PC.maker, which is NULL for the laptop-only maker D.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/sqlplay.js"></script>
+<script src="../i08/lecture.js"></script>
+<script>
+const H4 = ['PC.model', 'PC.maker', 'Laptop.model', 'Laptop.maker'];
+const LJ = [[1001, 'A', 2001, 'A'], [1002, 'B', 2002, 'B'], [1003, 'C', null, null]];
+stepper('#anti', [
+  { html: row2(rel('PC LEFT OUTER JOIN Laptop', H4, LJ)), cap: 'Slide 11: the left join keeps all three PCs. C has no laptop, so its Laptop columns are padded with NULL.' },
+  { html: row2(rel('WHERE PC.maker IS NOT NULL AND Laptop.maker IS NULL', H4, LJ, { cls: { 0: 'del', 1: 'del', 2: 'new' }, side: { 0: 'Laptop.maker = A', 1: 'Laptop.maker = B', 2: 'Laptop.maker IS NULL ✓' } })), cap: 'The WHERE clause keeps only rows whose Laptop columns are NULL, i.e. the dangling PCs.' },
+  { html: row2(rel('SELECT DISTINCT PC.maker', ['maker'], [['C']], { cls: { 0: 'new' } })), cap: 'Slide 12: C is the only maker of PCs but not laptops.' },
+]);
+const FJ = [[1001, 'A', 2001, 'A'], [1002, 'B', 2002, 'B'], [1003, 'C', null, null], [null, null, 2003, 'D']];
+stepper('#s19', [
+  { html: row2(rel('PC FULL OUTER JOIN Laptop', H4, FJ)), cap: 'The full join has 4 rows: two matches and one dangling row from each side.' },
+  { html: row2(rel('WHERE PC.maker IS NOT NULL OR Laptop.maker IS NOT NULL', H4, FJ, { cls: { 0: 'new', 1: 'new', 2: 'new', 3: 'new' } })), cap: 'Every row has at least one non-NULL maker, so all 4 rows pass the WHERE clause.' },
+  { html: row2(rel('SELECT DISTINCT PC.maker', ['PC.maker'], [['A'], ['B'], ['C'], [null]], { cls: { 3: 'del' }, side: { 3: 'D is lost!' } })), cap: 'But the SELECT list reads PC.maker. In the D row that column is NULL, so the output is A, B, C, NULL. <b>D is missing.</b>' },
+  { html: row2(rel('SELECT DISTINCT NVL(PC.maker, Laptop.maker)', ['maker'], [['A'], ['B'], ['C'], ['D']], { cls: { 3: 'new' } })), cap: 'Fix: NVL takes Laptop.maker whenever PC.maker is NULL. Result A, B, C, D (slide 19\'s intended answer).' },
+]);
+sqlPlay('#p9', { setup: JOINPC, query: 'SELECT DISTINCT PC.maker\nFROM   PC INNER JOIN Laptop\n       ON PC.maker = Laptop.maker;' });
+sqlPlay('#p12', { setup: JOINPC, query: 'SELECT DISTINCT PC.maker\nFROM   PC LEFT OUTER JOIN Laptop\n       ON PC.maker = Laptop.maker\nWHERE  PC.maker IS NOT NULL\nAND    Laptop.maker IS NULL;', note: 'Try "Laptop.maker = NULL" instead of IS NULL: no rows.' });
+sqlPlay('#p15', { setup: JOINPC, query: 'SELECT DISTINCT Laptop.maker\nFROM   PC RIGHT OUTER JOIN Laptop\n       ON PC.maker = Laptop.maker\nWHERE  PC.maker IS NULL\nAND    Laptop.maker IS NOT NULL;' });
+sqlPlay('#p18', { setup: JOINPC, query: 'SELECT DISTINCT PC.maker\nFROM   PC FULL OUTER JOIN Laptop ON PC.maker = Laptop.maker\nWHERE  PC.maker IS NOT NULL\nUNION\nSELECT DISTINCT Laptop.maker\nFROM   PC FULL OUTER JOIN Laptop ON PC.maker = Laptop.maker\nWHERE  Laptop.maker IS NOT NULL;' });
+sqlPlay('#p19', { setup: JOINPC, query: '-- slide 19 as written: returns A, B, C and NULL\nSELECT DISTINCT PC.maker\nFROM   PC FULL OUTER JOIN Laptop ON PC.maker = Laptop.maker\nWHERE  PC.maker IS NOT NULL\nOR     Laptop.maker IS NOT NULL;', note: 'Replace PC.maker in the SELECT list with NVL(PC.maker, Laptop.maker) and remove the WHERE clause.' });
+flashcards('#cards', [
+  { f: 'Anti-join pattern', b: 'A LEFT JOIN B ON cond WHERE B.key IS NULL: rows of A with no match in B.' },
+  { f: 'Why IS NULL and not = NULL?', b: 'Any comparison with NULL is unknown, never true; IS NULL is the only test for NULL.' },
+  { f: 'Makers of both (outer-join lecture)', b: 'SELECT DISTINCT PC.maker FROM PC INNER JOIN Laptop ON PC.maker = Laptop.maker.' },
+  { f: 'Slide 19 bug', b: 'SELECT PC.maker on a full join returns NULL for laptop-only makers; D is lost.' },
+  { f: 'NVL(a, b)', b: 'Oracle: a if a is not NULL, else b. Standard: COALESCE(a, b).' },
+]);
+quiz('#quiz', [
+  { q: 'Which query finds makers of PCs but not laptops?', opts: ['PC INNER JOIN Laptop … WHERE Laptop.maker IS NULL', 'PC LEFT JOIN Laptop … WHERE Laptop.maker IS NULL', 'PC LEFT JOIN Laptop … WHERE PC.maker IS NULL', 'PC RIGHT JOIN Laptop … WHERE Laptop.maker IS NULL'], a: 1, why: 'The inner join never has NULL Laptop columns; the left join pads unmatched PCs.' },
+  { q: 'What does slide 19\'s query return?', opts: ['A, B, C, D', 'A, B, C, NULL', 'A, B', 'an error'], a: 1, why: 'The D row has PC.maker NULL.' },
+  { q: 'WHERE Laptop.maker = NULL returns…', opts: ['the dangling rows', 'no rows', 'all rows', 'an error'], a: 1, why: 'x = NULL is unknown for every x.' },
+  { q: 'In the full join of slides 17–19, how many rows have both maker columns non-NULL?', opts: ['0', '2', '3', '4'], a: 1, why: 'The matched rows for A and B.' },
+  { q: 'A maker has 2 PCs and 4 laptops. How many rows does it contribute to PC INNER JOIN Laptop ON maker?', opts: ['2', '4', '6', '8'], a: 3, why: '2 · 4 = 8, which is why slide 9 uses DISTINCT.' },
+]);
+sqlCheck('#c1', { setup: JOINPC, task: '1. (Easy) Write slide 19\'s question correctly with a full outer join: makers of laptops or PCs or both, each once.', solution: 'SELECT DISTINCT NVL(PC.maker, Laptop.maker) FROM PC FULL OUTER JOIN Laptop ON PC.maker = Laptop.maker;', hint: 'NVL(PC.maker, Laptop.maker).' });
+sqlCheck('#c2', { setup: PCDB, task: '2. Using a left outer join from Product to PC, list the models in Product that do not appear in PC.', solution: 'SELECT Product.model FROM Product LEFT OUTER JOIN PC ON Product.model = PC.model WHERE PC.model IS NULL;' });
+sqlCheck('#c3', { setup: PCDB, task: '3. List the makers that make printers but no PCs, using an outer join (hint: join Product rows of type printer with Product rows of type pc of the same maker).', solution: "SELECT DISTINCT p1.maker FROM Product p1 LEFT OUTER JOIN Product p2 ON p1.maker = p2.maker AND p2.type = 'pc' WHERE p1.type = 'printer' AND p2.model IS NULL;", hint: "The condition p2.type = 'pc' must go in ON, not WHERE (see Chapter 1, section 5)." });
+sqlCheck('#c4', { setup: HR, task: '4. List the names of departments that have no employees.', solution: 'SELECT d.DEPARTMENTNAME FROM DEPARTMENT d LEFT JOIN EMPLOYEE e ON e.DEPARTMENTID = d.DEPARTMENTID WHERE e.EMPLOYEEID IS NULL;' });
+sqlCheck('#c5', { setup: HR, task: '5. (Exam: DB QB 23-24 3a(ii)) Print the last names of the employees who never changed their job or department (they have no row in JOB_HISTORY). Use an outer join.', solution: 'SELECT e.LASTNAME FROM EMPLOYEE e LEFT JOIN JOB_HISTORY h ON h.EMPLOYEEID = e.EMPLOYEEID WHERE h.EMPLOYEEID IS NULL;', hint: 'Anti-join EMPLOYEE against JOB_HISTORY.' });
+sqlCheck('#c6', { setup: HR, task: '6. (Exam style) List every job title with the last names of the employees currently holding it; jobs that nobody holds must appear with NULL.', solution: 'SELECT j.JOBTITLE, e.LASTNAME FROM JOB j LEFT JOIN EMPLOYEE e ON e.JOBID = j.JOBID;' });
+</script>
+</body>
+</html>

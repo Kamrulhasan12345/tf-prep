@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dates in Oracle · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="../i03/lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 03 (Ishrak) · Chapter 4 · Slides 21–26 · Book §2.3.2, §6.1.5</div>
+<h1>Dates in Oracle</h1>
+<p class="lede">The DATE type, how Oracle turns strings into dates (implicitly with its default format, or explicitly with TO_DATE), how it turns dates back into text (TO_CHAR and format masks), why '01-JAN-74' means 1974 but '01-JAN-14' means 2014, and what arithmetic is allowed on dates.</p>
+
+<h2>1. The DATE type (slide 21)</h2>
+<dl class="def">
+  <dt>DATE</dt>
+  <dd>A data type for calendar dates. In standard SQL a DATE holds year, month and day, and a date constant is written <code>DATE 'YYYY-MM-DD'</code>, for example <code>DATE '1994-10-21'</code>. In Oracle a DATE also stores a time of day (hours, minutes, seconds); when you give only a date, the time is midnight, 00:00:00.</dd>
+</dl>
+<p>Slide 21 adds a <code>dob DATE</code> column to the Student table:</p>
+<pre>CREATE TABLE Student (
+    name     CHAR(50),
+    id       NUMBER(10),
+    gender   CHAR(1),
+    dob      DATE,
+    address  CHAR(100),
+    gpa      FLOAT
+);</pre>
+<p>Oracle accepts the standard literal <code>DATE '1994-10-21'</code>. The literal is always year-month-day with dashes, whatever the session's settings, which makes it the safest way to write a constant date.</p>
+
+<h2>2. Oracle's default format and the RR rule (slide 22)</h2>
+<p>When a string is put where a DATE is expected, Oracle converts it using the session's default date format, <code>NLS_DATE_FORMAT</code>. In a standard English installation that format is <code>DD-MON-RR</code>: two-digit day, three-letter month, and a two- or four-digit year. The slide calls it "DD-MON-YYYY or DD-MON-YY"; strings in either form are accepted, and if you use this format you do not need TO_DATE:</p>
+<pre>CREATE TABLE foo (n NUMBER, d DATE);
+INSERT INTO foo VALUES (1, '01-JAN-1974');   -- 1  01-01-1974
+INSERT INTO foo VALUES (2, '01-JAN-74');     -- 2  01-01-1974
+INSERT INTO foo VALUES (3, '01-JAN-2014');   -- 3  01-01-2014
+INSERT INTO foo VALUES (4, '01-JAN-14');     -- 4  01-01-2014</pre>
+<p>Rows 2 and 4 are the interesting ones: the two-digit years 74 and 14 land in different centuries. That is the <b class="term">RR</b> rule (the last line of slide 24):</p>
+<dl class="def">
+  <dt>RR (two-digit year with a century window)</dt>
+  <dd>A two-digit year is placed in the 100-year window around the current year. For any current year from 2000 to 2049: <strong>00–49 → 2000–2049</strong> and <strong>50–99 → 1950–1999</strong>. So 74 → 1974, 14 → 2014, 06 → 2006.</dd>
+  <dt>YY (two-digit year, current century)</dt>
+  <dd>A two-digit year always gets the current century: in 2026, <code>TO_DATE('01-JAN-74', 'DD-MON-YY')</code> is 1 January <strong>2074</strong>.</dd>
+</dl>
+<figure>
+<svg viewBox="0 0 640 134" width="640" role="img" aria-label="RR maps two-digit years 50 to 99 to 1950-1999 and 00 to 49 to 2000-2049">
+  <g id="rrfig"></g>
+</svg>
+<figcaption><b>Figure 1.</b> The RR window for a current year between 2000 and 2049. Two-digit years from 50 up go to the 1900s; years below 50 go to the 2000s. With YY, every two-digit year goes to the 2000s.</figcaption>
+</figure>
+<p>Relying on the default format is convenient but fragile: another session can have a different <code>NLS_DATE_FORMAT</code>, and then the same INSERT fails or stores a different date. In programs and exam answers, prefer <code>DATE 'YYYY-MM-DD'</code> or an explicit <code>TO_DATE</code>.</p>
+
+<h2>3. TO_DATE: string to date (slide 23)</h2>
+<dl class="def">
+  <dt>TO_DATE(string, 'format')</dt>
+  <dd>Converts a string to a DATE, reading the string according to the format mask. The mask is built from the elements in the table of slide 24 (Oracle has over 40). Punctuation such as <code>-</code>, <code>/</code> and spaces in the mask matches the same punctuation in the string.</dd>
+</dl>
+<pre>TO_DATE('1994-10-21', 'YYYY-MM-DD')     -- 21 October 1994
+TO_DATE('1994-OCT-21', 'YYYY-MON-DD')   -- 21 October 1994
+TO_DATE('94-OCT-21', 'RR-MON-DD')       -- 21 October 1994 (94 → 1994 by RR)</pre>
+<p>(The slide writes the masks as <code>'YYYY –MM-DD'</code> with a space and a long dash; those are typing artefacts. Write the punctuation exactly as it appears in the string.)</p>
+<p>The animation shows how Oracle reads a string with a mask: each mask element consumes the matching part of the string.</p>
+<figure>
+<span class="anim-tag">Animation</span>
+<div id="parseA"></div>
+</figure>
+
+<h2>4. Format mask elements (slide 24)</h2>
+<div class="tbl"><table>
+<tr><th>Element</th><th>Meaning</th><th>Example for 24 July 1998</th></tr>
+<tr><td><code>MM</code></td><td>numeric month</td><td>07</td></tr>
+<tr><td><code>MON</code></td><td>abbreviated month name</td><td>JUL</td></tr>
+<tr><td><code>MONTH</code></td><td>full month name (padded with blanks to 9 characters)</td><td>JULY␣␣␣␣␣</td></tr>
+<tr><td><code>DD</code></td><td>day of month</td><td>24</td></tr>
+<tr><td><code>DY</code></td><td>abbreviated day name, e.g. <code>TO_CHAR(DoB, 'DY DD/MM/YYYY')</code></td><td>FRI 24/07/1998</td></tr>
+<tr><td><code>DAY</code></td><td>full day name</td><td>FRIDAY</td></tr>
+<tr><td><code>YYYY</code></td><td>4-digit year</td><td>1998</td></tr>
+<tr><td><code>YY</code></td><td>last 2 digits of the year (input: current century)</td><td>98</td></tr>
+<tr><td><code>RR</code></td><td>like YY, but on input the year is placed in 1950–2049 (see above)</td><td>98</td></tr>
+<tr><td><code>HH24</code>, <code>MI</code>, <code>SS</code></td><td>hour (00–23), minute, second (not on the slide)</td><td>00, 00, 00</td></tr>
+</table></div>
+
+<h2>5. TO_CHAR: date to string (slide 25)</h2>
+<dl class="def">
+  <dt>TO_CHAR(date, 'format')</dt>
+  <dd>Formats a DATE as a string using the same mask elements. It is how you control how dates are displayed.</dd>
+</dl>
+<pre>TO_CHAR(dob, 'YYYY-MM-DD')      →  1994-10-21
+TO_CHAR(dob, 'YYYY-MON-DD')     →  1994-OCT-21
+TO_CHAR(dob, 'YY-MONTH-DD')     →  94-OCTOBER  -21     (slide shows 94-OCTOBER-21)</pre>
+<p>One correction to slide 25: <code>MONTH</code> pads the name with blanks to the length of the longest month name, SEPTEMBER (9 letters), so OCTOBER is followed by two blanks. To suppress the padding, add the <code>FM</code> ("fill mode") modifier: <code>TO_CHAR(dob, 'YY-FMMONTH-DD')</code> gives <code>94-OCTOBER-21</code>.</p>
+<p>Try TO_DATE and TO_CHAR below. (The playground supports the masks YYYY, YY, MONTH, MON, MM, DD, DAY, HH24, MI, SS, and TO_DATE strings in the forms DD-MON-YYYY, DD-MON-RR, YYYY-MM-DD and DD/MM/YYYY. It does not pad MONTH. It shows unformatted dates as YYYY-MM-DD, where Oracle would show 21-OCT-94.)</p>
+<div id="p1"></div>
+
+<h2>6. Date arithmetic (slide 26)</h2>
+<ul>
+  <li><strong>Comparison:</strong> two dates can be compared with <code>= &lt;&gt; &lt; &gt; &lt;= &gt;=</code>; earlier dates are smaller. <code>WHERE dob &lt; DATE '2002-01-01'</code> finds people born before 2002.</li>
+  <li><strong>Subtraction of two dates</strong> gives the number of days between them, as a NUMBER; leap years are counted correctly. Because Oracle dates carry a time, the result can have a fraction (half a day = 0.5).</li>
+  <li><strong>Date ± integer</strong> gives a date that many days later or earlier: <code>hire_date + 30</code>.</li>
+  <li><strong>No other arithmetic:</strong> adding two dates, or multiplying or dividing a date, is an error (what would 21 October + 5 March mean?).</li>
+  <li><strong>SYSDATE</strong> returns the current date and time of the database server.</li>
+</ul>
+<pre>SELECT DATE '2024-03-01' - DATE '2024-02-01' FROM dual;   -- 29 (2024 is a leap year)
+SELECT DATE '2024-02-25' + 7 FROM dual;                   -- 03-MAR-24
+SELECT name, (SYSDATE - dob) / 365.25 AS age_years FROM Students;</pre>
+<figure>
+<span class="anim-tag">Animation</span>
+<div id="diffA"></div>
+</figure>
+<p>The playground cannot run Oracle date subtraction (SQLite stores these dates as text). The SQLite equivalent, labelled as such, uses <code>julianday</code>, which turns a date into a day number:</p>
+<div id="p2"></div>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div><div id="try2"></div><div id="try3"></div>
+<h3>SQL exercises</h3>
+<div id="c1"></div><div id="c2"></div><div id="c3"></div><div id="c4"></div><div id="c5"></div>
+
+<div class="key"><p><strong>Summary:</strong> a DATE holds a date (and, in Oracle, a time). Write constants as <code>DATE 'YYYY-MM-DD'</code> or with <code>TO_DATE(string, mask)</code>; strings in the default format DD-MON-RR are converted implicitly. RR puts two-digit years 50–99 in the 1900s and 00–49 in the 2000s; YY always uses the current century. <code>TO_CHAR(date, mask)</code> formats dates for output (MONTH is blank-padded; FM removes the padding). Dates can be compared, subtracted (giving days) and shifted by a number of days; SYSDATE is the current date and time.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/sqlplay.js"></script>
+<script src="../i03/lecture.js"></script>
+<script>
+// RR window figure
+(() => {
+  const X = y => 40 + (y - 1940) * 4.9;
+  let s = `<path d="M30 60 L${X(2062)} 60" class="s-fg" marker-end="url(#m-fg)"/>`;
+  for (let y = 1940; y <= 2060; y += 10) s += `<path d="M${X(y)} 56 L${X(y)} 64" class="s-fg"/><text x="${X(y)}" y="80" text-anchor="middle" class="lbl">${y}</text>`;
+  s += `<rect x="${X(1950)}" y="30" width="${X(2000) - X(1950)}" height="20" class="cell-hl"/><text x="${(X(1950) + X(2000)) / 2}" y="44" text-anchor="middle" style="font-size:12px">RR 50–99 → 1950–1999</text>`;
+  s += `<rect x="${X(2000)}" y="30" width="${X(2050) - X(2000)}" height="20" class="cell-new"/><text x="${(X(2000) + X(2050)) / 2}" y="44" text-anchor="middle" style="font-size:12px">RR 00–49 → 2000–2049</text>`;
+  s += `<rect x="${X(2000)}" y="92" width="${X(2100 > 2062 ? 2062 : 2100) - X(2000)}" height="20" class="cell"/><text x="${X(2000) + 6}" y="106" style="font-size:12px">YY 00–99 → 2000–2099 (current century)</text>`;
+  s += `<path d="M${X(2026)} 54 L${X(2026)} 66" class="s-red" style="stroke-width:3"/><text x="${X(2026)}" y="126" text-anchor="middle" class="red lbl">red tick = now (2026)</text>`;
+  s += `<circle cx="${X(1974)}" cy="60" r="5" class="cell-del"/><text x="${X(1974)}" y="96" text-anchor="middle" class="lbl">74 → 1974</text>`;
+  s += `<circle cx="${X(2014)}" cy="60" r="5" class="cell-del"/>`;
+  document.querySelector('#rrfig').innerHTML = s;
+})();
+// TO_DATE parsing animation
+(() => {
+  const parts = [['94', 'RR', 'two-digit year, RR rule: 94 ≥ 50 → <b>1994</b>'], ['-', '-', 'punctuation must match'], ['OCT', 'MON', 'abbreviated month name → month <b>10</b>'], ['-', '-', 'punctuation'], ['21', 'DD', 'day of month → <b>21</b>']];
+  const fr = k => `<div class="tbl"><table><tr><th>string</th>${parts.map((p, i) => `<td style="${i < k ? 'background:var(--cell-hl)' : ''}"><code>${p[0]}</code></td>`).join('')}</tr><tr><th>mask</th>${parts.map((p, i) => `<td style="${i === k - 1 ? 'box-shadow:inset 0 0 0 2px var(--red)' : ''}"><code>${p[1]}</code></td>`).join('')}</tr></table></div>` +
+    `<p style="margin:6px 0 0">result so far: <code>${k >= 5 ? '1994-10-21 (21-OCT-94), time 00:00:00' : `year ${k >= 1 ? 1994 : '?'}, month ${k >= 3 ? 10 : '?'}, day ${k >= 5 ? 21 : '?'}`}</code></p>`;
+  stepper('#parseA', [{ html: fr(0), cap: "<code>TO_DATE('94-OCT-21', 'RR-MON-DD')</code>: Oracle walks the string and the mask together, left to right." },
+    ...parts.map((p, i) => ({ html: fr(i + 1), cap: `Mask element <code>${p[1]}</code> reads <code>${p[0]}</code>: ${p[2]}.` })),
+    { html: fr(5), cap: 'All elements consumed: the DATE 21 October 1994, midnight. If the string had a part the mask could not read (say <code>\'94-10-21\'</code> against MON), Oracle would raise an error.' }]);
+})();
+// day difference animation: 2024-02-01 to 2024-03-01
+(() => {
+  const fr = upto => {
+    let s = '';
+    for (let d = 0; d < 30; d++) {
+      const x = 14 + (d % 15) * 40, y = 14 + Math.floor(d / 15) * 46, lab = d < 29 ? `Feb ${d + 1}` : 'Mar 1';
+      s += `<rect x="${x}" y="${y}" width="36" height="30" class="${d === 0 ? 'cell-hl' : d === 29 ? 'cell-new' : d < upto ? 'cell' : 'cell-plain'}"/><text x="${x + 18}" y="${y + 19}" text-anchor="middle" style="font-size:11px">${lab}</text>`;
+    }
+    return `<svg viewBox="0 0 620 110" width="620" role="img" aria-label="Counting days from 1 Feb to 1 Mar 2024">${s}<text x="14" y="104" class="lbl">blue = days counted: ${Math.min(upto, 29)}</text></svg>`;
+  };
+  stepper('#diffA', [
+    { html: fr(0), cap: "<code>DATE '2024-03-01' - DATE '2024-02-01'</code>: count the days from 1 February up to (not including) 1 March." },
+    { html: fr(15), cap: 'Halfway: 15 days counted.' },
+    { html: fr(29), cap: '2024 is a leap year (divisible by 4, not a century), so February has 29 days. The difference is <b>29</b>. In 2023 the same subtraction gives 28.' },
+  ]);
+})();
+sqlPlay('#p1', { setup: UNI, query: "SELECT name,\n       TO_CHAR(dob, 'DD-MON-YYYY') AS born,\n       TO_CHAR(dob, 'DAY') AS weekday\nFROM Students;", note: "Also try: <code>SELECT TO_DATE('21-OCT-94', 'DD-MON-RR') FROM dual;</code> and <code>SELECT TO_CHAR(DATE '1994-10-21', 'YYYY-MON-DD') FROM dual;</code>" });
+sqlPlay('#p2', { setup: '', query: "-- SQLite equivalent of Oracle's  DATE '2024-03-01' - DATE '2024-02-01'\nSELECT julianday('2024-03-01') - julianday('2024-02-01') AS days;", note: 'This is SQLite syntax, shown only so you can check the numbers. In Oracle write the subtraction directly.' });
+flashcards('#cards', [
+  { f: 'Standard date literal', b: "DATE 'YYYY-MM-DD', e.g. DATE '1994-10-21'." },
+  { f: 'Oracle DATE', b: 'Date plus time of day (to the second).' },
+  { f: 'Default format', b: 'NLS_DATE_FORMAT, normally DD-MON-RR. Strings in it convert implicitly.' },
+  { f: 'RR', b: 'Two-digit year: 50–99 → 1950–1999, 00–49 → 2000–2049 (for current years 2000–2049).' },
+  { f: 'YY', b: 'Two-digit year in the current century: 74 → 2074 in 2026.' },
+  { f: 'TO_DATE', b: 'TO_DATE(string, mask): string → DATE.' },
+  { f: 'TO_CHAR', b: 'TO_CHAR(date, mask): DATE → string.' },
+  { f: 'date − date', b: 'Number of days between them (may be fractional).' },
+  { f: 'FM', b: 'Fill mode: removes the blank padding of MONTH and DAY.' },
+]);
+quiz('#quiz', [
+  { q: "With the default format DD-MON-RR, '01-JAN-49' is stored as…", opts: ['1949-01-01', '2049-01-01', 'an error', '1849-01-01'], a: 1, why: 'RR: 00–49 → 2000–2049.' },
+  { q: "TO_DATE('01-JAN-74', 'DD-MON-YY') in 2026 is…", opts: ['1974-01-01', '2074-01-01', 'an error', '1874-01-01'], a: 1, why: 'YY always uses the current century.' },
+  { q: "TO_CHAR(DATE '1998-07-24', 'DD/MM/YYYY') returns…", opts: ['24/07/1998', '07/24/1998', '1998/07/24', '24-JUL-98'], a: 0, why: 'The mask is followed literally.' },
+  { q: 'Which expression is an error?', opts: ['hire_date + 30', 'SYSDATE - hire_date', 'hire_date + SYSDATE', "hire_date < DATE '2005-01-01'"], a: 2, why: 'Two dates cannot be added.' },
+  { q: "DATE '2023-03-01' - DATE '2023-02-01' equals…", opts: ['28', '29', '30', '1'], a: 0, why: '2023 is not a leap year.' },
+  { q: 'Why is DATE \'2001-03-14\' safer than \'14-MAR-01\' in an INSERT?', opts: ['It is shorter', 'It does not depend on the session\'s NLS_DATE_FORMAT', 'It stores the time too', 'It is faster'], a: 1, why: 'Implicit conversion uses the session format, which can differ.' },
+]);
+ask('#try1', { q: 'Using the RR rule (current year 2026), which year does the two-digit year 51 become?', a: 1951, why: '50–99 → 1950–1999.' });
+ask('#try2', { q: "How many days is DATE '2024-12-31' - DATE '2024-01-01'?", a: 365, why: '2024 has 366 days; from 1 Jan to 31 Dec is 365 days.' });
+ask('#try3', { q: "What does TO_CHAR(DATE '1994-10-21', 'YYYY-MON-DD') return?", a: ['1994-OCT-21'], why: 'YYYY → 1994, MON → OCT, DD → 21.' });
+chk('#c1', UNI, '<b>Easy.</b> Show each student\'s <code>name</code> and date of birth formatted as <code>DD-MON-YYYY</code> (for example 14-MAR-2001).', "SELECT name, TO_CHAR(dob, 'DD-MON-YYYY') FROM Students;");
+chk('#c2', UNI, '<b>Insert a date.</b> Add the star Daisy Ridley, address \'12 Elm St., London\', gender F, born 10 April 1992, to <code>MovieStar</code>. Use <code>TO_DATE</code> with the mask <code>DD-MON-YYYY</code> (or a DATE literal).', "INSERT INTO MovieStar VALUES ('Daisy Ridley', '12 Elm St., London', 'F', TO_DATE('10-APR-1992', 'DD-MON-YYYY'));", { check: 'state', table: 'MovieStar' });
+chk('#c3', UNI, '<b>Compare dates.</b> Show the names of students born before 1 January 2002. Form: <code>SELECT name FROM Students WHERE dob &lt; DATE \'2002-01-01\';</code>', "SELECT name FROM Students WHERE dob < DATE '2002-01-01';");
+chk('#c4', '', '<b>Format.</b> Using <code>dual</code>, display 21 October 1994 in the form <code>1994-OCT-21</code>.', "SELECT TO_CHAR(DATE '1994-10-21', 'YYYY-MON-DD') FROM dual;");
+chk('#c5', HR, '<b>Exam style.</b> In the <code>Employees</code> table, show the <code>last_name</code> and the hire date written as <code>DD/MM/YYYY</code> of every employee hired during 2007.', "SELECT last_name, TO_CHAR(hire_date, 'DD/MM/YYYY')\nFROM Employees\nWHERE hire_date BETWEEN DATE '2007-01-01' AND DATE '2007-12-31';", { hint: "Two date comparisons: hire_date &gt;= DATE '2007-01-01' AND hire_date &lt;= DATE '2007-12-31' (or BETWEEN, Lec 04)." });
+</script>
+</body>
+</html>

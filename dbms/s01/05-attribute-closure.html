@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Attribute Closure · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 01 (Sukarna) · Chapter 5 · Slides 24–27 · Book §3.2.4</div>
+<h1>The Closure of a Set of Attributes</h1>
+<p class="lede">The closure X⁺ is everything that X determines. It is the single most useful computation in design theory: it decides whether an FD follows, whether a set is a key, and whether a relation is in BCNF. This chapter gives the algorithm, animates the slides' example, and provides a calculator for your own FDs.</p>
+
+<h2>1. Definition (slide 24)</h2>
+<dl class="def">
+  <dt>Closure {A₁, …, Aₙ}⁺</dt>
+  <dd>Given a set of attributes {A₁, …, Aₙ} and a set S of FDs, the closure {A₁, …, Aₙ}⁺ is the set of all attributes B such that every relation satisfying the FDs in S also satisfies A₁A₂…Aₙ → B. In words: all attributes that A₁…Aₙ functionally determine, given S.</dd>
+</dl>
+<p>A₁, …, Aₙ are always in their own closure, because A₁A₂…Aₙ → Aᵢ is a trivial FD. Think of X⁺ as “if I know the values of X in a tuple, which other values in that tuple am I forced to know?”</p>
+
+<h2>2. The algorithm (slide 25)</h2>
+<pre>closure(X = {A₁, …, Aₙ}, S):
+  Step 1. Split the FDs of S so each has one attribute on the right side.
+  Step 2. X⁺ := {A₁, …, Aₙ}.
+  Step 3. Repeatedly find an FD  B₁B₂…Bₘ → C  such that
+            all of B₁, …, Bₘ are in X⁺  but  C is not;
+          add C to X⁺.
+  Step 4. When no FD can add anything, X⁺ is the answer.</pre>
+<p><strong>Why it stops.</strong> Each round adds at least one attribute and nothing is ever removed. R has finitely many attributes, so after at most |R| additions no FD can fire.</p>
+<p><strong>Why it is right (intuition).</strong> Every addition is a transitivity step: X determines all of B₁…Bₘ, and B₁…Bₘ determines C, so X determines C. Conversely, when the algorithm stops, one can build a two-tuple instance that agrees exactly on X⁺ and differs elsewhere; it satisfies every FD in S, so X determines nothing outside X⁺. (The full proof is book §3.2.5, outside the syllabus.)</p>
+
+<h2>3. Slide 26's example</h2>
+<p>Relation with attributes A, B, C, D, E, F and FDs <code>AB → C, BC → AD, D → E, CF → B</code>. Compute {A, B}⁺.</p>
+<ul>
+  <li>Step 1: split <code>BC → AD</code> into <code>BC → A</code> and <code>BC → D</code>. S = {AB → C, BC → A, BC → D, D → E, CF → B}.</li>
+  <li>Step 2: X = {A, B}.</li>
+  <li>Step 3: AB → C adds C, X = {A, B, C}. BC → A adds nothing (A is already in). BC → D adds D, X = {A, B, C, D}. D → E adds E, X = {A, B, C, D, E}. CF → B can never fire: F is not in X.</li>
+  <li>Step 4: <strong>{A, B}⁺ = {A, B, C, D, E}</strong>.</li>
+</ul>
+<p>The calculator below starts with exactly this example. Press Play or step through: the FD that fires is highlighted, and newly added attributes turn green.</p>
+
+<figure class="wide">
+<span class="anim-tag">Interactive tool</span>
+<div id="tool"></div>
+<figcaption><b>Tool 1: attribute closure.</b> Type your own relation and FDs. Attributes can be single letters (<code>ABCDEF</code>) or names separated by spaces or commas (<code>title year length</code>). FDs: <code>AB -> C; BC -> AD</code>, one per line or separated by <code>;</code>.</figcaption>
+</figure>
+
+<h2>4. Does an FD follow? (slide 27)</h2>
+<p>To test whether A₁A₂…Aₙ → B follows from S: compute {A₁, …, Aₙ}⁺. If it contains every attribute of B, the FD follows; otherwise it does not.</p>
+<div class="q">
+<h4>Slide 27: test AB → D and D → A (FDs AB → C, BC → AD, D → E, CF → B)</h4>
+<p><strong>AB → D:</strong> {A, B}⁺ = {A, B, C, D, E} contains D, so <strong>AB → D follows</strong>. The chain is AB → C, then BC → D.</p>
+<p><strong>D → A:</strong> {D}⁺: start with D; D → E adds E; no other FD has its left side inside {D, E}. {D}⁺ = {D, E}, which does not contain A, so <strong>D → A does not follow</strong>. Concretely, the two tuples (a₁, b, c, d, e, f) and (a₂, b′, c′, d, e, f′) agree exactly on D and E, satisfy all four FDs (check: no FD's left side is shared by them except D → E, which they obey), and differ on A.</p>
+</div>
+<p>Try both tests in the tool: put <code>AB -> D</code> or <code>D -> A</code> into the “Optional” box. Chapter 6 uses the same closure to find keys.</p>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+<div id="try2"></div>
+
+<h3>Exam questions</h3>
+<div class="exam">
+  <div class="exam-src">DB QB · 17-18 7a · 10 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-2 | 2017–18 · 10 marks</div>
+  <div class="exam-q"><p>Write the steps to compute the closure of a set of attributes with respect to a set of functional dependencies (FD). Let us consider a relation with attributes A, B, C, D, E, F. Suppose that this relation has the FD's: AB → C, BC → AD, D → E, CF → B. Find the closure of {A, B}, that is {A, B}⁺.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><strong>Steps</strong> (input: a set of attributes X and a set S of FDs):</p>
+    <ol>
+      <li>Split every FD in S so that its right side is a single attribute.</li>
+      <li>Initialize X⁺ = X.</li>
+      <li>Repeatedly look for an FD B₁…Bₘ → C with all B's in X⁺ and C not in X⁺; add C to X⁺.</li>
+      <li>Stop when no FD can add an attribute; the current X⁺ is the closure. (It terminates because X⁺ only grows and R is finite.)</li>
+    </ol>
+    <p><strong>Computation.</strong> Split: S = {AB → C, BC → A, BC → D, D → E, CF → B}.</p>
+    <div class="tbl"><table>
+      <tr><th>Round</th><th>FD used</th><th>Reason</th><th>X⁺</th></tr>
+      <tr><td>start</td><td>–</td><td>–</td><td>{A, B}</td></tr>
+      <tr><td>1</td><td>AB → C</td><td>A, B ∈ X⁺</td><td>{A, B, C}</td></tr>
+      <tr><td>2</td><td>BC → D</td><td>B, C ∈ X⁺ (BC → A adds nothing)</td><td>{A, B, C, D}</td></tr>
+      <tr><td>3</td><td>D → E</td><td>D ∈ X⁺</td><td>{A, B, C, D, E}</td></tr>
+      <tr><td>4</td><td>none</td><td>CF → B needs F, which is never added</td><td>{A, B, C, D, E}</td></tr>
+    </table></div>
+    <p><strong>{A, B}⁺ = {A, B, C, D, E}.</strong> Since F is missing, {A, B} is not a superkey of R.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2016–17 · 6 marks</div>
+  <div class="exam-q"><p>Given a set F of functional dependencies on r₁(A, B, C, G, H, I): A → B, A → C, CG → H, CG → I, B → H. Compute the attribute closure (AG)⁺ and show that AG is a candidate key of r₁.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><strong>(AG)⁺:</strong> start with {A, G}. A → B adds B. A → C adds C. CG → H adds H (C, G present). CG → I adds I. B → H adds nothing new. Result: <strong>(AG)⁺ = {A, B, C, G, H, I}</strong>, every attribute of r₁, so AG is a superkey.</p>
+    <p><strong>Minimal?</strong> Check the subsets with one attribute removed: A⁺ = {A, B, C, H} (A → B, A → C, B → H) misses G and I. G⁺ = {G} (no FD has left side G alone). Neither is a superkey, so <strong>AG is a candidate key</strong>. (In fact it is the only one: A and G never appear on a right side, so every key contains both.)</p>
+  </div></details>
+</div>
+
+<div class="key"><p><strong>Summary:</strong> X⁺ is the set of attributes X determines. Compute it by starting with X and repeatedly firing any FD whose whole left side is already in the set, adding its right side, until nothing changes. X → Y follows from S exactly when Y ⊆ X⁺, and X is a superkey exactly when X⁺ is all of R.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="lecture.js"></script>
+<script>
+FD.closureTool('#tool', { attrs: 'A B C D E F', fds: 'AB -> C; BC -> AD; D -> E; CF -> B', x: 'AB', test: 'AB -> D' });
+flashcards('#cards', [
+  { f: 'X⁺ (closure)', b: 'All attributes that X functionally determines under the given FDs.' },
+  { f: 'Closure algorithm', b: 'Start with X; while some FD Y → A has Y ⊆ X⁺ and A ∉ X⁺, add A.' },
+  { f: 'Test: does X → Y follow?', b: 'Compute X⁺; it follows iff Y ⊆ X⁺.' },
+  { f: 'Test: is X a superkey?', b: 'X⁺ contains every attribute of R.' },
+  { f: 'Is X always in X⁺?', b: 'Yes, by the trivial FDs X → Aᵢ.' },
+]);
+quiz('#quiz', [
+  { q: 'With AB → C, BC → AD, D → E, CF → B: what is {C, F}⁺?', opts: ['{C, F}', '{B, C, F}', '{A, B, C, D, E, F}', '{B, C, D, F}'], a: 2, why: 'CF → B, then BC → A and D, then D → E: everything.' },
+  { q: 'Same FDs. Which FD does NOT follow?', opts: ['AB → E', 'BC → E', 'D → A', 'CF → D'], a: 2, why: '{D}⁺ = {D, E}.' },
+  { q: 'Why does the closure algorithm always terminate?', opts: ['FDs are acyclic', 'X⁺ only grows and R has finitely many attributes', 'It runs one pass only', 'It removes attributes'], a: 1, why: 'At most |R| additions are possible.' },
+  { q: 'In Step 3, an FD Y → C fires when…', opts: ['some attribute of Y is in X⁺', 'all of Y is in X⁺ and C is not', 'C is in X⁺', 'Y equals X'], a: 1, why: 'The whole left side must already be known.' },
+]);
+ask('#try1', { q: 'R(A, B, C, D, E) with A → B, B → C, CD → E. Compute {A, D}⁺ (type the letters, e.g. ABC).', a: v => v.toUpperCase().replace(/[^A-Z]/g, '').split('').sort().join('') === 'ABCDE', show: '{A, B, C, D, E}', hint: 'A gives B, B gives C, and then C together with D fires CD → E.', why: 'AD is a superkey.' });
+ask('#try2', { q: 'Same FDs. Does B D → E follow? (yes / no)', a: ['yes'], hint: 'Compute {B, D}⁺.', why: '{B, D}⁺ = {B, C, D, E} contains E.' });
+</script>
+</body>
+</html>

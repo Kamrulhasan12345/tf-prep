@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Precedence Graphs · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 02 (Sukarna) · Chapter 4 · Slides 22–25 · Book §18.2.2</div>
+<h1>Testing Conflict-Serializability with a Precedence Graph</h1>
+<p class="lede">Instead of hunting for swaps, draw one arc for each conflicting pair and look for a cycle. This chapter gives the test, works the slides' two examples, and provides a tool that runs the test on any schedule you type, step by step. Most exam questions in this topic are this procedure.</p>
+
+<h2>1. Precedence between transactions (slide 22)</h2>
+<dl class="def">
+  <dt>T<sub>1</sub> takes precedence over T<sub>2</sub>, written T<sub>1</sub> &lt;<sub>S</sub> T<sub>2</sub></dt>
+  <dd>In schedule S there are actions A<sub>1</sub> of T<sub>1</sub> and A<sub>2</sub> of T<sub>2</sub> such that (1) A<sub>1</sub> is ahead of A<sub>2</sub> in S, (2) both involve the same database element, and (3) at least one of them is a write.</dd>
+</dl>
+<p>Conditions (2) and (3) say exactly that A<sub>1</sub> and A<sub>2</sub> <em>conflict</em>, so they can never be swapped past each other.</p>
+
+<div class="q">
+<h4>Slide 22 question: why must a conflict-equivalent serial schedule of S have T<sub>1</sub> before T<sub>2</sub>?</h4>
+<p>A<sub>1</sub> and A<sub>2</sub> conflict, so no legal swap can ever exchange their order: every schedule reachable from S by non-conflicting swaps still has A<sub>1</sub> ahead of A<sub>2</sub>. In a serial schedule, all of T<sub>1</sub>'s actions are on one side of all of T<sub>2</sub>'s. If T<sub>2</sub> came first, A<sub>2</sub> would be ahead of A<sub>1</sub>, which is impossible. So any conflict-equivalent serial schedule puts T<sub>1</sub> before T<sub>2</sub>.</p>
+</div>
+
+<h2>2. The precedence graph and the test (slides 23–24)</h2>
+<dl class="def">
+  <dt>Precedence graph of S</dt><dd>A directed graph with one node per transaction of S (node i stands for T<sub>i</sub>) and an arc from node i to node j whenever T<sub>i</sub> &lt;<sub>S</sub> T<sub>j</sub>. (Also called a serialization graph.)</dd>
+  <dt>Cycle</dt><dd>A path of arcs that starts and ends at the same node, e.g. 1 → 2 → 1.</dd>
+  <dt>Topological order</dt><dd>An ordering of the nodes of an acyclic graph such that for every arc a → b, a comes before b. Found by repeatedly removing a node with no incoming arcs from the remaining nodes.</dd>
+</dl>
+<div class="key">
+<p><strong>Test for conflict-serializability.</strong></p>
+<ol>
+  <li>Construct the precedence graph of S: for every pair of actions of different transactions on the same element with at least one write, draw an arc from the earlier action's transaction to the later one's.</li>
+  <li>If the graph has a cycle, S is <strong>not</strong> conflict-serializable. If it is acyclic, S <strong>is</strong> conflict-serializable, and <strong>every topological order</strong> of the graph is a conflict-equivalent serial order.</li>
+</ol>
+</div>
+<p>A practical way to do step 1 without missing anything: go element by element. For element X, list X's actions in schedule order, and for each write, draw arcs from every earlier action on X (of another transaction) to it, and from it to every later action on X (of another transaction). Two reads never produce an arc.</p>
+
+<h3>Slide 23: an acyclic example</h3>
+<p><code>S: r₂(A); r₁(B); w₂(A); r₃(A); w₁(B); w₃(A); r₂(B); w₂(B)</code> (textbook Example 18.7). Step through the test:</p>
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="ex1"></div>
+</figure>
+<p>On A, T₂'s actions all come before T₃'s, and w₂(A) is ahead of r₃(A) and w₃(A) (also r₂(A) ahead of w₃(A)): any one of these justifies the arc 2 → 3. On B, r₁(B) is ahead of w₂(B), and w₁(B) is ahead of r₂(B) and w₂(B): arc 1 → 2. Those are the only arcs. The graph 1 → 2 → 3 is acyclic, and its only topological order gives the serial schedule</p>
+<pre>S′: r₁(B); w₁(B); r₂(A); w₂(A); r₂(B); w₂(B); r₃(A); w₃(A)</pre>
+<p><strong>A note on slide 23:</strong> it gives the reason for T₁ &lt;<sub>S</sub> T₂ as “r₁(B); w₁(B)”. Both of those are T₁'s own actions, so they cannot justify an arc between two transactions. The intended pair is r₁(B) … w₂(B) (or w₁(B) … r₂(B)), as in the textbook.</p>
+
+<h3>Slide 25: a cyclic example</h3>
+<p><code>S₁: r₂(A); r₁(B); w₂(A); r₂(B); r₃(A); w₁(B); w₃(A); w₂(B)</code> differs from S only in that r₂(B) moved forward three places (textbook Example 18.9).</p>
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="ex2"></div>
+</figure>
+<p>On A nothing changed: 2 → 3. On B, r₁(B) is still ahead of w₂(B) (1 → 2), but now r₂(B) is ahead of w₁(B), giving 2 → 1. The cycle 1 → 2 → 1 says T₁ must be both before and after T₂ in any conflict-equivalent serial schedule. So <strong>S₁ is not conflict-serializable</strong>.</p>
+
+<h2>3. Run the test on any schedule</h2>
+<p>Type a schedule (forms such as <code>r1(A) w2(B)</code>, <code>r1(A); w2(B);</code>, <code>R1(A), W2(B)</code> are all accepted). The tool lists the conflicting pairs element by element, draws the arcs as they are found, then either highlights a cycle or performs the topological sort and the swaps that reach the serial schedule. Every exam schedule in the questions below can be checked here.</p>
+<figure class="wide">
+<span class="anim-tag">Interactive</span>
+<div id="tool"></div>
+</figure>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+<div id="try2"></div>
+
+<h3>Exam questions</h3>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 24-25 1d · 8 marks (Compulsory) &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-1 | 2024–25 · 8 marks</div>
+  <div class="exam-q"><p>Determine whether the following schedules are conflict-serializable by constructing precedence graphs:<br>(i) r₁(A); w₂(A); w₃(A); w₂(B); r₂(C); r₂(B); w₂(C)<br>(ii) w₁(A); r₂(A); w₂(B); r₂(B); w₃(C); r₄(C); w₄(D); r₃(D); r₁(C)</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+  <div class="figrow"><div><div class="figlabel">(i)</div><div id="g78a"></div></div><div><div class="figlabel">(ii)</div><div id="g78b"></div></div></div>
+  <p><b>(i)</b> A: r₁(A) before w₂(A) and w₃(A) gives 1 → 2 and 1 → 3; w₂(A) before w₃(A) gives 2 → 3. B and C are used only by T₂, so no arcs. Arcs {1→2, 1→3, 2→3}: acyclic. <b>Conflict-serializable</b>; the only topological order is <b>(T₁, T₂, T₃)</b>.</p>
+  <p><b>(ii)</b> A: w₁(A) before r₂(A): 1 → 2. B: only T₂. C: w₃(C) before r₄(C): 3 → 4; w₃(C) before r₁(C): 3 → 1. (r₄(C), r₁(C) are both reads.) D: w₄(D) before r₃(D): 4 → 3. The arcs 3 → 4 and 4 → 3 form a cycle, so <b>(ii) is not conflict-serializable</b>.</p>
+  <p>Note: the BUET bank prints the last action of (ii) as r₃(C) instead of r₁(C). That removes the arc 3 → 1 but the cycle 3 → 4 → 3 (from C and D) remains, so the answer is the same.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 22-23 1c · 12 marks (Compulsory) &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-1 | 2022–23 · 12 marks</div>
+  <div class="exam-q"><p>Assume you are given the following schedules involving four transactions T₁, T₂, T₃, and T₄:<br>S₁: r₁(A); w₂(A); r₂(B); r₄(C); r₃(B); w₂(B); w₃(B); r₄(A); w₄(C); r₁(C);<br>S₂: r₁(A); w₂(A); r₂(B); r₄(C); w₂(B); r₃(B); w₃(B); r₄(A); r₁(C); w₄(C);<br>Construct precedence graphs for the given schedules S₁ and S₂. Are the schedules conflict-serializable? Justify your answer.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+  <div class="figrow"><div><div class="figlabel">S₁</div><div id="g81a"></div></div><div><div class="figlabel">S₂</div><div id="g81b"></div></div></div>
+  <p><b>S₁.</b> A: r₁(A) before w₂(A): 1 → 2; w₂(A) before r₄(A): 2 → 4. B: r₂(B) before w₃(B): 2 → 3; r₃(B) before w₂(B): 3 → 2; w₂(B) before w₃(B): 2 → 3. C: w₄(C) before r₁(C): 4 → 1 (r₄(C) and r₁(C) are reads; r₄(C), w₄(C) are the same transaction). Cycles: 2 → 3 → 2, and 1 → 2 → 4 → 1. <b>Not conflict-serializable.</b></p>
+  <p><b>S₂.</b> A: 1 → 2 and 2 → 4 as before. B: now w₂(B) comes before r₃(B) and w₃(B), and r₂(B) before w₃(B): only 2 → 3. C: r₄(C) and r₁(C) are reads; r₁(C) before w₄(C): 1 → 4. Arcs {1→2, 2→4, 2→3, 1→4}: acyclic. <b>Conflict-serializable</b>, with serial orders <b>(T₁, T₂, T₃, T₄)</b> and <b>(T₁, T₂, T₄, T₃)</b>.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 21-22 7c · 10 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-2 | 2021–22 · 10 marks</div>
+  <div class="exam-q"><p>For the following schedule, containing four concurrent transactions shown in chronological order, sketch the precedence graph and determine whether the schedule is conflict serializable. If so, write down the equivalent serial schedule(s): R1(A), W2(B), R3(C), W3(A), R1(D), R4(B), W4(D), W2(C)</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+  <div id="g82"></div>
+  <p>A: R1(A) before W3(A): 1 → 3. B: W2(B) before R4(B): 2 → 4. C: R3(C) before W2(C): 3 → 2. D: R1(D) before W4(D): 1 → 4. Arcs {1→3, 3→2, 2→4, 1→4}: acyclic, so <b>conflict-serializable</b>.</p>
+  <p>Topological sort: only T₁ has no incoming arc; remove it. Then only T₃; then only T₂; then T₄. The unique serial schedule is <b>(T₁, T₃, T₂, T₄)</b>:</p>
+  <pre>R1(A) R1(D) | R3(C) W3(A) | W2(B) W2(C) | R4(B) W4(D)</pre>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 19-20 4a · 15 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-2 | 2019–20 · 15 marks</div>
+  <div class="exam-q"><p>Explain conflict serializability with an example. Two transactions T2: READ (A), WRITE (A), COMMIT and T1: READ (A), READ (B) COMMIT are given. Write down the concurrent schedule and the corresponding precedence graph. Using the precedence graph, prove that your schedule is serializable. Find the equivalent serial schedule.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+  <p><b>Conflict serializability.</b> Two actions conflict if they are from different transactions, touch the same element, and at least one is a write (or if they belong to the same transaction). A schedule is conflict-serializable if swapping adjacent non-conflicting actions can turn it into a serial schedule. Example: r₁(A); w₁(A); r₂(A); w₂(A); r₁(B); w₁(B); r₂(B); w₂(B) becomes (T₁, T₂) by four swaps (Chapter 3).</p>
+  <p><b>A concurrent schedule</b> of T₁: r₁(A); r₁(B); c₁ and T₂: r₂(A); w₂(A); c₂:</p>
+  <pre>S: r₁(A); r₂(A); r₁(B); w₂(A); c₁; c₂</pre>
+  <p><b>Precedence graph.</b> A: r₁(A) is before w₂(A): arc T₁ → T₂. r₁(A), r₂(A) are both reads: no arc. B: only T₁. So the graph is T₁ → T₂.</p>
+  <div id="g83"></div>
+  <p><b>Proof.</b> The graph has no cycle, so S is conflict-serializable, and conflict-serializable schedules are serializable. Concretely, swap r₂(A) with r₁(B) (different elements) to get r₁(A); r₁(B); r₂(A); w₂(A), which is serial. <b>Equivalent serial schedule: (T₁, T₂)</b>, i.e. r₁(A); r₁(B); c₁; r₂(A); w₂(A); c₂. Intuitively T₁ read the old A, which is exactly what it sees when it runs entirely before T₂.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">DB QB · Jan 20 1b · 15 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-2 | 2018–19 · 15 marks</div>
+  <div class="exam-q"><p>Two transactions are given as follows: (i) Transaction T1 transfers the sum of 20% of balances of accounts A and B to account C. (ii) Transaction T2 transfers Tk. 2000 from account D to account C. Prepare a concurrent schedule for the above two transactions and prove that the schedule is conflict serializable.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+  <p><b>The transactions.</b> T₁ takes 20% of A and 20% of B and adds the sum to C:</p>
+  <pre>T₁: READ(A,a); x := 0.2*a; a := a − x; WRITE(A,a);
+    READ(B,b); y := 0.2*b; b := b − y; WRITE(B,b);
+    READ(C,c); c := c + x + y; WRITE(C,c)          → r₁(A) w₁(A) r₁(B) w₁(B) r₁(C) w₁(C)
+T₂: READ(D,d); d := d − 2000; WRITE(D,d);
+    READ(C,c); c := c + 2000; WRITE(C,c)            → r₂(D) w₂(D) r₂(C) w₂(C)</pre>
+  <p><b>A concurrent schedule:</b></p>
+  <pre>S: r₁(A); w₁(A); r₂(D); w₂(D); r₁(B); w₁(B); r₁(C); w₁(C); r₂(C); w₂(C)</pre>
+  <p><b>Proof via the precedence graph.</b> The only element both use is C. r₁(C), w₁(C) come before r₂(C), w₂(C), and the pairs w₁(C)/r₂(C), w₁(C)/w₂(C), r₁(C)/w₂(C) all conflict with T₁ first: arc T₁ → T₂. A, B (T₁ only) and D (T₂ only) give no arcs. The graph T₁ → T₂ is acyclic, so S is conflict-serializable, equivalent to <b>(T₁, T₂)</b>.</p>
+  <p><b>Proof via swaps:</b> move r₂(D) and w₂(D) down past r₁(B), w₁(B), r₁(C), w₁(C); each pair involves D and a different element, so no swap is a conflict. The result r₁(A) w₁(A) r₁(B) w₁(B) r₁(C) w₁(C) r₂(D) w₂(D) r₂(C) w₂(C) is serial.</p>
+  <p>(Any interleaving that keeps all of T₁'s C-actions on one side of T₂'s C-actions is a correct answer. Interleaving them, e.g. r₁(C); r₂(C); w₁(C); w₂(C), would create arcs both ways and be a lost update.)</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 17-18 2a · 21 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-2 | 2017–18 · 21 marks</div>
+  <div class="exam-q"><p>The highly anticipated Marvel movie "Avenger: Endgame" has been released recently and theatres are flooded with movie-lovers. Three superhero enthusiasts Leonard, Howard, and Raj are dying to watch the movie in any first-day show, but they failed to manage tickets. Out of desperation, they decided to hack the database managing seat reservation system of a nearby theatre concurrently. At first, Leonard hacked into the system. He read all the reservations for the matinee show. After making changes, he saved the reservations. Then Howard read the reservations for the same show and did the same as Leonard. Next, Leonard read the reservations for night show on the same date and after making changes saved those. Subsequently, Raj changed the reservations for a morning show and saved it in the database. Finally, Howard repeated the same process for the same night show as Leonard did. [Note that, there are different relations for morning, matinee and night show.]<br>(i) Construct the schedule of actions using standard notations<br>(ii) What is a conflict serializable schedule? Show whether the schedule of previous question is conflict serializable or not without using Precedence graph.<br>(iii) Show whether the schedule is conflict serializable or not using Precedence graph. If it is not conflict serializable, then briefly describe the reason. If it is conflict serializable, then determine the serializability order using topological sort.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+  <p><b>(i)</b> T₁ = Leonard, T₂ = Howard, T₃ = Raj; elements M (matinee), N (night), O (morning). Raj “changed” the morning reservations, which means reading them and writing them back.</p>
+  <pre>S: r₁(M); w₁(M); r₂(M); w₂(M); r₁(N); w₁(N); r₃(O); w₃(O); r₂(N); w₂(N)</pre>
+  <p><b>(ii)</b> A schedule is conflict-serializable if it can be turned into a serial schedule by swapping adjacent actions of different transactions that do not conflict (do not touch the same element with at least one write). Swaps:</p>
+  <ol>
+    <li>Move r₁(N), w₁(N) up past w₂(M), r₂(M): N vs M, no conflict. Now r₁(M) w₁(M) r₁(N) w₁(N) r₂(M) w₂(M) r₃(O) w₃(O) r₂(N) w₂(N).</li>
+    <li>Move r₃(O), w₃(O) up past w₂(M), r₂(M): O vs M, no conflict. Now r₁(M) w₁(M) r₁(N) w₁(N) r₃(O) w₃(O) r₂(M) w₂(M) r₂(N) w₂(N).</li>
+  </ol>
+  <p>This is the serial schedule (T₁, T₃, T₂), so S is conflict-serializable. (T₂'s N-actions never had to pass T₁'s N-actions, which would be forbidden.)</p>
+  <p><b>(iii)</b> M: w₁(M) before r₂(M), w₂(M) (and r₁(M) before w₂(M)): T₁ → T₂. N: w₁(N) before r₂(N), w₂(N): T₁ → T₂. O: only T₃.</p>
+  <div id="g85"></div>
+  <p>Acyclic, so conflict-serializable. Topological sort: initially T₁ and T₃ have no incoming arcs. Removing them in either order, then T₂, gives the orders <b>(T₁, T₂, T₃)</b>, <b>(T₁, T₃, T₂)</b> and <b>(T₃, T₁, T₂)</b>. All three are conflict-equivalent to S.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2016–17 · 7 marks</div>
+  <div class="exam-q"><p>Consider the schedule S: r₂(A); r₁(B); w₂(A); r₂(B); r₃(A); w₁(B); w₃(A); w₂(B). Show that there is no serial schedule conflict-equivalent to S.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+  <p>This is slide 25's S₁. On B: r₁(B) comes before w₂(B), a read–write conflict, so in any conflict-equivalent schedule r₁(B) stays ahead of w₂(B), forcing T₁ before T₂ in a serial schedule. Also r₂(B) comes before w₁(B), another conflict, forcing T₂ before T₁. (On A we also get T₂ before T₃.) A serial schedule cannot have T₁ both before and after T₂, so none is conflict-equivalent to S. In graph terms: the precedence graph has arcs 1 → 2, 2 → 1 and 2 → 3, with the cycle 1 → 2 → 1 (see the second animation above).</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2012–13 · 10 marks</div>
+  <div class="exam-q"><p>Draw the precedence graph of the following schedule. Is the schedule conflict serializable? If so, what are all the equivalent serial schedules? r₁(A); r₂(A); r₃(B); w₁(A); r₂(C); r₂(B); w₂(B); w₁(C)</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+  <div id="g43"></div>
+  <p>A: r₂(A) before w₁(A): 2 → 1 (r₁(A), r₂(A) are reads). B: r₃(B) before w₂(B): 3 → 2. C: r₂(C) before w₁(C): 2 → 1. Arcs {3→2, 2→1}: acyclic, so <b>conflict-serializable</b>. Only one topological order: <b>(T₃, T₂, T₁)</b>, i.e. r₃(B); r₂(A); r₂(C); r₂(B); w₂(B); r₁(A); w₁(A); w₁(C). It is the only equivalent serial schedule.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2011–12 · 12 marks</div>
+  <div class="exam-q"><p>What is the precedence graph of the following schedule? r₁(A); r₂(A); r₁(B); r₂(B); r₃(A); r₄(B); w₁(A); w₂(B). Is the above schedule conflict serializable? If so, what are all the equivalent serial schedules?</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+  <div id="g47"></div>
+  <p>A: r₂(A) before w₁(A): 2 → 1; r₃(A) before w₁(A): 3 → 1. B: r₁(B) before w₂(B): 1 → 2; r₄(B) before w₂(B): 4 → 2. The arcs 1 → 2 and 2 → 1 form a cycle, so the schedule is <b>not conflict-serializable</b> and has no equivalent serial schedule. (Each of T₁, T₂ reads the element the other one later writes.)</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2014–15 · 10 marks</div>
+  <div class="exam-q"><p>A concurrent schedule of transactions T₁, T₂ and T₃ is given in Figure 5. Find the equivalent serial schedule by using conflict serializability. Show the steps.</p>
+  <div class="tbl"><table style="width:auto"><tr><th>T₁</th><th>T₂</th><th>T₃</th></tr><tr><td>READ(A)</td><td></td><td></td></tr><tr><td></td><td>WRITE(B)</td><td></td></tr><tr><td></td><td>READ(B)</td><td></td></tr><tr><td>WRITE(A)</td><td></td><td></td></tr><tr><td></td><td></td><td>WRITE(C)</td></tr><tr><td></td><td></td><td>READ(C)</td></tr><tr><td></td><td></td><td>READ(B)</td></tr><tr><td></td><td>READ(C)</td><td></td></tr><tr><td>READ(B)</td><td></td><td></td></tr><tr><td></td><td></td><td>READ(A)</td></tr></table></div></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+  <p>In r/w notation: r₁(A) w₂(B) r₂(B) w₁(A) w₃(C) r₃(C) r₃(B) r₂(C) r₁(B) r₃(A).</p>
+  <div id="g35"></div>
+  <p>A: w₁(A) before r₃(A): 1 → 3. B: w₂(B) before r₃(B): 2 → 3; w₂(B) before r₁(B): 2 → 1. C: w₃(C) before r₂(C): 3 → 2. The arcs 2 → 3 and 3 → 2 form a cycle (T₂ wrote B that T₃ read, and T₃ wrote C that T₂ read). So the schedule is <b>not conflict-serializable</b>: <b>no equivalent serial schedule exists</b>. The steps of the test are the answer: listing conflicts, drawing the graph, finding the cycle.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2010–11 · 10 marks</div>
+  <div class="exam-q"><p>Explain with examples, the testing of serializability by using precedence graph. Show the cases of both conflict and non-conflict schedules.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+  <p><b>Test.</b> Nodes = transactions. For each pair of actions A₁ of T<sub>i</sub> and A₂ of T<sub>j</sub> (i ≠ j) with A₁ earlier, same element, at least one a write, add arc T<sub>i</sub> → T<sub>j</sub>. If the graph has a cycle the schedule is not conflict-serializable; if not, it is, and any topological order is an equivalent serial order. Reason: conflicting pairs can never change order under legal swaps, so every arc is a constraint “T<sub>i</sub> before T<sub>j</sub>” on the serial order; a cycle makes the constraints contradictory, and without a cycle a topological order satisfies all of them (proof in Chapter 5).</p>
+  <p><b>Conflict-serializable case:</b> S = r₂(A); r₁(B); w₂(A); r₃(A); w₁(B); w₃(A); r₂(B); w₂(B). Arcs 2 → 3 (on A) and 1 → 2 (on B). Acyclic; serial order (T₁, T₂, T₃).</p>
+  <p><b>Non-conflict-serializable case:</b> S₁ = r₂(A); r₁(B); w₂(A); r₂(B); r₃(A); w₁(B); w₃(A); w₂(B). Arcs 2 → 3, 1 → 2 (r₁(B) before w₂(B)) and 2 → 1 (r₂(B) before w₁(B)). Cycle 1 → 2 → 1; not conflict-serializable.</p>
+  <p>Both graphs are drawn step by step in the two animations of Section 2.</p>
+  </div></details>
+</div>
+
+<div class="key"><p><strong>Summary:</strong> draw a node per transaction and an arc T<sub>i</sub> → T<sub>j</sub> for each conflicting pair (same element, at least one write) with T<sub>i</sub>'s action first. A cycle means not conflict-serializable. No cycle means conflict-serializable, and every topological order of the graph is an equivalent serial order. Work element by element so no pair is missed, and remember that two reads never make an arc.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="lecture.js"></script>
+<script>
+const an = s => CC.csAnalyze(CC.parse(s).acts);
+stepper('#ex1', CC.csSteps(an('r2(A); r1(B); w2(A); r3(A); w1(B); w3(A); r2(B); w2(B)')));
+stepper('#ex2', CC.csSteps(an('r2(A); r1(B); w2(A); r2(B); r3(A); w1(B); w3(A); w2(B)')));
+CC.csTool('#tool', 'r1(A); r2(A); r1(B); r2(B); r3(A); r4(B); w1(A); w2(B)');
+// static graphs for the exam answers; arcs on a cycle are red
+function G(sel, s) {
+  const R = an(s);
+  const onCycle = (f, t) => { // arc lies on some cycle iff t reaches f
+    const seen = new Set([t]), st = [t];
+    while (st.length) { const u = st.pop(); if (u === f) return true; R.edges.filter(e => e.from === u).forEach(e => { if (!seen.has(e.to)) { seen.add(e.to); st.push(e.to); } }); }
+    return false;
+  };
+  document.querySelector(sel).innerHTML = CC.graphSVG(R.txns, R.edges.map(e => ({ from: e.from, to: e.to, label: [...e.elems].join(','), cls: onCycle(e.from, e.to) ? 'red' : '' })));
+}
+G('#g78a', 'r1(A); w2(A); w3(A); w2(B); r2(C); r2(B); w2(C)');
+G('#g78b', 'w1(A); r2(A); w2(B); r2(B); w3(C); r4(C); w4(D); r3(D); r1(C)');
+G('#g81a', 'r1(A); w2(A); r2(B); r4(C); r3(B); w2(B); w3(B); r4(A); w4(C); r1(C)');
+G('#g81b', 'r1(A); w2(A); r2(B); r4(C); w2(B); r3(B); w3(B); r4(A); r1(C); w4(C)');
+G('#g82', 'r1(A) w2(B) r3(C) w3(A) r1(D) r4(B) w4(D) w2(C)');
+G('#g83', 'r1(A); r2(A); r1(B); w2(A)');
+G('#g85', 'r1(M) w1(M) r2(M) w2(M) r1(N) w1(N) r3(O) w3(O) r2(N) w2(N)');
+G('#g43', 'r1(A); r2(A); r3(B); w1(A); r2(C); r2(B); w2(B); w1(C)');
+G('#g47', 'r1(A); r2(A); r1(B); r2(B); r3(A); r4(B); w1(A); w2(B)');
+G('#g35', 'r1(A) w2(B) r2(B) w1(A) w3(C) r3(C) r3(B) r2(C) r1(B) r3(A)');
+
+flashcards('#cards', [
+  { f: 'T₁ <ₛ T₂', b: 'Some action of T₁ is ahead of a conflicting action of T₂ in S (same element, at least one write).' },
+  { f: 'Precedence graph', b: 'Node per transaction; arc i → j when Tᵢ <ₛ Tⱼ.' },
+  { f: 'Cycle in the graph', b: 'Not conflict-serializable: the order constraints contradict each other.' },
+  { f: 'Acyclic graph', b: 'Conflict-serializable; every topological order is a conflict-equivalent serial order.' },
+  { f: 'Topological order', b: 'Node order with a before b for every arc a → b; repeatedly take a node with no incoming arcs.' },
+  { f: 'Two reads of X', b: 'Never an arc.' },
+]);
+quiz('#quiz', [
+  { q: 'Which pair gives an arc T₃ → T₁?', opts: ['r₃(A) … r₁(A)', 'r₃(A) … w₁(A)', 'w₁(A) … r₃(A)', 'w₃(A) … w₃(B)'], a: 1, why: 'Same element, one write, T₃\'s action first.' },
+  { q: 'The graph has arcs 1→2, 1→3, 3→2. How many serial orders are conflict-equivalent?', opts: ['0', '1', '2', '3'], a: 1, why: 'T₁ first, then T₃ must precede T₂: only (T₁, T₃, T₂).' },
+  { q: 'The graph has arcs 1→2 and 3→2 only. Which order is NOT valid?', opts: ['(T₁, T₃, T₂)', '(T₃, T₁, T₂)', '(T₁, T₂, T₃)', 'all are valid'], a: 2, why: 'T₃ must precede T₂.' },
+  { q: 'Slide 23 justifies T₁ <ₛ T₂ by “r₁(B); w₁(B)”. What is wrong?', opts: ['Nothing', 'Both actions are T₁\'s; the arc comes from r₁(B) … w₂(B)', 'Reads never cause arcs', 'It should be T₂ <ₛ T₁'], a: 1, why: 'Precedence needs actions of two different transactions.' },
+  { q: 'A schedule of 3 transactions has no conflicting pairs at all. How many conflict-equivalent serial orders does it have?', opts: ['0', '1', '3', '6'], a: 3, why: 'No arcs: every one of the 3! = 6 orders is topological.' },
+]);
+ask('#try1', { q: 'How many arcs does the precedence graph of r₁(A); r₂(A); w₃(A) have?', a: 2, why: 'r₁(A) → w₃(A) gives 1→3 and r₂(A) → w₃(A) gives 2→3. The two reads give nothing.' });
+ask('#try2', { q: 'Give the serial order (like T2,T1,T3) for w₂(A); r₁(A); w₁(B); r₃(B).', a: v => (v.replace(/[₀-₉]/g, c => '₀₁₂₃₄₅₆₇₈₉'.indexOf(c)).match(/\d/g) || []).join('') === '213', show: '(T₂, T₁, T₃)', why: '2 → 1 on A and 1 → 3 on B give the unique order (T₂, T₁, T₃).' });
+</script>
+</body>
+</html>

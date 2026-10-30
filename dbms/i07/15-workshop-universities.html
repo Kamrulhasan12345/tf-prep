@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ER Design Workshop II: Universities and Pharmacies · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 07 (Ishrak) · Chapter 15 · ER design workshop (exam questions)</div>
+<h1>ER Design Workshop II: Universities, Research and Pharmacies</h1>
+<p class="lede">Four scenario questions that need every tool of the lecture at once: ternary relationships, recursive relationships with roles, subclasses, weak entities and multivalued attributes. Each answer gives the analysis, the assumptions, the diagram and the schema.</p>
+
+<h2>1. Patterns that recur in these questions</h2>
+<ul>
+<li><strong>"X works on Y, and for each such Z…"</strong>: a fact that needs three participants is a ternary relationship (Chapter 6). "When graduate students work on a project, a professor must supervise their work" ties student, project and professor together.</li>
+<li><strong>"Another, more senior X"</strong>: a recursive relationship with role names (Chapter 3).</li>
+<li><strong>"X has one … called the Y" (chairman, principal investigator, coordinator)</strong>: a separate relationship for the special role, not an attribute.</li>
+<li><strong>"identifies … uniquely from among the products of the company"</strong>: a weak entity set (Chapter 8).</li>
+<li><strong>"multiple phone numbers"</strong>: a multivalued attribute (Chapter 10).</li>
+<li><strong>"can be either A or B"</strong>: a specialization (Chapter 7); ask disjoint/overlapping and total/partial.</li>
+</ul>
+
+<h2>Practice</h2>
+<h3>Quick check</h3><div id="quiz"></div>
+<h3>Exam questions</h3>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 19-20 5a, 5b · 10 + 15 marks &nbsp;·&nbsp; BUET QBank · CSE 215 | L-2/T-2 | 2019–20 · 35 marks &nbsp;·&nbsp; BUET QBank · CSE 303 | L-3/T-1 | 2014–15 · 18 marks</div>
+  <div class="exam-q"><p>Consider the following information about a university database:</p><ul>
+  <li>Professors have an SSN, a name, an age, a rank, and a research specialty</li>
+  <li>Projects have a project number, a sponsor name (e.g., NSF), a starting date, an ending date, and a budget</li>
+  <li>Graduate students have an SSN, a name, an age, and a degree program (e.g., M.S. or Ph.D.)</li>
+  <li>Each project is managed by one professor (known as the project's principal investigator)</li>
+  <li>Each project is worked on by one or more professors (known as the project's co-investigators)</li>
+  <li>Professors can manage and/or work on multiple projects</li>
+  <li>Each project is worked on by one or more graduate students (known as the project's research assistants)</li>
+  <li>When graduate students work on a project, a professor must supervise their work on the project. Graduate students can work on multiple projects, in which case they will have a (potentially different) supervisor for each one</li>
+  <li>Department have a department number, a department name, and a main office</li>
+  <li>Department have a professor (known as the chairman) who runs the department</li>
+  <li>Professors work in one or more departments, and for each department that they work in, a time percentage is associated with their job</li>
+  <li>Graduate students have one major department in which they are working on their degree</li>
+  <li>Each graduate student has another, more senior graduate student (known as a student advisor) who advises him or her on what courses to take</li>
+  <li>Both the professors and graduate students have multiple phone numbers and email addresses</li></ul>
+  <p>Draw an ER diagram that captures the information about the university. You need to indicate all key and cardinality constraints and any assumptions you make. (5b / (b): Convert the above ER diagram into relational schema.) (The 2014–15 paper asks only for the diagram and omits the last bullet.)</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><strong>Entity sets:</strong> Professor(<u>ssn</u>, name, age, rank, specialty, {phone}, {email}); Project(<u>pno</u>, sponsor, start_date, end_date, budget); GradStudent(<u>ssn</u>, name, age, degree_program, {phone}, {email}); Department(<u>dno</u>, dname, main_office).</p>
+    <p><strong>Relationships, sentence by sentence:</strong></p>
+    <div class="tbl"><table><tr><th>Relationship</th><th>Participants</th><th>Multiplicity and participation</th></tr>
+    <tr><td>manages (role: principal investigator)</td><td>Project, Professor</td><td>many-to-one into Professor; total for Project ("each project is managed by one")</td></tr>
+    <tr><td>coInvestigates</td><td>Professor, Project</td><td>many-to-many; total for Project ("one or more professors")</td></tr>
+    <tr><td>worksOn (ternary; role of Professor: supervisor)</td><td>GradStudent, Project, Professor</td><td>arrow into Professor: for each (student, project) one supervisor; total for Project ("one or more graduate students")</td></tr>
+    <tr><td>runs (role: chairman)</td><td>Department, Professor</td><td>many-to-one into Professor; total for Department</td></tr>
+    <tr><td>worksIn, attribute time_pct</td><td>Professor, Department</td><td>many-to-many; total for Professor ("one or more departments")</td></tr>
+    <tr><td>majorIn</td><td>GradStudent, Department</td><td>many-to-one into Department; total for GradStudent</td></tr>
+    <tr><td>advises (roles: advisor, advisee)</td><td>GradStudent, GradStudent</td><td>many-to-one into the advisor role ("another … student advisor")</td></tr></table></div>
+    <p><strong>Assumptions:</strong> a professor may chair more than one department (nothing forbids it; add a UNIQUE if not); "advisor is more senior" cannot be drawn and is a design note, and so is the fact that the most senior student cannot have a senior advisor, so the advisee side is drawn partial; the supervisor of a student on a project need not be one of the project's co-investigators (if required, a design note).</p>
+    <figure class="wide"><div id="uni"></div></figure>
+    <p><strong>(b) Relational schema</strong> (Chapter 11 rules; 11 relations):</p>
+    <div id="uniRel"></div>
+    <p>Notes: manages, runs, majorIn and advises are many-to-one, so they became foreign keys (pi_ssn, chair_ssn, major_dno, advisor_ssn); pi_ssn, chair_ssn and major_dno are NOT NULL because of total participation. worksOn's key is (grad_ssn, pno) because of the arrow into Professor. "At least one co-investigator / research assistant per project" and "every professor works in a department" cannot be enforced by keys. The question bank's schema matches this one.</p>
+    <div id="uniPlay"></div>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 17-18 5a · 20 marks &nbsp;·&nbsp; BUET QBank · CSE 215 | L-2/T-2 | 2017–18 · 20 marks</div>
+  <div class="exam-q"><p>Assume that you are designing a database for a university. Consider the following in your design. Each student has a student id, name, address and contact name. Each course has a course number, name of the course, credit hour per term, and the minimum level and term of the students for whom the course is offered. Each student enrolls in several courses. Now, university employee can be divided into two parts. The can be either faculty members or they can be office staff. Each faculty member has a name, designation, address, contact number and room number associated with them. On the other hand, each office staff has a name, contact and address, hourly payment rate associated with them. In each semester, every faculty member conducts several courses. At the same time, a single course can have many course teachers. Moreover, if a course is conducted by several teachers, then one of them is assigned as the coordinator. Assume that each semester is identified by a label such as "January 2019". (i) Write down the list of entity sets. With each entity set, mention its attributes. (ii) Draw the E/R diagram of your design. Use appropriate arrows to indicate multiplicity of each relation. There is no need to show the attributes of the entity sets. However, if there is an attribute on a relation then you must mention it.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><strong>(i) Entity sets and attributes</strong> (keys underlined; emp_id is assumed because no key is given for employees):</p>
+    <ul>
+    <li>Student(<u>student_id</u>, name, address, contact_name)</li>
+    <li>Course(<u>course_no</u>, name, credit_hours, min_level, min_term)</li>
+    <li>Semester(<u>label</u>), e.g. "January 2019". It is an entity set because conducting and coordinating are per semester and the semester label is the identifier the question gives.</li>
+    <li>Employee(<u>emp_id</u>, name, address, contact_no): the common attributes of faculty and staff.</li>
+    <li>Faculty isA Employee: (designation, room_no). OfficeStaff isA Employee: (hourly_rate). Disjoint and total ("can be either … or …").</li>
+    </ul>
+    <p><strong>Relationships.</strong> enrolls: Student – Course, many-to-many (assumption: the semester of enrollment is not needed; otherwise make it ternary with Semester). conducts: Faculty – Course – Semester, ternary, no arrows: in a semester a faculty member conducts many courses and a course has many teachers. coordinates: Faculty – Course – Semester, ternary with an arrow into Faculty: for each (course, semester) at most one coordinator. Design note: the coordinator must also be one of the course's conductors in that semester.</p>
+    <figure class="wide"><div id="u2"></div><figcaption>Two parts of one diagram: Faculty on the left is the same entity set as the subclass Faculty on the right (drawn twice to avoid crossing lines). Attributes of entity sets are omitted, as the question allows.</figcaption></figure>
+    <p>Why a second relationship and not a boolean attribute is_coordinator on conducts (the question bank's choice)? The attribute cannot prevent two teachers of the same course in the same semester from both being marked coordinator; the arrow on coordinates says exactly "one coordinator per (course, semester)". In tables it becomes Coordinates(<u>course_no</u>, <u>label</u>, emp_id), whose key enforces the rule.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 21 CT1 1 · 10 marks</div>
+  <div class="exam-q"><p><strong>University Research Management.</strong> A university wants to manage all the research works being done by the teachers and students. The teachers info contains name, email, position and salary, and the students info contains name, email and gpa. Each research project is initiated by some teachers, and some students can participate in them. The research projects have attributes such as title, description, start-time, fund etc. Some papers can be published under a research project. A paper can also be standalone (i.e., not under any research project). A paper can be authored by some teachers and students, and there is some sequence maintained in the paper (e.g., 1st author, 2nd author, etc). Other attributes of a paper are: name of journal, publishing date and number of citations. Draw a detailed ERD for this system with all entities, relationships and attributes.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><strong>Key design decision.</strong> A paper's author list mixes teachers and students in one sequence. If authorship were two relationships (Teacher–Paper and Student–Paper), the order numbers would live in two places and could clash. So we generalize: <strong>Researcher</strong>(<u>rid</u>, name, email) with subclasses Teacher(position, salary) and Student(gpa), disjoint and total. Authorship is one relationship <em>authors</em> between Researcher and Paper with attribute <em>author_order</em>.</p>
+    <ul>
+    <li>Project(<u>project_id</u>, title, description, start_time, fund). Keys are not given, so surrogate ids are assumed.</li>
+    <li>initiates: Teacher – Project, many-to-many, total for Project ("each project is initiated by some teachers").</li>
+    <li>participates: Student – Project, many-to-many, partial on both sides ("some students can").</li>
+    <li>Paper(<u>paper_id</u>, title, journal_name, publish_date, citations).</li>
+    <li>publishedUnder: Paper → Project, many-to-one, <strong>partial</strong> for Paper (a paper can be standalone).</li>
+    <li>authors: Researcher – Paper, many-to-many, attribute author_order, total for Paper. Design note: author_order is unique within a paper (in tables: UNIQUE (paper_id, author_order)).</li>
+    </ul>
+    <figure class="wide"><div id="res"></div></figure>
+    <p>Schema (for completeness): Researcher(<u>rid</u>, name, email); Teacher(<u>rid</u>, position, salary); Student(<u>rid</u>, gpa); Project(<u>project_id</u>, title, description, start_time, fund); Initiates(<u>rid</u>, <u>project_id</u>); Participates(<u>rid</u>, <u>project_id</u>); Paper(<u>paper_id</u>, title, journal_name, publish_date, citations, <i>project_id</i> NULL allowed); Authors(<u>paper_id</u>, <u>rid</u>, author_order) with UNIQUE(paper_id, author_order).</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 22 CT1 2 · 10 marks</div>
+  <div class="exam-q"><p>Patients are identified by an ID, and their names, addresses, and ages must be recorded. Doctors are identified by an ID. For each doctor, the name, specialty, and years of experience must be recorded. Each pharmaceutical company is identified by name and has a phone number. For each drug, the trade name and formula must be identified. Each drug is sold by a given pharmaceutical company, and the trade name identifies a drug uniquely from among the products of the company. If a pharmaceutical company is deleted, you need not to keep track of its products any more. Each pharmacy has a name, address, and phone number. Every patient has a primary physician. Every doctor has at least one patient. Each pharmacy sells several drugs and has a price for each. A drug could be sold at several pharmacies, and the price could vary from one pharmacy to another. Doctors prescribe drugs for patients. A doctor could prescribe one or more drugs for several patients, and a patient could obtain prescriptions from several doctors. Each prescription has a date and a quantity associated with it. Pharmaceutical companies have long-term contracts with pharmacies. A pharmaceutical company can contract with several pharmacies, and a pharmacy can contract with several pharmaceutical companies. For each contract, you have to store a start date, an end date, and a text to the contract. Draw an Entity-relationship (ER) diagram to represent Library data requirements described above.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>(The last sentence says "Library" by mistake; the requirements are for a prescription/pharmacy database.)</p>
+    <ul>
+    <li>Patient(<u>patient_id</u>, name, address, age); Doctor(<u>doctor_id</u>, name, specialty, years_exp); Pharmacy(<u>name</u>, address, phone) (name assumed unique); PharmCo(<u>name</u>, phone).</li>
+    <li><strong>Drug is weak</strong>: "the trade name identifies a drug uniquely from among the products of the company" (partial key trade_name) and "if a company is deleted, you need not keep track of its products" (existence dependency). Owner PharmCo through the identifying relationship makes. Drug(trade_name, formula), with trade_name as the partial key (dashed underline).</li>
+    <li>primaryPhysician: Patient → Doctor, many-to-one; total for Patient ("every patient has a primary physician") and total for Doctor ("every doctor has at least one patient").</li>
+    <li>sells: Pharmacy – Drug, many-to-many, attribute price.</li>
+    <li>prescribes: ternary Doctor – Patient – Drug with attributes date and quantity. Assumption (as in the textbook exercise this comes from): one prescription record per (doctor, patient, drug); if repeat prescriptions must be kept, date becomes part of the key (or Prescription becomes an entity).</li>
+    <li>contract: PharmCo – Pharmacy, many-to-many, attributes start_date, end_date, text.</li>
+    </ul>
+    <figure class="wide"><div id="rx"></div></figure>
+    <p>In tables Drug becomes Drug(<u>company_name</u>, <u>trade_name</u>, formula) with ON DELETE CASCADE to PharmCo, and every table that references a drug (Sells, Prescribes) carries both columns as a composite foreign key.</p>
+  </div></details>
+</div>
+
+<div class="key">
+<p><strong>Summary:</strong> when a fact needs three participants (student, project, supervisor), draw a ternary relationship and use its arrow for "one per pair". Model special roles (chairman, PI, coordinator) as their own relationships. Generalize when one list mixes two kinds of entity (authors who are teachers or students). Use a weak entity when the scenario says an identifier is unique only within an owner or that items disappear with their owner.</p>
+</div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/sqlplay.js"></script>
+<script src="lecture.js"></script>
+<script>
+$('#uni').innerHTML = erd({
+  n: [['Department', 'E', -480, 260], ['runs', 'R', -240, 170], ['worksIn', 'R', -240, 350], ['Professor', 'E', 0, 260], ['manages', 'R', 240, 170], ['coInv', 'R', 240, 350, 'co\nInvestigates'], ['Project', 'E', 480, 260],
+      ['worksOn', 'R', 240, 500, 'works\nOn'], ['GradStudent', 'E', 240, 660], ['majorIn', 'R', -240, 600, 'major\nIn'], ['advises', 'R', 580, 640]],
+  a: [['Department', '_dno', -60, -60], ['Department', 'dname', 60, -60], ['Department', 'main_office', -80, 60],
+      ['Professor', '_ssn', -130, -70], ['Professor', 'name', -50, -100], ['Professor', 'age', 30, -105], ['Professor', 'rank', 95, -75], ['Professor', 'specialty', 0, -140], ['Professor', '{phone}', -140, -125], ['Professor', '{email}', 115, -130],
+      ['Project', '_pno', 140, -60], ['Project', 'sponsor', 160, -15], ['Project', 'start_date', 150, 30], ['Project', 'end_date', 130, 75], ['Project', 'budget', 30, -80],
+      ['worksIn', 'time_pct', 0, 65],
+      ['GradStudent', '_ssn', -160, 35], ['GradStudent', 'name', -40, 85], ['GradStudent', 'age', 40, 95], ['GradStudent', 'degree_program', 140, 95], ['GradStudent', '{phone}', -170, -10], ['GradStudent', '{email}', -130, 80]],
+  l: [['Department', 'runs', { total: true }], ['Professor', 'runs', { one: true, role: 'chairman', roleSide: -1 }], ['Department', 'worksIn'], ['Professor', 'worksIn', { total: true }],
+      ['Project', 'manages', { total: true }], ['Professor', 'manages', { one: true, role: 'PI', roleSide: 1 }], ['Professor', 'coInv'], ['Project', 'coInv', { total: true }],
+      ['Professor', 'worksOn', { one: true, role: 'supervisor' }], ['Project', 'worksOn', { total: true }], ['GradStudent', 'worksOn'],
+      ['GradStudent', 'majorIn', { total: true }], ['Department', 'majorIn', { one: true }],
+      ['GradStudent', 'advises', { bend: -55, role: 'advisor', one: true }], ['GradStudent', 'advises', { bend: 55, role: 'advisee' }]],
+});
+const UNI = [{ n: 'Professor', c: ['*ssn:NUMBER(9)', 'name', 'age', 'rank', 'specialty'] }, { n: 'Prof_Phone', c: ['*ssn>Professor', '*phone'] }, { n: 'Prof_Email', c: ['*ssn>Professor', '*email'] },
+  { n: 'Department', c: ['*dno:NUMBER(4)', 'dname', 'main_office', 'chair_ssn!>Professor(ssn)'] }, { n: 'Project', c: ['*pno:NUMBER(6)', 'sponsor', 'start_date', 'end_date', 'budget', 'pi_ssn!>Professor(ssn)'] },
+  { n: 'GradStudent', c: ['*ssn:NUMBER(9)', 'name', 'age', 'degree_program', 'major_dno!>Department(dno)', 'advisor_ssn>GradStudent(ssn)'] }, { n: 'Grad_Phone', c: ['*ssn>GradStudent', '*phone'] }, { n: 'Grad_Email', c: ['*ssn>GradStudent', '*email'] },
+  { n: 'Works_In', c: ['*prof_ssn>Professor(ssn)', '*dno>Department', 'time_pct'] }, { n: 'Co_Investigates', c: ['*prof_ssn>Professor(ssn)', '*pno>Project'] },
+  { n: 'Works_On', c: ['*grad_ssn>GradStudent(ssn)', '*pno>Project', 'supervisor_ssn!>Professor(ssn)'] }];
+relInto('#uniRel', UNI);
+sqlPlay('#uniPlay', { setup: ddl(UNI) + `
+INSERT INTO Professor VALUES (111, 'Dr. Haque', 50, 'Professor', 'Databases');
+INSERT INTO Professor VALUES (222, 'Dr. Rahman', 40, 'Assoc. Prof.', 'Networks');
+INSERT INTO Department VALUES (5, 'CSE', 'ECE Bldg', 111);
+INSERT INTO Project VALUES (900, 'NSF', DATE '2024-01-01', DATE '2026-12-31', 500000, 111);
+INSERT INTO Co_Investigates VALUES (222, 900);
+INSERT INTO GradStudent VALUES (701, 'Nabila', 27, 'Ph.D.', 5, NULL);
+INSERT INTO GradStudent VALUES (702, 'Tanvir', 24, 'M.S.', 5, 701);
+INSERT INTO Works_On VALUES (701, 900, 111);
+INSERT INTO Works_On VALUES (702, 900, 222);
+INSERT INTO Works_In VALUES (111, 5, 100);
+INSERT INTO Works_In VALUES (222, 5, 60);`, query: `-- research assistants of project 900, each with their supervisor and their advisor
+SELECT g.name AS student, p.name AS supervisor, a.name AS advisor
+FROM Works_On w
+JOIN GradStudent g ON g.ssn = w.grad_ssn
+JOIN Professor p   ON p.ssn = w.supervisor_ssn
+LEFT JOIN GradStudent a ON a.ssn = g.advisor_ssn
+WHERE w.pno = 900;`, note: 'The generated DDL with invented rows. Try inserting a second supervisor for (701, 900): the key (grad_ssn, pno) rejects it.' });
+$('#u2').innerHTML = `<div class="figrow"><div>${erd({
+  n: [['Student', 'E', -470, 0], ['enrolls', 'R', -240, 0], ['Course', 'E', 0, 0], ['conducts', 'R', -210, 170], ['Faculty', 'E', 0, 170], ['coordinates', 'R', 210, 170, 'coordi-\nnates'], ['Semester', 'E', 0, 340]],
+  l: [['Student', 'enrolls'], ['Course', 'enrolls'], ['Course', 'conducts'], ['Semester', 'conducts'], ['Faculty', 'conducts'], ['Course', 'coordinates'], ['Semester', 'coordinates'], ['Faculty', 'coordinates', { one: true }]],
+  t: [[330, 240, 'arrow into Faculty:\none coordinator per\n(course, semester)', 'acc']],
+})}</div><div>${erd({ n: [['Employee', 'E', 0, 0], ['isA', 'D', 0, 100, 'isA'], ['Faculty', 'E', -110, 200], ['OfficeStaff', 'E', 110, 200, 'Office\nStaff']],
+  l: [['Employee', 'isA', { total: true }], ['Faculty', 'isA'], ['OfficeStaff', 'isA']], t: [[0, 260, 'disjoint, total', 'acc']] })}</div></div>`;
+$('#res').innerHTML = erd({
+  n: [['Researcher', 'E', 0, 0], ['isA', 'D', 0, 120, 'isA'], ['Teacher', 'E', -230, 220], ['Student', 'E', 230, 220], ['initiates', 'R', -230, 370], ['participates', 'R', 230, 370, 'partici-\npates'], ['Project', 'E', 0, 500],
+      ['authors', 'R', 520, 0], ['Paper', 'E', 520, 500], ['publishedUnder', 'R', 270, 560, 'published\nUnder']],
+  a: [['Researcher', '_rid', -110, -40], ['Researcher', 'name', -20, -65], ['Researcher', 'email', 90, -50], ['Teacher', 'position', -150, -20], ['Teacher', 'salary', -140, 30], ['Student', 'gpa', 110, 30],
+      ['Project', '_project_id', -150, -20], ['Project', 'title', -150, 30], ['Project', 'description', -80, 75], ['Project', 'start_time', 40, 80], ['Project', 'fund', 130, 60],
+      ['authors', 'author_order', 0, -65], ['Paper', '_paper_id', 150, -40], ['Paper', 'title', 140, 5], ['Paper', 'journal_name', 140, 50], ['Paper', 'publish_date', 50, 90], ['Paper', 'citations', -60, 85]],
+  l: [['Researcher', 'isA', { total: true }], ['Teacher', 'isA'], ['Student', 'isA'], ['Teacher', 'initiates'], ['Project', 'initiates', { total: true }], ['Student', 'participates'], ['Project', 'participates'],
+      ['Researcher', 'authors'], ['Paper', 'authors', { total: true }], ['Paper', 'publishedUnder'], ['Project', 'publishedUnder', { one: true }]],
+  t: [[120, 120, 'disjoint, total', 'acc']],
+});
+$('#rx').innerHTML = erd({
+  n: [['Doctor', 'E', -460, 0], ['primary', 'R', -460, 190, 'primary\nPhysician'], ['Patient', 'E', -460, 380], ['prescribes', 'R', -170, 190, 'prescribes'], ['Drug', 'W', 120, 190], ['makes', 'I', 120, 370], ['PharmCo', 'E', 120, 540],
+      ['sells', 'R', 400, 190], ['Pharmacy', 'E', 650, 190], ['contract', 'R', 420, 540]],
+  a: [['Doctor', '_doctor_id', -70, -55], ['Doctor', 'name', 40, -60], ['Doctor', 'specialty', 130, -30], ['Doctor', 'years_exp', -140, 40],
+      ['Patient', '_patient_id', -80, 55], ['Patient', 'name', 30, 65], ['Patient', 'address', 130, 40], ['Patient', 'age', -140, -20],
+      ['prescribes', 'date', -45, 65], ['prescribes', 'quantity', 60, 65], ['Drug', '~trade_name', -40, -60], ['Drug', 'formula', 70, -60],
+      ['PharmCo', '_name', -70, 55], ['PharmCo', 'phone', 60, 55], ['sells', 'price', 0, -60], ['Pharmacy', '_name', -60, -60], ['Pharmacy', 'address', 60, -60], ['Pharmacy', 'phone', 120, 30],
+      ['contract', 'start_date', -80, 60], ['contract', 'end_date', 30, 70], ['contract', 'text', 120, 40]],
+  l: [['Patient', 'primary', { total: true }], ['Doctor', 'primary', { one: true, total: true }], ['Doctor', 'prescribes'], ['Patient', 'prescribes'], ['Drug', 'prescribes'],
+      ['Drug', 'makes', { total: true }], ['PharmCo', 'makes', { one: true }], ['Pharmacy', 'sells'], ['Drug', 'sells'], ['PharmCo', 'contract'], ['Pharmacy', 'contract']],
+});
+quiz('#quiz', [
+  { q: '"When graduate students work on a project, a professor must supervise their work; a student has a (potentially different) supervisor for each project." Best model?', opts: ['Professor supervises GradStudent (binary)', 'A ternary relationship GradStudent–Project–Professor with an arrow into Professor', 'An attribute supervisor on Project', 'A weak entity'], a: 1, why: 'The supervisor depends on the (student, project) pair.' },
+  { q: '"Each graduate student has another, more senior graduate student as advisor." Best model?', opts: ['A recursive relationship on GradStudent with roles advisor/advisee', 'A new entity set Advisor', 'An attribute advisor_name', 'A ternary relationship'], a: 0, why: 'Same entity set in two roles.' },
+  { q: '"The trade name identifies a drug uniquely from among the products of the company." Drug is…', opts: ['strong with key trade_name', 'weak, owner PharmCo, partial key trade_name', 'a relationship', 'a multivalued attribute'], a: 1, why: 'Unique only within its owner.' },
+  { q: 'Why model the coordinator with its own relationship rather than a flag on conducts?', opts: ['Flags are not allowed', 'The relationship\'s arrow enforces one coordinator per (course, semester)', 'It uses fewer tables', 'Coordinators are not faculty'], a: 1, why: 'A flag cannot stop two coordinators.' },
+]);
+</script>
+</body>
+</html>

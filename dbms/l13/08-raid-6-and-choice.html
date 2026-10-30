@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RAID 6 and Choosing a Level · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 13 · Chapter 8 · Slides 20–22 · Book §13.4.9</div>
+<h1>RAID 6, and Choosing a RAID Level</h1>
+<p class="lede">RAID 6 adds a second check block per stripe so the array survives two failures. Then the slides' comparison of RAID 1, 5 and 6, the factors for choosing a level, and why latent block failures make RAID 6 more important every year.</p>
+
+<h2>1. RAID 6: P+Q redundancy (slide 20)</h2>
+
+<dl class="def">
+  <dt>RAID level 6</dt><dd>The <b class="term">P+Q redundancy scheme</b>: similar to RAID 5, but each stripe stores <em>two</em> error-correcting blocks, P and Q, instead of a single parity block, to guard against multiple disk failures. Better reliability than RAID 5 at a higher cost, and becoming more important as storage sizes increase.</dd>
+  <dt>P block</dt><dd>The ordinary XOR parity of the stripe, as in RAID 5.</dd>
+  <dt>Q block</dt><dd>A second check block computed with a different formula, an error-correcting <b class="term">Reed–Solomon code</b>. Its arithmetic (over a finite field) is beyond this course; what matters is that P and Q are two <em>independent</em> equations about the stripe.</dd>
+</dl>
+
+<p>One equation can be solved for one unknown; two independent equations can be solved for two unknowns. So when any two blocks of a stripe are lost, RAID 6 can compute both from the rest. That is exactly the case where RAID 5 loses data.</p>
+
+<h3>Placement (slide 20)</h3>
+<p>With 6 disks, the two error-correcting blocks P<sub>k</sub> and Q<sub>k</sub> for data blocks 4k, 4k+1, 4k+2, 4k+3 are stored on disk <i>k</i> mod 6 and disk (<i>k</i> + 1) mod 6. The data blocks fill the other four disks in order. Both check blocks rotate, as RAID 5's parity does.</p>
+
+<figure>
+<svg id="r6"></svg>
+<figcaption><b>Figure 1.</b> RAID 6 with 6 disks and B0–B9, as on slide 20. Stripe 0: P0 on D0, Q0 on D1, B0–B3 on D2–D5. Stripe 1: P1 on D1, Q1 on D2, B4 on D0, B5–B7 on D3–D5. The slide stops at B8, B9; their stripe also needs P2 (D2) and Q2 (D3), drawn here.</figcaption>
+</figure>
+
+<p><strong>Cost.</strong> Two disks' worth of space go to P and Q: <i>N</i> disks give <i>N</i> − 2 disks of usable space. For 8 TB of data on 2 TB disks, RAID 6 needs 4 + 2 = 6 disks. <strong>Small writes</strong> are dearer than in RAID 5: an update must fix both P and Q, so it reads old B, old P, old Q and writes all three, 3 reads + 3 writes = 6 transfers.</p>
+
+<p>Try it: the simulator below fails D1 and D3. In stripe 0 that costs Q0 and B1 (B1 comes back from P alone, then Q0 is recomputed); in stripe 1 it costs P1 and B5 (only Q can help, so the Reed–Solomon equations are used); in stripe 2 it costs B9 and Q2 (B9 comes back from P2 = B8 ⊕ B9, then Q2 is recomputed).</p>
+<figure class="wide">
+<span class="anim-tag">Interactive tool</span>
+<div id="sim"></div>
+</figure>
+
+<h2>2. Discussion: RAID 1 versus RAID 5 versus RAID 6 (slide 20)</h2>
+
+<div class="q">
+<h4>Compare RAID 1, RAID 5 and RAID 6 in terms of cost, update, recovery and reliability</h4>
+<p>Assume <i>N</i> disks and a small (one-block) update.</p>
+<div class="tbl"><table>
+<tr><th></th><th>RAID 1</th><th>RAID 5</th><th>RAID 6</th></tr>
+<tr><th>Cost (usable space)</th><td class="bad">N/2: half the disks are copies</td><td class="good">N − 1: one disk's worth of parity</td><td class="mid">N − 2: two disks' worth</td></tr>
+<tr><th>Update of one block</th><td class="good">2 writes</td><td class="mid">2 reads + 2 writes</td><td class="bad">3 reads + 3 writes</td></tr>
+<tr><th>Recovery</th><td class="good">Copy the mirror disk: simple and fast, only the twin is read.</td><td class="mid">XOR of all other disks, stripe by stripe: every surviving disk is read in full.</td><td class="mid">Like RAID 5 for one failure; for two, solve the P and Q equations (heavier computation).</td></tr>
+<tr><th>Reliability</th><td class="mid">Survives 1 failure (2 only if not a mirror pair)</td><td class="mid">Survives exactly 1 failure</td><td class="good">Survives any 2 failures</td></tr>
+<tr><th>Best for</th><td>many small random updates, logs</td><td>large data, large sequential writes</td><td>large data where safety matters most</td></tr>
+</table></div>
+</div>
+
+<h2>3. Choice of RAID level (slides 21–22)</h2>
+
+<p>The slides name four factors:</p>
+<ol>
+  <li><b class="term">Monetary cost</b>: how many disks must be bought for the space needed.</li>
+  <li><b class="term">Performance</b> during normal operation: the number of I/O operations per second (for small random requests) and the bandwidth (bytes per second for large transfers).</li>
+  <li><b class="term">Performance during failure</b>: how slow the array is while a disk is dead. RAID 1 reads the mirror at full speed; RAID 5 must compute every lost block from all the other disks.</li>
+  <li><b class="term">Performance during rebuild</b> of the failed disk, including the time taken to rebuild it. A long rebuild slows everything else and is also a long window with reduced protection.</li>
+</ol>
+
+<p>And they draw these conclusions:</p>
+<ul>
+  <li><strong>RAID 0</strong> is used only when data safety is not important, e.g. when the data can be recovered quickly from other sources.</li>
+  <li><strong>Level 1 provides much better write performance than level 5.</strong> Level 5 requires at least 2 block reads and 2 block writes to write a single block, whereas level 1 only requires 2 block writes.</li>
+  <li><strong>Level 1 has higher storage cost than level 5</strong> (half the disks versus one disk's worth).</li>
+  <li><strong>Level 5 is preferred</strong> for applications where writes are sequential and large (many blocks, so full stripes are written without reads) and which need large amounts of data storage.</li>
+  <li><strong>RAID 1 is preferred</strong> for applications with many random or small updates, because it avoids the small-write penalty.</li>
+  <li><strong>Level 6 gives better data protection than RAID 5</strong>, since it can tolerate two disk (or disk block) failures.</li>
+</ul>
+
+<h3>Latent block failures</h3>
+<dl class="def">
+  <dt>Latent block failure</dt><dd>A block that has gone bad on a disk without anyone noticing, because nobody has read it recently. It is discovered only when someone tries to read it.</dd>
+</dl>
+<p>Picture a RAID 5 array where one disk dies. To rebuild it, the system must read <em>every</em> block of every surviving disk. If one survivor has a latent bad block, its stripe now has two missing pieces, and RAID 5 can fix only one: that data is lost. RAID 1 has the same problem if the bad block is on the surviving mirror. RAID 6 can still recover, because it handles two missing pieces per stripe. Disks keep getting bigger, so a rebuild reads more blocks and takes longer, and the chance of meeting a latent failure during it keeps rising. That is why the slide says RAID 6 is <em>increasing in importance</em>: a latent failure on one disk coupled with the failure of another disk can lose data with RAID 1 and RAID 5.</p>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+
+<h3>Exam questions</h3>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 21-22 6b · 5 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-2 | 2021–22 · 5 marks</div>
+  <div class="exam-q"><p>Briefly describe the differences between RAID-5 and RAID-6.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <div class="tbl"><table>
+      <tr><th></th><th>RAID 5</th><th>RAID 6</th></tr>
+      <tr><td>Redundancy per stripe</td><td>one XOR parity block P</td><td>two check blocks, P (XOR) and Q (Reed–Solomon): the P+Q scheme</td></tr>
+      <tr><td>Placement (n disks)</td><td>P<sub>k</sub> on disk k mod n</td><td>P<sub>k</sub> on k mod n, Q<sub>k</sub> on (k+1) mod n</td></tr>
+      <tr><td>Failures tolerated</td><td>1 disk</td><td>any 2 disks (or a disk plus a latent bad block)</td></tr>
+      <tr><td>Usable capacity</td><td>(n − 1) disks</td><td>(n − 2) disks</td></tr>
+      <tr><td>Minimum disks</td><td>3</td><td>4</td></tr>
+      <tr><td>Small update</td><td>2 reads + 2 writes</td><td>3 reads + 3 writes</td></tr>
+      <tr><td>Recovery</td><td>XOR of the surviving blocks</td><td>XOR for one loss; solve the P and Q equations for two</td></tr>
+    </table></div>
+    <p>In short, RAID 6 trades one more disk of space and slower writes for protection against a second failure, which matters more as disks grow and rebuilds take longer.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 20-21 4c · 12 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-2 | 2020–21 · 10 marks</div>
+  <div class="exam-q"><p>You have been given 6 disks of 4 TB each and the student relation has 10 blocks: B0, B1, …, B9. Show the storage of the student relation using (a) a RAID level 5 storage system, (b) a RAID level 6 storage system, (c) compare RAID level 5 with RAID level 6.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><strong>(a) RAID 5.</strong> 5 data blocks + 1 parity per stripe, P<sub>k</sub> on disk k mod 6. 10 blocks fill exactly 2 stripes.</p>
+    <figure><svg id="q10a"></svg></figure>
+    <p>P0 = B0 ⊕ B1 ⊕ B2 ⊕ B3 ⊕ B4; P1 = B5 ⊕ B6 ⊕ B7 ⊕ B8 ⊕ B9.</p>
+    <p><strong>(b) RAID 6.</strong> 4 data blocks + P + Q per stripe, P<sub>k</sub> on disk k mod 6 and Q<sub>k</sub> on (k+1) mod 6 (slide 20). 10 blocks need 3 stripes; the last has B8, B9 and two empty slots.</p>
+    <figure><svg id="q10b"></svg></figure>
+    <p><strong>(c) Comparison.</strong></p>
+    <div class="tbl"><table>
+      <tr><th></th><th>RAID 5</th><th>RAID 6</th></tr>
+      <tr><td>Usable capacity</td><td>(6 − 1) × 4 = <strong>20 TB</strong> (83%)</td><td>(6 − 2) × 4 = <strong>16 TB</strong> (67%)</td></tr>
+      <tr><td>Stripes for 10 blocks</td><td>2</td><td>3</td></tr>
+      <tr><td>Failures tolerated</td><td>1 disk</td><td>2 disks</td></tr>
+      <tr><td>Update one block</td><td>4 transfers</td><td>6 transfers</td></tr>
+      <tr><td>Reads</td><td colspan="2">Both read data blocks directly; a full scan uses all disks in parallel.</td></tr>
+    </table></div>
+    <p>Note: the question bank's answer rotates the parity differently (P0 on the last disk, moving left). The layouts here follow the slides' placement rules.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2014–15 · 5 marks</div>
+  <div class="exam-q"><p>Discuss the applications where you will use RAID level 1 and RAID level 5.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><strong>RAID 1</strong> (mirroring) writes a block with just 2 writes and recovers by copying, but costs half the disks. Use it where updates are many, small and random, and must be safe:</p>
+    <ul>
+      <li>the database <strong>log</strong> (the slide's example): a constant stream of small appends that must reach disk quickly at commit;</li>
+      <li>OLTP data such as banking or reservation systems, with many single-record updates;</li>
+      <li>system disks and other small, critical data where the extra disks cost little.</li>
+    </ul>
+    <p><strong>RAID 5</strong> (distributed parity) costs only one disk's worth of space but needs 2 reads + 2 writes per small update. Use it where data is large and mostly read, or written in large sequential batches (full stripes need no reads):</p>
+    <ul>
+      <li>data warehouses and decision-support databases, loaded in bulk and then queried;</li>
+      <li>archives, file and media servers, backups on disk;</li>
+      <li>any large read-mostly data where storage cost matters.</li>
+    </ul>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2011–12 · 12 marks</div>
+  <div class="exam-q"><p>What are the differences between RAID levels 1, 4, 5 and 6?</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <div class="tbl"><table>
+      <tr><th></th><th>RAID 1</th><th>RAID 4</th><th>RAID 5</th><th>RAID 6</th></tr>
+      <tr><td>Redundancy</td><td>mirror copy of every disk</td><td>XOR parity on one dedicated disk</td><td>XOR parity rotated over all disks</td><td>two check blocks P (XOR) and Q (Reed–Solomon), rotated</td></tr>
+      <tr><td>Usable space (n disks)</td><td>n/2</td><td>n − 1</td><td>n − 1</td><td>n − 2</td></tr>
+      <tr><td>Failures tolerated</td><td>1 (more if not mirror pairs)</td><td>1</td><td>1</td><td>2</td></tr>
+      <tr><td>Small write</td><td>2 writes</td><td>2 reads + 2 writes, always involving the parity disk</td><td>2 reads + 2 writes, parity spread out</td><td>3 reads + 3 writes</td></tr>
+      <tr><td>Bottleneck</td><td>none</td><td>the parity disk takes part in every write</td><td>none</td><td>none</td></tr>
+      <tr><td>Recovery</td><td>copy the mirror</td><td>XOR of the other disks</td><td>XOR of the other disks</td><td>XOR, or solving P and Q for two losses</td></tr>
+      <tr><td>Typical use</td><td>logs, many small updates</td><td>largely replaced by RAID 5</td><td>large, read-mostly or sequentially written data</td><td>large data needing the highest safety</td></tr>
+    </table></div>
+  </div></details>
+</div>
+
+<div class="key"><p><strong>Summary:</strong> RAID 6 stores two check blocks per stripe (P = XOR parity, Q = Reed–Solomon code), on disks k mod n and (k+1) mod n, so it survives any two failures at the cost of n − 2 usable disks and 6 transfers per small update. Choose a level by monetary cost, normal performance (IOPS and bandwidth), performance during failure and during rebuild. RAID 0 only for data that can be recovered elsewhere; RAID 1 for many small random updates (2 writes per block); RAID 5 for large, sequentially written data; RAID 6 when latent block failures during long rebuilds make a second failure likely.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="lecture.js"></script>
+<script>
+const put = (id, level, n, m) => { document.getElementById(id).outerHTML = raidSVG({ rows: raidLayout(level, n, m).rows, n }); };
+put('r6', 6, 6, 10);
+put('q10a', 5, 6, 10);
+put('q10b', 6, 6, 10);
+raidTool('#sim', { level: 6, n: 6, m: 10, size: 4, fail: '1, 3', upd: 5 });
+
+flashcards('#cards', [
+  { f: 'RAID 6', b: 'P+Q redundancy: two check blocks per stripe; survives any two failures; n − 2 usable disks.' },
+  { f: 'Q block', b: 'Second check block from a Reed–Solomon code, independent of the XOR parity P.' },
+  { f: 'RAID 6 placement (6 disks)', b: 'Pk on disk k mod 6, Qk on disk (k+1) mod 6.' },
+  { f: 'Four factors for choosing a level', b: 'Monetary cost; normal performance (IOPS, bandwidth); performance during failure; performance during rebuild.' },
+  { f: 'Latent block failure', b: 'A bad block nobody has noticed yet; found during a rebuild, it causes a second loss in a stripe.' },
+  { f: 'RAID 1 vs RAID 5 writes', b: 'RAID 1: 2 writes. RAID 5: at least 2 reads + 2 writes.' },
+]);
+quiz('#quiz', [
+  { q: 'Six 4 TB disks in RAID 6: usable capacity?', opts: ['24 TB', '20 TB', '16 TB', '12 TB'], a: 2, why: '(6 − 2) × 4 = 16 TB.' },
+  { q: 'In the 6-disk RAID 6 layout, where is Q4?', opts: ['D4', 'D5', 'D0', 'D3'], a: 1, why: '(4 + 1) mod 6 = 5.' },
+  { q: 'Which application suits RAID 1 best?', opts: ['A data warehouse loaded nightly', 'A database log with many small writes', 'An archive of videos', 'Scratch space for temporary files'], a: 1, why: 'Small random updates favour mirroring (2 writes, no reads).' },
+  { q: 'Why is RAID 6 becoming more important?', opts: ['Disks are getting smaller', 'Long rebuilds of big disks risk hitting a latent block failure, a second loss RAID 5 cannot fix', 'Reed–Solomon codes are new', 'It is cheaper than RAID 5'], a: 1, why: 'A failed disk plus a latent bad block on another disk loses data in RAID 1 and RAID 5.' },
+  { q: 'Which is NOT one of the slides\' factors for choosing a RAID level?', opts: ['Monetary cost', 'Performance during failure', 'Performance during rebuild', 'The number of relations in the database'], a: 3, why: 'The four factors are cost, normal performance, performance during failure and during rebuild.' },
+]);
+ask('#try1', { q: 'You need 12 TB usable with 3 TB disks. How many disks for RAID 6?', a: 6, why: '12 / 3 = 4 data disks, plus 2 for P and Q.' });
+</script>
+</body>
+</html>

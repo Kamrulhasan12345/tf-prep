@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Files, Spreadsheets or a DBMS · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 01 (Ishrak) · Chapter 2 · Slides 12–17</div>
+<h1>Files, Spreadsheets or a DBMS?</h1>
+<p class="lede">Why not keep everything in plain files or a spreadsheet? Slides 12–17 compare the three options on three questions: how much data, what we do with it, and whether its structure changes. This chapter works through each comparison and answers the classic exam question on the advantages of a DBMS over a file system.</p>
+
+<h2>1. Easy to start, hard to control (slide 12)</h2>
+
+<p>Slide 12 puts a pile of files (A.txt, B.csv, C.xlsx) next to a DBMS. Files are <em>easy to start</em>: any program can write a text file, and anyone can open a spreadsheet. A DBMS is <em>structured, shared and protected</em>, but it takes more setup. The rest of the lecture asks when the extra setup pays off.</p>
+
+<dl class="def">
+<dt>File-processing system</dt><dd>The approach used before DBMSs (and still common in small scripts): each application program stores its data in its own operating-system files (text, CSV, binary) and contains its own code to read, search and update them.</dd>
+<dt>Spreadsheet</dt><dd>A grid of cells (Excel, Google Sheets) with formulas, filters and sorting. Good for small tables that people edit by hand.</dd>
+<dt>Workload</dt><dd>What the data will be used for: how big it is, which questions are asked of it, how often it is updated, and by how many users at once.</dd>
+</dl>
+
+<p>Slide 13 gives the three questions used to compare the options, and the rule behind them: <strong>the best choice depends on the workload, not only on where data is stored</strong>.</p>
+<ol>
+<li><strong>How much data?</strong> Can it grow comfortably?</li>
+<li><strong>What will we do with it?</strong> Search, query and update.</li>
+<li><strong>Will the structure change?</strong> New columns, rules and relationships.</li>
+</ol>
+
+<h2>2. What if the data becomes very large? (slide 14)</h2>
+
+<p><b>Files</b> are <span class="mid">technically possible</span>: log files of many gigabytes are common. But once a file is large, everything around it becomes your responsibility: splitting it into pieces (<b class="term">partitioning</b>), checking that values are valid (<b class="term">validation</b>), making copies (<b class="term">backup</b>), and keeping track of which piece holds what. None of that comes with the file.</p>
+<p><b>Spreadsheets</b> are <span class="mid">limited</span>. They are good for small datasets, but a large sheet becomes slow, uses a lot of memory (the whole sheet is usually loaded at once), and is hard to maintain safely. Excel, for example, has a hard limit of 1,048,576 rows per sheet.</p>
+<p>A <b>DBMS</b> is <span class="good">designed for it</span>. It is built for <b class="term">persistent</b> data (data that must outlive the program that created it) and handles storage systematically: it reads only the disk blocks a query needs, keeps indexes, and manages space as tables grow. The cost is that a DBMS requires more setup and administration. How it does this is the subject of <a href="../l13/01-storage-media.html">Lec 13</a> and <a href="../l15/01-what-is-an-index.html">Lec 15</a>.</p>
+
+<h2>3. What if we need to search, query or update? (slide 15)</h2>
+
+<p><b>Files</b> need <span class="mid">custom code</span>. Simple scans are possible: <code>grep "CSE 215" enroll.csv</code> finds lines containing a string. But a question such as “names of students who took more than 18 credits this term” needs a program that parses every line, looks up each course's credits in another file, adds them up and filters. Every new question means new code. Safe updates also need code: to change one line in the middle of a text file, a program usually rewrites the whole file.</p>
+<p><b>Spreadsheets</b> offer <span class="mid">basic operations</span>: filters and formulas help with sorting and simple analysis, but combining sheets (joins) and repeated updates become messy (VLOOKUP chains, copied formulas that break).</p>
+<p>A <b>DBMS</b> is <span class="good">powerful</span>: it offers <b class="term">SQL</b>, <b class="term">joins</b> and <b class="term">indexes</b>. You state the question and the DBMS finds an efficient way to answer it. The cost is that users must learn the query language.</p>
+
+<dl class="def">
+<dt>Query</dt><dd>A question asked of the data, such as “which courses did student 2405190 take in Jan26?”</dd>
+<dt>SQL</dt><dd>Structured Query Language, the standard language for defining, querying and updating relational databases. It is <b class="term">declarative</b>: you say <em>what</em> result you want, not <em>how</em> to compute it.</dd>
+<dt>Join</dt><dd>Combining rows of two tables that refer to each other (an enrollment row with the matching student row). Lecture 02 shows one.</dd>
+<dt>Index</dt><dd>An extra structure that finds the rows with a given value without reading the whole table, like the index at the back of a book.</dd>
+</dl>
+
+<h2>4. What if the structure changes? (slide 16)</h2>
+
+<p>The new requirement on slide 16: <em>add an address to every student</em>.</p>
+<p>With <b>files</b> the change is <span class="bad">brittle</span>. The file format must change (a new comma-separated field in every line), and <strong>every program that reads or writes the file may also need to be changed</strong>, because each program has the old format built into its parsing code. A program that expected 3 fields per line may now crash or, worse, read the address where it expected something else. This tight coupling between programs and the physical file layout is called <b class="term">program–data dependence</b>.</p>
+<p>With a <b>spreadsheet</b> it is <span class="mid">easy, but loose</span>: you add a column in a second. That is fast for small datasets, but nothing forces the column to be filled, so blank cells appear; formulas that referred to column positions break; and people keep separate copies that drift apart.</p>
+<p>With a <b>DBMS</b> it is <span class="good">controlled</span>: one statement, <code>ALTER TABLE</code>, changes the table's definition. A <b class="term">default</b> value can fill existing rows, and <b class="term">constraints</b> (rules such as NOT NULL) can be enforced from then on. Programs that did not ask for the address keep working, because they request columns by name, not by position in a file. On a huge production table, such a change (a <b class="term">migration</b>) can still be costly, which is the slide's caveat.</p>
+
+<p>Try it. This is Oracle SQL; the box runs it on an in-browser engine. Press <b>Run</b>, then try adding a second column of your own.</p>
+<div id="alter"></div>
+
+<p>After the <code>ALTER TABLE</code>, the query <code>SELECT sid, name FROM students</code> returns exactly what it returned before. That is the property files lack: adding data to the structure did not break the existing question. The general name for this property is <b class="term">logical data independence</b>, explained in <a href="../i02/06-beyond-architecture.html">the architecture chapter</a>.</p>
+
+<h2>5. Redundancy and inconsistency: the classic file-system problem</h2>
+
+<p>The slides' three questions have a fourth, older companion that every textbook lists first (Silberschatz, <i>Database System Concepts</i>, §1.2). In a file-processing system, different offices write different programs, and each program keeps its own files. The same fact ends up stored in several files. This is <b class="term">data redundancy</b>. When the fact changes and only some copies are updated, the copies disagree. This is <b class="term">data inconsistency</b>. Step through the example.</p>
+
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="redund"></div>
+<figcaption><b>Figure 1.</b> Two offices, two programs, two files, one student. Compare with a DBMS, where both programs share one stored copy.</figcaption>
+</figure>
+
+<h2>6. The summary table (slide 17)</h2>
+
+<div class="tbl"><table>
+<tr><th>Question</th><th>Files</th><th>Spreadsheets</th><th>DBMS</th></tr>
+<tr><td>Large data</td><td class="mid">Possible</td><td class="mid">Limited</td><td class="good">Strong</td></tr>
+<tr><td>Query and update</td><td class="mid">Custom code</td><td class="mid">Basic</td><td class="good">Powerful</td></tr>
+<tr><td>Change structure</td><td class="bad">Brittle</td><td class="mid">Easy, loose</td><td class="good">Controlled</td></tr>
+</table></div>
+<p>The slide's conclusion: <strong>a DBMS is not merely a place to store data. It is a complete data-management layer.</strong> Files and spreadsheets store data; a DBMS also organizes it, answers questions about it, and controls how it changes. The next chapter adds the three remaining questions (slides 18–23): many users at once, crashes, and security.</p>
+
+<div class="q">
+<h4>When is a file or spreadsheet the right choice?</h4>
+<p>The slides do not say “always use a DBMS”. A single user's small, rarely changing data (a personal budget, a one-off experiment's results, an application's configuration file, a log that is only appended and occasionally searched) is fine in a file or spreadsheet: the DBMS's setup and administration would cost more than they save. A DBMS pays off as soon as the data is large, shared by several programs or people, queried in new ways, updated concurrently, or valuable enough that a crash or a wrong edit would hurt.</p>
+</div>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+
+<h3>Exam questions</h3>
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2010–11 · 14 marks</div>
+  <div class="exam-q"><p>Describe the key properties that give a DBMS edge over a file system.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+<p>In a file-processing system each application keeps its own files and its own code to read and update them. A DBMS replaces this with one shared, managed database. The properties that give it the edge, each with the file-system problem it solves:</p>
+<ol>
+<li><strong>Controlled redundancy, hence consistency.</strong> Files: the same fact (a student's address) is copied into the files of several programs; updating one copy and forgetting another leaves the data inconsistent. DBMS: the fact is stored once in an integrated database and every program reads that copy, so one update is seen everywhere.</li>
+<li><strong>Data independence.</strong> Files: programs depend on the physical file format; adding a field or reorganizing a file forces every program that reads it to change (program–data dependence). DBMS: programs see a logical schema (tables and columns by name); storage can be reorganized (physical data independence) and columns added (logical data independence) without rewriting existing programs.</li>
+<li><strong>Easy access through a query language.</strong> Files: each new question needs a new program. DBMS: a declarative language (SQL) answers new questions without new code, and a query optimizer picks efficient access paths such as indexes.</li>
+<li><strong>Integrity constraints.</strong> Files: rules such as “credit must be positive” or “an enrollment must refer to an existing student” are buried in each program's code and are easy to bypass or forget. DBMS: constraints (PRIMARY KEY, FOREIGN KEY, CHECK, NOT NULL) are declared once in the schema and enforced for every program.</li>
+<li><strong>Concurrency control.</strong> Files: two programs updating the same file at once can overwrite each other (the lost update of the seat example). DBMS: transactions with locking or multiversion concurrency control let many users work at once safely.</li>
+<li><strong>Atomicity and crash recovery.</strong> Files: a crash in the middle of a multi-step update (debit A, credit B) leaves the files half-updated. DBMS: transactions are all-or-nothing, and the log lets the DBMS undo incomplete work and redo committed work after a failure (durability).</li>
+<li><strong>Security.</strong> Files: operating-system permissions apply to a whole file. DBMS: users, roles and privileges can be granted per table, per column or (through views) per row, and access can be audited.</li>
+<li><strong>Handling large data efficiently.</strong> Files: partitioning, indexing and backup are the programmer's job. DBMS: storage management, indexes, buffering and backup are built in.</li>
+</ol>
+<p><strong>Data isolation</strong> is a further file-system problem worth naming: data scattered in files of different formats is hard to combine in one program. A DBMS keeps everything in one model (tables) so any data can be joined with any other.</p>
+<div class="tbl"><table>
+<tr><th>Property</th><th>File system</th><th>DBMS</th></tr>
+<tr><td>Redundancy / consistency</td><td>Uncontrolled copies, inconsistency</td><td>Stored once, consistent</td></tr>
+<tr><td>Data independence</td><td>Programs tied to file format</td><td>Logical and physical independence</td></tr>
+<tr><td>Querying</td><td>New program per question</td><td>Declarative SQL + optimizer</td></tr>
+<tr><td>Integrity</td><td>In application code</td><td>Declared constraints, always enforced</td></tr>
+<tr><td>Concurrency</td><td>Manual locking, lost updates</td><td>Transactions, concurrency control</td></tr>
+<tr><td>Recovery</td><td>Manual backups</td><td>Atomic transactions, log-based recovery</td></tr>
+<tr><td>Security</td><td>Whole-file permissions</td><td>Fine-grained privileges and roles</td></tr>
+</table></div>
+<p>The bank's answer covers the same points correctly. One detail to sharpen: it says the DBMS removes redundancy “via normalization”. Normalization is a design technique the designer applies; what the DBMS itself provides is a single shared copy of each table plus constraints that keep related data consistent.</p>
+  </div></details>
+</div>
+
+<div class="key"><p><strong>Summary:</strong> files and spreadsheets are easy to start but leave size, querying and structural change to you: large files need manual partitioning and backup, every new question needs new code, and a format change breaks every program (program–data dependence). Separate files per program also cause redundancy and inconsistency. A DBMS handles large data systematically, answers declarative SQL queries, changes structure with ALTER TABLE without breaking existing programs, and stores each fact once. It is a complete data-management layer, at the cost of setup and administration.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/sqlplay.js"></script>
+<script src="lecture.js"></script>
+<script>
+sqlPlay('#alter', {
+  setup: `CREATE TABLE students (
+  sid   NUMBER(7) PRIMARY KEY,
+  name  VARCHAR2(30) NOT NULL,
+  email VARCHAR2(40)
+);
+INSERT INTO students VALUES (2405190, 'Jalil', 'jalil@university.edu');
+INSERT INTO students VALUES (2405191, 'Karim', 'karim@university.edu');
+INSERT INTO students VALUES (2505200, 'Faria', 'faria@university.edu');`,
+  query: `ALTER TABLE students ADD address VARCHAR2(60) DEFAULT 'Not given';
+
+UPDATE students SET address = 'Dhanmondi, Dhaka' WHERE sid = 2405190;
+
+SELECT * FROM students;`,
+  note: 'Existing rows receive the default value. Run <code>SELECT sid, name FROM students</code> afterwards: an old query is unaffected by the new column.',
+});
+// Figure 1: redundancy and inconsistency
+(() => {
+  const file = (x, y, name, addr, cls = 'cell', extra = '') =>
+    `<path d="M${x} ${y} h150 l16 16 v78 h-166 z" class="cell-plain"/>` + T(x + 8, y + 18, name, { a: 'start', w: 1, size: 12 }) +
+    `<rect x="${x + 8}" y="${y + 30}" width="150" height="48" class="${cls}"/>` + T(x + 14, y + 49, '24FF501, Nadia,', { a: 'start', size: 11 }) +
+    T(x + 14, y + 68, addr, { a: 'start', size: 11 }) + extra;
+  const prog = (x, y, t, sub, cls = 'cell') => box(x, y, 160, 54, t, sub, cls);
+  const F = (o = {}) => {
+    let s = T(200, 18, 'FILE-PROCESSING SYSTEM', { cls: 'lbl', w: 1 }) + T(620, 18, 'WITH A DBMS', { cls: 'lbl', w: 1 });
+    s += `<line x1="420" y1="10" x2="420" y2="330" class="s-fg dash"/>`;
+    s += prog(20, 34, 'Registration', ['program'], o.p1 || 'cell') + prog(220, 34, 'Accounts', ['(fees) program'], o.p2 || 'cell');
+    s += arrow(100, 90, 100, 128) + arrow(300, 90, 300, 128);
+    s += file(18, 132, 'reg_students.csv', o.a1 || 'address: Mirpur', o.c1 || 'cell');
+    s += file(218, 132, 'fee_students.txt', o.a2 || 'address: Mirpur', o.c2 || 'cell');
+    if (o.note) s += T(210, 262, o.note, { cls: 'lbl ' + (o.ncls || ''), size: 12 });
+    if (o.note2) s += T(210, 282, o.note2, { cls: 'lbl ' + (o.ncls || ''), size: 12 });
+    // DBMS side
+    const d = o.dbms;
+    const dc = d ? 'cell' : 'cell-dim';
+    s += box(440, 34, 150, 54, 'Registration', ['program'], dc) + box(640, 34, 150, 54, 'Accounts', ['(fees) program'], dc);
+    s += `<rect x="470" y="128" width="290" height="44" rx="6" class="${dc}"/>` + T(615, 155, 'DBMS', { w: 1, size: 13, cls: d ? '' : 'dimt' });
+    s += arrow(515, 90, 560, 126) + arrow(715, 90, 670, 126);
+    s += `<rect x="490" y="200" width="250" height="56" class="${d === 'new' ? 'cell-new' : dc}"/>` + T(625, 190, 'students (stored once)', { cls: 'lbl', a: 'start' }) +
+      T(500, 222, '24FF501, Nadia,', { a: 'start', size: 11, cls: d ? '' : 'dimt' }) + T(500, 242, d === 'new' ? 'address: Dhanmondi' : 'address: Mirpur', { a: 'start', size: 11, cls: d ? '' : 'dimt' });
+    s += arrow(615, 174, 615, 197);
+    if (d === 'new') s += T(615, 282, 'one update; both programs read the same row', { cls: 'lbl grn', size: 12 });
+    return svgWrap(820, 300, s, 'File processing versus DBMS');
+  };
+  stepper('#redund', [
+    { html: F(), cap: 'The registration office and the accounts office each wrote their own program, and each program keeps its own file. Both files store Nadia\'s address. The same fact stored twice is <b>redundancy</b>: it wastes space, and worse, the copies can drift apart.' },
+    { html: F({ p1: 'cell-hl', a1: 'address: Dhanmondi', c1: 'cell-new', note: 'Nadia moves. She tells the registration office.', ncls: '' }), cap: 'Nadia moves to Dhanmondi and updates her address through the registration portal. The registration program rewrites <b>its</b> file. Nothing tells the accounts program.' },
+    { html: F({ a1: 'address: Dhanmondi', c1: 'cell-new', c2: 'cell-del', p2: 'cell-hl', note: 'Two files now disagree: inconsistency.', note2: 'The fee letter goes to Mirpur.', ncls: 'red' }), cap: 'The two copies now disagree. This is <b>inconsistency</b>. The accounts program sends the fee letter to the old address. Neither program is buggy on its own; the problem is that the same fact lives in two places with no one keeping them in step.' },
+    { html: F({ a1: 'Dhanmondi, nadia@…', c1: 'cell-new', c2: 'cell-del', p2: 'cell-del', note: 'Registration adds an email field to its file;', note2: 'any program parsing that file by position must change.', ncls: 'red' }), cap: 'A second file problem: the registration office adds an email field to its format. Any program that parses <code>reg_students.csv</code> by field position must now be rewritten. This is <b>program–data dependence</b> (slide 16\'s “brittle”).' },
+    { html: F({ dbms: 'old' }), cap: 'Now the DBMS way. Both programs send requests to one DBMS, which stores the <code>students</code> table <b>once</b>. There is only one address to keep correct.' },
+    { html: F({ dbms: 'new' }), cap: 'Nadia updates her address once. The accounts program reads the same row, so it sees Dhanmondi immediately. No redundancy, so no inconsistency. Adding an email column with ALTER TABLE would not break either program, because they ask for columns by name.' },
+  ], { interval: 2800 });
+})();
+flashcards('#cards', [
+  { f: 'File-processing system', b: 'Each application keeps its own OS files and its own code to read, search and update them.' },
+  { f: 'Data redundancy', b: 'The same fact stored in more than one place (e.g. a student\'s address in two offices\' files).' },
+  { f: 'Data inconsistency', b: 'Copies of the same fact disagree, because only some of them were updated.' },
+  { f: 'Program–data dependence', b: 'Programs have the file format built in, so changing the format forces the programs to change.' },
+  { f: 'Declarative query language', b: 'You state what result you want (SQL); the DBMS works out how to compute it.' },
+  { f: 'ALTER TABLE', b: 'The SQL statement that changes a table\'s structure, e.g. adds a column with a default value.' },
+  { f: 'Workload', b: 'How big the data is, what is done with it, how often it changes and by how many users. The right storage choice depends on it.' },
+  { f: 'Data isolation', b: 'Data scattered in files of different formats is hard to combine in one program.' },
+]);
+quiz('#quiz', [
+  { q: 'Slide 16: a new address field is added to a CSV file read by five programs. What is the main risk?', opts: ['The file becomes too large', 'Every program that parses the file may need to change', 'Spreadsheets cannot open it', 'Nothing; CSV handles it'], a: 1,
+    why: 'Programs that read fields by position have the old format built in. That is program–data dependence.' },
+  { q: 'Which word does slide 17 use for a spreadsheet\'s handling of structure changes?', opts: ['Brittle', 'Controlled', 'Easy, loose', 'Powerful'], a: 2,
+    why: 'Adding a column is easy, but nothing forces it to be filled or kept consistent.' },
+  { q: 'The registration file says Dhanmondi and the accounts file says Mirpur for the same student. This is:', opts: ['Redundancy only', 'Inconsistency, caused by redundancy', 'A concurrency anomaly', 'A security breach'], a: 1,
+    why: 'Storing the address twice is redundancy; the two copies disagreeing is inconsistency.' },
+  { q: 'According to slide 14, what is the DBMS\'s cost for handling large data well?', opts: ['It cannot store more than a million rows', 'More setup and administration', 'It must load all data into memory', 'It needs a spreadsheet front end'], a: 1,
+    why: 'A DBMS is built for persistent, large data, but requires more setup and administration than a file.' },
+  { q: 'After <code>ALTER TABLE students ADD address …</code>, what does <code>SELECT sid, name FROM students</code> return?', opts: ['An error', 'The same rows and columns as before', 'sid, name and address', 'Only rows with an address'], a: 1,
+    why: 'The query names its columns, so a new column does not affect it. This is logical data independence.' },
+  { q: 'The rule on slide 13 says the best choice depends on…', opts: ['the file extension', 'the workload', 'the operating system', 'the programming language'], a: 1,
+    why: '“The best choice depends on the workload, not only on where data is stored.”' },
+]);
+ask('#try1', { q: 'A fact is stored in 4 files. It changes, and an office updates 3 of them. How many copies are now inconsistent with the truth?', a: 1, why: 'One stale copy is enough to make the data inconsistent.' });
+</script>
+</body>
+</html>

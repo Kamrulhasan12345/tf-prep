@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dense and Sparse Indices · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 15 · Chapter 2 · Slides 7–12</div>
+<h1>Primary, Dense and Sparse Indices</h1>
+<p class="lede">An ordered index can have an entry for every key (dense) or only for some keys (sparse). This chapter explains both, animates a sparse-index lookup, answers the slide 10 question, and shows why the usual choice is one entry per block.</p>
+
+<h2>1. Ordered and primary indices (slide 7)</h2>
+
+<p>In an <b class="term">ordered index</b>, the index entries are stored sorted by search-key value. Recall from Lecture 14 that a file can itself be kept in order: a <b class="term">sequentially ordered file</b> stores its records sorted on some attribute. The instructor file in the slides is sorted on ID.</p>
+
+<p>A <b class="term">primary index</b> is an index whose search key is the same attribute the file is sorted on. Since the file and the index are in the same order, consecutive index entries point to consecutive records. Two notes from the slide:</p>
+<ul>
+  <li>A primary index is also called a <b class="term">clustering index</b>, because records with nearby key values are physically clustered together in the file.</li>
+  <li>The search key of a primary index is <em>usually</em> the primary key, but not necessarily. If the file were sorted on dept_name, an index on dept_name would be the primary (clustering) index, even though dept_name is not a key. Section 2 shows exactly that case.</li>
+</ul>
+
+<h2>2. Dense indices (slides 8–9)</h2>
+
+<p>A <b class="term">dense index</b> has an index entry for <em>every search-key value</em> that appears in the file. The index on ID (Figure 1) is dense: 12 distinct IDs, 12 entries.</p>
+
+<figure>
+<div id="denseid"></div>
+<figcaption><b>Figure 1.</b> Dense index on ID (slide 8). Every ID in the file has its own entry.</figcaption>
+</figure>
+
+<p>Slide 9 shows a dense index on <code>dept_name</code>, with the instructor file now sorted on dept_name. Some departments have several instructors, but a dense index needs one entry per <em>distinct value</em>, not per record. Each entry points to the <em>first</em> record with that value. Because the file is sorted on dept_name, the other records with the same department follow right after it, so you read forward until the department changes.</p>
+
+<figure>
+<div id="densedept"></div>
+<figcaption><b>Figure 2.</b> Dense index on dept_name (slide 9). 7 distinct departments, 7 entries. The entry for Comp. Sci. points to Srinivasan, and Katz and Brandt follow directly. (The slide prints Gold's id as 33465; it is 33456, as on every other slide.)</figcaption>
+</figure>
+
+<h2>3. Sparse indices (slide 10)</h2>
+
+<p>A <b class="term">sparse index</b> has entries for only <em>some</em> of the search-key values. That only works when the file is sorted on the search key, because the sorting is what lets you find the keys that have no entry. The slide's lookup rule for a key <i>K</i>:</p>
+<ol>
+  <li>Find the index entry with the <strong>largest search-key value ≤ <i>K</i></strong>.</li>
+  <li>Follow its pointer and <strong>scan the file forward</strong> from that record until you find <i>K</i>, or pass it.</li>
+</ol>
+<p>The slide writes “&lt; <i>K</i>”, but it should be “≤ <i>K</i>”: if <i>K</i> itself has an entry, you start exactly there. Since the index is sorted, the largest entry ≤ <i>K</i> is the right place to start: every record before it is too small, and <i>K</i> must lie between this entry and the next one.</p>
+
+<div class="q">
+<h4>Question (worked answer)</h4>
+<p><em>(a) Explain how <code>SELECT * FROM instructor WHERE id = 45565</code> is executed using the given sparse index (entries 10101, 32343, 76766).</em></p>
+<figure>
+<span class="anim-tag">Animation</span>
+<div id="sparse45565"></div>
+</figure>
+<ol>
+  <li>Look through the index for the largest key ≤ 45565. 10101 ≤ 45565, 32343 ≤ 45565, but 76766 &gt; 45565. So the entry is <strong>32343</strong>.</li>
+  <li>Follow its pointer to record 32343 (El Said). Not a match.</li>
+  <li>Read forward: 33456 (Gold), not a match. Then 45565 (Katz): <strong>found</strong>.</li>
+</ol>
+<p>3 records read after the index lookup. The scan can stop early at any record larger than 45565 too, because the file is sorted: if 45565 did not exist, reaching 58583 would prove it.</p>
+
+<p><em>(b) Compare dense and sparse indices.</em></p>
+<div class="tbl"><table>
+<tr><th></th><th>Dense index</th><th>Sparse index</th></tr>
+<tr><td>Entries</td><td>One per search-key value</td><td>Only for some values (typically one per block)</td></tr>
+<tr><td>Space</td><td class="bad">Larger</td><td class="good">Much smaller</td></tr>
+<tr><td>Lookup</td><td class="good">Points directly at the record</td><td class="mid">Points near the record, then a short forward scan</td></tr>
+<tr><td>Insert / delete overhead</td><td class="bad">Often must add or remove an index entry</td><td class="good">Index changes only rarely</td></tr>
+<tr><td>File must be sorted on the key?</td><td>No (it is the only option for unsorted files)</td><td>Yes</td></tr>
+</table></div>
+</div>
+
+<h2>4. Trade-offs, with examples (slide 11)</h2>
+
+<h3>Sparse: less space and less maintenance</h3>
+<p>Example: <code>INSERT INTO instructor VALUES (12120, 'Rafique', 'Physics', 60000)</code>. 12120 sits between 10101 and 12121 in the sorted file.</p>
+<figure>
+<span class="anim-tag">Animation</span>
+<div id="ins12120"></div>
+</figure>
+<p>The dense index must insert a brand-new entry 12120 into its sorted list, shifting the entries after it. The sparse index does nothing: 12120 lies between its entries 10101 and 32343, so a later search for 12120 will start at 10101 and scan forward to it. That is the “less maintenance overhead” on the slide.</p>
+
+<h3>Sparse: generally slower to locate a record</h3>
+<p>Example: <code>SELECT * FROM instructor WHERE id = 76543</code>. With the dense index, one lookup gives the exact record. With the sparse index, the largest entry ≤ 76543 is 32343, and the scan must read 32343, 33456, 45565, 58583 and finally 76543: <strong>5 records</strong> instead of 1.</p>
+<figure>
+<div id="find76543"></div>
+<figcaption><b>Figure 3.</b> Finding 76543 with the sparse index means a forward scan over 5 records (orange) starting from entry 32343.</figcaption>
+</figure>
+
+<h2>5. The good trade-off: one entry per block (slide 12)</h2>
+
+<p>Here is the key insight that makes sparse indices practical. The expensive part of reading is the <em>block transfer</em>, not looking at a record inside a block that is already in memory. So give the sparse index exactly <strong>one entry per block</strong>, holding the <strong>smallest search key in that block</strong>.</p>
+
+<figure>
+<div id="perblock"></div>
+<figcaption><b>Figure 4.</b> A block-level sparse index for a clustered file with 4 records per block. Each entry points to the first record of one block.</figcaption>
+</figure>
+
+<p>Now a lookup finds the right block from the index, reads that <em>one block</em>, and searches inside it in memory. That costs the same single block transfer as a dense index, while the index has only as many entries as there are blocks: here 3 instead of 12, and in real files often 1/100th the size of a dense index.</p>
+
+<p>The slide adds the case where this does not work: for an <b class="term">unclustered index</b> (the file is <em>not</em> sorted on the index's key), a sparse index is impossible on its own, because the records with nearby keys are not next to each other. The solution there is a dense index, with a sparse index built on top of it. That is a <b class="term">multilevel index</b>, covered in Chapter 4.</p>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+<div id="try2"></div>
+
+<h3>Exam questions</h3>
+<div class="exam">
+  <div class="exam-src">DB QB · Jan 20 3a · 15 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-2 | 2018–19 · 15 marks (first part)</div>
+  <div class="exam-q"><p>Explain how the following queries will be executed using the sparse index shown in the figure (the sparse index 10101, 32343, 76766 on the instructor file of slide 10).</p>
+  <p>(i) <code>SELECT * FROM instructor WHERE id = 22222</code><br>(ii) <code>SELECT * FROM instructor WHERE id = 99999</code></p>
+  <p>(The deletion part of the CSE 215 version is answered in <a href="05-index-update.html">Updating an index</a>.)</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>Rule for a sparse index: find the index entry with the <strong>largest key ≤ K</strong>, follow its pointer, then read the file forward in key order until K is found or a larger key (or the end of the file) proves K is absent.</p>
+    <p><strong>(i) id = 22222.</strong> Compare with the index: 10101 ≤ 22222 ✓, 32343 ≤ 22222 ✗. The largest entry ≤ 22222 is <strong>10101</strong>. Follow it to Srinivasan's record and scan forward: 10101 (no), 12121 (no), 15151 (no), <strong>22222 (match, Einstein)</strong>. Four records are examined. If records are packed several to a block, this is one or two block reads.</p>
+    <figure><div id="ex22222"></div><figcaption>Lookup of 22222: entry 10101 (orange), records scanned (orange), match (green).</figcaption></figure>
+    <p><strong>(ii) id = 99999.</strong> Every index key is ≤ 99999, so the largest one, <strong>76766</strong>, is chosen. Follow it to Crick and scan: 76766 (no), 83821 (no), 98345 (no), then the end of the file. Since the file is sorted on id and no record ≥ 99999 was met, <strong>99999 does not exist</strong> and the query returns an empty result. Three records are examined.</p>
+    <figure><div id="ex99999"></div><figcaption>Lookup of 99999: the scan from 76766 runs off the end of the file (red note).</figcaption></figure>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 17-18 1b · 5 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-2 | 2017–18 · 5 marks</div>
+  <div class="exam-q"><p>Consider a dictionary where each page contains only a single word along with its description. If we take the word from each page and form indexing based on the taken words, then what type of indexing (Dense/Sparse) would it be? Explain your answer.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>It is a <strong>dense index</strong>. A dense index has an entry for <em>every search-key value</em> in the file. Here every page holds exactly one word, and we take the word from every page, so every search-key value (word) gets its own index entry.</p>
+    <p>It also happens to be the block-level layout of slide 12: one entry per page (block), holding the smallest key of that page. The two definitions coincide because each block holds exactly one record. In the usual dictionary, with many words per page and only the first word of each page in the index (the guide words at the top of the page), the same construction would be <strong>sparse</strong>. The deciding test is always: does every search-key value have an entry? Here yes, so dense.</p>
+    <p>Because the dictionary is sorted by word, this is also a primary (clustering) index.</p>
+  </div></details>
+</div>
+
+<div class="key">
+<p><strong>Summary:</strong> a primary (clustering) index uses the key the file is sorted on. A dense index has an entry for every key value. A sparse index has entries for only some keys, finds the largest entry ≤ <i>K</i>, and scans forward from there. Sparse indices are smaller and cheaper to maintain but need a sorted file and are slower per lookup, unless they keep one entry per block, which gives the best of both.</p>
+</div>
+</main>
+<script src="../assets/book.js"></script>
+<script>
+const H = ['ID', 'Name', 'Dept.', 'Salary'];
+const dense = INSTR.map((r, i) => ({ key: r[0], to: [i], alignRow: i }));
+document.querySelector('#denseid').innerHTML = indexSVG({ rows: INSTR, head: H, index: dense });
+
+const byDept = [...INSTR].sort((a, b) => a[2] < b[2] ? -1 : a[2] > b[2] ? 1 : 0);
+const depts = [...new Set(byDept.map(r => r[2]))];
+document.querySelector('#densedept').innerHTML = indexSVG({ rows: byDept, head: H, idxW: 96, labels: { idx: 'index on dept_name', file: 'instructor file, sorted on dept_name' },
+  index: depts.map(d => ({ key: d, to: [byDept.findIndex(r => r[2] === d)] })) });
+
+const sp = [['10101', 0], ['32343', 4], ['76766', 9]];
+const sparse = (hot, extra = {}) => indexSVG({ rows: INSTR, head: H, labels: { idx: 'sparse index' }, ...extra,
+  index: sp.map(([k, t], i) => ({ key: k, to: [t], cls: i === hot ? 'hl' : '' })) });
+
+stepper('#sparse45565', [
+  { html: sparse(-1), cap: 'The sparse index has only three entries: 10101, 32343 and 76766. We want 45565.' },
+  { html: sparse(1), cap: 'Largest entry ≤ 45565: 10101 ≤ 45565 ✓, 32343 ≤ 45565 ✓, 76766 ≤ 45565 ✗. So start at <b>32343</b>.' },
+  { html: sparse(1, { rowCls: { 4: 'hl' } }), cap: 'Follow the pointer to record 32343 (El Said). Not 45565. Records read: 1.' },
+  { html: sparse(1, { rowCls: { 4: 'dim', 5: 'hl' } }), cap: 'Read forward to 33456 (Gold). Not 45565. Records read: 2.' },
+  { html: sparse(1, { rowCls: { 4: 'dim', 5: 'dim', 6: 'new' } }), cap: 'Read forward to 45565 (Katz). <b>Found.</b> Records read: 3.' },
+]);
+
+const two = rows => rows.map(r => r.slice(0, 2));
+const withNew = [...INSTR.slice(0, 1), ['12120', 'Rafique', 'Physics', '60000'], ...INSTR.slice(1)];
+const denseNew = withNew.map((r, i) => ({ key: r[0], to: [i], alignRow: i, cls: i === 1 ? 'new' : '' }));
+const spNew = [['10101', 0], ['32343', 5], ['76766', 10]].map(([k, t]) => ({ key: k, to: [t] }));
+stepper('#ins12120', [
+  { html: `<div class="figrow"><div>${indexSVG({ rows: two(INSTR), index: dense, labels: { idx: 'DENSE index' }, colW: [52, 88] })}</div><div>${indexSVG({ rows: two(INSTR), index: sp.map(([k, t]) => ({ key: k, to: [t] })), labels: { idx: 'SPARSE index' }, colW: [52, 88] })}</div></div>`,
+    cap: 'Before the insert. Left: dense index (12 entries). Right: sparse index (3 entries). Only ID and name are shown.' },
+  { html: `<div class="figrow"><div>${indexSVG({ rows: two(withNew), rowCls: { 1: 'new' }, index: denseNew, labels: { idx: 'DENSE index' }, colW: [52, 88] })}</div><div>${indexSVG({ rows: two(withNew), rowCls: { 1: 'new' }, index: spNew, labels: { idx: 'SPARSE index' }, colW: [52, 88] })}</div></div>`,
+    cap: 'After inserting 12120 (green). The dense index had to insert a new entry, 12120, in sorted position. The sparse index is <b>unchanged</b>: 12120 is reached by scanning forward from 10101.' },
+]);
+
+document.querySelector('#find76543').innerHTML = sparse(1, { rowCls: { 4: 'hl', 5: 'hl', 6: 'hl', 7: 'hl', 8: 'new' } });
+
+document.querySelector('#perblock').innerHTML = indexSVG({ rows: INSTR, head: H, blockSize: 4, labels: { idx: 'index, 1 per block' },
+  index: [0, 4, 8].map(t => ({ key: INSTR[t][0], to: [t], alignRow: t })) });
+document.querySelector('#ex22222').innerHTML = sparse(0, { rowCls: { 0: 'hl', 1: 'hl', 2: 'hl', 3: 'new' } });
+document.querySelector('#ex99999').innerHTML = sparse(2, { rowCls: { 9: 'hl', 10: 'hl', 11: 'hl' }, side: { 11: '← end of file' } });
+flashcards('#cards', [
+  { f: 'Primary (clustering) index', b: 'An index whose search key is the attribute the file is sorted on. At most one per file.' },
+  { f: 'Dense index', b: 'An index entry for every search-key value in the file.' },
+  { f: 'Sparse index', b: 'Entries for only some search-key values. Needs the file sorted on the key.' },
+  { f: 'Sparse lookup rule', b: 'Find the largest entry ≤ K, follow it, scan the file forward until K or a larger key.' },
+  { f: 'Block-level sparse index', b: 'One entry per block, holding the smallest key in the block. Same 1 block read as dense, far fewer entries.' },
+  { f: 'Dense index on a non-unique key', b: 'One entry per distinct value, pointing to the first record with that value; the rest follow in the sorted file.' },
+]);
+quiz('#quiz', [
+  { q: 'Sparse index entries: 10101, 32343, 76766. Which entry starts the search for <code>id = 76543</code>?', opts: ['10101', '32343', '76766', 'None'], a: 1, why: 'Largest entry ≤ 76543: 32343 (76766 is larger). Then scan 32343, 33456, 45565, 58583, 76543.' },
+  { q: 'Why can a sparse index only be used on a file sorted on the search key?', opts: ['Sparse indices store no pointers', 'The forward scan from an entry only works if the keys between two entries are stored between them', 'Sorting makes the index smaller', 'It is a rule of SQL'], a: 1, why: 'The lookup jumps to a nearby entry and scans forward; that finds K only if the file is in key order.' },
+  { q: 'The instructor file is sorted on dept_name. A dense index on dept_name has how many entries?', opts: ['12', '7', '4', '1'], a: 1, why: 'One per distinct department: Biology, Comp. Sci., Elec. Eng., Finance, History, Music, Physics.' },
+  { q: 'Inserting 12120 into a file with sparse index (10101, 32343, 76766). What happens to the index?', opts: ['A new entry 12120 is added', 'Entry 10101 is replaced by 12120', 'Nothing', 'The index is rebuilt'], a: 2, why: '12120 lies between entries 10101 and 32343 and is reached by the forward scan. The index does not change.' },
+  { q: 'A file of 12 records, 4 per block, has a block-level sparse index. How many entries?', opts: ['12', '4', '3', '1'], a: 2, why: '12 / 4 = 3 blocks, one entry each.' },
+  { q: 'Which is generally faster for locating one record?', opts: ['Dense index', 'Sparse index with one entry per 3 records', 'Both always identical', 'Neither uses the file'], a: 0, why: 'The dense index points straight at the record; the sparse index may need a forward scan (unless it has one entry per block and the scan stays inside one block).' },
+]);
+ask('#try1', { q: 'Using the sparse index (10101, 32343, 76766), how many records are examined to find <code>id = 58583</code>?', a: 4, hint: 'Start at the largest entry ≤ 58583, then count records until the match, including both ends.', why: 'Start at 32343, then 33456, 45565, 58583: 4 records.' });
+ask('#try2', { q: 'A file has 1,000,000 records, 50 per block, sorted on the key. How many entries does a block-level sparse index have?', a: 20000, why: '1,000,000 / 50 = 20,000 blocks, one entry each (a dense index would have 1,000,000).' });
+
+</script>
+</body>
+</html>

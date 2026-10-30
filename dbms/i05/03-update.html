@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Modifying Rows with UPDATE · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="../i03/lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 05 (Ishrak) · Chapter 3 · Slides 12–15 · Book §6.5.3</div>
+<h1>Modifying Rows with UPDATE</h1>
+<p class="lede">The UPDATE statement: which rows change (WHERE), how they change (SET, which may compute the new value from the old one), and how to choose the rows through another table. Worked through the slides' examples and three exam questions.</p>
+
+<h2>1. The UPDATE statement (slide 12)</h2>
+<pre>UPDATE &lt;table_name&gt;
+SET    &lt;attribute_name1&gt; = &lt;v1&gt;, &lt;attribute_name2&gt; = &lt;v2&gt;, …
+WHERE  …;</pre>
+<dl class="def">
+  <dt>UPDATE</dt>
+  <dd>Changes the values of some columns in the rows of one table for which the WHERE condition is TRUE. The SET clause lists one or more assignments <code>column = expression</code>, separated by commas. The expression may be a constant, NULL, or a formula using the row's current values (<code>price = price - 100</code>). Without WHERE, every row is changed.</dd>
+</dl>
+<pre>UPDATE Student
+SET    city = 'Austin', state = 'TX'
+WHERE  id = 'S123456789';</pre>
+<p>John Doe moves to Austin: in the one row with that id, two columns change; the other columns and all other rows are untouched. Choosing the row by its primary key guarantees that at most one row changes.</p>
+<p>Two rules about SET that are easy to get wrong:</p>
+<ul>
+  <li><strong>All expressions use the old values.</strong> In <code>SET a = b, b = a</code>, both right-hand sides are computed from the row as it was before the statement, so the two values are swapped (unlike two assignments in C).</li>
+  <li><strong>Assignments are separated by commas, not AND.</strong> <code>SET city = 'Austin' AND state = 'TX'</code> is a different (and in Oracle invalid) statement.</li>
+</ul>
+<div id="p1"></div>
+
+<h2>2. Manufacturer A buys manufacturer B (slide 13)</h2>
+<p><em>Change all products made by B so they are now made by A.</em></p>
+<pre>UPDATE Product
+SET    maker = 'A'
+WHERE  maker = 'B';</pre>
+<p>Only Product stores the maker, so one statement is enough: B's four products (1004, 1005, 1006, 2007) now belong to A. PC and Laptop refer to products by model, which has not changed. (This is the advantage of storing each fact in one place.)</p>
+<figure>
+<span class="anim-tag">Animation</span>
+<div id="a1"></div>
+</figure>
+
+<h2>3. Changing values computed from old values (slides 14–15)</h2>
+<p><em>For each laptop made by manufacturer B, add one inch to the screen size and subtract $100 from the price.</em></p>
+<pre>UPDATE Laptop
+SET    screen = screen + 1, price = price - 100
+WHERE  model IN (SELECT model
+                 FROM   Product
+                 WHERE  type = 'laptop'
+                 AND    maker = 'B');</pre>
+<p>Laptop does not know who made a laptop, so the rows are chosen through Product, as in the DELETE examples: the subquery returns B's laptop models, {2007}. For that row, the new screen is the old screen plus 1 (13.3 → 14.3) and the new price the old price minus 100 (1429 → 1329).</p>
+<figure>
+<span class="anim-tag">Animation</span>
+<div id="a2"></div>
+</figure>
+<div id="p2"></div>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div><div id="try2"></div>
+<h3>SQL exercises</h3>
+<div id="c1"></div><div id="c2"></div><div id="c3"></div><div id="c4"></div><div id="c5"></div><div id="c6"></div>
+
+<h3>Exam questions</h3>
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2011–12 · 5 + 5 marks</div>
+  <div class="exam-q"><p>A database schema consists of four relations: Product(maker, model, type), PC(model, speed, ram, hd, price), Laptop(model, speed, ram, hd, screen, price), Printer(model, color, type, price).</p>
+  <p>(a) Delete all laptops made by a manufacturer that does not make printers.<br>(b) Assume that manufacturer A bought manufacturer B. Change all products made by B so that they are now made by A.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><strong>(a)</strong> This is slides 10–11. The laptop's facts are in Product (maker, type) and in Laptop (specifications); remove them from both. The makers of printers are <code>SELECT maker FROM Product WHERE type = 'printer'</code>.</p>
+    <pre>DELETE FROM Product
+WHERE  type = 'laptop'
+AND    maker NOT IN (SELECT maker
+                     FROM   Product
+                     WHERE  type = 'printer');
+
+DELETE FROM Laptop
+WHERE  model NOT IN (SELECT model
+                     FROM   Product
+                     WHERE  type = 'laptop');</pre>
+    <p>The first statement removes the laptop rows of makers without printers from Product (on the textbook data: A, B, F, G, models 2004–2010). The second then removes from Laptop every model that Product no longer lists as a laptop. The order matters: the second statement uses the cleaned Product. (Equivalently, delete from Laptop first with <code>WHERE model IN (SELECT model FROM Product WHERE type = 'laptop' AND maker NOT IN (…printer makers…))</code>, then from Product.)</p>
+    <p><strong>(b)</strong> This is slide 13. The maker is stored only in Product:</p>
+    <pre>UPDATE Product
+SET    maker = 'A'
+WHERE  maker = 'B';</pre>
+    <p>PC, Laptop and Printer refer to products by model, which does not change, so nothing else needs updating. On the textbook data, 4 rows change (1004, 1005, 1006, 2007).</p>
+    <p>Note: the question bank deletes only from Laptop in (a). That leaves Product claiming that A, B, F and G still make laptops 2004–2010; delete from both tables as the slides do.</p>
+  </div></details>
+</div>
+<div id="cq29"></div>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 215 | L-2/T-1 | 2024–25 · 18 marks (parts a and b)</div>
+  <div class="exam-q"><p>Consider the following relational database schema: employee(employee_name, street, city), works(employee_name, company_name, salary), company(company_name, city), manages(employee_name, manager_name). Write SQL statements for the following:</p>
+  <p>(a) Give a 20% salary rise to employees who are managers.<br>
+  (b) Delete all tuples in the works relation for employees of the company "Sonali Bank". Note that works.employee_name is a foreign key referencing employee(employee_name), manages.employee_name is a foreign key referencing employee(employee_name), manages.manager_name is a foreign key referencing employee(employee_name).<br>
+  (c) Design a trigger such that whenever a manager's salary is updated, all employees managed by that manager receive a 10% salary increase.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><strong>(a)</strong> Salaries are stored in <code>works</code>. An employee is a manager if their name appears as a <code>manager_name</code> in <code>manages</code>:</p>
+    <pre>UPDATE works
+SET    salary = salary * 1.2
+WHERE  employee_name IN (SELECT manager_name
+                         FROM   manages);</pre>
+    <p><code>salary * 1.2</code> is a 20% rise computed from the old salary. A manager who manages several people appears several times in the subquery's result, but IN only asks whether the name is in the list, so each manager's row is raised once. (DISTINCT in the subquery is allowed but unnecessary.) A manages row whose manager_name is NULL (an employee with no manager) does no harm: that NULL is not equal to any employee name, so it raises nobody.</p>
+    <p><strong>(b)</strong></p>
+    <pre>DELETE FROM works
+WHERE  company_name = 'Sonali Bank';</pre>
+    <p>The foreign keys all point from <code>works</code> and <code>manages</code> <em>to</em> <code>employee</code>. Deleting rows of <code>works</code> (a referencing, "child" table) can never violate them, because no table refers to works. The employee rows themselves are not deleted, so the employees still exist (they just no longer work at Sonali Bank), and their <code>manages</code> rows remain valid.</p>
+    <p><strong>(c)</strong> needs a trigger, which belongs to Lecture 12 (Relational Algebra, Triggers); see that lecture's chapter on triggers for the full answer.</p>
+    <p>The bank's answers to (a) and (b) are correct.</p>
+  </div></details>
+</div>
+<div id="cq2a"></div><div id="cq2b"></div>
+
+<div class="key"><p><strong>Summary:</strong> <code>UPDATE T SET c1 = e1, c2 = e2 WHERE cond</code> changes columns of the rows where cond is TRUE; without WHERE, every row. Each expression may use the row's old values, and all are computed from the old row. Rows can be chosen through another table with <code>IN (SELECT …)</code>. A fact stored in one place (the maker, in Product) needs one UPDATE.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/sqlplay.js"></script>
+<script src="../i03/lecture.js"></script>
+<script>
+(() => {
+  const PH = ['maker', 'model', 'type'];
+  const R = [['A', 1001, 'pc'], ['A', 1002, 'pc'], ['A', 1003, 'pc'], ['A', 2004, 'laptop'], ['A', 2005, 'laptop'], ['A', 2006, 'laptop'], ['B', 1004, 'pc'], ['B', 1005, 'pc'], ['B', 1006, 'pc'], ['B', 2007, 'laptop'], ['C', 1007, 'pc']];
+  const L = [['u', 'UPDATE Product'], ['s', "SET    maker = 'A'"], ['w', "WHERE  maker = 'B';"]];
+  stepper('#a1', [
+    { html: dmlFrame(L, null, [T(PH, R, { name: 'Product (makers A–C)' })]), cap: '<b>Before.</b> B makes three PCs and one laptop.' },
+    { html: dmlFrame(L, 'w', [T(PH, R.map(r => ({ c: r, cls: r[0] === 'B' ? 'hl' : '', side: r[0] === 'B' ? "maker = 'B'" : '' })), { name: 'Product' })]), cap: 'WHERE picks the rows to change: the 4 rows with maker B.' },
+    { html: dmlFrame(L, 's', [T(PH, R.map(r => r[0] === 'B' ? { c: ['A', r[1], r[2]], cls: 'new', side: 'B → A' } : { c: r }), { name: 'Product after' })]), cap: '<b>After.</b> SET changes the maker column of those 4 rows to A; model and type are untouched. "4 rows updated."' },
+  ]);
+})();
+(() => {
+  const LH = ['model', 'speed', 'ram', 'hd', 'screen', 'price'];
+  const LR = [[2001, 2.00, 2048, 240, 20.1, 3673], [2002, 1.73, 1024, 80, 17.0, 949], [2003, 1.80, 512, 60, 15.4, 549], [2004, 2.00, 512, 60, 13.3, 1150], [2005, 2.16, 1024, 120, 17.0, 2500], [2006, 2.00, 2048, 80, 15.4, 1700], [2007, 1.83, 1024, 120, 13.3, 1429], [2008, 1.60, 1024, 100, 15.4, 900], [2009, 1.60, 512, 80, 14.1, 680], [2010, 2.00, 2048, 160, 15.4, 2300]];
+  const L = [['u', 'UPDATE Laptop'], ['s', 'SET    screen = screen + 1, price = price - 100'], ['w', 'WHERE  model IN (SELECT model FROM Product'], ['w', "                WHERE type = 'laptop' AND maker = 'B');"]];
+  const PH = ['maker', 'model', 'type'];
+  const pl = [['A', 2004, 'laptop'], ['A', 2005, 'laptop'], ['A', 2006, 'laptop'], ['B', 2007, 'laptop'], ['E', 2001, 'laptop'], ['E', 2002, 'laptop'], ['E', 2003, 'laptop'], ['F', 2008, 'laptop'], ['F', 2009, 'laptop'], ['G', 2010, 'laptop']];
+  stepper('#a2', [
+    { html: dmlFrame(L, 'w', [T(PH, pl.map(r => ({ c: r, cls: r[0] === 'B' ? 'hl' : '' })), { name: 'Product (laptops)' }), T(LH, LR, { name: 'Laptop' })]), cap: 'The subquery runs first: B\'s laptop models are <b>{2007}</b>.' },
+    { html: dmlFrame(L, 'w', [T(LH, LR.map(r => ({ c: r, cls: r[0] === 2007 ? 'hl' : '' })), { name: 'Laptop' })]), cap: 'WHERE model IN {2007} selects one Laptop row: screen 13.3, price 1429.' },
+    { html: dmlFrame(L, 's', [T(LH, LR.map(r => r[0] === 2007 ? { c: [r[0], r[1], r[2], r[3], 14.3, 1329], cls: 'new', side: '13.3+1, 1429−100' } : { c: r }), { name: 'Laptop after' })]), cap: '<b>After.</b> Both expressions use the row\'s old values: screen 13.3 + 1 = <b>14.3</b>, price 1429 − 100 = <b>1329</b>. "1 row updated."' },
+  ]);
+})();
+sqlPlay('#p1', { setup: UNI, query: STUDENT_ROWS + "\nUPDATE Student\nSET    city = 'Austin', state = 'TX'\nWHERE  id = 'S123456789';\n\nSELECT * FROM Student;", note: 'The setup first inserts the three students of slide 2, then updates John Doe.' });
+sqlPlay('#p2', { setup: PCS, query: "UPDATE Laptop\nSET    screen = screen + 1, price = price - 100\nWHERE  model IN (SELECT model\n                 FROM   Product\n                 WHERE  type = 'laptop'\n                 AND    maker = 'B');\n\nSELECT * FROM Laptop WHERE model = 2007;", note: "Try first running slide 13's <code>UPDATE Product SET maker = 'A' WHERE maker = 'B';</code> in the same box: then this statement changes nothing, because B no longer makes anything." });
+const EMP = CS + `CREATE TABLE employee (employee_name VARCHAR2(30) PRIMARY KEY, street VARCHAR2(30), city VARCHAR2(20));
+CREATE TABLE company (company_name VARCHAR2(30) PRIMARY KEY, city VARCHAR2(20));
+CREATE TABLE works (employee_name VARCHAR2(30) PRIMARY KEY REFERENCES employee(employee_name), company_name VARCHAR2(30) REFERENCES company(company_name), salary NUMBER(10,2));
+CREATE TABLE manages (employee_name VARCHAR2(30) PRIMARY KEY REFERENCES employee(employee_name), manager_name VARCHAR2(30) REFERENCES employee(employee_name));
+INSERT INTO company VALUES ('Sonali Bank', 'Dhaka');
+INSERT INTO company VALUES ('Grameenphone', 'Dhaka');
+INSERT INTO company VALUES ('Walton', 'Gazipur');
+INSERT INTO employee VALUES ('Rahim', 'Road 5', 'Dhaka');
+INSERT INTO employee VALUES ('Karim', 'Road 9', 'Dhaka');
+INSERT INTO employee VALUES ('Salma', 'Station Rd', 'Gazipur');
+INSERT INTO employee VALUES ('Nadia', 'Lake Rd', 'Dhaka');
+INSERT INTO employee VALUES ('Jamal', 'Hill Rd', 'Chattogram');
+INSERT INTO employee VALUES ('Rina', 'Road 2', 'Dhaka');
+INSERT INTO works VALUES ('Rahim', 'Sonali Bank', 80000);
+INSERT INTO works VALUES ('Karim', 'Sonali Bank', 50000);
+INSERT INTO works VALUES ('Salma', 'Walton', 60000);
+INSERT INTO works VALUES ('Nadia', 'Grameenphone', 90000);
+INSERT INTO works VALUES ('Jamal', 'Grameenphone', 45000);
+INSERT INTO works VALUES ('Rina', 'Sonali Bank', 40000);
+INSERT INTO manages VALUES ('Karim', 'Rahim');
+INSERT INTO manages VALUES ('Rina', 'Rahim');
+INSERT INTO manages VALUES ('Jamal', 'Nadia');
+INSERT INTO manages VALUES ('Salma', NULL);
+`;
+flashcards('#cards', [
+  { f: 'UPDATE form', b: 'UPDATE T SET c1 = e1, c2 = e2 WHERE cond;' },
+  { f: 'UPDATE without WHERE', b: 'Changes every row.' },
+  { f: 'SET a = b, b = a', b: 'Swaps: all right-hand sides use the old row.' },
+  { f: 'Separator in SET', b: 'Comma, not AND.' },
+  { f: 'Choosing rows via another table', b: 'WHERE key IN (SELECT key FROM other WHERE …).' },
+  { f: '20% rise', b: 'SET salary = salary * 1.2' },
+]);
+quiz('#quiz', [
+  { q: 'Row (a = 1, b = 2). After <code>UPDATE T SET a = b, b = a</code>?', opts: ['(2, 2)', '(2, 1)', '(1, 1)', '(1, 2)'], a: 1, why: 'Both use old values: a gets 2, b gets 1.' },
+  { q: 'Which updates two columns correctly?', opts: ["SET city = 'Austin' AND state = 'TX'", "SET city = 'Austin', state = 'TX'", "SET (city, state) = 'Austin', 'TX'", "SET city, state = 'Austin', 'TX'"], a: 1, why: 'Assignments are comma-separated.' },
+  { q: 'After slide 13, how many products does A make?', opts: ['6', '10', '4', '7'], a: 1, why: 'A had 6, B had 4: now A has 10.' },
+  { q: 'Slide 15 changes how many Laptop rows?', opts: ['0', '1', '4', '10'], a: 1, why: 'B makes one laptop, 2007.' },
+  { q: '<code>UPDATE PC SET price = price * 0.9</code> does what?', opts: ['Reduces every PC price by 10%', 'Error: WHERE missing', 'Changes one row', 'Sets all prices to 0.9'], a: 0, why: 'No WHERE: every row.' },
+]);
+ask('#try1', { q: 'After <code>UPDATE PC SET price = price - 50 WHERE speed &gt;= 3</code>, what is the price of PC 1013?', a: 479, why: '1013 has speed 3.06 and price 529: 529 − 50 = 479.' });
+ask('#try2', { q: 'On the invented exam data below (Rahim and Nadia are managers), what is Rahim\'s salary after exam part (a)? (It was 80000.)', a: 96000, why: '80000 × 1.2.' });
+chk('#c1', UNI, '<b>Easy (slide 12).</b> The Student table holds the three students of slide 2 after you insert them. Insert them (copy the three INSERTs from Chapter 1), then move John Doe (S123456789) to Austin, TX.', STUDENT_ROWS + "UPDATE Student SET city = 'Austin', state = 'TX' WHERE id = 'S123456789';", { check: 'state', table: 'Student' });
+chk('#c2', PCS, '<b>Slide 13.</b> Manufacturer A buys B: make all of B\'s products A\'s.', "UPDATE Product SET maker = 'A' WHERE maker = 'B';", { check: 'state', table: 'Product' });
+chk('#c3', PCS, '<b>Slide 15.</b> For each laptop made by B, add one inch to the screen and subtract $100 from the price.', "UPDATE Laptop\nSET screen = screen + 1, price = price - 100\nWHERE model IN (SELECT model FROM Product WHERE type = 'laptop' AND maker = 'B');", { check: 'state', table: 'Laptop' });
+chk('#c4', PCS, '<b>Computed values.</b> Double the RAM and add $150 to the price of every PC with 512 MB of RAM.', 'UPDATE PC SET ram = ram * 2, price = price + 150 WHERE ram = 512;', { check: 'state', table: 'PC' });
+chk('#c5', PCS, "<b>Through another table.</b> Reduce by 10% the price of every printer made by manufacturer E.", "UPDATE Printer\nSET price = price * 0.9\nWHERE model IN (SELECT model FROM Product WHERE maker = 'E' AND type = 'printer');", { check: 'state', table: 'Printer' });
+chk('#c6', PCS, '<b>Exam style.</b> Every laptop whose maker also makes printers gets a $50 discount. Write the UPDATE.', "UPDATE Laptop\nSET price = price - 50\nWHERE model IN (SELECT model FROM Product\n                WHERE type = 'laptop'\n                AND maker IN (SELECT maker FROM Product WHERE type = 'printer'));", { check: 'state', table: 'Laptop', hint: 'Laptop models of makers IN (makers of printers): a subquery inside a subquery.' });
+chk('#cq29', PCS, '<b>Exam CSE 303 2011–12 (a) on the textbook data.</b> Write both DELETE statements. The checker looks at Laptop.', "DELETE FROM Product\nWHERE type = 'laptop'\nAND maker NOT IN (SELECT maker FROM Product WHERE type = 'printer');\nDELETE FROM Laptop\nWHERE model NOT IN (SELECT model FROM Product WHERE type = 'laptop');", { check: 'state', table: 'Laptop' });
+chk('#cq2a', EMP, '<b>Exam CSE 215 2024–25 (a)</b> on invented data (Rahim manages Karim and Rina; Nadia manages Jamal). Give every manager a 20% rise.', 'UPDATE works SET salary = salary * 1.2\nWHERE employee_name IN (SELECT manager_name FROM manages);', { check: 'state', table: 'works' });
+chk('#cq2b', EMP, '<b>Exam CSE 215 2024–25 (b).</b> Delete all <code>works</code> tuples of employees of Sonali Bank.', "DELETE FROM works WHERE company_name = 'Sonali Bank';", { check: 'state', table: 'works' });
+</script>
+</body>
+</html>

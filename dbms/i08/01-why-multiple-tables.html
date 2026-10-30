@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Why Data Lives in Several Tables · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 08 (Ishrak) · Chapter 1 · Slides 1–6</div>
+<h1>Why Data Lives in Several Tables</h1>
+<p class="lede">Before learning how to query several tables at once, we need to see why a database splits its data into several tables in the first place. This chapter follows slides 2–6: one big table causes repetition and update mistakes, splitting it fixes that, and a primary key / foreign key pair lets us join the pieces back together.</p>
+
+<h2>1. One table is not enough (slides 2–3)</h2>
+
+<p>Slide 2 starts with a single table, <code>Product</code>, that lists four products with their name, price, category and manufacturer. So far there is no problem: each row describes one product.</p>
+
+<figure>
+<div id="f-prod"></div>
+<figcaption><b>Figure 1.</b> The Product table of slide 2.</figcaption>
+</figure>
+
+<p>Now the slide asks us to <em>add company information, like the country and the stock price</em>. The obvious move is to add two more columns to the same table (slide 3). The result looks harmless, but look at the GizmoWorks rows: both say <code>USA</code> and <code>25</code>. The country and stock price of a company are facts about the <em>company</em>, yet they are now stored once for every <em>product</em> the company makes. If GizmoWorks made 500 products, "USA, 25" would be written 500 times.</p>
+
+<figure>
+<div id="f-wide"></div>
+<figcaption><b>Figure 2.</b> Slide 3: company columns added to Product. The two highlighted rows repeat the same company facts (the slide circles them).</figcaption>
+</figure>
+
+<dl class="def">
+<dt>Redundancy</dt><dd>Storing the same fact more than once. It wastes space, and worse, the copies can disagree.</dd>
+<dt>Update anomaly</dt><dd>A change to one fact has to be made in several rows. If any copy is missed, the table contradicts itself.</dd>
+<dt>Insertion and deletion anomalies</dt><dd>You cannot record a company that has no products yet (there is no product row to put it in), and deleting a company's last product also deletes everything known about the company.</dd>
+</dl>
+
+<p>The animation shows the update anomaly. GizmoWorks' stock price rises from 25 to 30. In the wide table that fact lives in two rows, and an update that touches only one of them leaves the database saying two different things.</p>
+
+<figure>
+<span class="anim-tag">Animation</span>
+<div id="anom"></div>
+</figure>
+
+<h2>2. The solution: split the table (slides 4–5)</h2>
+
+<p>The fix is to store each kind of fact in its own table. Product facts go in <code>Product</code>, company facts go in <code>Company</code>. Slide 4 first just cuts the wide table into two vertical pieces, and the circled row shows that the cut alone is not enough: the Company piece still has GizmoWorks twice. Slide 5 removes the duplicate, so each company appears <strong>exactly once</strong> in Company.</p>
+
+<figure>
+<span class="anim-tag">Animation</span>
+<div id="split"></div>
+</figure>
+
+<p>After the split, GizmoWorks' stock price is stored in one place. Changing it is a single-row update, and there is nothing to get out of step. A company with no products can still be inserted into Company, and deleting a product does not delete its maker.</p>
+
+<h3>Primary key and foreign key</h3>
+<p>Slide 5 labels the two columns that tie the tables together:</p>
+<dl class="def">
+<dt>Primary key</dt><dd>A column (or set of columns) whose value is different in every row, so it identifies a row. In Company, the company name is the primary key: there is exactly one row per company.</dd>
+<dt>Foreign key</dt><dd>A column in one table whose values must appear in the primary key of another table. Product.manufacturer is a foreign key that refers to Company. It says "this product is made by <em>that</em> company row", and the DBMS refuses a manufacturer that is not in Company.</dd>
+</dl>
+<p>In Oracle the two tables are declared like this (the slide names the company column <code>Manufacturer</code>; from slide 13 on it is called <code>cname</code>, and we use that name from now on):</p>
+<pre>CREATE TABLE Company (
+  cname      VARCHAR2(20) PRIMARY KEY,
+  stockPrice NUMBER,
+  country    VARCHAR2(20)
+);
+CREATE TABLE Product (
+  pname        VARCHAR2(20) PRIMARY KEY,
+  price        NUMBER(8,2),
+  category     VARCHAR2(20),
+  manufacturer VARCHAR2(20) REFERENCES Company(cname)   -- foreign key
+);</pre>
+<p>Notice the direction: <em>many</em> products can point to the same company, but each product points to one company. The foreign key sits on the "many" side. Prices are stored as plain numbers; the slides print them with a <code>$</code> sign only for display.</p>
+
+<h2>3. How do we get the information back? (slide 6)</h2>
+
+<p>Splitting costs us something. A question such as "in which country is the Gizmo made?" now needs two tables: find Gizmo's manufacturer in Product, then look that name up in Company. Slide 6 asks exactly this: <em>how to get the information back?</em></p>
+<p>The answer is a <b class="term">join</b>: a query that lists several tables in its FROM clause and matches their rows on the foreign key. The next chapter builds it from scratch. As a preview, this query glues every product to its company row and gives back the wide table of slide 3, without storing anything twice:</p>
+<div id="p1"></div>
+
+<div class="q">
+<h4>Question (worked answer): why not keep the wide table and be careful?</h4>
+<p>Because "be careful" is not something a database can rely on. Every program that updates the table would have to remember to change every copy, and one bug or one interrupted update leaves the data contradicting itself. With the split design, the DBMS itself guarantees that each fact has one home (the primary key stops a second GizmoWorks row) and that products only refer to real companies (the foreign key). The price is that queries must join tables, which is cheap and is exactly what SQL is built for. The <a href="../s01/01-why-design-theory.html">design theory chapters</a> (functional dependencies and normalization) make this splitting systematic.</p>
+</div>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<h3>Try it in SQL</h3>
+<p>All exercises use the Product and Company tables of slide 5, plus a few invented rows (Xiaomi, Lenovo, Walton and two more products) so that every query has something to return. Click <em>Show tables</em> to see the data.</p>
+<div id="c1"></div><div id="c2"></div><div id="c3"></div><div id="c4"></div><div id="c5"></div><div id="c6"></div>
+
+<div class="key"><p><strong>Summary:</strong> putting company facts into the product table repeats them once per product, which wastes space and invites update, insertion and deletion anomalies. Splitting into Product and Company stores each fact once. Company's primary key (cname) identifies each company; Product's foreign key (manufacturer) refers to it. The split loses nothing, because a join on manufacturer = cname rebuilds the combined view whenever we need it.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/sqlplay.js"></script>
+<script src="../i08/lecture.js"></script>
+<script>
+const PH = ['PName', 'Price', 'Category', 'Manufacturer'];
+const PR = [['Gizmo', '$19.99', 'Gadgets', 'GizmoWorks'], ['Powergizmo', '$29.99', 'Gadgets', 'GizmoWorks'], ['SingleTouch', '$149.99', 'Photography', 'Canon'], ['MultiTouch', '$203.99', 'Household', 'Hitachi']];
+const CO = { GizmoWorks: ['USA', '25'], Canon: ['Japan', '65'], Hitachi: ['Japan', '15'] };
+const WH = [...PH, 'Country', 'StockPrice'];
+const wide = (sp = {}) => PR.map(r => [...r, CO[r[3]][0], sp[r[0]] ?? CO[r[3]][1]]);
+$('#f-prod').innerHTML = row2(rel('Product', PH, PR));
+$('#f-wide').innerHTML = row2(rel('Product (wide)', WH, wide(), { cls: { 0: 'hl', 1: 'hl' } }));
+stepper('#anom', [
+  { html: row2(rel('Product (wide)', WH, wide(), { cls: { 0: 'hl', 1: 'hl' } })), cap: 'GizmoWorks\' stock price (25) is stored in two rows, one per GizmoWorks product.' },
+  { html: row2(rel('Product (wide)', WH, wide({ Gizmo: '30' }), { cls: { 0: 'new', 1: 'hl' }, side: { 0: 'updated to 30', 1: 'missed: still 25' } })), cap: 'An update changes the Gizmo row to 30 but misses the Powergizmo row. The table now says GizmoWorks\' stock price is both 30 and 25: an <b>update anomaly</b>.' },
+  { html: row2(rel('Product (wide)', WH, wide().slice(0, 3), { cls: {} }), rel('lost', WH, [wide()[3]], { cls: { 0: 'del' } })), cap: 'Deletion anomaly: deleting MultiTouch (Hitachi\'s only product) also deletes the only record that Hitachi is a Japanese company with stock price 15.' },
+]);
+const CH = ['Manufacturer', 'Country', 'StockPrice'];
+stepper('#split', [
+  { html: row2(rel('Product (wide)', WH, wide())), cap: 'Start: the wide table of slide 3.' },
+  { html: row2(rel('Product', PH, PR), rel('Company (cut)', CH, PR.map(r => [r[3], ...CO[r[3]]]), { cls: { 0: 'hl', 1: 'hl' } })), cap: 'Slide 4: cut the columns into two tables, keeping Manufacturer in both. The company piece still repeats GizmoWorks (the circled row).' },
+  { html: row2(rel('Product', PH, PR), rel('Company', CH, [['GizmoWorks', 'USA', '25'], ['Canon', 'Japan', '65'], ['Hitachi', 'Japan', '15']], { cls: { 0: 'new' } })), cap: 'Slide 5: remove the duplicate. Each company now has <b>one</b> row, so Manufacturer is the <b>primary key</b> of Company, and Product.Manufacturer is a <b>foreign key</b> pointing to it.' },
+]);
+sqlPlay('#p1', { setup: PRODCO, query: `SELECT pname, price, category, manufacturer, country, stockPrice
+FROM   Product, Company
+WHERE  manufacturer = cname;`, note: 'Four rows, one per product, with the company columns attached: the wide table rebuilt on demand.' });
+flashcards('#cards', [
+  { f: 'Redundancy', b: 'The same fact stored more than once (GizmoWorks, USA, 25 in two rows).' },
+  { f: 'Update anomaly', b: 'Changing one fact needs several rows changed; missing one leaves contradictory data.' },
+  { f: 'Deletion anomaly', b: 'Deleting a row also deletes an unrelated fact (Hitachi\'s country disappears with MultiTouch).' },
+  { f: 'Primary key', b: 'Column(s) whose value is unique in every row; identifies the row (Company.cname).' },
+  { f: 'Foreign key', b: 'Column whose values must exist in another table\'s primary key (Product.manufacturer → Company.cname).' },
+  { f: 'Join', b: 'A query over several tables that matches rows on a condition such as manufacturer = cname.' },
+]);
+quiz('#quiz', [
+  { q: 'In the wide table of slide 3, how many times is the fact "GizmoWorks is in the USA" stored?', opts: ['Once', 'Twice', 'Four times', 'Never'], a: 1, why: 'Once per GizmoWorks product: Gizmo and Powergizmo.' },
+  { q: 'After the split, which column is the foreign key?', opts: ['Company.cname', 'Product.pname', 'Product.manufacturer', 'Company.country'], a: 2, why: 'Product.manufacturer refers to the primary key of Company.' },
+  { q: 'Why does slide 4 circle the second GizmoWorks row in Company?', opts: ['It has a typo', 'It is a duplicate that must be removed so cname can be a key', 'It violates the foreign key', 'Its stock price is wrong'], a: 1, why: 'A primary key cannot repeat; the duplicate row is redundant.' },
+  { q: 'Which problem does the split design NOT have?', opts: ['Needing joins for combined questions', 'Update anomalies on a company\'s stock price', 'Storing Product rows', 'Needing a foreign key'], a: 1, why: 'The stock price is stored once, so there is nothing to get out of step. Queries do need joins.' },
+  { q: 'Can the split design record a company that has no products yet?', opts: ['Yes, as a Company row', 'No', 'Only with NULL product columns', 'Only in Oracle'], a: 0, why: 'Company rows exist independently of Product rows.' },
+]);
+const T = PRODCO_X;
+sqlCheck('#c1', { setup: T, task: '1. (Easy) List the name and country of every company.', solution: 'SELECT cname, country FROM Company;' });
+sqlCheck('#c2', { setup: T, task: '2. List the names of all products made by Canon.', solution: "SELECT pname FROM Product WHERE manufacturer = 'Canon';" });
+sqlCheck('#c3', { setup: T, task: '3. List the companies located in Japan or China.', solution: "SELECT cname FROM Company WHERE country IN ('Japan', 'China');", hint: 'Use IN or two conditions joined with OR.' });
+sqlCheck('#c4', { setup: T, task: '4. Which product categories exist? List each category once.', solution: 'SELECT DISTINCT category FROM Product;', hint: 'DISTINCT removes repeated rows.' });
+sqlCheck('#c5', { setup: T, task: '5. Preview of the next chapter: list each product name with the country of its manufacturer.', solution: 'SELECT pname, country FROM Product, Company WHERE manufacturer = cname;', hint: 'FROM Product, Company and match manufacturer to cname in WHERE.' });
+sqlCheck('#c6', { setup: T, task: '6. Insert a new company Samsung (South Korea, stock price 55) that has no products yet. (The checker compares the Company table after your statement.)', solution: "INSERT INTO Company VALUES ('Samsung', 55, 'South Korea');", check: 'state', table: 'Company', hint: 'INSERT INTO Company VALUES (cname, stockPrice, country). In the split design a company needs no product.' });
+</script>
+</body>
+</html>

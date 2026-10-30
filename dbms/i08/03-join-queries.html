@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Writing Join Queries · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 08 (Ishrak) · Chapter 3 · Slides 13–19</div>
+<h1>Writing Join Queries</h1>
+<p class="lede">Now we apply the join to the Product and Company tables and answer real questions with it. This chapter animates the Product–Company join, shows how to add ordinary conditions next to the join condition, warns about AND/OR precedence, and answers slide 18's question "what is the problem?" (duplicates, fixed by DISTINCT).</p>
+
+<h2>1. Joining Product and Company (slide 13)</h2>
+
+<p>The schema, with keys underlined on the slides, is</p>
+<pre>Product (<u>pname</u>, price, category, manufacturer)
+Company (<u>cname</u>, stockPrice, country)</pre>
+<p>Product.manufacturer is a foreign key referring to Company.cname. Slide 13 joins the two tables on exactly that pair of columns:</p>
+<pre>SELECT *
+FROM   Product, Company
+WHERE  manufacturer = cname;</pre>
+<p>The column names are all different now (manufacturer vs cname), so no prefixes are needed. The cross product has 4 · 3 = 12 rows; the condition keeps the 4 in which a product meets its own manufacturer. The lines on the slide connect each product to its company row. Step through it:</p>
+
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="pcj"></div>
+</figure>
+
+<p>Because manufacturer is a foreign key, every product finds <strong>exactly one</strong> company, so the join has as many rows as Product. That is the typical shape of a foreign-key join: the "many" side's rows, each extended with its "one" side's row. Here the result is the wide table of slide 3, rebuilt on demand.</p>
+<div id="p13"></div>
+
+<h2>2. Adding conditions (slides 14–15)</h2>
+
+<p><em>Find all products under $200 manufactured in Japan; return their names and prices.</em></p>
+<p>"Manufactured in Japan" is a fact about the company, "under $200" is a fact about the product, so we need both tables. The WHERE clause then has three conditions joined by AND:</p>
+<pre>SELECT pname, price
+FROM   Product, Company
+WHERE  manufacturer = cname      -- the join condition (slide 14's bubble)
+AND    country = 'Japan'         -- a condition on Company's columns
+AND    price < 200;              -- a condition on Product's columns</pre>
+<p>Only the join condition relates the two tables. The other two are ordinary filters. On the slide data: of the 4 joined rows, the Japanese ones are SingleTouch (Canon) and MultiTouch (Hitachi), and only SingleTouch costs less than 200. Result: <strong>SingleTouch, 149.99</strong> (slide 15).</p>
+<div id="p14"></div>
+
+<div class="q">
+<h4>Question (worked answer): what happens if you forget the join condition?</h4>
+<p>Without <code>manufacturer = cname</code>, the query works on the full cross product. Every product under 200 (Gizmo, Powergizmo, SingleTouch) is paired with every Japanese company (Canon, Hitachi), giving 3 · 2 = <strong>6 rows</strong>, including nonsense such as "Gizmo, made in Japan". Forgetting the join condition is the single most common join bug: the query runs without an error and returns too many rows. A useful habit: with <i>n</i> tables in FROM you normally need at least <i>n</i> − 1 join conditions.</p>
+</div>
+
+<h2>3. More joins, and AND/OR precedence (slide 16)</h2>
+<p><em>Find all Chinese companies that manufacture electronic products or toys.</em></p>
+<pre>SELECT cname
+FROM   Product, Company
+WHERE  manufacturer = cname
+AND    country = 'China'
+AND    (category = 'electronic' OR category = 'toy');</pre>
+
+<p>The parentheses are essential. SQL evaluates <b class="term">AND before OR</b> (AND has higher precedence), just as multiplication comes before addition. Without the parentheses the condition means</p>
+<pre>(manufacturer = cname AND country = 'China' AND category = 'electronic')
+OR category = 'toy'</pre>
+<p>and the second branch has no join condition at all. Every toy is then paired with <em>every</em> company in the cross product. On the slide's own four products there are no Chinese companies, so the slide's query returns nothing; the playground below uses the extended data (with two invented Chinese companies, Xiaomi and Lenovo) so you can see both versions:</p>
+<div id="p16"></div>
+<p>The correct query returns Xiaomi <em>twice</em>, once for its electronic RedmiPad and once for its toy MiRobot. That is the subtlety of the next section.</p>
+
+<h2>4. A subtlety about joins: duplicates (slides 17–19)</h2>
+<p><em>Find all countries that manufacture some product in the 'Gadgets' category.</em></p>
+<pre>SELECT country
+FROM   Product, Company
+WHERE  manufacturer = cname
+AND    category = 'Gadgets';</pre>
+<p>Slide 18 shows the result as "??, ??" and asks <em>what is the problem?</em></p>
+
+<div class="q">
+<h4>Question (worked answer): slide 18, "What is the problem?"</h4>
+<p>Two products are in the Gadgets category: Gizmo and Powergizmo. Both are made by GizmoWorks, so both join with the same Company row, and each joined row contributes its country. The result is <strong>USA, USA</strong>: the same country twice (slide 19). The question asks for <em>countries</em>, and a country is either in the answer or not, so the duplicate is wrong.</p>
+<p>Duplicates appear because SQL results are bags (Chapter 2, slide 11): one output row per qualifying combination of input rows. Whenever the SELECT list does not include a key of every joined table, two different combinations can produce the same output. <strong>Solution</strong> (slide 19): add <code>DISTINCT</code>.</p>
+<pre>SELECT DISTINCT country
+FROM   Product, Company
+WHERE  manufacturer = cname
+AND    category = 'Gadgets';      -- result: USA (once)</pre>
+</div>
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="dup"></div>
+</figure>
+<div id="p19"></div>
+<p>Do not sprinkle DISTINCT everywhere "just in case". It costs a sort or hash of the result, and sometimes the duplicates are meaningful (for example, "list the price of every product sold", where two equal prices are two facts). Ask: <em>can two different input combinations produce the same output row, and should they be counted once?</em></p>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+<h3>Try it in SQL</h3>
+<p>All exercises use Product and Company with the extra invented rows (Xiaomi, Lenovo, Walton, GizmoCam, ZoomTouch). Use <em>Show tables</em> first.</p>
+<div id="c1"></div><div id="c2"></div><div id="c3"></div><div id="c4"></div><div id="c5"></div><div id="c6"></div>
+
+<div class="key"><p><strong>Summary:</strong> a join query lists the tables in FROM and puts the join condition (foreign key = primary key) in WHERE, followed by any ordinary filters on either table. Forgetting the join condition silently returns cross-product rows. AND binds tighter than OR, so put parentheses around OR-conditions. A join can produce the same output row from different input rows; when the question asks for a set of values (countries, companies), use SELECT DISTINCT.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/sqlplay.js"></script>
+<script src="../i08/lecture.js"></script>
+<script>
+const P = [['Gizmo', 19.99, 'Gadgets', 'GizmoWorks'], ['Powergizmo', 29.99, 'Gadgets', 'GizmoWorks'], ['SingleTouch', 149.99, 'Photography', 'Canon'], ['MultiTouch', 203.99, 'Household', 'Hitachi']];
+const C = [['GizmoWorks', 25, 'USA'], ['Canon', 65, 'Japan'], ['Hitachi', 15, 'Japan']];
+const ph = ['pname', 'price', 'category', 'manufacturer'], ch = ['cname', 'stockPrice', 'country'];
+stepper('#pcj', joinSteps({ L: P, R: C, lname: 'Product', rname: 'Company', lhead: ph, rhead: ch, on: (p, c) => p[3] === c[0], cond: 'manufacturer = cname',
+  outHead: [...ph, ...ch], intro: 'Join Product and Company on <code>manufacturer = cname</code>. For each product, the 3 company rows are tested (green = match, red = no match).',
+  outro: 'Done: 4 rows, one per product, because each product\'s manufacturer is the key of exactly one company row (slide 13\'s result).' }));
+// duplicates
+const G = P.filter(p => p[2] === 'Gadgets');
+stepper('#dup', [
+  { html: row2(rel('Product', ph, P, { cls: { 0: 'hl', 1: 'hl' } }), rel('Company', ch, C, { cls: { 0: 'hl' } })), cap: 'Two Gadgets products, Gizmo and Powergizmo, both made by GizmoWorks.' },
+  { html: row2(rel('joined rows with category = Gadgets', [...ph, ...ch], G.map(p => [...p, ...C[0]]), { cls: { 0: 'new', 1: 'new' } })), cap: 'The join produces two rows, one per product. Both carry the same company row.' },
+  { html: row2(rel('SELECT country', ['country'], [['USA'], ['USA']], { cls: { 0: 'hl', 1: 'hl' } })), cap: 'Projecting onto country gives USA twice: a bag with a duplicate (slide 19).' },
+  { html: row2(rel('SELECT DISTINCT country', ['country'], [['USA']], { cls: { 0: 'new' } })), cap: 'DISTINCT removes the duplicate: the answer is the set {USA}.' },
+]);
+sqlPlay('#p13', { setup: PRODCO, query: 'SELECT *\nFROM   Product, Company\nWHERE  manufacturer = cname;', note: 'Slide 13. Delete the WHERE line to see the 12-row cross product.' });
+sqlPlay('#p14', { setup: PRODCO, query: "SELECT pname, price\nFROM   Product, Company\nWHERE  manufacturer = cname\nAND    country = 'Japan'\nAND    price < 200;", note: 'Slides 14–15. Remove the first condition (manufacturer = cname) to see the 6 wrong rows.' });
+sqlPlay('#p16', { setup: PRODCO_X, query: "-- correct (slide 16)\nSELECT cname\nFROM   Product, Company\nWHERE  manufacturer = cname\nAND    country = 'China'\nAND    (category = 'electronic' OR category = 'toy');\n\n-- now delete the two parentheses and run again: every toy pairs with every company", note: 'Uses the extended data (invented Chinese companies). Without parentheses you get 7 rows instead of 2: RedmiPad–Xiaomi, plus the toy MiRobot paired with all 6 companies.' });
+sqlPlay('#p19', { setup: PRODCO, query: "SELECT country\nFROM   Product, Company\nWHERE  manufacturer = cname\nAND    category = 'Gadgets';", note: 'Slide 18 returns USA twice. Add DISTINCT after SELECT (slide 19).' });
+flashcards('#cards', [
+  { f: 'Join condition', b: 'The WHERE condition that links the tables, usually foreign key = primary key (manufacturer = cname).' },
+  { f: 'Forgotten join condition', b: 'The query runs over the cross product and returns too many, meaningless rows.' },
+  { f: 'AND vs OR precedence', b: 'AND is evaluated first. Put parentheses around OR-ed conditions.' },
+  { f: 'Why do joins produce duplicates?', b: 'Different combinations of input rows can project to the same output row (two Gadgets → USA, USA).' },
+  { f: 'SELECT DISTINCT', b: 'Removes duplicate output rows; use it when the answer should be a set of values.' },
+]);
+quiz('#quiz', [
+  { q: 'Product has 4 rows, Company 3. Product.manufacturer is a foreign key to Company.cname (no NULLs). How many rows does the join on manufacturer = cname have?', opts: ['3', '4', '7', '12'], a: 1, why: 'Each product matches exactly one company.' },
+  { q: 'Slide 14\'s query without "manufacturer = cname" returns how many rows on the slide data?', opts: ['1', '4', '6', '12'], a: 2, why: '3 products under 200 × 2 Japanese companies = 6.' },
+  { q: 'How is "A AND B OR C" evaluated?', opts: ['A AND (B OR C)', '(A AND B) OR C', 'left to right with equal precedence', 'it is a syntax error'], a: 1, why: 'AND has higher precedence than OR.' },
+  { q: 'Slide 18\'s query returns USA twice because…', opts: ['Company has two USA rows', 'two Gadgets products have the same manufacturer', 'the join is wrong', 'Oracle bug'], a: 1, why: 'Gizmo and Powergizmo both join with GizmoWorks.' },
+  { q: 'Which query certainly cannot return duplicate rows (slide data)?', opts: ['SELECT country FROM Company', 'SELECT pname FROM Product, Company WHERE manufacturer = cname', 'SELECT category FROM Product', 'SELECT manufacturer FROM Product'], a: 1, why: 'pname is Product\'s key and each product joins with one company, so each pname appears once. The others repeat Japan, Gadgets, GizmoWorks.' },
+]);
+ask('#try1', { q: 'On the slide data, how many rows does slide 18\'s query return (without DISTINCT)?', a: 2, why: 'USA, USA.' });
+const T = PRODCO_X;
+sqlCheck('#c1', { setup: T, task: '1. (Easy) List the names of all products made by companies in the USA.', solution: "SELECT pname FROM Product, Company WHERE manufacturer = cname AND country = 'USA';" });
+sqlCheck('#c2', { setup: T, task: '2. List each Photography product with its price and its manufacturer\'s country.', solution: "SELECT pname, price, country FROM Product, Company WHERE manufacturer = cname AND category = 'Photography';" });
+sqlCheck('#c3', { setup: T, task: '3. List the <em>distinct</em> countries whose companies make some product priced above 100.', solution: 'SELECT DISTINCT country FROM Product, Company WHERE manufacturer = cname AND price > 100;', hint: 'Join, filter on price, and use DISTINCT.' });
+sqlCheck('#c4', { setup: T, task: '4. List the companies (cname) that make a product in the Photography or Gadgets category, each company once.', solution: "SELECT DISTINCT cname FROM Product, Company WHERE manufacturer = cname AND (category = 'Photography' OR category = 'Gadgets');", hint: 'Parentheses around the OR, and DISTINCT.' });
+sqlCheck('#c5', { setup: T, task: '5. List the names of products whose price is less than 10 times their manufacturer\'s stock price, together with that stock price, sorted by price (cheapest first).', solution: 'SELECT pname, stockPrice FROM Product, Company WHERE manufacturer = cname AND price < 10 * stockPrice ORDER BY price;', ordered: true, hint: 'ORDER BY price at the end.' });
+sqlCheck('#c6', { setup: T, task: '6. (Exam style) Find the names of companies that are <em>not</em> in Japan but make some product costing less than 100. Each company once.', solution: "SELECT DISTINCT cname FROM Product, Company WHERE manufacturer = cname AND country <> 'Japan' AND price < 100;" });
+</script>
+</body>
+</html>

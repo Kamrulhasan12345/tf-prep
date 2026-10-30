@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pattern Matching with LIKE · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="../i03/lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 04 (Ishrak) · Chapter 4 · Slides 26–35 · Book §6.1.4</div>
+<h1>Pattern Matching with LIKE</h1>
+<p class="lede">How <code>s LIKE p</code> decides whether a string fits a pattern built from <code>%</code> and <code>_</code>; how to search for the special characters themselves (apostrophe, %, _) with doubling and ESCAPE; why LIKE does not ignore trailing blanks the way = does; and NOT LIKE. An interactive matcher animates any pattern on any string.</p>
+
+<h2>1. The LIKE operator (slide 26)</h2>
+<dl class="def">
+  <dt>s LIKE p</dt>
+  <dd>A condition that is TRUE when the string <i>s</i> matches the pattern <i>p</i>. Every ordinary character in <i>p</i> must match itself exactly (upper and lower case are different in Oracle), and two characters are wildcards:</dd>
+  <dt><code>%</code> (percent)</dt>
+  <dd>matches any sequence of characters, of any length, <em>including zero</em>.</dd>
+  <dt><code>_</code> (underscore)</dt>
+  <dd>matches <em>exactly one</em> character, whatever it is.</dd>
+</dl>
+<p>The pattern must cover the <em>whole</em> string, from the first character to the last. That is why "contains mo" is written <code>'%mo%'</code>: the first % absorbs whatever comes before mo, the second whatever comes after.</p>
+<div class="tbl"><table>
+<tr><th>Pattern</th><th>Matches strings that…</th><th>Examples that match</th></tr>
+<tr><td><code>'%mo%'</code></td><td>contain mo anywhere</td><td>Gizmo, Powergizmo, mo</td></tr>
+<tr><td><code>'%Touch'</code></td><td>end with Touch</td><td>SingleTouch, MultiTouch, Touch</td></tr>
+<tr><td><code>'G%'</code></td><td>start with G</td><td>Gizmo, GizmoWorks, G</td></tr>
+<tr><td><code>'_a%'</code></td><td>have a as the second character</td><td>Banana, Rahim, Ka</td></tr>
+<tr><td><code>'___'</code></td><td>have exactly 3 characters</td><td>abc, U2!, 007</td></tr>
+<tr><td><code>'G_z_oWorks'</code></td><td>G, any one, z, any one, oWorks</td><td>GizmoWorks</td></tr>
+</table></div>
+
+<h2>2. Try the matcher</h2>
+<p>Type a string and a pattern and press <b>Match</b>. The animation takes the pattern one token at a time and shows which characters each token consumes (orange: a literal character; green: <code>_</code>; blue: <code>%</code>). Try <code>Powergizmo</code> with <code>%mo%</code>, then <code>Powergizmo</code> with <code>%Giz%</code> (fails: case matters), then <code>10%</code> with <code>%\%</code> and escape <code>\</code>.</p>
+<figure class="wide">
+<span class="anim-tag">Interactive</span>
+<div id="tool"></div>
+</figure>
+
+<h2>3. The slides' examples (slides 27–29)</h2>
+<p>(Slides 27–29 and 35 write <code>FROM Products</code>; the table is called <code>Product</code>. With the extra s, Oracle would report ORA-00942: table or view does not exist.)</p>
+<p><em>Show all products' info that has 'mo' as a substring of the product name</em> (slide 27):</p>
+<pre>SELECT * FROM Product WHERE pname LIKE '%mo%';        -- Gizmo, Powergizmo</pre>
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="a1"></div>
+</figure>
+<p><em>Show all products' info where the product name ends with 'Touch'</em> (slide 28):</p>
+<pre>SELECT * FROM Product WHERE pname LIKE '%Touch';      -- SingleTouch, MultiTouch</pre>
+<p>Slide 29 matches the manufacturer with one-character wildcards. <code>'G_z_oWorks'</code> has 10 characters, so it only matches 10-character strings; GizmoWorks fits (G, i, z, m, o, W…), so both GizmoWorks products are returned:</p>
+<pre>SELECT * FROM Product WHERE manufacturer LIKE 'G_z_oWorks';   -- Gizmo, Powergizmo</pre>
+<div id="p1"></div>
+
+<h2>4. Searching for the special characters (slides 30–33)</h2>
+<p>Three characters have special meaning inside a pattern string: the apostrophe <code>'</code> (it ends the string), <code>%</code> and <code>_</code> (they are wildcards). Each needs a way to be searched for literally.</p>
+<h3>The apostrophe: write it twice (slide 31)</h3>
+<p>Inside a string constant, two apostrophes in a row stand for one apostrophe character. This is a rule of string constants in general, not of LIKE: <code>'Baby''s World'</code> is the 13-character string Baby's World.</p>
+<pre>-- company names containing 's (apostrophe s)
+SELECT * FROM Company WHERE cname LIKE '%''s%';</pre>
+<h3>% and _: the ESCAPE clause (slides 32–33)</h3>
+<dl class="def">
+  <dt>ESCAPE 'c'</dt>
+  <dd>Declares a character <i>c</i> that, inside this pattern, makes the character right after it ordinary. <code>\%</code> then matches a real percent sign and <code>\_</code> a real underscore. Any character can be chosen as the escape character; <code>\</code> and <code>!</code> are common choices because they rarely occur in the data.</dd>
+</dl>
+<pre>-- interest rates that end with a percent sign (slide 32)
+SELECT * FROM Bank WHERE interestRates LIKE '%\%' ESCAPE '\';
+
+-- country names that contain an underscore (slide 33)
+SELECT * FROM Company WHERE country LIKE '%\_%' ESCAPE '\';</pre>
+<p>Read <code>'%\%'</code> as two tokens: a wildcard <code>%</code> (anything) followed by an escaped, literal <code>%</code> (the last character must be a percent sign). Without ESCAPE, <code>'%%'</code> would be two wildcards and would match every string, and <code>'%_%'</code> would match every string of at least one character.</p>
+<div id="p2"></div>
+
+<h2>5. LIKE does not pad with blanks (slide 34)</h2>
+<pre>WHERE category = 'Household'        -- blank-padded comparison for CHAR
+WHERE category LIKE 'Household'     -- pattern match: NOT equivalent</pre>
+<p>Chapter 3 showed that <code>=</code> between CHAR values ignores trailing blanks. LIKE does not: it matches the pattern against the value exactly as stored. If <code>category</code> is <code>CHAR(15)</code>, the stored value is <code>'Household␣␣␣␣␣␣'</code>, and the pattern <code>'Household'</code> has no wildcard to absorb the six blanks, so <code>LIKE 'Household'</code> is FALSE while <code>= 'Household'</code> is TRUE. For a VARCHAR2 column the two conditions give the same answer. A pattern that works for CHAR columns is <code>'Household%'</code>.</p>
+
+<h2>6. NOT LIKE (slide 35)</h2>
+<p><code>s NOT LIKE p</code> is TRUE exactly when <code>s LIKE p</code> is FALSE.</p>
+<pre>SELECT * FROM Product WHERE manufacturer NOT LIKE '%mo%';   -- SingleTouch, MultiTouch</pre>
+<p>GizmoWorks contains mo, so both GizmoWorks products are excluded; Canon and Hitachi do not, so their products are returned.</p>
+<p>Because LIKE is case-sensitive in Oracle, a case-insensitive search converts the column first: <code>WHERE UPPER(pname) LIKE '%GIZ%'</code> finds both Gizmo and Powergizmo. (UPPER is one of the single-row functions in <a href="../i05/04-alter-drop-functions.html">Lec 05 Chapter 4</a>.)</p>
+<div id="p3"></div>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div><div id="try2"></div>
+<h3>SQL exercises</h3>
+<p>Exercises use the slides' <code>Product</code>, <code>Company(cname, country)</code> and <code>Bank(bname, interestRates)</code> tables, and the <code>Employees</code> table.</p>
+<div id="c1"></div><div id="c2"></div><div id="c3"></div><div id="c4"></div><div id="c5"></div><div id="c6"></div><div id="c7"></div>
+
+<h3>Exam questions</h3>
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 215 | L-2/T-1 | 2024–25 · 12 marks</div>
+  <div class="exam-q"><p>Consider the following relational database schema:</p>
+  <p>Planet(planet_id, name, type, distance_sun_au), planet_id is the primary key.<br>Moon(moon_id, name, planet_id, diameter_km), moon_id is the primary key, and planet_id is a foreign key referencing Planet(planet_id).</p>
+  <p>(a) Write an SQL function total_moons() that returns a single integer representing the total number of moons possessed by all planets. Then write the SQL statement to call the function.<br>
+  (b) Find the names of all planets whose name contains a substring that starts with "Ma", then has exactly two unknown characters, and ends with "s".</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><strong>(b)</strong> The substring is: the two letters <code>Ma</code>, then exactly two unknown characters (<code>__</code>), then <code>s</code>. It may appear anywhere in the name, so put <code>%</code> on both sides:</p>
+    <pre>SELECT name
+FROM   Planet
+WHERE  name LIKE '%Ma__s%';</pre>
+    <p>Check on example names: <code>Malys</code> matches (Ma, ly, s); <code>Neo Mares</code> matches (Ma, re, s inside the name); <code>Mars</code> does not (only one character, r, between Ma and s); <code>Magnus</code> does not (after Ma + gn comes u, not s); <code>Tamaras</code> does not, because its "ma" has a lower-case m and Oracle's LIKE is case-sensitive. The real planets Mercury … Neptune give no match at all.</p>
+    <p><strong>(a)</strong> In Oracle, a stored function is written in PL/SQL. It counts the rows of Moon (each row is one moon):</p>
+    <pre>CREATE OR REPLACE FUNCTION total_moons
+RETURN NUMBER
+IS
+  v_total NUMBER;
+BEGIN
+  SELECT COUNT(*) INTO v_total FROM Moon;
+  RETURN v_total;
+END;
+/
+
+SELECT total_moons() FROM dual;     -- call it in a query</pre>
+    <p><code>COUNT(*)</code> counts the rows of Moon (aggregate functions are taught in Lecture 10); <code>SELECT … INTO</code> stores the single result in the variable; the <code>/</code> line tells SQL*Plus to compile the block. Because every moon row has a planet_id referencing a planet, counting Moon counts exactly the moons possessed by planets. (If planet_id could be NULL, use <code>COUNT(planet_id)</code> to count only moons that belong to a planet.) The function can also be called from PL/SQL: <code>DBMS_OUTPUT.PUT_LINE(total_moons);</code>.</p>
+    <p>Note: the question bank's answer for (a) is written in PostgreSQL's PL/pgSQL (<code>RETURNS INTEGER … $$ … LANGUAGE plpgsql</code>), which does not run on Oracle; in this course write the Oracle version above. Its answer for (b) is correct, but it contains a stray space (<code>'% Ma__s % '</code>) that would change the pattern.</p>
+    <p>The exercise below lets you test (b) on a small invented Planet table, and the query part of (a) as <code>SELECT COUNT(*) FROM Moon</code>.</p>
+  </div></details>
+</div>
+<div id="cq1"></div><div id="cq2"></div>
+
+<div class="key"><p><strong>Summary:</strong> <code>s LIKE p</code> matches the whole string against the pattern: <code>%</code> = any sequence (even empty), <code>_</code> = exactly one character, everything else literal and case-sensitive. Write an apostrophe as <code>''</code>; search for a literal % or _ with an escape character declared by <code>ESCAPE</code>. LIKE does not ignore trailing blanks (= on CHAR does). NOT LIKE negates the match.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/sqlplay.js"></script>
+<script src="../i03/lecture.js"></script>
+<script>
+likeTool('#tool', { s: 'Powergizmo', p: '%mo%' });
+selectAnim('#a1', { name: 'Product', head: GIZ_HEAD, rows: GIZ_ROWS, perRow: true,
+  where: { test: r => likeAlign(r[0], '%mo%').ok, why: r => `'${r[0]}' LIKE '%mo%'` },
+  sql: [['select', 'SELECT *'], ['from', 'FROM   Product'], ['where', "WHERE  pname LIKE '%mo%';"]] });
+sqlPlay('#p1', { setup: GIZ, query: "SELECT *\nFROM   Product\nWHERE  manufacturer LIKE 'G_z_oWorks';", note: "Also try <code>'%Touch'</code> and <code>'%mo%'</code> on pname, and <code>'G_z_o'</code> (no match: the pattern must cover the whole string)." });
+sqlPlay('#p2', { setup: GIZ, query: "SELECT *\nFROM   Bank\nWHERE  interestRates LIKE '%\\%' ESCAPE '\\';", note: "Remove <code>ESCAPE '\\'</code> and change the pattern to <code>'%%'</code>: every bank is returned. Then try the Company queries above." });
+sqlPlay('#p3', { setup: GIZ, query: "SELECT *\nFROM   Product\nWHERE  manufacturer NOT LIKE '%mo%';", note: "Try <code>WHERE pname LIKE '%Giz%'</code> (Gizmo only) and <code>WHERE UPPER(pname) LIKE '%GIZ%'</code> (both)." });
+flashcards('#cards', [
+  { f: '%', b: 'Any sequence of characters, including none.' },
+  { f: '_', b: 'Exactly one character.' },
+  { f: 'Contains X', b: "LIKE '%X%'" },
+  { f: 'Ends with X', b: "LIKE '%X'" },
+  { f: 'Apostrophe in a string', b: "Write it twice: 'Baby''s World'." },
+  { f: 'ESCAPE', b: "LIKE '%\\%' ESCAPE '\\' : the character after \\ is literal." },
+  { f: 'LIKE and blanks', b: 'No padding: trailing blanks of a CHAR value must be matched (e.g. by a final %).' },
+  { f: 'Case', b: 'Oracle LIKE is case-sensitive; use UPPER(col) LIKE \'…\' to ignore case.' },
+]);
+quiz('#quiz', [
+  { q: "Which strings match <code>'_a%'</code>?", opts: ['Dhaka and Rajshahi', 'Barisal and Rajshahi', 'Dhaka only', 'Khulna'], a: 1, why: 'The second character must be a: B-a-risal, R-a-jshahi. Dhaka has h second.' },
+  { q: "Does <code>'Mars' LIKE 'Ma__s'</code> hold?", opts: ['Yes', 'No: it needs 5 characters', 'No: case', 'Error'], a: 1, why: "'Ma__s' has 5 tokens, none of them %, so the string must have exactly 5 characters." },
+  { q: "Does <code>'ab' LIKE 'ab%'</code> hold?", opts: ['Yes, % can match nothing', 'No, % needs at least one character', 'Only with ESCAPE', 'Error'], a: 0, why: '% matches zero or more characters.' },
+  { q: "Which pattern finds values that contain an underscore?", opts: ["'%_%'", "'%\\_%' ESCAPE '\\'", "'%''_''%'", "'_'"], a: 1, why: "Without ESCAPE, _ is a wildcard; '%_%' matches any non-empty string." },
+  { q: "<code>pname LIKE '%giz%'</code> on the slide data returns…", opts: ['Gizmo and Powergizmo', 'Powergizmo only', 'Gizmo only', 'Nothing'], a: 1, why: 'Case-sensitive: Gizmo has a capital G.' },
+  { q: "category is CHAR(15) holding 'Household'. Which condition is FALSE in Oracle?", opts: ["category = 'Household'", "category LIKE 'Household%'", "category LIKE 'Household'", "category = 'Household  '"], a: 2, why: 'LIKE does not pad: the 6 trailing blanks are not matched.' },
+]);
+ask('#try1', { q: "How many of these match <code>'%a_'</code>: Dhaka, Sylhet, Barisal, Rangpur, Comilla?", a: 1, hint: 'The second-to-last character must be a.', why: 'Only Barisal (…s-a-l). Dhaka ends k-a and Comilla ends l-a, so their second-to-last letters are k and l.' });
+ask('#try2', { q: "On the Employees table, how many last names contain the letter <code>a</code> (lower case) as their second character, i.e. <code>LIKE '_a%'</code>?", a: 6, hint: 'Scan the second letter of each name: King, Kochhar, De Haan, …', why: 'Rajs, Davies, Matos, Taylor, Hartstein, Fay.' });
+const PLANETS = CS + `CREATE TABLE Planet (planet_id NUMBER PRIMARY KEY, name VARCHAR2(30), type VARCHAR2(20), distance_sun_au NUMBER);
+INSERT INTO Planet VALUES (1, 'Mercury', 'terrestrial', 0.39);
+INSERT INTO Planet VALUES (2, 'Venus', 'terrestrial', 0.72);
+INSERT INTO Planet VALUES (3, 'Earth', 'terrestrial', 1.00);
+INSERT INTO Planet VALUES (4, 'Mars', 'terrestrial', 1.52);
+INSERT INTO Planet VALUES (5, 'Jupiter', 'gas giant', 5.20);
+INSERT INTO Planet VALUES (6, 'Saturn', 'gas giant', 9.58);
+INSERT INTO Planet VALUES (7, 'Malys', 'dwarf', 41.2);
+INSERT INTO Planet VALUES (8, 'Neo Mares', 'exoplanet', 120.0);
+INSERT INTO Planet VALUES (9, 'Magnus', 'exoplanet', 88.4);
+INSERT INTO Planet VALUES (10, 'Tamaras', 'exoplanet', 64.0);
+CREATE TABLE Moon (moon_id NUMBER PRIMARY KEY, name VARCHAR2(30), planet_id NUMBER REFERENCES Planet(planet_id), diameter_km NUMBER);
+INSERT INTO Moon VALUES (1, 'Moon', 3, 3474);
+INSERT INTO Moon VALUES (2, 'Phobos', 4, 22);
+INSERT INTO Moon VALUES (3, 'Deimos', 4, 12);
+INSERT INTO Moon VALUES (4, 'Io', 5, 3643);
+INSERT INTO Moon VALUES (5, 'Europa', 5, 3122);
+INSERT INTO Moon VALUES (6, 'Ganymede', 5, 5268);
+INSERT INTO Moon VALUES (7, 'Callisto', 5, 4821);
+INSERT INTO Moon VALUES (8, 'Titan', 6, 5150);
+`;
+chk('#c1', GIZ, '<b>Easy (slide 28).</b> Show all information about products whose name ends with <code>Touch</code>.', "SELECT * FROM Product WHERE pname LIKE '%Touch';");
+chk('#c2', GIZ, '<b>Slide 29.</b> Using only <code>_</code> wildcards (no %), find the products made by GizmoWorks, as <code>\'G_z_oWorks\'</code> does.', "SELECT * FROM Product WHERE manufacturer LIKE 'G_z_oWorks';");
+chk('#c3', GIZ, "<b>Apostrophe (slide 31).</b> Show the companies whose name contains <code>'s</code>.", "SELECT * FROM Company WHERE cname LIKE '%''s%';", { hint: 'Two apostrophes inside a string stand for one.' });
+chk('#c4', GIZ, '<b>Escaped % (slide 32).</b> Show the banks whose interest rate ends with a percent sign. (Prime Bank\'s \'%6 promo\' starts with one; it must not appear.)', "SELECT * FROM Bank WHERE interestRates LIKE '%\\%' ESCAPE '\\';");
+chk('#c5', GIZ, '<b>Escaped _ (slide 33).</b> Show the companies whose <em>country</em> contains an underscore.', "SELECT * FROM Company WHERE country LIKE '%\\_%' ESCAPE '\\';", { hint: 'North_Star Ltd has an underscore in its name, not its country, so it must not appear.' });
+chk('#c6', HR, "<b>Single-character wildcard.</b> Show the <code>last_name</code> of employees whose last name has <code>a</code> as its second letter.", "SELECT last_name FROM Employees WHERE last_name LIKE '_a%';");
+chk('#c7', HR, "<b>Exam style.</b> Show <code>first_name</code>, <code>last_name</code> and <code>phone_number</code> of employees whose phone number does <em>not</em> start with <code>515.</code> and whose first name ends in <code>n</code>. (The dot is an ordinary character in LIKE.)", "SELECT first_name, last_name, phone_number\nFROM Employees\nWHERE phone_number NOT LIKE '515.%'\n  AND first_name LIKE '%n';");
+chk('#cq1', PLANETS, '<b>Exam question (b)</b> on invented data: find the names of planets containing <code>Ma</code>, then exactly two characters, then <code>s</code>.', "SELECT name FROM Planet WHERE name LIKE '%Ma__s%';");
+chk('#cq2', PLANETS, '<b>Exam question (a), the query inside the function.</b> Compute the total number of moons as a single number.', 'SELECT COUNT(*) FROM Moon;', { hint: 'COUNT(*) counts rows (Lecture 10).' });
+</script>
+</body>
+</html>

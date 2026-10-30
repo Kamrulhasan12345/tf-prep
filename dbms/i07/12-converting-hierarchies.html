@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Converting isA Hierarchies to Tables · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 07 (Ishrak) · Chapter 12 · Beyond the slides (exam topic)</div>
+<h1>Converting isA Hierarchies to Tables</h1>
+<p class="lede">The textbook gives three ways to store subclasses: E/R style, object-oriented style and the null-value style. This chapter animates all three on the slides' Product hierarchy with real rows, compares them, and works the four hierarchy questions from past papers.</p>
+
+<h2>1. Three strategies</h2>
+<p>Take slide 73's hierarchy: Product(<u>pid</u>, name, price) with subclasses SoftwareProduct(platforms) and EducationalProduct(ageGroup), overlapping (KidPix is both). Four sample products: a chair (neither), Photoshop (software), an atlas (educational) and KidPix (both).</p>
+<dl class="def">
+<dt>E/R style ("a table per entity set")</dt><dd>One table for each entity set in the hierarchy. The root table has all root attributes; each subclass table has <em>only the key</em> plus the subclass's own attributes, and its key is a foreign key to the parent. An entity is spread over the tables of all classes it belongs to.</dd>
+<dt>Object-oriented style ("a table per kind of object")</dt><dd>One table for each <em>subtree that includes the root</em>, i.e. for each combination of classes an entity can belong to. The table has all attributes of all classes in the combination. Each entity is stored in exactly one table, complete.</dd>
+<dt>Null style ("one big table")</dt><dd>One table with every attribute of every class. An entity has NULL in the attributes of classes it does not belong to.</dd>
+</dl>
+<figure class="wide"><span class="anim-tag">Animation</span><div id="three"></div></figure>
+
+<h2>2. Comparing the strategies</h2>
+<div class="tbl"><table>
+<tr><th></th><th>E/R style</th><th>Object-oriented</th><th>Nulls</th></tr>
+<tr><td>Number of tables (root + k subclasses, overlapping)</td><td>k + 1</td><td>2<sup>k</sup> (every subset of subclasses, plus the root)</td><td>1</td></tr>
+<tr><td>Where is one entity?</td><td>in several tables</td><td>in exactly one table</td><td>in one row</td></tr>
+<tr><td>"All products cheaper than 1000"</td><td>one table (Product)</td><td>UNION over all tables</td><td>one table</td></tr>
+<tr><td>"Platforms and price of KidPix"</td><td>join Product with SoftwareProduct</td><td>one table (if we know which)</td><td>one table</td></tr>
+<tr><td>Wasted space</td><td>key repeated in each table</td><td>none</td><td>many NULLs</td></tr>
+<tr><td>Subclass relationships</td><td>reference the subclass table cleanly</td><td>may need to reference several tables</td><td>reference the single table; cannot restrict to the subclass</td></tr>
+<tr><td>Can tell an entity's classes?</td><td>yes (which tables hold its key)</td><td>yes (which table)</td><td>only by NULL patterns, unreliable; add type flags</td></tr>
+</table></div>
+<p>Rules of thumb: the E/R style is the default and the only one that keeps every subclass relationship clean; it avoids NULLs, which is what exam questions mean by "avoid keeping null values". The OO style suits <em>disjoint</em> hierarchies with few subclasses, where it needs only k tables (or k + 1 if the root may have plain members). The null style suits small hierarchies with few subclass attributes and many queries over the whole set; add a discriminator column (product_type) or boolean flags so the class of each row is explicit.</p>
+<p>Try the E/R style in Oracle SQL. Each question needs a different join:</p>
+<div id="play"></div>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+<div id="try2"></div>
+
+<h3>Exam questions</h3>
+<div class="exam">
+  <div class="exam-src">DB QB · 17-18 5b · 10 marks &nbsp;·&nbsp; BUET QBank · CSE 215 | L-2/T-2 | 2017–18 · 10 marks</div>
+  <div class="exam-q"><p>Convert the isa-hierarchies of the diagram in the following figure into schemas using three principal conversation strategies.</p><figure class="wide"><div id="q51"></div></figure></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>This is the textbook's movie hierarchy (Garcia-Molina et al. §4.6). Movies(<u>title</u>, <u>year</u>, length, genre); subclasses Cartoons (taking part in Voices with Stars) and MurderMysteries(weapon). Assume Stars has key name. Subclasses overlap (a cartoon murder mystery is possible), as ER assumes by default.</p>
+    <p><strong>1. E/R style</strong> (a table per entity set, subclass tables hold the key + own attributes):</p>
+    <div id="q51a"></div>
+    <p><strong>2. Object-oriented style</strong> (a table per subtree including the root: {Movies}, {Movies, Cartoons}, {Movies, MurderMysteries}, {Movies, Cartoons, MurderMysteries}):</p>
+    <div id="q51b"></div>
+    <p>Voices(title, year, starName) refers to a cartoon, which may live in MoviesC or MoviesCMM, so its foreign key cannot point at a single table; it is checked by the application (or a trigger).</p>
+    <p><strong>3. Null style</strong> (one table):</p>
+    <div id="q51c"></div>
+    <p>A non-murder-mystery has weapon NULL. Note that the null style cannot tell a cartoon that has no voices yet from an ordinary movie, so add a flag is_cartoon (and is_mystery) if that matters.</p>
+    <p><strong>Note:</strong> the question bank's object-oriented answer lists only Movies, Cartoons and MurderMysteries, which is the disjoint case. With overlapping subclasses (the ER default, and the textbook's answer) a fourth table for cartoon murder mysteries, MoviesCMM(title, year, length, genre, weapon), is required; otherwise such a movie has no place to be stored.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2012–13 · 15 marks</div>
+  <div class="exam-q"><p>Convert the following ER-diagram into relations. Create three separate lists for the three ISA-hierarchy conversion approaches.</p><figure class="wide"><div id="q25"></div></figure></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>Two-level hierarchy: Person(<u>ID</u>) → Employee(Post), Student(Dept); Employee → Salaried(Salary), Contracted(Lump); Student → OnCampus(Dorm), OffCampus(Address). <strong>Assumption:</strong> each isa is disjoint (a person is an employee or a student, an employee is salaried or contracted, a student lives on or off campus) and partial (a person may be in no subclass).</p>
+    <p><strong>List 1, E/R style</strong> (7 tables, one per entity set; each subclass table's ID references its parent):</p>
+    <div id="q25a"></div>
+    <p><strong>List 2, object-oriented style</strong> (one table per possible kind of entity, i.e. per subtree containing Person; with the disjointness assumption there are 7 kinds):</p>
+    <div id="q25b"></div>
+    <p>If Employee and Student could overlap (a working student), the OO style needs a table for every allowed combination: 4 choices on the Employee side (none, Employee, Employee+Salaried, Employee+Contracted) × 4 on the Student side = <strong>16 tables</strong>; if every isa were overlapping, 5 × 5 = <strong>25</strong>. (Counted by enumerating subtrees.)</p>
+    <p><strong>List 3, null style</strong> (1 table):</p>
+    <div id="q25c"></div>
+    <p>Optional discriminator columns (emp_kind, stud_kind) make each row's classes explicit. <strong>Note:</strong> the question bank's object-oriented list keeps only the four leaf tables. That is only correct if the specialization is total at every level; with partial specialization, Person-only, Employee-only and Student-only entities need the tables Person, Employee and Student as well.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 19-20 6a, 18 CT1 2 · 10 marks &nbsp;·&nbsp; BUET QBank · CSE 215 | L-2/T-2 | 2019–20 · 15 marks</div>
+  <div class="exam-q"><p>All employees in an organization are identified by employee id. All employees must have name, address, mobile and email. An employee must be one of the following: technical or non-technical. Technical employees have the trade and year of experience. Non-technical employees have the highest degree and year of experience. Each employee is managed by a manager who is also an employee. Draw the complete ERD for this scenario. Convert the ER diagram into two different possible relational schemas.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><strong>ERD.</strong> Employee(<u>emp_id</u>, name, address, mobile, email) with a <em>disjoint, total</em> specialization into Technical(trade, year_of_exp) and NonTechnical(highest_degree, year_of_exp) ("must be one of"). Recursive relationship manages with roles manager and subordinate: each employee has one manager (arrow on the manager line); a manager has many subordinates. (Assume the top manager's manager is NULL, so participation of the subordinate role is partial.)</p>
+    <figure class="wide"><div id="q46"></div></figure>
+    <p>year_of_exp appears in both subclasses. Since every employee is in one of them, it could be moved up to Employee; we keep it where the question puts it.</p>
+    <p><strong>Schema 1, E/R style:</strong></p>
+    <div id="q46a"></div>
+    <p><strong>Schema 2, object-oriented style.</strong> The specialization is total and disjoint, so every employee is exactly Technical or NonTechnical, and only two tables are needed, each holding all attributes:</p>
+    <div id="q46b"></div>
+    <p>Here manager_id may refer to a row of either table, so it cannot be a single foreign key; emp_id must also be kept unique across both tables (e.g. one shared sequence). A third option is the null style: Employee(<u>emp_id</u>, name, address, mobile, email, emp_type, trade, highest_degree, year_of_exp, <i>manager_id</i>) with CHECK constraints such as <code>emp_type = 'T' AND highest_degree IS NULL OR emp_type = 'N' AND trade IS NULL</code>.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 21-22 2b · 10 marks &nbsp;·&nbsp; BUET QBank · CSE 215 | L-2/T-2 | 2021–22 · 20 marks</div>
+  <div class="exam-q"><p>Consider the following descriptions of an organization having many EMPLOYEES. (i) An EMPLOYEE has a name, nid number, data of birth, and address. (ii) Based on the EMPLOYEE's Job, EMPLOYEE may be further grouped into: SECRETARY, ENGINEER, TECHNICIAN, and MANAGER. (iii) Based on the EMPLOYEE's method of pay, EMPLOYEE may also be grouped into: SALARIED_EMPLOYEE, and HOURLY_EMPLOYEE. (iv) A salaried employee who is also an engineer belongs to the two subclasses: ENGINEER, and SALARIED_EMPLOYEE. (v) A salaried employee who is also an engineering manager belongs to the three subclasses: MANAGER, ENGINEER, and SALARIED_EMPLOYEE. (vi) We want to record typing speed of each SECRETARY. (vii) Each technician has a technical grade (a number) which depends on his skill level. (viii) Each Engineer has a type (ME, CSE, EEE, etc ...). (ix) Each MANAGER manages at least one project, each project has a project id, title, and a project value. (x) Each HOURLY_EMPLOYEE is a member of some TRADE_UNION which has a name and member count. Construct an E/R diagram with the above description; clearly indicate the cardinality mappings as well as any role indicators in your E/R diagram. Convert the E/R diagram into a set of relational database schema. You should avoid keeping null values in attributes.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><strong>Reading the requirements.</strong> Two independent specializations of Employee:</p>
+    <ul>
+    <li><strong>By job:</strong> Secretary, Engineer, Technician, Manager. (v) shows an engineer can also be a manager, so this one is <em>overlapping</em>; "may be grouped" makes it <em>partial</em>.</li>
+    <li><strong>By pay:</strong> SalariedEmployee, HourlyEmployee: <em>disjoint</em> (one method of pay); assume <em>total</em> (everyone is paid somehow).</li>
+    </ul>
+    <p>(iv) and (v) show one employee can be in subclasses of both specializations at once. Relationships: <em>manages</em> Manager–Project, one-to-many (a project has one manager; assumed), with total participation of Manager ("manages at least one project") and of Project (every project has a manager, assumed). <em>memberOf</em> HourlyEmployee–TradeUnion, many-to-one, total on HourlyEmployee ("is a member of some trade union"). member_count of a union can be derived by counting members.</p>
+    <figure class="wide"><div id="q39"></div><figcaption>Notes: job isA overlapping, partial; pay isA disjoint, total. Cardinalities shown both as arrows and as 1/N labels; role names manager / managed project on manages.</figcaption></figure>
+    <p><strong>Schema with no NULLs: E/R style</strong> (each subclass gets its own table, so no row has a column that does not apply to it; foreign keys to the "one" side are NOT NULL because participation is total):</p>
+    <div id="q39rel"></div>
+    <p>Manager and SalariedEmployee have no attributes of their own but still need tables, so that "is a manager" / "is salaried" is recorded and Project can reference Manager. "Each manager manages at least one project" cannot be enforced by keys (it needs a trigger). member_count is derived (<code>SELECT COUNT(*) FROM Hourly_Employee WHERE union_name = …</code>) and is better computed by a view; store it only if required. The null style is rejected because it would leave typing_speed, tech_grade, eng_type and union_name NULL for most employees.</p>
+  </div></details>
+</div>
+
+<div class="key">
+<p><strong>Summary:</strong> E/R style: one table per entity set, subclass tables hold the key and their own attributes (no NULLs, joins needed). Object-oriented style: one table per combination of classes an entity can have, each complete (no joins for one entity, UNIONs for the whole set; 2<sup>k</sup> tables if k subclasses overlap). Null style: one table, NULLs where a class does not apply. Overlap and totality decide how many OO tables you need.</p>
+</div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/sqlplay.js"></script>
+<script src="lecture.js"></script>
+<script>
+const P = { chair: ['P1', 'Chair', 1500], ps: ['P2', 'Photoshop', 2000], atlas: ['P3', 'Atlas', 800], kid: ['P4', 'KidPix', 600] };
+const dt = (name, head, rows, cls = '') => `<div class="rs-t ${cls}"><div class="rs-n">${name}</div><table class="rec"><tr>${head.map((h, i) => `<th${i === 0 ? ' style="text-decoration:underline"' : ''}>${h}</th>`).join('')}</tr>${rows.map(r => `<tr${r.hl ? ' class="hl"' : ''}>${r.map(c => `<td>${c === null ? '<span style="color:var(--muted)">NULL</span>' : c}</td>`).join('')}</tr>`).join('') || `<tr class="empty"><td colspan="${head.length}">(empty)</td></tr>`}</table></div>`;
+const hl = r => Object.assign([...r], { hl: true });
+const ER_ = { n: [['Product', 'E', 0, 0], ['isA', 'D', 0, 90, 'isA'], ['Software', 'E', -150, 170, 'Software\nProduct'], ['Educational', 'E', 150, 170, 'Educational\nProduct']],
+  a: [['Product', '_pid', -110, -30], ['Product', 'name', 0, -60], ['Product', 'price', 110, -30], ['Software', 'platforms', -40, 65], ['Educational', 'ageGroup', 40, 65]],
+  l: [['Product', 'isA'], ['Software', 'isA'], ['Educational', 'isA']] };
+const row = h => `<div class="rs" style="margin-top:12px">${h}</div>`;
+stepper('#three', [
+  { html: erd(ER_, { scale: 0.85 }) + '<p style="text-align:center;font-size:.9rem">Chair: neither · Photoshop: software (Win, Mac) · Atlas: educational (10+) · KidPix: both (Win; 4–9)</p>', cap: 'The hierarchy and the four products to store.' },
+  { html: row(dt('Product', ['pid', 'name', 'price'], [P.chair, P.ps, P.atlas, hl(P.kid)]) + dt('SoftwareProduct', ['pid', 'platforms'], [['P2', 'Win, Mac'], hl(['P4', 'Win'])]) + dt('EducationalProduct', ['pid', 'ageGroup'], [['P3', '10+'], hl(['P4', '4–9'])])),
+    cap: '<b>E/R style:</b> three tables. Every product is in Product; subclass tables hold only pid and their own attribute. KidPix (highlighted) is spread over all three tables.' },
+  { html: row(dt('Product', ['pid', 'name', 'price'], [P.chair]) + dt('ProductS', ['pid', 'name', 'price', 'platforms'], [[...P.ps, 'Win, Mac']]) + dt('ProductE', ['pid', 'name', 'price', 'ageGroup'], [[...P.atlas, '10+']]) + dt('ProductSE', ['pid', 'name', 'price', 'platforms', 'ageGroup'], [hl([...P.kid, 'Win', '4–9'])])),
+    cap: '<b>Object-oriented style:</b> one table per combination of classes: {Product}, {+Software}, {+Educational}, {+both} = 2<sup>2</sup> = 4 tables. Each product is stored once, complete. KidPix needs the "both" table.' },
+  { html: row(dt('Product', ['pid', 'name', 'price', 'platforms', 'ageGroup'], [[...P.chair, null, null], [...P.ps, 'Win, Mac', null], [...P.atlas, null, '10+'], hl([...P.kid, 'Win', '4–9'])])),
+    cap: '<b>Null style:</b> one table with every attribute. Products lacking a subclass get NULL there. Simple, but the NULLs waste space and do not say <em>why</em> a value is missing.' },
+]);
+sqlPlay('#play', { setup: `CREATE TABLE Product (pid VARCHAR2(4) PRIMARY KEY, name VARCHAR2(20), price NUMBER(8));
+CREATE TABLE SoftwareProduct (pid VARCHAR2(4) PRIMARY KEY REFERENCES Product(pid), platforms VARCHAR2(20));
+CREATE TABLE EducationalProduct (pid VARCHAR2(4) PRIMARY KEY REFERENCES Product(pid), ageGroup VARCHAR2(10));
+INSERT INTO Product VALUES ('P1', 'Chair', 1500);
+INSERT INTO Product VALUES ('P2', 'Photoshop', 2000);
+INSERT INTO Product VALUES ('P3', 'Atlas', 800);
+INSERT INTO Product VALUES ('P4', 'KidPix', 600);
+INSERT INTO SoftwareProduct VALUES ('P2', 'Win, Mac');
+INSERT INTO SoftwareProduct VALUES ('P4', 'Win');
+INSERT INTO EducationalProduct VALUES ('P3', '10+');
+INSERT INTO EducationalProduct VALUES ('P4', '4-9');`, query: `-- everything about the products that are both software and educational
+SELECT p.pid, p.name, p.price, s.platforms, e.ageGroup
+FROM Product p
+JOIN SoftwareProduct s    ON s.pid = p.pid
+JOIN EducationalProduct e ON e.pid = p.pid;
+
+-- try: products in no subclass
+-- SELECT * FROM Product WHERE pid NOT IN (SELECT pid FROM SoftwareProduct)
+--                         AND pid NOT IN (SELECT pid FROM EducationalProduct);`, note: 'E/R style tables from the animation.' });
+// Q51
+$('#q51').innerHTML = erd({ n: [['Movies', 'E', 0, 0], ['isa1', 'T', -120, 90], ['isa2', 'T', 120, 90], ['Cartoons', 'E', -120, 180], ['MM', 'E', 120, 180, 'MurderMysteries'], ['Voices', 'R', -330, 180], ['Stars', 'E', -330, 60, 'To Stars']],
+  a: [['Movies', 'length', -110, -50], ['Movies', '_title', -35, -65], ['Movies', '_year', 45, -65], ['Movies', 'genre', 120, -50], ['MM', 'weapon', 60, 60]],
+  l: [['Movies', 'isa1'], ['Cartoons', 'isa1'], ['Movies', 'isa2'], ['MM', 'isa2'], ['Cartoons', 'Voices'], ['Stars', 'Voices']] });
+relInto('#q51a', [{ n: 'Movies', c: ['*title', '*year', 'length', 'genre'] }, { n: 'Cartoons', c: ['*title>Movies', '*year>Movies'] }, { n: 'MurderMysteries', c: ['*title>Movies', '*year>Movies', 'weapon'] }, { n: 'Voices', c: ['*title>Cartoons', '*year>Cartoons', '*starName>Stars(name)'] }]);
+relInto('#q51b', [{ n: 'Movies', c: ['*title', '*year', 'length', 'genre'] }, { n: 'MoviesC', c: ['*title', '*year', 'length', 'genre'] }, { n: 'MoviesMM', c: ['*title', '*year', 'length', 'genre', 'weapon'] }, { n: 'MoviesCMM', c: ['*title', '*year', 'length', 'genre', 'weapon'], cls: 'new' }, { n: 'Voices', c: ['*title', '*year', '*starName>Stars(name)'] }]);
+relInto('#q51c', [{ n: 'Movie', c: ['*title', '*year', 'length', 'genre', 'weapon'] }, { n: 'Voices', c: ['*title>Movie', '*year>Movie', '*starName>Stars(name)'] }]);
+// Q25
+$('#q25').innerHTML = erd({ n: [['Person', 'E', 0, 0], ['i0', 'T', 0, 80], ['Employee', 'E', -190, 160], ['Student', 'E', 190, 160], ['i1', 'T', -190, 240], ['i2', 'T', 190, 240],
+  ['Salaried', 'E', -290, 320], ['Contracted', 'E', -90, 320], ['OnCampus', 'E', 90, 320], ['OffCampus', 'E', 290, 320]],
+  a: [['Person', '_ID', 110, 0], ['Employee', 'Post', -130, 0], ['Student', 'Dept', 120, 0], ['Salaried', 'Salary', 0, 55], ['Contracted', 'Lump', 0, 55], ['OnCampus', 'Dorm', 0, 55], ['OffCampus', 'Address', 0, 55]],
+  l: [['Person', 'i0'], ['Employee', 'i0'], ['Student', 'i0'], ['Employee', 'i1'], ['Salaried', 'i1'], ['Contracted', 'i1'], ['Student', 'i2'], ['OnCampus', 'i2'], ['OffCampus', 'i2']] });
+relInto('#q25a', [{ n: 'Person', c: ['*ID'] }, { n: 'Employee', c: ['*ID>Person', 'Post'] }, { n: 'Student', c: ['*ID>Person', 'Dept'] }, { n: 'Salaried', c: ['*ID>Employee', 'Salary'] }, { n: 'Contracted', c: ['*ID>Employee', 'Lump'] }, { n: 'OnCampus', c: ['*ID>Student', 'Dorm'] }, { n: 'OffCampus', c: ['*ID>Student', 'Address'] }]);
+relInto('#q25b', [{ n: 'Person', c: ['*ID'] }, { n: 'Person_Emp', c: ['*ID', 'Post'] }, { n: 'Person_Emp_Sal', c: ['*ID', 'Post', 'Salary'] }, { n: 'Person_Emp_Con', c: ['*ID', 'Post', 'Lump'] }, { n: 'Person_Stu', c: ['*ID', 'Dept'] }, { n: 'Person_Stu_On', c: ['*ID', 'Dept', 'Dorm'] }, { n: 'Person_Stu_Off', c: ['*ID', 'Dept', 'Address'] }]);
+relInto('#q25c', [{ n: 'Person', c: ['*ID', 'Post', 'Dept', 'Salary', 'Lump', 'Dorm', 'Address'] }]);
+// Q46
+$('#q46').innerHTML = erd({ n: [['Employee', 'E', 0, 0], ['manages', 'R', 330, 0], ['isA', 'D', 0, 110, 'isA'], ['Technical', 'E', -150, 200], ['NonTechnical', 'E', 150, 200, 'Non-Technical']],
+  a: [['Employee', '_emp_id', -150, -45], ['Employee', 'name', -75, -80], ['Employee', 'address', 25, -85], ['Employee', 'mobile', -165, 10], ['Employee', 'email', -135, 60],
+      ['Technical', 'trade', -60, 60], ['Technical', 'year_of_exp', 70, 60], ['NonTechnical', 'highest_degree', -60, 60], ['NonTechnical', 'year_of_exp', 90, 60]],
+  l: [['Employee', 'manages', { bend: -70, role: 'manager', one: true }], ['Employee', 'manages', { bend: 70, role: 'subordinate' }], ['Employee', 'isA', { total: true }], ['Technical', 'isA'], ['NonTechnical', 'isA']],
+  t: [[110, 112, 'disjoint, total', 'acc']] });
+relInto('#q46a', [{ n: 'Employee', c: ['*emp_id', 'name!', 'address!', 'mobile!', 'email!', 'manager_id>Employee(emp_id)'] }, { n: 'Technical', c: ['*emp_id>Employee', 'trade', 'year_of_exp'] }, { n: 'NonTechnical', c: ['*emp_id>Employee', 'highest_degree', 'year_of_exp'] }]);
+relInto('#q46b', [{ n: 'Technical', c: ['*emp_id', 'name', 'address', 'mobile', 'email', 'trade', 'year_of_exp', 'manager_id'] }, { n: 'NonTechnical', c: ['*emp_id', 'name', 'address', 'mobile', 'email', 'highest_degree', 'year_of_exp', 'manager_id'] }]);
+// Q39
+$('#q39').innerHTML = erd({ n: [['Employee', 'E', 0, 0], ['job', 'D', -230, 110, 'isA'], ['pay', 'D', 260, 110, 'isA'],
+  ['Secretary', 'E', -460, 220], ['Engineer', 'E', -300, 220], ['Technician', 'E', -150, 220], ['Manager', 'E', 10, 220],
+  ['Salaried', 'E', 190, 220, 'Salaried\nEmployee'], ['Hourly', 'E', 360, 220, 'Hourly\nEmployee'],
+  ['manages', 'R', 10, 340], ['Project', 'E', 10, 460], ['memberOf', 'R', 360, 340, 'member\nOf'], ['Union', 'E', 360, 460, 'TradeUnion']],
+  a: [['Employee', '_nid', -120, -35], ['Employee', 'name', -40, -65], ['Employee', 'dob', 45, -65], ['Employee', 'address', 125, -35],
+      ['Secretary', 'typing_speed', 0, 60], ['Engineer', 'eng_type', -20, 60], ['Technician', 'tech_grade', 0, 60],
+      ['Project', '_proj_id', -120, 0], ['Project', 'title', -70, 50], ['Project', 'proj_value', 60, 50], ['Union', '_name', -60, 50], ['Union', '/member_count', 80, 50]],
+  l: [['Employee', 'job'], ['Secretary', 'job'], ['Engineer', 'job'], ['Technician', 'job'], ['Manager', 'job'], ['Employee', 'pay', { total: true }], ['Salaried', 'pay'], ['Hourly', 'pay'],
+      ['Manager', 'manages', { one: true, total: true, card: '1', role: 'manager', roleSide: -1 }], ['Project', 'manages', { total: true, card: 'N', role: 'managed project', roleSide: -1 }],
+      ['Hourly', 'memberOf', { total: true, card: 'N' }], ['Union', 'memberOf', { one: true, card: '1' }]],
+  t: [[-330, 110, 'overlapping,\npartial', 'acc'], [370, 105, 'disjoint,\ntotal', 'acc']] });
+relInto('#q39rel', [{ n: 'Employee', c: ['*nid', 'name', 'dob', 'address'] }, { n: 'Secretary', c: ['*nid>Employee', 'typing_speed'] }, { n: 'Engineer', c: ['*nid>Employee', 'eng_type'] }, { n: 'Technician', c: ['*nid>Employee', 'tech_grade'] }, { n: 'Manager', c: ['*nid>Employee'] },
+  { n: 'Salaried_Employee', c: ['*nid>Employee'] }, { n: 'Trade_Union', c: ['*name', 'member_count'] }, { n: 'Hourly_Employee', c: ['*nid>Employee', 'union_name!>Trade_Union(name)'] }, { n: 'Project', c: ['*proj_id', 'title', 'proj_value', 'manager_nid!>Manager(nid)'] }]);
+flashcards('#cards', [
+  { f: 'E/R style', b: 'One table per entity set; subclass tables = key + own attributes; key is FK to parent.' },
+  { f: 'Object-oriented style', b: 'One table per subtree containing the root (per combination of classes); each entity stored once, complete.' },
+  { f: 'Null style', b: 'One table with every attribute; NULL where a class does not apply.' },
+  { f: 'OO table count, k overlapping subclasses of the root', b: '2^k.' },
+  { f: '"Avoid null values"', b: 'Use the E/R style.' },
+]);
+quiz('#quiz', [
+  { q: 'Which strategy answers "names of all products under 1000" with one table and no UNION?', opts: ['E/R and null', 'OO only', 'E/R only', 'none'], a: 0, why: 'E/R: Product holds every product. Null: one table. OO needs a UNION.' },
+  { q: 'Root with 3 overlapping subclasses. Tables in OO style?', opts: ['3', '4', '8', '1'], a: 2, why: '2^3 = 8 subsets of subclasses.' },
+  { q: 'Root with 3 disjoint subclasses, partial. Tables in OO style?', opts: ['3', '4', '8', '1'], a: 1, why: 'Root-only plus one per subclass.' },
+  { q: 'Which strategy stores an entity in several tables?', opts: ['E/R', 'OO', 'Null', 'All'], a: 0, why: 'Its key appears in the root and each of its subclasses.' },
+  { q: 'Which creates the most NULLs?', opts: ['E/R', 'OO', 'Null', 'none'], a: 2, why: 'By design.' },
+]);
+ask('#try1', { q: 'Hierarchy: Vehicle with subclasses Car, Truck, Bus (disjoint, total). How many tables in the E/R style?', a: 4, hint: 'One per entity set.', why: 'Vehicle, Car, Truck, Bus.' });
+ask('#try2', { q: 'Same hierarchy (disjoint, total). How many tables in the OO style?', a: 3, hint: 'Total: no vehicle is only a Vehicle.', why: 'Car, Truck, Bus, each with all Vehicle attributes.' });
+</script>
+</body>
+</html>

@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>IN and NOT IN · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="../i03/lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 04 (Ishrak) · Chapter 7 · Slides 44–45</div>
+<h1>Membership Tests: IN and NOT IN</h1>
+<p class="lede">IN tests whether a value belongs to a list; NOT IN tests that it does not. Each is shorthand for a chain of = joined by OR, or &lt;&gt; joined by AND, as slides 44–45 show side by side. The chapter ends with the one trap of NOT IN: a NULL in the list.</p>
+
+<h2>1. IN (slide 44)</h2>
+<dl class="def">
+  <dt>x IN (v1, v2, …, vn)</dt>
+  <dd>TRUE when x equals at least one of the listed values. It means exactly <code>x = v1 OR x = v2 OR … OR x = vn</code>. The values can be numbers, strings or dates. (In Lecture 11 the list can also be a subquery, as in Lecture 5's DELETE examples.)</dd>
+</dl>
+<p>The slides use a small table of CDs:</p>
+<div id="cd"></div>
+<p><em>Find all albums launched in 1984 or 1996.</em> The two queries below are equivalent:</p>
+<div class="figrow">
+<pre>SELECT album
+FROM   CDCollection
+WHERE  year IN (1984, 1996);</pre>
+<pre>SELECT album
+FROM   CDCollection
+WHERE  year = 1984
+OR     year = 1996;</pre>
+</div>
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="a1"></div>
+</figure>
+<p>IN is shorter, easier to read and easier to extend: adding 1991 means adding one value to the list instead of one more <code>OR year = 1991</code>.</p>
+
+<h2>2. NOT IN (slide 45)</h2>
+<dl class="def">
+  <dt>x NOT IN (v1, …, vn)</dt>
+  <dd>TRUE when x differs from every listed value: <code>x &lt;&gt; v1 AND x &lt;&gt; v2 AND … AND x &lt;&gt; vn</code>. It is the same as <code>NOT (x IN (v1, …, vn))</code>.</dd>
+</dl>
+<div class="figrow">
+<pre>SELECT *
+FROM   CDCollection
+WHERE  year NOT IN (1984, 1996);</pre>
+<pre>SELECT *
+FROM   CDCollection
+WHERE  year &lt;&gt; 1984
+AND    year &lt;&gt; 1996;</pre>
+</div>
+<p>Both return Rattle and Hum (1988) and Achtung Boys (1991). Notice the switch from OR to AND: by De Morgan's law, NOT (A OR B) = (NOT A) AND (NOT B). Writing <code>year &lt;&gt; 1984 OR year &lt;&gt; 1996</code> is a common mistake: every year differs from at least one of the two, so it returns every row.</p>
+<div id="p1"></div>
+
+<h2>3. The NULL trap in NOT IN</h2>
+<p>Expand <code>year NOT IN (1984, NULL)</code> with the rule above: <code>year &lt;&gt; 1984 AND year &lt;&gt; NULL</code>. Any comparison with NULL is UNKNOWN (<a href="08-null-and-three-valued-logic.html">Chapter 8</a>), so the second half is never TRUE, and the whole condition is never TRUE: <strong>a NOT IN list that contains a NULL returns no rows at all.</strong> IN does not have this problem: <code>year IN (1984, NULL)</code> still finds 1984, because <code>TRUE OR UNKNOWN</code> is TRUE.</p>
+<p>The same happens when the tested value itself is NULL: an employee whose <code>department_id</code> is NULL satisfies neither <code>department_id IN (50, 60)</code> nor <code>department_id NOT IN (50, 60)</code>. You will meet this again with subqueries (<code>NOT IN (SELECT …)</code>), where a single NULL returned by the subquery empties the answer.</p>
+<div id="p2"></div>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+<h3>SQL exercises</h3>
+<div id="c1"></div><div id="c2"></div><div id="c3"></div><div id="c4"></div><div id="c5"></div>
+
+<div class="key"><p><strong>Summary:</strong> <code>x IN (v1, …, vn)</code> = <code>x = v1 OR … OR x = vn</code>; <code>x NOT IN (…)</code> = <code>x &lt;&gt; v1 AND … AND x &lt;&gt; vn</code> (OR becomes AND, by De Morgan). A NULL in a NOT IN list makes the condition never TRUE, and a NULL x satisfies neither IN nor NOT IN.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/sqlplay.js"></script>
+<script src="../i03/lecture.js"></script>
+<script>
+const CDH = ['artist', 'album', 'tracks', 'company', 'year'];
+const CDR = [['U2', 'The Unforgettable', 10, 'Island', 1984], ['U2', 'Rattle and Hum', 17, 'Island', 1988], ['U2', 'Achtung Boys', 12, 'Island', 1991], ['Underworld', 'Second Toughest', 8, 'Junior', 1996]];
+document.querySelector('#cd').innerHTML = `<figure>${T(CDH, CDR, { name: 'CDCollection' })}<figcaption>The slides' CDCollection table. (The slide's "Achtung Boys" is U2's <i>Achtung Baby</i>; the slide's spelling is kept.)</figcaption></figure>`;
+selectAnim('#a1', { name: 'CDCollection', head: CDH, rows: CDR, perRow: true, cols: [1],
+  where: { test: r => [1984, 1996].includes(r[4]), why: r => `${r[4]} = 1984 OR ${r[4]} = 1996` },
+  sql: [['select', 'SELECT album'], ['from', 'FROM   CDCollection'], ['where', 'WHERE  year IN (1984, 1996);']] });
+sqlPlay('#p1', { setup: GIZ, query: 'SELECT *\nFROM   CDCollection\nWHERE  year NOT IN (1984, 1996);', note: 'Then try the wrong version <code>WHERE year &lt;&gt; 1984 OR year &lt;&gt; 1996</code>: all four rows.' });
+sqlPlay('#p2', { setup: GIZ, query: 'SELECT *\nFROM   CDCollection\nWHERE  year NOT IN (1984, NULL);', note: 'No rows. Change NOT IN to IN: the 1984 album is found.' });
+flashcards('#cards', [
+  { f: 'x IN (a, b)', b: 'x = a OR x = b' },
+  { f: 'x NOT IN (a, b)', b: 'x <> a AND x <> b' },
+  { f: 'De Morgan', b: 'NOT (A OR B) = NOT A AND NOT B' },
+  { f: 'NOT IN with a NULL in the list', b: 'Never TRUE: returns no rows.' },
+  { f: 'x is NULL', b: 'Neither x IN (…) nor x NOT IN (…) is TRUE.' },
+]);
+quiz('#quiz', [
+  { q: 'Which is equivalent to <code>year IN (1988, 1991)</code>?', opts: ['year = 1988 AND year = 1991', 'year = 1988 OR year = 1991', 'year BETWEEN 1988 AND 1991', 'year <> 1988 OR year <> 1991'], a: 1, why: 'BETWEEN would also include 1989 and 1990.' },
+  { q: 'Which is equivalent to <code>year NOT IN (1984, 1996)</code>?', opts: ['year <> 1984 OR year <> 1996', 'year <> 1984 AND year <> 1996', 'NOT year = 1984 OR 1996', 'year NOT BETWEEN 1984 AND 1996'], a: 1, why: 'De Morgan turns OR into AND.' },
+  { q: '<code>WHERE year &lt;&gt; 1984 OR year &lt;&gt; 1996</code> returns how many of the 4 CDs?', opts: ['0', '2', '3', '4'], a: 3, why: 'No year equals both 1984 and 1996, so every row passes one of the tests.' },
+  { q: '<code>WHERE year NOT IN (1988, NULL)</code> returns…', opts: ['3 rows', '4 rows', '1 row', 'no rows'], a: 3, why: 'year <> NULL is UNKNOWN for every row, so the AND is never TRUE.' },
+  { q: 'Kimberely Grant has department_id NULL. Is she returned by <code>WHERE department_id NOT IN (50, 60)</code>?', opts: ['Yes', 'No', 'Only in Oracle', 'Error'], a: 1, why: 'NULL <> 50 is UNKNOWN.' },
+]);
+ask('#try1', { q: 'How many Employees rows satisfy <code>department_id NOT IN (50, 60, 90)</code>? (There are 17 employees: 4 in dept 50, 3 in 60, 3 in 90, 1 with NULL.)', a: 6, hint: '17 − 4 − 3 − 3 = 7, but one of those 7 has a NULL department.', why: 'Grant (NULL) is not returned, leaving Zlotkey, Abel, Taylor (80), Whalen (10), Hartstein, Fay (20): 6.' });
+chk('#c1', GIZ, '<b>Easy (slide 44).</b> Find the albums launched in 1984 or 1996, using IN.', 'SELECT album FROM CDCollection WHERE year IN (1984, 1996);');
+chk('#c2', GIZ, '<b>Slide 45.</b> Show all information about the CDs <em>not</em> launched in 1984 or 1996.', 'SELECT * FROM CDCollection WHERE year NOT IN (1984, 1996);');
+chk('#c3', PCS, '<b>IN with strings.</b> Show, each once, the makers that make laptops or printers.', "SELECT DISTINCT maker FROM Product WHERE type IN ('laptop', 'printer');");
+chk('#c4', HR, '<b>IN with ORDER BY.</b> Show <code>last_name</code> and <code>job_id</code> of all programmers and stock clerks (job IDs <code>IT_PROG</code>, <code>ST_CLERK</code>), sorted by job, then last name.', "SELECT last_name, job_id FROM Employees\nWHERE job_id IN ('IT_PROG', 'ST_CLERK')\nORDER BY job_id, last_name;", { ordered: true });
+chk('#c5', HR, '<b>Exam style.</b> Show <code>last_name</code> and <code>department_id</code> of every employee who is not in department 50, 60 or 90, <em>including</em> employees who have no department.', 'SELECT last_name, department_id FROM Employees\nWHERE department_id NOT IN (50, 60, 90)\n   OR department_id IS NULL;', { hint: 'NOT IN alone silently drops the NULL department. Add OR department_id IS NULL.' });
+</script>
+</body>
+</html>

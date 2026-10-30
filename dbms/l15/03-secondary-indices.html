@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Secondary Indices · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 15 · Chapter 3 · Slides 13–15</div>
+<h1>Secondary Indices</h1>
+<p class="lede">A file can be sorted in only one order, but you often want to search by other attributes too. A secondary index makes that possible. This chapter shows how it is built (with buckets), answers the slide 13 question, and animates why it slows down updates and range scans.</p>
+
+<h2>1. What a secondary index is (slide 13)</h2>
+
+<p>The instructor file is sorted on ID, so the index on ID is its primary (clustering) index. But users also search by salary or by department. An index on one of those attributes is a <b class="term">secondary index</b>: <em>an index whose search key specifies an order different from the sequential order of the file</em>. It is also called a <b class="term">non-clustering index</b>, because records with nearby salaries are <em>not</em> stored near each other. They are scattered across the file.</p>
+
+<p>That scattering has two consequences:</p>
+<ol>
+  <li><strong>A secondary index must be dense.</strong> A sparse index relies on scanning forward through sorted records, and here the file is not sorted by salary, so every salary value needs its own entry.</li>
+  <li><strong>One value can match many scattered records.</strong> Two instructors earn 80000 (Singh and Kim), and they are far apart in the file. So the index entry does not point at a record. It points to a <b class="term">bucket</b>: a small list that holds pointers to <em>all</em> the records with that value.</li>
+</ol>
+
+<figure>
+<div id="salary"></div>
+<figcaption><b>Figure 1.</b> Secondary index on salary (slide 13). Each salary value has one entry, which points to a bucket (the small box). The bucket holds a pointer to every record with that salary. The arrows cross all over the file because the file is sorted on ID, not salary.</figcaption>
+</figure>
+
+<div class="q">
+<h4>Question (worked answer)</h4>
+<p><em>The primary index is on id. (a) How many secondary indices can be created for this relation? (b) Construct a secondary index on dept-name, showing only id and dept-name.</em></p>
+
+<p><strong>(a)</strong> A secondary index can be created on any attribute other than the one the file is sorted on. The relation has four attributes, and id is taken by the primary index, so there can be <strong>3 single-attribute secondary indices</strong>: on name, on dept-name and on salary. (If composite search keys are counted, as in Chapter 6, more are possible: any combination of attributes, such as (dept-name, salary), can also be a secondary index.) A file can have only <em>one</em> primary index, because it can be physically sorted in only one order, but it can have as many secondary indices as you like.</p>
+
+<p><strong>(b)</strong> List the distinct dept-name values in sorted order. Each gets one entry pointing to a bucket, and each bucket holds pointers to every instructor in that department:</p>
+<figure>
+<div id="dept"></div>
+<figcaption><b>Figure 2.</b> Secondary index on dept-name. 7 entries and 7 buckets. Comp. Sci.'s bucket has three pointers (10101, 45565, 83821).</figcaption>
+</figure>
+<div class="tbl"><table>
+<tr><th>Index entry</th><th>Bucket contents (pointers to records with id…)</th></tr>
+<tr><td>Biology</td><td class="num">76766</td></tr>
+<tr><td>Comp. Sci.</td><td class="num">10101, 45565, 83821</td></tr>
+<tr><td>Elec. Eng.</td><td class="num">98345</td></tr>
+<tr><td>Finance</td><td class="num">12121, 76543</td></tr>
+<tr><td>History</td><td class="num">32343, 58583</td></tr>
+<tr><td>Music</td><td class="num">15151</td></tr>
+<tr><td>Physics</td><td class="num">22222, 33456</td></tr>
+</table></div>
+</div>
+
+<h2>2. Indices cost something on every change (slide 14)</h2>
+
+<p>Indices make searching much faster, but the slide warns that they impose overhead on every modification of the database. The index is a <em>copy</em> of information in the file (keys and locations), and every copy has to be kept correct.</p>
+
+<h3>Insert or delete: every index on the relation must be updated. Explain?</h3>
+<p>Example: <code>INSERT INTO instructor VALUES (22225, 'David', 'History', 70000)</code>. Suppose the relation has a primary index on id, a secondary index on salary and a secondary index on dept-name. Step through what has to change:</p>
+
+<figure>
+<span class="anim-tag">Animation</span>
+<div id="insert"></div>
+</figure>
+
+<p>One <code>INSERT</code> turned into four writes: the record, plus one change in each of the three indices. If David's row had not been added to, say, the salary index, then <code>WHERE salary = 70000</code> would use the index and wrongly find nobody. A delete is the same in reverse: the record's entry or bucket pointer must be removed from every index.</p>
+
+<h3>Update: indices on the changed attribute must be updated. Explain?</h3>
+<p>Example: <code>UPDATE instructor SET salary = 50000 WHERE id = 15151</code> (Mozart, currently 40000).</p>
+<figure>
+<span class="anim-tag">Animation</span>
+<div id="update"></div>
+</figure>
+<p>Only indices whose search key includes the <em>changed</em> attribute are affected. The id index and the dept-name index do not mention salary, so they stay as they are. The salary index must move Mozart from the 40000 entry to a 50000 entry. 40000's bucket becomes empty, so that entry is removed, and 50000 is a new value, so a new entry and bucket are created.</p>
+
+<h2>3. Range scans through a secondary index are expensive (slide 15)</h2>
+
+<p><em>Sequential scan using a clustering index is efficient, but a sequential scan using a secondary index is expensive on magnetic disk. Explain?</em> Query: <code>SELECT * FROM instructor WHERE salary &lt;= 90000</code>.</p>
+
+<p>Using the salary index, the database walks the salary entries in order (40000, 60000, 62000, …) and fetches each record. But consecutive salaries belong to records in completely different places in the file. In the animation, the file has 3 records per block, and the memory holds one block at a time:</p>
+
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="range"></div>
+</figure>
+
+<p>10 matching records cost <strong>9 block fetches</strong>, because almost every record is in a different block from the previous one. The slide's numbers: each fetch from a magnetic disk takes about 5 to 10 milliseconds, mostly seek and rotation. So this query spends 45 to 90 ms on I/O. A plain scan of the whole file, in its stored order, reads each of its 4 blocks exactly once (about 4 fetches, and they are consecutive, so mostly without seeks) and simply skips the rows with salary &gt; 90000.</p>
+
+<p>That is the general lesson: <strong>through a clustering index, a range of keys is a run of neighbouring blocks. Through a secondary index, each record can be a separate random block read.</strong> When a range matches a large part of the table, the database is often better off ignoring the secondary index and scanning the file.</p>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+<div id="try2"></div>
+
+<h3>Exam questions</h3>
+<div class="exam">
+  <div class="exam-src">DB QB · 20-21 3c · 10 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-2 | 2020–21 · 10 marks</div>
+  <div class="exam-q"><p>Compare primary index with secondary index showing representative index structures.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>A <strong>primary (clustering) index</strong> is an index on the attribute the file is physically sorted on. A <strong>secondary (non-clustering) index</strong> is an index on any other attribute, so the file order and the index order differ.</p>
+    <figure><div class="figrow"><div><div class="figlabel">Primary index on id (sparse, one entry per block)</div><div id="cmpP"></div></div><div><div class="figlabel">Secondary index on salary (dense, with buckets)</div><div id="cmpS"></div></div></div>
+    <figcaption>Left: the primary index arrows run parallel, because file order = key order. Right: the secondary index arrows cross the whole file.</figcaption></figure>
+    <div class="tbl"><table>
+      <tr><th></th><th>Primary index</th><th>Secondary index</th></tr>
+      <tr><td>Search key</td><td>The attribute the file is sorted on (usually, not necessarily, the primary key)</td><td>Any other attribute</td></tr>
+      <tr><td>How many per file</td><td>At most one (a file has one physical order)</td><td>Any number</td></tr>
+      <tr><td>Dense or sparse</td><td>Either; usually sparse with one entry per block</td><td>Must be dense</td></tr>
+      <tr><td>Duplicate key values</td><td>Entry points to the first record; the others follow it in the file</td><td>Entry points to a bucket of pointers, one per matching record</td></tr>
+      <tr><td>Point query cost</td><td>Index search + 1 block</td><td>Index search + 1 block per matching record (they are scattered)</td></tr>
+      <tr><td>Range query cost</td><td>Cheap: matching records are in consecutive blocks</td><td>Expensive: possibly one random block read per record (Section 3)</td></tr>
+      <tr><td>Space</td><td>Small</td><td>Larger (an entry for every value, plus buckets)</td></tr>
+      <tr><td>Update overhead</td><td>Inserts must keep the file sorted (free space, overflow or block splits)</td><td>Every insert/delete adds/removes a bucket pointer</td></tr>
+    </table></div>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 19-20 2a · 15 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-2 | 2019–20 · 15 marks</div>
+  <div class="exam-q"><p>A relation schema R(A, B, C) and a relation r(R) is given. The relation is physically sorted on the primary key A. Construct an ordered secondary index of r on attribute B considering the buckets containing maximum 3 pointers. Explain the cases if you need to insert the tuple t = ⟨a8, b2, c2⟩.</p>
+  <div class="tbl"><table><tr><th>A</th><th>B</th><th>C</th></tr><tr><td>a1</td><td>b1</td><td>c1</td></tr><tr><td>a2</td><td>b2</td><td>c1</td></tr><tr><td>a3</td><td>b3</td><td>c1</td></tr><tr><td>a4</td><td>b1</td><td>c1</td></tr><tr><td>a5</td><td>b2</td><td>c1</td></tr><tr><td>a7</td><td>b2</td><td>c1</td></tr><tr><td>a8</td><td>b3</td><td>c1</td></tr></table></div></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><strong>Construction.</strong> List the distinct B values in sorted order: b1, b2, b3. Each gets one index entry pointing to a bucket of at most 3 record pointers:</p>
+    <ul><li>b1 → {a1, a4}</li><li>b2 → {a2, a5, a7} (the bucket is now <strong>full</strong>)</li><li>b3 → {a3, a8}</li></ul>
+    <figure><svg id="bkt1"></svg><figcaption>Ordered secondary index on B. Each bucket has 3 pointer slots; empty slots are white.</figcaption></figure>
+    <p><strong>Inserting ⟨a8, b2, c2⟩.</strong> First the record must go into the file, and A is the primary key.</p>
+    <p><em>Case 1: the key a8 already exists.</em> r already contains ⟨a8, b3, c1⟩, so the insert violates the primary-key constraint and is <strong>rejected</strong>. Neither the file nor the index changes. (If the intention were to <em>update</em> a8 to ⟨a8, b2, c2⟩, the pointer to a8 would move from b3's bucket to b2's bucket, which then overflows exactly as in case 3.)</p>
+    <p>The question most likely intends a new key; the missing key in the sequence is a6, and the next question in the same paper inserts a6. So take t = ⟨a6, b2, c2⟩. The record goes into the file between a5 and a7 (the file is sorted on A). For the index, the general cases are:</p>
+    <ol start="2">
+      <li><em>The B value is new</em> (for example b4): insert a new entry b4 into the index in sorted position and create a new bucket holding one pointer.</li>
+      <li><em>The B value exists and its bucket has a free slot</em> (b1 or b3): just add the pointer to that bucket.</li>
+      <li><em>The B value exists and its bucket is full</em>: this is our case, since b2's bucket already holds a2, a5, a7. Allocate an <strong>overflow bucket</strong>, chain it from b2's bucket, and put the pointer to a6 there. (Alternatively the bucket can be split into two chained buckets; the index entry for b2 still points to the first.)</li>
+    </ol>
+    <figure><svg id="bkt2"></svg><figcaption>After inserting ⟨a6, b2, c2⟩: the new record (green) and the overflow bucket chained to b2's full bucket.</figcaption></figure>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 20-21 3a · 10 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-2 | 2020–21 · 10 marks</div>
+  <div class="exam-q"><p>The student relation and query on the relation are given as follows:<br>Student (Id, name, f_name, m_name, cgpa, year_admit, division, district, thana, street, house_number, city, NID, DOB, total_credit).</p>
+  <pre>SELECT * FROM student WHERE name = 'Abid' AND City = 'Feni' AND year_admit = 2015</pre>
+  <p>The B+ tree secondary indices on name, city, and year_admit are given. The heights of the indices are 4, 2 and 1 respectively. The number of tuples (pointers) for name 'Abid', City = 'Feni', and year_admit = 2015 are 50, 20 and 1000 respectively. Seek cost is 10 ms and block transfer cost is 0.1 ms. The number of blocks of the student relation is 2000.</p>
+  <p>i. Find the worst-case costs of processing the above conjunctive selection query using the single index method.<br>ii. Explain clearly how this query will be executed in this method.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><strong>The single index method</strong> (textbook algorithm A7, conjunctive selection using one index): pick <em>one</em> of the conditions that has an index, use that index to fetch the matching tuples, and test the remaining conditions on each fetched tuple in memory. The optimizer computes the cost for each usable index and picks the cheapest.</p>
+    <p><strong>Cost of one secondary-index equality lookup</strong> (textbook algorithm A4, secondary index, equality on a non-key): traverse the tree, h<sub>i</sub> node reads, then fetch each of the n matching tuples. In the worst case each tuple is in a different block, and every read is a random access (seek + transfer):</p>
+    <p class="formula">cost = (h<sub>i</sub> + n) × (t<sub>S</sub> + t<sub>T</sub>) = (h<sub>i</sub> + n) × (10 + 0.1) ms</p>
+    <div class="tbl"><table>
+      <tr><th>Index used</th><th>h<sub>i</sub></th><th>n</th><th>Block reads</th><th>Cost</th></tr>
+      <tr><td>name = 'Abid'</td><td class="num">4</td><td class="num">50</td><td class="num">54</td><td class="num">54 × 10.1 = 545.4 ms</td></tr>
+      <tr><td>city = 'Feni'</td><td class="num">2</td><td class="num">20</td><td class="num">22</td><td class="num"><strong>22 × 10.1 = 222.2 ms</strong></td></tr>
+      <tr><td>year_admit = 2015</td><td class="num">1</td><td class="num">1000</td><td class="num">1001</td><td class="num">1001 × 10.1 = 10,110.1 ms</td></tr>
+    </table></div>
+    <p>The worst-case cost with the single index method is therefore <strong>222.2 ms, using the index on city</strong>.</p>
+    <p><strong>(ii) Execution.</strong></p>
+    <ol>
+      <li>The optimizer estimates the three costs above and chooses the city index, the most selective one (20 matching tuples).</li>
+      <li>It searches the city B+ tree for 'Feni': root to leaf, 2 node reads.</li>
+      <li>The leaf entry for 'Feni' gives 20 record pointers.</li>
+      <li>It fetches the 20 records, 20 random block reads in the worst case.</li>
+      <li>For each record in memory it tests the other two conditions, <code>name = 'Abid' AND year_admit = 2015</code>, outputs the records that pass and discards the rest. The name and year_admit indices are not used at all.</li>
+    </ol>
+    <p>Check against a linear scan: one seek plus 2000 transfers = 10 + 2000 × 0.1 = 210 ms. That is in fact slightly cheaper than 222.2 ms, so a real optimizer comparing all plans would scan the file; the question, however, asks for the single index method.</p>
+    <p>Note: the question bank's answer charges (h<sub>i</sub> + 1) index reads and gets 232.3 ms. The textbook formula is (h<sub>i</sub> + n) × (t<sub>S</sub> + t<sub>T</sub>), where h<sub>i</sub> is the number of levels read from root to leaf; the extra +1 is only right if “height” is taken to count edges instead of levels. State your convention in the exam.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">DB QB · Jan 20 2b · 15 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-2 | 2018–19 · 8 marks</div>
+  <div class="exam-q"><p>The Employee Management System of an organization has the following relational schema: employee (e-id, name, date-of-birth, salary, street, thana, district, NID). Total employees are 40000 and the size of the employee relation is 4000 blocks. The primary index is e-id and secondary indices are name, district and NID. The heights of the indices e-id, name, district and NID are 4, 3, 2 and 4 respectively. The time to transfer 1 block is 0.5 ms and the average seek time in the disk is 8 ms. The number of tuples with salary = 50000 is 100 and district = 'Comilla' is 2000. Consider each tuple is in a different block and non-overlapping.</p>
+  <p>(i) Find the query costs using the indices for the SQL: <code>SELECT * FROM employee WHERE salary = 50000 OR district = 'Comilla'</code><br>(ii) Explain the algorithm you have used to process the SQL of this question.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><strong>Disjunctive selection</strong> (textbook algorithm A10, union of record identifiers) can use indices only if <em>every</em> condition in the OR has an index: look each one up, take the union of the record pointers, and fetch those records. If even one condition has no index, the index results are useless, because a tuple satisfying only that condition could be anywhere in the file. Then the only correct plan is a linear scan that tests the whole OR on every tuple.</p>
+    <p>Here district has an index, but <strong>salary has none</strong> (the indices are on e-id, name, district and NID). So:</p>
+    <ul>
+      <li><strong>Using the district index alone is wrong</strong>: it finds the 2000 Comilla employees but misses the 100 employees with salary 50000 who live elsewhere. Its cost would already be (2 + 2000) × (8 + 0.5) = <strong>17,017 ms</strong>, and a scan would still be needed for the salary condition.</li>
+      <li><strong>Linear file scan</strong> (textbook A1): one seek, then 4000 consecutive block transfers: 8 + 4000 × 0.5 = <strong>2,008 ms</strong>.</li>
+    </ul>
+    <p>The query cost is therefore <strong>2,008 ms</strong>, with a linear scan.</p>
+    <p>For comparison, if salary did have a secondary index of height 2 (not given), A10 would cost (2 + 100) × 8.5 + (2 + 2000) × 8.5 = 17,884 ms, still worse than the scan, because 2,100 random reads (each 8.5 ms) cost more than reading the whole relation sequentially.</p>
+    <p><strong>(ii) Algorithm.</strong> Linear scan: seek to the first block of employee; read each of the 4000 blocks in order; for every tuple in the block, test <code>salary = 50000 OR district = 'Comilla'</code> and output it if true. Because the two sets are disjoint (“non-overlapping”), the result has 100 + 2000 = 2,100 tuples and no duplicates need to be removed.</p>
+  </div></details>
+</div>
+
+<div class="key">
+<p><strong>Summary:</strong> a secondary (non-clustering) index is on an attribute the file is not sorted by. It must be dense, and each entry points to a bucket of pointers to all matching records. A relation can have many secondary indices but only one primary index. Every index must be updated on insert and delete (and on updates to its key attribute), and range scans through a secondary index can cost one random block fetch per record.</p>
+</div>
+</main>
+<script src="../assets/book.js"></script>
+<script>
+const H = ['ID', 'Name', 'Dept.', 'Salary'];
+// secondary index on a column: entries sorted by value, bucket → all matching rows
+const secondary = (rows, col, hot = {}) => [...new Set(rows.map(r => r[col]))].sort()
+  .map(v => ({ key: v, to: rows.map((r, i) => r[col] === v ? i : -1).filter(i => i >= 0), cls: hot[v] || '' }));
+document.querySelector('#salary').innerHTML = indexSVG({ rows: INSTR, head: H, bucket: true, labels: { idx: 'index on salary' }, index: secondary(INSTR, 3) });
+const two = INSTR.map(r => [r[0], r[2]]);
+document.querySelector('#dept').innerHTML = indexSVG({ rows: two, head: ['ID', 'Dept.'], colW: [56, 92], idxW: 96, bucket: true, labels: { idx: 'index on dept-name' }, index: secondary(two, 1) });
+
+// insert David
+const D = ['22225', 'David', 'History', '70000'];
+const after = [...INSTR.slice(0, 4), D, ...INSTR.slice(4)];
+const denseOn = (rows, hot) => rows.map((r, i) => ({ key: r[0], to: [i], alignRow: i, cls: i === hot ? 'new' : '' }));
+stepper('#insert', [
+  { html: indexSVG({ rows: after, head: H, rowCls: { 4: 'new' }, labels: { file: 'instructor file' } }),
+    cap: '1. The record itself is written into the file. The file is sorted on id, so 22225 goes right after 22222.' },
+  { html: indexSVG({ rows: after, head: H, rowCls: { 4: 'new' }, labels: { idx: 'primary index on id' }, index: denseOn(after, 4) }),
+    cap: '2. Primary index on id: a new entry <b>22225</b> is inserted in sorted position, pointing to the new record.' },
+  { html: indexSVG({ rows: after, head: H, rowCls: { 4: 'new' }, bucket: true, labels: { idx: 'index on salary' }, index: secondary(after, 3, { '70000': 'new' }) }),
+    cap: '3. Secondary index on salary: 70000 is a new value, so a new entry and a new bucket are created, with one pointer to David.' },
+  { html: indexSVG({ rows: after, head: H, rowCls: { 4: 'new' }, bucket: true, idxW: 96, labels: { idx: 'index on dept-name' }, index: secondary(after, 2, { History: 'new' }) }),
+    cap: '4. Secondary index on dept-name: History already has an entry, so a pointer to David is added to History\'s bucket (now 3 pointers).' },
+]);
+
+// update Mozart's salary
+const upd = INSTR.map((r, i) => i === 2 ? [r[0], r[1], r[2], '50000'] : r);
+stepper('#update', [
+  { html: indexSVG({ rows: INSTR, head: H, rowCls: { 2: 'hl' }, bucket: true, labels: { idx: 'index on salary' }, index: secondary(INSTR, 3, { '40000': 'hl' }) }),
+    cap: 'Before: Mozart (15151) earns 40000. The salary index entry 40000 points to Mozart\'s record.' },
+  { html: indexSVG({ rows: upd, head: H, rowCls: { 2: 'new' }, bucket: true, labels: { idx: 'index on salary' }, index: [...secondary(INSTR, 3).map(e => e.key === '40000' ? { ...e, cls: 'del', to: [] } : e)] }),
+    cap: 'The record is changed to 50000. Remove Mozart\'s pointer from the 40000 bucket. The bucket is now empty, so entry 40000 is deleted.' },
+  { html: indexSVG({ rows: upd, head: H, rowCls: { 2: 'new' }, bucket: true, labels: { idx: 'index on salary' }, index: secondary(upd, 3, { '50000': 'new' }) }),
+    cap: 'Insert a new entry 50000 with a bucket pointing to Mozart. The id and dept-name indices are untouched, because id and dept-name did not change.' },
+]);
+
+// range scan through the salary index, 3 records per block
+const order = secondary(INSTR, 3).filter(e => +e.key <= 90000).flatMap(e => e.to.map(t => ({ key: e.key, t })));
+const steps = [{ html: indexSVG({ rows: INSTR, head: H, bucket: true, blockSize: 3, labels: { idx: 'index on salary' }, index: secondary(INSTR, 3) }),
+  cap: 'Walk the salary index in order, from 40000 up to 90000, fetching each matching record. Memory holds one block at a time. <b>Block fetches: 0</b>.' }];
+let inMem = -1, fetches = 0;
+order.forEach(({ key, t }, n) => {
+  const blk = Math.floor(t / 3), nw = blk !== inMem;
+  if (nw) { fetches++; inMem = blk; }
+  const rowCls = {}; order.slice(0, n).forEach(o => { rowCls[o.t] = 'dim'; }); rowCls[t] = 'hl';
+  steps.push({ html: indexSVG({ rows: INSTR, head: H, bucket: true, blockSize: 3, rowCls,
+      labels: { idx: 'index on salary' }, index: secondary(INSTR, 3, { [key]: 'hl' }).map(e => e.key === key ? { ...e, to: [t] } : { ...e, to: [] }) }),
+    cap: `Salary ${key} → ${INSTR[t][1]} (id ${INSTR[t][0]}) in <b>block ${blk}</b>. ${nw ? `Not in memory, so <b>fetch block ${blk}</b> from disk.` : 'Same block as the last record, no fetch needed.'} <b>Block fetches: ${fetches}</b> (≈ ${fetches * 5}–${fetches * 10} ms).` });
+});
+stepper('#range', steps, { interval: 1500 });
+document.querySelector('#cmpP').innerHTML = indexSVG({ rows: INSTR.map(r => [r[0], r[3]]), head: ['ID', 'Salary'], colW: [56, 60], blockSize: 4, labels: { idx: 'index on id' },
+  index: [0, 4, 8].map(t => ({ key: INSTR[t][0], to: [t], alignRow: t })) });
+document.querySelector('#cmpS').innerHTML = indexSVG({ rows: INSTR.map(r => [r[0], r[3]]), head: ['ID', 'Salary'], colW: [56, 60], bucket: true, labels: { idx: 'index on salary' }, index: secondary(INSTR, 3) });
+// bucket figure for R(A,B,C): index entries → 3-slot buckets → file rows
+function bucketFig(id, rows, buckets, o = {}) {
+  const rh = 24, y0 = 40, fx = 470, ix = 10, bx = 120, sw = 34;
+  let s = `<text x="${ix}" y="20" class="lbl">index on B</text><text x="${bx}" y="20" class="lbl">buckets (max 3 pointers)</text><text x="${fx}" y="20" class="lbl">file, sorted on A</text>`;
+  rows.forEach((r, i) => r.forEach((v, c) => {
+    s += `<rect class="${(o.newRow === i) ? 'cell-new' : 'cell'}" x="${fx + c * 44}" y="${y0 + i * rh}" width="44" height="${rh}"/><text x="${fx + c * 44 + 12}" y="${y0 + i * rh + 16}" style="font-size:12px">${v}</text>`; }));
+  const rowOf = a => rows.findIndex(r => r[0] === a);
+  let by = y0;
+  buckets.forEach(([key, ptrs, ovf]) => {
+    s += `<rect class="cell-plain" x="${ix}" y="${by}" width="44" height="${rh}"/><text x="${ix + 10}" y="${by + 16}" style="font-size:12px">${key}</text>`;
+    s += `<path d="M${ix + 44} ${by + rh / 2} H${bx - 2}" class="s-fg" marker-end="url(#m-fg)"/>`;
+    const slots = (x, list, cls) => [0, 1, 2].forEach(j => {
+      const a = list[j];
+      s += `<rect class="${a ? cls : 'cell-plain'}" x="${x + j * sw}" y="${by}" width="${sw}" height="${rh}"/>`;
+      if (a) { s += `<text x="${x + j * sw + 9}" y="${by + 16}" style="font-size:11px">${a}</text>`;
+        s += `<path d="M${x + j * sw + sw / 2} ${by + rh} L${fx - 2} ${y0 + rowOf(a) * rh + rh / 2}" class="${cls === 'cell-new' ? 's-grn' : 's-fg'}" marker-end="url(#${cls === 'cell-new' ? 'm-grn' : 'm-fg'})" style="opacity:.75"/>`; }
+    });
+    slots(bx, ptrs, 'cell');
+    if (ovf) {
+      const ox = bx + 3 * sw + 30;
+      s += `<path d="M${bx + 3 * sw} ${by + rh / 2} H${ox - 2}" class="s-red" marker-end="url(#m-red)"/>`;
+      s += `<text x="${ox + 3 * sw + 6}" y="${by + 16}" class="lbl red">overflow</text>`;
+      slots(ox, ovf, 'cell-new');
+    }
+    by += rh + 30;
+  });
+  const H = Math.max(by, y0 + rows.length * rh) + 10, W = fx + 3 * 44 + 10;
+  const el = document.querySelector(id); el.setAttribute('viewBox', `0 0 ${W} ${H}`); el.setAttribute('width', W); el.innerHTML = s;
+}
+const RR = [['a1','b1','c1'],['a2','b2','c1'],['a3','b3','c1'],['a4','b1','c1'],['a5','b2','c1'],['a7','b2','c1'],['a8','b3','c1']];
+bucketFig('#bkt1', RR, [['b1', ['a1', 'a4']], ['b2', ['a2', 'a5', 'a7']], ['b3', ['a3', 'a8']]]);
+const RR2 = [...RR.slice(0, 5), ['a6', 'b2', 'c2'], ...RR.slice(5)];
+bucketFig('#bkt2', RR2, [['b1', ['a1', 'a4']], ['b2', ['a2', 'a5', 'a7'], ['a6']], ['b3', ['a3', 'a8']]], { newRow: 5 });
+flashcards('#cards', [
+  { f: 'Secondary (non-clustering) index', b: 'An index whose search key gives an order different from the file\'s physical order.' },
+  { f: 'Bucket', b: 'A small list of pointers to all records with one search-key value; the secondary index entry points to it.' },
+  { f: 'Why a secondary index must be dense', b: 'The file is not sorted on its key, so the forward scan of a sparse index cannot find unlisted keys.' },
+  { f: 'Index maintenance on INSERT', b: 'Every index on the relation gets a new entry or a new bucket pointer.' },
+  { f: 'Index maintenance on UPDATE', b: 'Only indices whose key contains the changed attribute change: remove the old value\'s pointer, add the new one.' },
+  { f: 'Range scan through a secondary index', b: 'Each matching record can be in a different block: one random block read (5–10 ms) per record.' },
+]);
+quiz('#quiz', [
+  { q: 'A relation with 5 attributes is sorted on its primary key. How many single-attribute secondary indices can it have?', opts: ['1', '4', '5', 'Unlimited'], a: 1, why: 'Any attribute other than the one the file is sorted on: 5 − 1 = 4.' },
+  { q: 'How many primary (clustering) indices can a file have?', opts: ['None', 'At most one', 'One per attribute', 'Two'], a: 1, why: 'A file is physically sorted in only one order.' },
+  { q: '<code>UPDATE instructor SET dept_name = \'Physics\' WHERE id = 12121</code>. With indices on id, salary and dept_name, which must change?', opts: ['All three', 'Only dept_name', 'Only id', 'id and dept_name'], a: 1, why: 'Only the index whose search key includes the changed attribute.' },
+  { q: 'Why is <code>WHERE salary &lt;= 90000</code> slow through the salary index on a magnetic disk?', opts: ['The index is sparse', 'Consecutive salaries are in unrelated blocks, so many random block reads are needed', 'The index is unsorted', 'The query cannot use an index'], a: 1, why: 'The file is sorted on id; each matching record may cost its own seek and transfer.' },
+  { q: 'Two instructors earn 80000. In the secondary index on salary, how many index entries does 80000 have?', opts: ['0', '1', '2', '12'], a: 1, why: 'One entry for the value; its bucket holds the 2 pointers.' },
+  { q: 'For a conjunctive query using the single index method, which index is chosen?', opts: ['The tallest', 'The one with the lowest estimated cost, usually the most selective', 'All of them', 'The primary index always'], a: 1, why: 'The optimizer costs each usable index and picks the cheapest; the other conditions are tested in memory.' },
+]);
+ask('#try1', { q: 'Secondary index of height 3, 40 matching tuples each in a different block, t<sub>S</sub> = 4 ms, t<sub>T</sub> = 0.1 ms. Worst-case cost in ms?', a: 176.3, tol: 0.05, hint: '(h + n) × (t_S + t_T)', why: '(3 + 40) × 4.1 = 176.3 ms.' });
+ask('#try2', { q: 'Same relation, 1,000 blocks, read by a linear scan (one seek, then transfers). Cost in ms?', a: 104, tol: 0.05, why: '4 + 1,000 × 0.1 = 104 ms, cheaper than the index here.' });
+
+</script>
+</body>
+</html>

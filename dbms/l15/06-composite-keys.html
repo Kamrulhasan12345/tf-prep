@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Indices on Multiple Keys · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 15 · Chapter 6 · Slide 23</div>
+<h1>Indices on Multiple Keys</h1>
+<p class="lede">An index can be built on two or more attributes together. This chapter explains composite search keys, the dictionary-style ordering they use, and works the thana and district question.</p>
+
+<h2>1. Composite search keys</h2>
+
+<p>Every index so far had a single attribute as its search key. A <b class="term">composite search key</b> is made of <em>several attributes</em> taken together. The slide's examples are an index on instructor with search key (name, ID), and one with search key (name, dept-name). Each index entry then holds a <em>pair</em> of values plus a pointer.</p>
+
+<h3>Lexicographic ordering</h3>
+<p>To keep composite keys sorted, they are compared <b class="term">lexicographically</b>, which is the way a dictionary orders words: compare the first attribute; only if it is equal, compare the second; and so on. Formally, (a₁, a₂) &lt; (b₁, b₂) if a₁ &lt; b₁, or if a₁ = b₁ and a₂ &lt; b₂. The slide's examples:</p>
+<ul>
+  <li>(John, 12121) &lt; (John, 13514): the names are equal, so the IDs decide, and 12121 &lt; 13514.</li>
+  <li>(John, 13514) &lt; (Peter, 11223): the names already differ, John &lt; Peter, so the IDs are never looked at, even though 13514 &gt; 11223.</li>
+</ul>
+
+<h3>Which queries it helps</h3>
+<p>The slide says the (name, ID) index can serve queries <em>on just name, or on (name, ID)</em>. Since entries are sorted by name first, all entries for one name sit together, so a query on name alone can use the index. A query on <em>ID alone</em> cannot: the IDs are only sorted <em>within</em> each name, so they are scattered across the whole index. This is the same as a phone book sorted by (surname, first name): easy to find everyone called “Rahman”, useless for finding everyone called “Karim” as a first name.</p>
+
+<h2>2. Example: a composite index on (name, dept-name)</h2>
+
+<pre>SELECT * FROM instructor
+WHERE name = 'Gold' AND dept-name = 'Physics';</pre>
+
+<p>Slide 23 lists the (name, dept-name) pairs in the order of the file (Srinivasan, Wu, Mozart, …). An ordered index stores them sorted lexicographically, so the animation below shows the sorted version: Brandt first, Wu last.</p>
+
+<figure>
+<span class="anim-tag">Animation</span>
+<div id="comp"></div>
+</figure>
+
+<p>Because both conditions are part of the key, the index lands on exactly the matching entry, and only that record is fetched. With a separate single-attribute index on name, the database would fetch every instructor called Gold and then check each one's department.</p>
+
+<div class="q">
+<h4>Question (worked answer): thanas and districts</h4>
+<p><em>There are 460 thanas and 64 districts. (a) Find the number of search keys of the (thana, district) composite index and of a simple thana index. Query: <code>SELECT * FROM person WHERE thana = 'Sadar' AND district = 'Sylhet'</code>. (b) Compare query performance using the composite index and the simple index.</em></p>
+
+<p>The key fact: thana names are <em>not unique</em> across the country. The clearest example is “Sadar”: almost every district has a thana called Sadar (Sylhet Sadar, Cumilla Sadar, Bogura Sadar, and so on). A thana is identified uniquely only by its name <em>together with</em> its district.</p>
+
+<p><strong>(a) Number of search keys.</strong></p>
+<ul>
+  <li><strong>Composite (thana, district) index:</strong> one search key for each distinct (thana, district) pair that actually occurs. Every thana belongs to exactly one district, so there are <strong>460</strong> search keys. (Not 460 × 64 = 29,440: most combinations, such as a Sylhet thana paired with Khulna district, never occur.)</li>
+  <li><strong>Simple thana index:</strong> one search key per distinct thana <em>name</em>, which is <strong>fewer than 460</strong>, because repeated names share a key. If, say, 64 thanas are all called “Sadar”, they collapse into one key, giving at most 460 − 63 = 397 search keys.</li>
+</ul>
+
+<p><strong>(b) Query performance.</strong></p>
+<figure>
+<svg id="thana" viewBox="0 0 660 230" width="660" role="img" aria-label="Simple vs composite index for Sadar, Sylhet"></svg>
+<figcaption><b>Figure 1.</b> Simple index: the key “Sadar” leads to people from every Sadar thana in the country, and all of them must be fetched and filtered. Composite index: the key (Sadar, Sylhet) leads only to the people we want.</figcaption>
+</figure>
+<ul>
+  <li><strong>With the simple thana index:</strong> look up “Sadar”. Its bucket points to every person living in <em>any</em> Sadar thana, roughly 64 thanas' worth of people. The database must fetch all of those records (each one possibly a separate block read, Chapter 3) and then discard every one whose district is not Sylhet. About 63/64 of the work is wasted.</li>
+  <li><strong>With the composite index:</strong> look up (Sadar, Sylhet) directly. Its bucket points only to people in Sylhet Sadar, so every fetched record is part of the answer. Roughly <strong>64 times fewer</strong> record fetches.</li>
+</ul>
+<p>The composite index is clearly better for this query. The price is the usual one: a bigger index (460 keys instead of fewer, and each key holds two values), and one more index to update on every insert and delete.</p>
+</div>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+<div id="try2"></div>
+
+<div class="key">
+<p><strong>Summary:</strong> a composite search key combines several attributes and is sorted lexicographically: first attribute first, later ones only to break ties. It serves queries on the whole key or on a leading part of it, but not on a later attribute alone. When a query constrains all the key's attributes, a composite index fetches only matching records, while a single-attribute index fetches extra records that must be filtered out.</p>
+</div>
+</main>
+<script src="../assets/book.js"></script>
+<script>
+const pairs = INSTR.map((r, i) => ({ name: r[1], dept: r[2], i })).sort((a, b) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0);
+const two = INSTR.map(r => [r[1], r[2]]);
+const comp = (hot = -1, scan = []) => indexSVG({ rows: two, head: ['Name', 'Dept.'], colW: [88, 88], idxW: 170, labels: { idx: 'index on (name, dept-name)' },
+  rowCls: hot >= 0 ? { [pairs[hot].i]: 'new' } : {},
+  index: pairs.map((p, k) => ({ key: `(${p.name}, ${p.dept})`, to: [p.i], cls: k === hot ? 'hl' : scan.includes(k) ? 'new' : '' })) });
+stepper('#comp', [
+  { html: comp(), cap: 'The composite index on (name, dept-name). Entries are sorted by name first. Ties on name would be broken by dept-name.' },
+  { html: comp(-1, [0, 1, 2, 3, 4]), cap: 'Search for (Gold, Physics). Compare names first: Brandt, Califieri, Crick, Einstein and El Said all come before Gold.' },
+  { html: comp(5), cap: 'Name equals Gold, so compare the second attribute: Physics = Physics. <b>Exact match</b>.' },
+  { html: comp(5), cap: 'Follow the pointer and fetch the one record: (33456, Gold, Physics, 87000). Only matching records are ever read.' },
+]);
+
+// thana figure
+(() => {
+  let s = '';
+  s += `<text x="10" y="18" class="big" style="font-size:12px">Simple index on thana</text>`;
+  s += `<rect class="cell-hl" x="10" y="30" width="90" height="26"/><text x="20" y="48" style="font-size:12px">Sadar</text>`;
+  const dist = ['Sylhet', 'Dhaka', 'Cumilla', 'Bogura', 'Khulna', 'Rajshahi', 'Barishal', '… 57 more'];
+  dist.forEach((d, i) => {
+    const y = 30 + i * 22, ok = i === 0;
+    s += `<path d="M100 43 L176 ${y + 10}" class="${ok ? 's-grn' : 's-fg'}" marker-end="url(#${ok ? 'm-grn' : 'm-fg'})"/>`;
+    s += `<rect class="${ok ? 'cell-new' : 'cell-del'}" x="180" y="${y}" width="130" height="20"/><text x="186" y="${y + 14}" style="font-size:11px">${i === 7 ? d : 'Sadar, ' + d}</text>`;
+  });
+  s += `<text x="10" y="222" class="lbl">all fetched; only the green ones are kept</text>`;
+  s += `<text x="360" y="18" class="big" style="font-size:12px">Composite index on (thana, district)</text>`;
+  s += `<rect class="cell-hl" x="360" y="30" width="140" height="26"/><text x="368" y="48" style="font-size:12px">(Sadar, Sylhet)</text>`;
+  s += `<path d="M500 43 L536 43" class="s-grn" marker-end="url(#m-grn)"/>`;
+  s += `<rect class="cell-new" x="540" y="32" width="110" height="20"/><text x="546" y="46" style="font-size:11px">Sadar, Sylhet</text>`;
+  s += `<text x="360" y="80" class="lbl">only the wanted records are fetched</text>`;
+  document.querySelector('#thana').innerHTML = s;
+})();
+flashcards('#cards', [
+  { f: 'Composite search key', b: 'A search key made of several attributes, e.g. (name, ID).' },
+  { f: 'Lexicographic order', b: 'Compare the first attribute; only on a tie compare the second, and so on (dictionary order).' },
+  { f: 'Queries a (A, B) index serves', b: 'Conditions on A alone, or on A and B. Not on B alone.' },
+  { f: 'Why (thana, district) beats thana alone', b: 'Thana names repeat across districts; the composite key fetches only the wanted district\'s records.' },
+]);
+quiz('#quiz', [
+  { q: 'Which is smaller in lexicographic order?', opts: ['(Peter, 11223)', '(John, 13514)', 'They are equal', 'Cannot tell'], a: 1, why: 'John &lt; Peter decides it; the IDs are never compared.' },
+  { q: 'An index on (name, ID). Which query can use it efficiently?', opts: ['WHERE ID = 12121', 'WHERE name = \'Wu\'', 'WHERE salary &gt; 50000', 'WHERE dept_name = \'Physics\''], a: 1, why: 'name is the leading attribute, so all entries for Wu are adjacent.' },
+  { q: '(Gold, Physics) vs (Gold, Music): which comes first?', opts: ['(Gold, Physics)', '(Gold, Music)', 'Equal', 'Depends on ID'], a: 1, why: 'Names tie, so dept-name decides: Music &lt; Physics.' },
+  { q: 'For <code>WHERE thana = \'Sadar\' AND district = \'Sylhet\'</code>, the simple thana index…', opts: ['Fetches only Sylhet Sadar residents', 'Fetches residents of every Sadar thana, then filters', 'Cannot be used', 'Is faster than the composite index'], a: 1, why: 'Its key is only the thana name, which many districts share.' },
+]);
+ask('#try1', { q: 'Every one of 495 upazilas belongs to exactly one district. How many search keys does a composite (upazila, district) index have?', a: 495, why: 'One per (upazila, district) pair that occurs: one per upazila.' });
+ask('#try2', { q: '50 thanas are all named “Sadar” and the other 410 thana names are unique. How many search keys does a simple thana-name index have?', a: 411, why: '410 unique names + 1 shared key “Sadar” = 411.' });
+
+</script>
+</body>
+</html>

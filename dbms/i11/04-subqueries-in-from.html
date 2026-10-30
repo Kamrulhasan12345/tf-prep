@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Subqueries in FROM and SELECT · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 11 (Ishrak) · Chapter 4 · Slides 17–22</div>
+<h1>Subqueries in FROM and SELECT</h1>
+<p class="lede">A query's result is a table, so it can stand wherever a table can: in the FROM clause. Slides 17–22 use this to count computers (PCs or laptops) per maker. This chapter explains derived tables, works the slides' three versions on the textbook data, shows why "think combined" (slide 22) matters, adds scalar subqueries in the SELECT list, and works the 25-mark HR exam question that uses both.</p>
+
+<h2>1. Derived tables (slide 17)</h2>
+<dl class="def">
+<dt>Derived table (inline view)</dt>
+<dd>A subquery in the FROM clause. It is evaluated to a temporary table, which the outer query then uses like any stored table: join it, filter it, group it. It can be given an alias after the closing parenthesis (in Oracle without AS), and its columns are named by the subquery's SELECT list (use column aliases for computed columns, e.g. <code>AVG(salary) AS avg_sal</code>).</dd>
+</dl>
+<p>Slide 17's title says "correlated sub queries in the FROM clause", but the subqueries on slides 19 and 22 are ordinary, uncorrelated ones: they do not refer to the outer query, and a plain derived table is not allowed to. (Oracle 12c added <code>LATERAL</code> and <code>CROSS APPLY</code> for correlated derived tables; they are beyond this course.)</p>
+
+<h2>2. Makers of at least two fast computers (slides 18–19)</h2>
+<p><em>Find manufacturers of at least two different computers (PCs or laptops) with speeds of at least 2.0.</em> Slide 18 shows parts of Product, PC and Laptop. The difficulty: a maker's fast computers are split over two tables, PC and Laptop, so we cannot simply join and count. Slide 19 first builds one table of all fast computers, then counts per maker:</p>
+<pre>SELECT maker
+FROM  (SELECT model, maker
+       FROM   Product NATURAL JOIN PC
+       WHERE  speed &gt;= 2
+       UNION
+       SELECT model, maker
+       FROM   Product NATURAL JOIN Laptop
+       WHERE  speed &gt;= 2)
+GROUP BY maker
+HAVING COUNT(model) &gt;= 2;</pre>
+<p>The derived table has one row (model, maker) per fast PC or laptop. NATURAL JOIN works here because Product and PC share only the column <code>model</code> (and likewise Product and Laptop). The outer query groups it by maker and keeps makers with at least 2 models. Oracle allows a derived table without an alias, as here; you need one only to qualify its columns.</p>
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="dt"></div>
+</figure>
+<div id="p19"></div>
+
+<h2>3. Why not count PCs and laptops separately? (slides 20–22)</h2>
+<p>Slides 20 and 21 answer the narrower questions, with ordinary joins:</p>
+<pre>-- slide 20: at least two fast PCs                 -- slide 21: at least two fast laptops
+SELECT maker                                       SELECT maker
+FROM   Product, PC                                 FROM   Product, Laptop
+WHERE  Product.model = PC.model                    WHERE  Product.model = Laptop.model
+AND    speed &gt;= 2.0                                AND    speed &gt;= 2.0
+GROUP BY maker                                     GROUP BY maker
+HAVING COUNT(PC.model) &gt;= 2;                       HAVING COUNT(Laptop.model) &gt;= 2;</pre>
+<p>On the textbook data slide 20 gives A, B, D, E and slide 21 gives A. Their union (A, B, D, E) happens to equal the right answer here, but it is not the right method: a maker with <em>one</em> fast PC and <em>one</em> fast laptop has two fast computers, yet passes neither query. Slide 22 says "think combined": put PCs and laptops into one table first, then count once.</p>
+<pre>SELECT maker
+FROM   Product, (SELECT model, speed FROM PC
+                 UNION
+                 SELECT model, speed FROM Laptop) T
+WHERE  Product.model = T.model
+AND    speed &gt;= 2.0
+GROUP BY maker
+HAVING COUNT(T.model) &gt;= 2;</pre>
+<p>Here the derived table T is all computers (model, speed), joined with Product like a stored table. The alias T is needed because the outer query writes T.model. On the sample data: A has 5 fast computers, B 3, D 3, E 3, C and G 1 each: answer A, B, D, E. The playground below adds an invented maker X with one fast PC and one fast laptop: X appears in slide 22's answer but in neither slide 20's nor slide 21's.</p>
+<div id="p22"></div>
+
+<h2>4. Scalar subqueries in the SELECT list</h2>
+<p>A scalar subquery (Chapter 1) may also appear in the SELECT list, where it computes one value per output row. Correlated with the outer row, it is a compact way to show a per-row count or total next to each row:</p>
+<pre>SELECT e1.LASTNAME,
+       (SELECT COUNT(*) FROM EMPLOYEE e2 WHERE e2.HIREDATE &lt; e1.HIREDATE) AS hired_before,
+       (SELECT COUNT(*) FROM EMPLOYEE e2 WHERE e2.HIREDATE &gt; e1.HIREDATE) AS hired_after
+FROM   EMPLOYEE e1;</pre>
+<p>For each employee e1, the two subqueries count the colleagues hired earlier and later. Employees hired on the same day as e1 count in neither (Higgins and Gietz both started on 7 June 2002). This answers part (i) of the exam question below.</p>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<h3>Try it in SQL</h3>
+<p>Exercises 1–3 use the computer database, 4–6 the HR schema.</p>
+<div id="c1"></div><div id="c2"></div><div id="c3"></div><div id="c4"></div><div id="c5"></div><div id="c6"></div>
+
+<h3>Exam questions</h3>
+<div class="exam">
+  <div class="exam-src">DB QB · 23-24 3a · 25 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-1 | 2023–24 · 25 marks</div>
+  <div class="exam-q"><p>EMPLOYEE (EMPLOYEEID, LASTNAME, FIRSTNAME, PHONE, HIREDATE, JOBID, SALARY, DEPARTMENTID)<br>JOB (JOBID, JOBTITLE, MINSALARY, MAXSALARY)<br>DEPARTMENT (DEPARTMENTID, DEPARTMENTNAME, MANAGERID)<br>JOB_HISTORY (EMPLOYEEID, JOBID, DEPARTMENTID, STARTDATE, ENDDATE)</p>
+  <p>For the schema above, write SQL to implement the following queries:<br>(i) For each employee, find the total number of employees that were hired before him/her and those that were hired after him/her. Print employee last name, total employees hired before him/her, and total employees hired after him/her.<br>(ii) Print the last name of the employees who never changed their job or department.<br>(iii) Print the last name of the employees and the difference between their salary and the maximum salary of their department, such that the difference is not more than 5000.<br>(iv) For each department, print the department name, corresponding manager's last name, and the number of employees working under that manager in that department.<br>(v) Print the last name of those employees who get a higher salary than the average salary of their department. Also print the difference of their salary with the average salary of their department.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><strong>(i)</strong> Correlated scalar subqueries in SELECT (section 4):</p>
+<pre>SELECT e1.LASTNAME,
+       (SELECT COUNT(*) FROM EMPLOYEE e2 WHERE e2.HIREDATE &lt; e1.HIREDATE) AS hired_before,
+       (SELECT COUNT(*) FROM EMPLOYEE e2 WHERE e2.HIREDATE &gt; e1.HIREDATE) AS hired_after
+FROM   EMPLOYEE e1;</pre>
+    <p>(A self-join with GROUP BY and <code>SUM(CASE WHEN e2.HIREDATE &lt; e1.HIREDATE THEN 1 ELSE 0 END)</code> also works.)</p>
+    <p><strong>(ii)</strong> An employee who changed job or department has a row in JOB_HISTORY; we want those without one (anti-join; JOB_HISTORY.EMPLOYEEID is part of its key, so NOT IN is NULL-safe here, and NOT EXISTS works too):</p>
+<pre>SELECT LASTNAME
+FROM   EMPLOYEE
+WHERE  EMPLOYEEID NOT IN (SELECT EMPLOYEEID FROM JOB_HISTORY);</pre>
+    <p><strong>(iii)</strong> Department maxima in a derived table, joined back to the employees:</p>
+<pre>SELECT e.LASTNAME, m.max_sal - e.SALARY AS diff
+FROM   EMPLOYEE e,
+       (SELECT DEPARTMENTID, MAX(SALARY) AS max_sal
+        FROM EMPLOYEE GROUP BY DEPARTMENTID) m
+WHERE  e.DEPARTMENTID = m.DEPARTMENTID
+AND    m.max_sal - e.SALARY &lt;= 5000;</pre>
+    <p>The difference is never negative (nobody earns more than the maximum), so "not more than 5000" is just ≤ 5000; the best-paid employee of each department appears with difference 0. Employees without a department drop out of the join, as they have no department maximum.</p>
+    <p><strong>(iv)</strong> In this schema EMPLOYEE has no manager column, so "working under that manager in that department" means the department's employees other than the manager. Join DEPARTMENT to the manager's EMPLOYEE row for the name, and to the department's employees for the count; outer joins keep departments without a manager or without employees, with a count of 0:</p>
+<pre>SELECT   d.DEPARTMENTNAME, m.LASTNAME AS manager, COUNT(e.EMPLOYEEID) AS num_emp
+FROM     DEPARTMENT d
+         LEFT JOIN EMPLOYEE m ON m.EMPLOYEEID = d.MANAGERID
+         LEFT JOIN EMPLOYEE e ON e.DEPARTMENTID = d.DEPARTMENTID
+                             AND e.EMPLOYEEID &lt;&gt; NVL(d.MANAGERID, -1)
+GROUP BY d.DEPARTMENTID, d.DEPARTMENTNAME, m.LASTNAME;</pre>
+    <p>Group by DEPARTMENTID too (names could repeat), and count <code>e.EMPLOYEEID</code>, not <code>*</code>, so an empty department gives 0. If your schema has EMPLOYEE.MANAGERID (Oracle's HR does), you could instead count the manager's direct reports in the department (<code>e.MANAGERID = d.MANAGERID</code>); state the interpretation you use. Note: the question bank's answer counts all employees of the department, including the manager himself; that is defensible only if the manager is considered to work "under" himself.</p>
+    <p><strong>(v)</strong> Department averages in a derived table:</p>
+<pre>SELECT e.LASTNAME, e.SALARY - a.avg_sal AS diff
+FROM   EMPLOYEE e,
+       (SELECT DEPARTMENTID, AVG(SALARY) AS avg_sal
+        FROM EMPLOYEE GROUP BY DEPARTMENTID) a
+WHERE  e.DEPARTMENTID = a.DEPARTMENTID
+AND    e.SALARY &gt; a.avg_sal;</pre>
+    <p>The correlated form of Chapter 2 finds the same employees, but the derived table is needed to <em>print</em> the average (or use a scalar subquery in SELECT as well as in WHERE). The bank's answers to (i), (ii), (iii) and (v) are correct. The checks below run on the HR sample data (shared with the rest of these chapters; it has extra columns MANAGERID and COMMISSIONPCT, which the answers do not use).</p>
+    <div id="hr1"></div><div id="hr2"></div><div id="hr3"></div><div id="hr4"></div><div id="hr5"></div>
+  </div></details>
+</div>
+
+<div class="key"><p><strong>Summary:</strong> a subquery in FROM (derived table, inline view) is a temporary table the outer query can join, filter and group; give it an alias (no AS in Oracle) and name computed columns. It solves "combine first, then aggregate" problems such as counting PCs and laptops together (slide 22), and "compare each row with a group value" problems (salary vs department average). A correlated scalar subquery in SELECT computes one value per output row.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/sqlplay.js"></script>
+<script src="../i08/lecture.js"></script>
+<script>
+const fastPC = [[1001, 'A'], [1002, 'A'], [1004, 'B'], [1005, 'B'], [1006, 'B'], [1007, 'C'], [1008, 'D'], [1009, 'D'], [1010, 'D'], [1012, 'E'], [1013, 'E']];
+const fastLT = [[2004, 'A'], [2005, 'A'], [2006, 'A'], [2001, 'E'], [2010, 'G']];
+const all = [...fastPC, ...fastLT];
+const cnt = {}; all.forEach(r => cnt[r[1]] = (cnt[r[1]] || 0) + 1);
+const groups = Object.keys(cnt).sort().map(k => [k, cnt[k]]);
+stepper('#dt', [
+  { html: row2(rel('Product ⋈ PC, speed ≥ 2', ['model', 'maker'], fastPC), rel('Product ⋈ Laptop, speed ≥ 2', ['model', 'maker'], fastLT)), cap: 'The two halves of the derived table: 11 fast PCs (1003 at 1.42 and 1011 at 1.86 GHz are too slow) and 5 fast laptops.' },
+  { html: row2(rel('derived table (UNION)', ['model', 'maker'], all, { cls: Object.fromEntries(fastPC.map((r, i) => [i, ''])) })), cap: 'UNION glues them into one temporary table of 16 (model, maker) rows. To the outer query it is just a table.' },
+  { html: row2(rel('GROUP BY maker', ['maker', 'COUNT(model)'], groups)), cap: 'The outer query groups the derived table by maker and counts models: A 5, B 3, C 1, D 3, E 3, G 1.' },
+  { html: row2(rel('HAVING COUNT(model) >= 2', ['maker', 'COUNT(model)'], groups, { cls: Object.fromEntries(groups.map((g, i) => [i, g[1] >= 2 ? 'new' : 'del'])) })), cap: 'HAVING keeps makers with at least 2 fast computers: <b>A, B, D, E</b>.' },
+]);
+sqlPlay('#p19', { setup: PCDB, query: 'SELECT maker\nFROM  (SELECT model, maker\n       FROM   Product NATURAL JOIN PC\n       WHERE  speed >= 2\n       UNION\n       SELECT model, maker\n       FROM   Product NATURAL JOIN Laptop\n       WHERE  speed >= 2)\nGROUP BY maker\nHAVING COUNT(model) >= 2;', note: 'Slide 19. Run the inner query alone to see the derived table.' });
+sqlPlay('#p22', { setup: PCDB + "\nINSERT INTO Product VALUES ('X', 1099, 'pc'); INSERT INTO PC VALUES (1099, 2.5, 1024, 250, 700);\nINSERT INTO Product VALUES ('X', 2099, 'laptop'); INSERT INTO Laptop VALUES (2099, 2.4, 1024, 250, 14.0, 900);",
+  query: 'SELECT maker\nFROM   Product, (SELECT model, speed FROM PC\n                 UNION\n                 SELECT model, speed FROM Laptop) T\nWHERE  Product.model = T.model\nAND    speed >= 2.0\nGROUP BY maker\nHAVING COUNT(T.model) >= 2;', note: 'Slide 22, with an invented maker X (one fast PC, one fast laptop). X is in this answer, but slides 20 and 21 would both miss it.' });
+flashcards('#cards', [
+  { f: 'Derived table', b: 'A subquery in FROM; used like a table by the outer query.' },
+  { f: 'Alias for a derived table in Oracle', b: '(SELECT …) T, without AS. Needed to write T.column.' },
+  { f: 'Why "think combined" (slide 22)?', b: 'One fast PC + one fast laptop = 2 computers, but passes neither the PC-only nor the laptop-only query.' },
+  { f: 'Scalar subquery in SELECT', b: 'Computes one value per output row, often correlated (counts, totals).' },
+  { f: 'Printing a group value next to each row', b: 'Join with a derived table of group values, e.g. (SELECT dept, AVG(sal) avg_sal … GROUP BY dept).' },
+]);
+quiz('#quiz', [
+  { q: 'Is slide 19\'s FROM subquery correlated?', opts: ['Yes', 'No'], a: 1, why: 'It does not mention any outer column.' },
+  { q: 'Which column does Product NATURAL JOIN PC join on?', opts: ['maker', 'model', 'type', 'price'], a: 1, why: 'model is the only shared name.' },
+  { q: 'Which FROM clause is valid Oracle?', opts: ['FROM (SELECT model FROM PC) AS T', 'FROM (SELECT model FROM PC) T', 'FROM T = (SELECT model FROM PC)', 'FROM TABLE T (SELECT model FROM PC)'], a: 1, why: 'No AS before a table or subquery alias.' },
+  { q: 'Maker with 1 fast PC and 1 fast laptop. Which slide\'s query returns it?', opts: ['slide 20', 'slide 21', 'slide 22', 'none'], a: 2, why: 'Only the combined count reaches 2.' },
+]);
+const C = (sel, setup, task, solution, x = {}) => sqlCheck(sel, { setup, task, solution, ...x });
+C('#c1', PCDB, '1. (Easy) Using a derived table of all PC and laptop prices, return the overall average price of a computer.', 'SELECT AVG(price) FROM (SELECT model, price FROM PC UNION SELECT model, price FROM Laptop);');
+C('#c2', PCDB, '2. For each maker, return the number of computers (PCs plus laptops) it makes; makers with none need not appear.', 'SELECT maker, COUNT(*) FROM Product, (SELECT model FROM PC UNION SELECT model FROM Laptop) T WHERE Product.model = T.model GROUP BY maker;');
+C('#c3', PCDB, '3. (Textbook Exercise 6.3.1 style) Find the maker(s) of the computer (PC or laptop) with the highest speed, each maker once.', 'SELECT DISTINCT maker FROM Product, (SELECT model, speed FROM PC UNION SELECT model, speed FROM Laptop) T WHERE Product.model = T.model AND speed = (SELECT MAX(speed) FROM (SELECT speed FROM PC UNION SELECT speed FROM Laptop));');
+C('#c4', HR, '4. For each department id (not NULL), return the department id and how much its highest salary exceeds its lowest.', 'SELECT DEPARTMENTID, MAX(SALARY) - MIN(SALARY) FROM EMPLOYEE WHERE DEPARTMENTID IS NOT NULL GROUP BY DEPARTMENTID;');
+C('#c5', HR, '5. Return each employee\'s last name with the number of employees in his or her department (a correlated scalar subquery in SELECT; employees without a department may show 0).', 'SELECT e.LASTNAME, (SELECT COUNT(*) FROM EMPLOYEE x WHERE x.DEPARTMENTID = e.DEPARTMENTID) FROM EMPLOYEE e;');
+C('#c6', HR, '6. (Exam style) Return the names of departments whose average salary is higher than the average of all department averages.', 'SELECT d.DEPARTMENTNAME FROM DEPARTMENT d, (SELECT DEPARTMENTID, AVG(SALARY) AS a FROM EMPLOYEE GROUP BY DEPARTMENTID) t WHERE d.DEPARTMENTID = t.DEPARTMENTID AND t.a > (SELECT AVG(a) FROM (SELECT AVG(SALARY) AS a FROM EMPLOYEE WHERE DEPARTMENTID IS NOT NULL GROUP BY DEPARTMENTID));', { hint: 'Two derived tables: one of department averages to join, one to average the averages.' });
+C('#hr1', HR, '(i) Last name, number hired before, number hired after.', 'SELECT e1.LASTNAME, (SELECT COUNT(*) FROM EMPLOYEE e2 WHERE e2.HIREDATE < e1.HIREDATE), (SELECT COUNT(*) FROM EMPLOYEE e2 WHERE e2.HIREDATE > e1.HIREDATE) FROM EMPLOYEE e1;');
+C('#hr2', HR, '(ii) Employees who never changed their job or department.', 'SELECT LASTNAME FROM EMPLOYEE WHERE EMPLOYEEID NOT IN (SELECT EMPLOYEEID FROM JOB_HISTORY);');
+C('#hr3', HR, '(iii) Last name and (department maximum − salary), where that difference is at most 5000.', 'SELECT e.LASTNAME, m.max_sal - e.SALARY FROM EMPLOYEE e, (SELECT DEPARTMENTID, MAX(SALARY) AS max_sal FROM EMPLOYEE GROUP BY DEPARTMENTID) m WHERE e.DEPARTMENTID = m.DEPARTMENTID AND m.max_sal - e.SALARY <= 5000;');
+C('#hr4', HR, '(iv) Department name, manager\'s last name, number of other employees in the department.', 'SELECT d.DEPARTMENTNAME, m.LASTNAME, COUNT(e.EMPLOYEEID) FROM DEPARTMENT d LEFT JOIN EMPLOYEE m ON m.EMPLOYEEID = d.MANAGERID LEFT JOIN EMPLOYEE e ON e.DEPARTMENTID = d.DEPARTMENTID AND e.EMPLOYEEID <> NVL(d.MANAGERID, -1) GROUP BY d.DEPARTMENTID, d.DEPARTMENTNAME, m.LASTNAME;');
+C('#hr5', HR, '(v) Last name and (salary − department average) for employees above their department average.', 'SELECT e.LASTNAME, e.SALARY - a.avg_sal FROM EMPLOYEE e, (SELECT DEPARTMENTID, AVG(SALARY) AS avg_sal FROM EMPLOYEE GROUP BY DEPARTMENTID) a WHERE e.DEPARTMENTID = a.DEPARTMENTID AND e.SALARY > a.avg_sal;');
+</script>
+</body>
+</html>

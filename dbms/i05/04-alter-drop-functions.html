@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ALTER, DROP and Single-Row Functions · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="../i03/lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 05 (Ishrak) · Chapter 4 · Beyond the slides · Book §2.3.4–2.3.5</div>
+<h1>Changing Tables (ALTER, DROP, DEFAULT) and Computing in SELECT</h1>
+<p class="lede">Two topics that Lectures 3–5 use but do not teach, and that exams and lab work expect: the rest of the DDL (dropping a table, adding, removing, renaming and changing columns, default values, TRUNCATE), and the expressions, aliases and Oracle single-row functions that can appear in a SELECT list or a WHERE clause.</p>
+
+<h2>1. Removing a table: DROP TABLE (textbook §2.3.4)</h2>
+<pre>DROP TABLE Laptop2;</pre>
+<p>Removes the table completely: its rows <em>and</em> its schema. Afterwards the name no longer exists, and any query on it fails (ORA-00942). Compare the three ways of "getting rid of" data:</p>
+<div class="tbl"><table>
+<tr><th>Statement</th><th>Kind</th><th>Rows</th><th>Table (schema)</th><th>Undo with ROLLBACK?</th></tr>
+<tr><td><code>DELETE FROM T [WHERE …]</code></td><td>DML</td><td>chosen rows (or all) removed</td><td>stays</td><td>yes, until COMMIT</td></tr>
+<tr><td><code>TRUNCATE TABLE T</code></td><td>DDL</td><td>all removed, fast</td><td>stays</td><td>no (DDL commits)</td></tr>
+<tr><td><code>DROP TABLE T</code></td><td>DDL</td><td>gone</td><td>gone</td><td>no; Oracle keeps it in the recycle bin (<code>FLASHBACK TABLE T TO BEFORE DROP</code>) unless <code>PURGE</code> is added</td></tr>
+</table></div>
+<p>If other tables have foreign keys referencing T, Oracle refuses to drop it unless you write <code>DROP TABLE T CASCADE CONSTRAINTS</code>, which also removes those foreign keys. (The playground has no TRUNCATE; use <code>DELETE FROM T</code> there.)</p>
+
+<h2>2. Changing a table: ALTER TABLE (textbook §2.3.4)</h2>
+<p>A table that already holds data can have its schema changed without dropping it:</p>
+<pre>ALTER TABLE MovieStar ADD phone CHAR(16);              -- new column, NULL in every existing row
+ALTER TABLE MovieStar DROP COLUMN birthdate;           -- the column and its values disappear
+ALTER TABLE MovieStar RENAME COLUMN address TO addr;   -- rename a column
+ALTER TABLE MovieStar RENAME TO Star;                  -- rename the table
+ALTER TABLE MovieStar MODIFY (address VARCHAR2(100));  -- change a column's type or size (Oracle)</pre>
+<ul>
+  <li>The textbook writes <code>ALTER TABLE MovieStar DROP birthdate</code>; Oracle needs the word <code>COLUMN</code> (or the form <code>DROP (birthdate)</code>).</li>
+  <li>Oracle also accepts a parenthesised list: <code>ALTER TABLE MovieStar ADD (phone CHAR(16), email VARCHAR2(40));</code></li>
+  <li><code>MODIFY</code> can always enlarge a column; it can shrink one only if every existing value still fits. The playground's SQLite has no MODIFY.</li>
+  <li>Adding and dropping <em>constraints</em> with ALTER TABLE (<code>ADD CONSTRAINT</code>, <code>DROP CONSTRAINT</code>) is part of Lecture 6.</li>
+</ul>
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="a1"></div>
+</figure>
+
+<h2>3. Default values (textbook §2.3.5)</h2>
+<dl class="def">
+  <dt>DEFAULT</dt>
+  <dd>A value written after an attribute's type, used whenever a row is inserted without a value for that attribute (a partial insert), and for existing rows when the column is added by ALTER TABLE. Without DEFAULT, the default is NULL. The value can be a constant or a system value such as <code>SYSDATE</code>.</dd>
+</dl>
+<pre>CREATE TABLE MovieStar (
+    name       VARCHAR2(50) PRIMARY KEY,
+    address    VARCHAR2(50),
+    gender     CHAR(1) DEFAULT '?',
+    birthdate  DATE    DEFAULT DATE '1900-01-01'
+);
+ALTER TABLE MovieStar ADD phone CHAR(16) DEFAULT 'unlisted';</pre>
+<p>(The textbook's example uses <code>DATE '0000-00-00'</code> as an "unknown" date. Oracle rejects it: there is no year 0 or month 0. Use NULL for an unknown date, or a clearly artificial real date.) Writing the keyword <code>DEFAULT</code> in a VALUES list also asks for the default explicitly: <code>INSERT INTO MovieStar VALUES ('Ali', 'Dhaka', DEFAULT, NULL, DEFAULT);</code></p>
+<div id="p1"></div>
+
+<h2>4. Expressions and aliases in SELECT</h2>
+<p>The SELECT list may contain expressions, not only column names. Lecture 5 already used <code>model + 1100</code> and <code>price + 500</code>.</p>
+<ul>
+  <li><strong>Arithmetic:</strong> <code>+ − * /</code> on numbers, with the usual precedence (* and / before + and −; use parentheses). <code>salary * 12</code> is an annual salary.</li>
+  <li><strong>Column alias:</strong> <code>expression AS name</code> (AS is optional) names an output column. A name with spaces or a fixed case needs double quotes: <code>salary * 12 AS "Annual Salary"</code>. An alias can be used in ORDER BY but not in WHERE (WHERE is evaluated before SELECT, so the alias does not exist yet).</li>
+  <li><strong>Concatenation:</strong> <code>||</code> joins strings: <code>first_name || ' ' || last_name</code>. In Oracle a NULL operand is treated as an empty string here; in most other systems (and in the playground) the result is NULL.</li>
+  <li><strong>dual:</strong> Oracle's one-row table for computing an expression without a real table: <code>SELECT 7 * 6 FROM dual;</code></li>
+</ul>
+<div id="p2"></div>
+<p>Two playground differences to keep in mind: SQLite divides integers as integers (<code>7 / 2</code> gives 3; Oracle gives 3.5), so write <code>7 / 2.0</code> there; and <code>ROUND</code> with a negative number of places is not supported.</p>
+
+<h2>5. Oracle's single-row functions</h2>
+<p>A <b class="term">single-row function</b> takes values from one row and returns one value for that row (unlike the aggregate functions of Lecture 10, which summarise many rows). They can be used in SELECT, WHERE and ORDER BY. The most used ones:</p>
+<div class="tbl"><table>
+<tr><th>Group</th><th>Function</th><th>Example → result</th></tr>
+<tr><td rowspan="8">Character</td><td><code>UPPER(s)</code>, <code>LOWER(s)</code>, <code>INITCAP(s)</code></td><td><code>INITCAP('de haan')</code> → De Haan</td></tr>
+<tr><td><code>LENGTH(s)</code></td><td><code>LENGTH('Gizmo')</code> → 5</td></tr>
+<tr><td><code>SUBSTR(s, start, len)</code> (positions from 1)</td><td><code>SUBSTR('GizmoWorks', 1, 5)</code> → Gizmo</td></tr>
+<tr><td><code>INSTR(s, t)</code>: position of t in s, 0 if absent</td><td><code>INSTR('GizmoWorks', 'Works')</code> → 6</td></tr>
+<tr><td><code>TRIM(s)</code>, <code>LTRIM</code>, <code>RTRIM</code>: remove blanks</td><td><code>RTRIM('Household   ')</code> → Household</td></tr>
+<tr><td><code>LPAD(s, n, c)</code>, <code>RPAD</code>: pad to length n</td><td><code>LPAD('42', 5, '0')</code> → 00042</td></tr>
+<tr><td><code>REPLACE(s, a, b)</code></td><td><code>REPLACE('SA_REP', '_', ' ')</code> → SA REP</td></tr>
+<tr><td><code>CONCAT(a, b)</code> (two arguments)</td><td><code>CONCAT('Giz', 'mo')</code> → Gizmo</td></tr>
+<tr><td rowspan="3">Number</td><td><code>ROUND(x, n)</code>, <code>TRUNC(x, n)</code></td><td><code>ROUND(149.987, 2)</code> → 149.99; <code>TRUNC(149.987, 1)</code> → 149.9</td></tr>
+<tr><td><code>MOD(a, b)</code>, <code>ABS(x)</code>, <code>POWER(a, b)</code>, <code>SQRT(x)</code></td><td><code>MOD(17, 5)</code> → 2</td></tr>
+<tr><td><code>CEIL(x)</code>, <code>FLOOR(x)</code></td><td><code>CEIL(4.1)</code> → 5</td></tr>
+<tr><td rowspan="3">Date</td><td><code>SYSDATE</code></td><td>current date and time</td></tr>
+<tr><td><code>ADD_MONTHS(d, n)</code>, <code>MONTHS_BETWEEN(d1, d2)</code></td><td><code>ADD_MONTHS(DATE '2024-01-31', 1)</code> → 29-FEB-24</td></tr>
+<tr><td><code>TO_CHAR(d, mask)</code>, <code>TO_DATE(s, mask)</code></td><td>Lec 03, Chapter 4</td></tr>
+<tr><td rowspan="2">NULL</td><td><code>NVL(x, y)</code></td><td>y if x is NULL, else x</td></tr>
+<tr><td><code>NVL2(x, y, z)</code></td><td>y if x is not NULL, else z</td></tr>
+</table></div>
+<div id="p3"></div>
+
+<h2>6. Conditional values: CASE and DECODE</h2>
+<pre>SELECT last_name, salary,
+       CASE
+         WHEN salary &gt;= 15000 THEN 'high'
+         WHEN salary &gt;= 7000  THEN 'medium'
+         ELSE 'low'
+       END AS band
+FROM   Employees;</pre>
+<p>A <b class="term">searched CASE</b> tests its WHEN conditions in order and returns the THEN value of the first TRUE one, or the ELSE value (NULL if there is no ELSE). Oracle's older <code>DECODE</code> function compares one expression with a list of values:</p>
+<pre>SELECT last_name,
+       DECODE(department_id, 90, 'Executive', 60, 'IT', 50, 'Shipping', 'Other') AS dept
+FROM   Employees;</pre>
+<p>is the same as <code>CASE department_id WHEN 90 THEN 'Executive' WHEN 60 THEN 'IT' WHEN 50 THEN 'Shipping' ELSE 'Other' END</code>. (One difference: DECODE treats two NULLs as equal, CASE does not.) The playground supports both forms.</p>
+<div id="p4"></div>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div><div id="try2"></div>
+<h3>SQL exercises</h3>
+<div id="c1"></div><div id="c2"></div><div id="c3"></div><div id="c4"></div><div id="c5"></div><div id="c6"></div>
+
+<div class="key"><p><strong>Summary:</strong> DROP TABLE removes rows and schema; TRUNCATE removes all rows quickly (DDL, no rollback); DELETE removes chosen rows (DML). ALTER TABLE adds (<code>ADD col type [DEFAULT v]</code>), drops (<code>DROP COLUMN</code>), renames and (Oracle) modifies columns. DEFAULT gives the value used when none is supplied. SELECT lists may hold arithmetic, <code>||</code>, CASE and single-row functions such as UPPER, SUBSTR, ROUND, NVL, TO_CHAR; <code>AS</code> names the output column.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/sqlplay.js"></script>
+<script src="../i03/lecture.js"></script>
+<script>
+(() => {
+  const H = ['name', 'address', 'gender', 'birthdate'];
+  const R = [['Carrie Fisher', '123 Maple St., Hollywood', 'F', '1999-09-09'], ['Mark Hamill', '456 Oak Rd., Brentwood', 'M', '1988-08-08'], ['Harrison Ford', '789 Palm Dr., Beverly Hills', 'M', '1977-07-07']];
+  const L1 = [['a', "ALTER TABLE MovieStar ADD phone CHAR(16) DEFAULT 'unlisted';"]];
+  const L2 = [['a', 'ALTER TABLE MovieStar DROP COLUMN birthdate;']];
+  const L0 = [['a', 'ALTER TABLE MovieStar ADD phone CHAR(16);']];
+  stepper('#a1', [
+    { html: dmlFrame([['x', '-- MovieStar before']], null, [T(H, R, { name: 'MovieStar' })]), cap: 'MovieStar has 4 columns and 3 rows.' },
+    { html: dmlFrame(L0, 'a', [T([...H, 'phone'], R.map(r => [...r, null]), { name: 'MovieStar', hl: [4] })]), cap: '<b>ADD without DEFAULT.</b> Every existing row gets the new column, and since no phone numbers are known, the value is NULL (textbook Example 2.4).' },
+    { html: dmlFrame(L1, 'a', [T([...H, 'phone'], R.map(r => [...r, 'unlisted']), { name: 'MovieStar', hl: [4] })]), cap: "<b>ADD with DEFAULT</b> (instead of the previous step): existing rows get the default 'unlisted', and so will future inserts that give no phone." },
+    { html: dmlFrame(L2, 'a', [T(['name', 'address', 'gender', 'phone'], R.map(r => [r[0], r[1], r[2], 'unlisted']), { name: 'MovieStar' })]), cap: '<b>DROP COLUMN.</b> The birthdate column and all its values are removed from every row. The rows themselves remain.' },
+  ]);
+})();
+sqlPlay('#p1', { setup: UNI, query: "ALTER TABLE MovieStar ADD phone CHAR(16) DEFAULT 'unlisted';\nINSERT INTO MovieStar (name, address, gender) VALUES ('Ali', 'Dhaka', 'M');\nSELECT * FROM MovieStar;", note: "Then try <code>ALTER TABLE MovieStar DROP COLUMN birthdate;</code> and <code>ALTER TABLE MovieStar RENAME COLUMN address TO addr;</code>" });
+sqlPlay('#p2', { setup: HR, query: "SELECT first_name || ' ' || last_name AS \"Full Name\",\n       salary * 12 AS annual_salary\nFROM   Employees\nWHERE  department_id = 60\nORDER BY annual_salary DESC;" });
+sqlPlay('#p3', { setup: HR, query: "SELECT UPPER(last_name), LENGTH(last_name),\n       SUBSTR(job_id, 1, INSTR(job_id, '_') - 1) AS job_area,\n       NVL(commission_pct, 0) AS comm,\n       TO_CHAR(hire_date, 'MON-YYYY') AS hired\nFROM   Employees\nWHERE  department_id IN (80, 90);" });
+sqlPlay('#p4', { setup: HR, query: "SELECT last_name, salary,\n       CASE\n         WHEN salary >= 15000 THEN 'high'\n         WHEN salary >= 7000  THEN 'medium'\n         ELSE 'low'\n       END AS band\nFROM   Employees\nORDER BY salary DESC;" });
+flashcards('#cards', [
+  { f: 'DROP TABLE T', b: 'Removes rows and schema.' },
+  { f: 'TRUNCATE TABLE T', b: 'Removes all rows, keeps the table; DDL, cannot be rolled back.' },
+  { f: 'ALTER TABLE T ADD c type', b: 'New column; existing rows get NULL (or the DEFAULT).' },
+  { f: 'ALTER TABLE T DROP COLUMN c', b: 'Removes the column and its values.' },
+  { f: 'MODIFY', b: 'Oracle: ALTER TABLE T MODIFY (c newtype) changes type/size.' },
+  { f: 'DEFAULT', b: 'Value used when an insert gives none.' },
+  { f: 'Alias', b: 'expr AS name; double quotes for spaces/case; usable in ORDER BY, not WHERE.' },
+  { f: '||', b: 'String concatenation (Oracle treats NULL as empty here).' },
+  { f: 'CASE vs DECODE', b: 'CASE WHEN … THEN … ELSE … END is standard; DECODE(x, v1, r1, …, default) is Oracle.' },
+]);
+quiz('#quiz', [
+  { q: 'Which statement keeps the table but removes all rows and cannot be rolled back?', opts: ['DELETE FROM T', 'TRUNCATE TABLE T', 'DROP TABLE T', 'ALTER TABLE T DROP ROWS'], a: 1, why: 'TRUNCATE is DDL, so it commits.' },
+  { q: 'After <code>ALTER TABLE Movie ADD rating NUMBER(2,1)</code>, existing movies have rating…', opts: ['0', 'NULL', 'an error', '1.0'], a: 1, why: 'No DEFAULT was given.' },
+  { q: 'Why does <code>SELECT salary * 12 AS annual FROM Employees WHERE annual &gt; 100000</code> fail?', opts: ['AS is not allowed', 'WHERE is evaluated before SELECT, so the alias is unknown', 'annual is reserved', 'It does not fail'], a: 1, why: 'Repeat the expression in WHERE: <code>WHERE salary * 12 &gt; 100000</code>.' },
+  { q: "<code>SUBSTR('GizmoWorks', 6, 5)</code> returns…", opts: ['Works', 'oWork', 'Gizmo', 'mo'], a: 0, why: 'Start at position 6 (W), take 5 characters.' },
+  { q: "<code>CASE WHEN 5 &gt; 3 THEN 'a' WHEN 5 &gt; 1 THEN 'b' END</code> returns…", opts: ["'a'", "'b'", "'ab'", 'NULL'], a: 0, why: 'The first TRUE WHEN wins.' },
+  { q: 'Which is valid Oracle?', opts: ['ALTER TABLE T DROP c', 'ALTER TABLE T DROP COLUMN c', 'ALTER TABLE T REMOVE c', 'DROP COLUMN T.c'], a: 1, why: 'The textbook\'s form without COLUMN is not Oracle syntax.' },
+]);
+ask('#try1', { q: "What does <code>INSTR('011.44.1344.429018', '.')</code> return?", a: 4, why: 'The first dot is the 4th character.' });
+ask('#try2', { q: 'What is <code>MOD(2026, 4)</code>?', a: 2, why: '2026 = 4 × 506 + 2.' });
+chk('#c1', UNI, "<b>Easy: ALTER … ADD.</b> Add a column <code>phone</code> of type CHAR(16) with default 'unlisted' to MovieStar.", "ALTER TABLE MovieStar ADD phone CHAR(16) DEFAULT 'unlisted';", { check: 'state', table: 'MovieStar' });
+chk('#c2', UNI, '<b>DROP COLUMN.</b> Remove the <code>length</code> column from Movie.', 'ALTER TABLE Movie DROP COLUMN length;', { check: 'state', table: 'Movie' });
+chk('#c3', HR, '<b>Expressions and aliases.</b> Show each employee\'s <code>last_name</code> and annual salary (salary × 12) as a column named <code>annual</code>, highest first, then by last name.', 'SELECT last_name, salary * 12 AS annual FROM Employees ORDER BY annual DESC, last_name;', { ordered: true });
+chk('#c4', HR, "<b>Concatenation and functions.</b> Show, for department 60, one column with the full name in upper case, e.g. <code>ALEXANDER HUNOLD</code>, and one with the length of the last name.", "SELECT UPPER(first_name || ' ' || last_name), LENGTH(last_name)\nFROM Employees WHERE department_id = 60;");
+chk('#c5', HR, "<b>CASE.</b> Show <code>last_name</code>, <code>salary</code> and a column <code>band</code> that is 'high' for salaries of at least 15000, 'medium' for at least 7000 and 'low' otherwise.", "SELECT last_name, salary,\n  CASE WHEN salary >= 15000 THEN 'high'\n       WHEN salary >= 7000 THEN 'medium'\n       ELSE 'low' END AS band\nFROM Employees;");
+chk('#c6', HR, "<b>Exam style.</b> Show each employee\'s <code>last_name</code> and total monthly pay, <code>salary * (1 + commission_pct)</code>, treating a missing commission as 0 and rounding to the nearest whole number; name the column <code>total_pay</code>. Sort by total_pay descending, then last_name.", 'SELECT last_name, ROUND(salary * (1 + NVL(commission_pct, 0))) AS total_pay\nFROM Employees\nORDER BY total_pay DESC, last_name;', { ordered: true, hint: 'NVL(commission_pct, 0) makes the formula work for everyone. ROUND(x) rounds to 0 decimals.' });
+</script>
+</body>
+</html>

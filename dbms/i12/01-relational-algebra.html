@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Relational Algebra and the SQL Engine · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 12 (Ishrak) · Chapter 1 · Slides 1–5 · Book §2.4.1–2.4.2</div>
+<h1>Relational Algebra and the SQL Engine</h1>
+<p class="lede">Why a database turns your SQL into relational algebra, what the operators of that algebra are, and the two conventions the slides use (sets, and named attributes). It also introduces the RA evaluator you will use in every chapter of this lecture.</p>
+
+<p>The title slide calls this deck "Lecture 11, Chapter 2: The Relational Algebra and Triggers". In this course it is Lecture 12. The first part (slides 2–49) is relational algebra; the second part (slides 50–52) is triggers, covered from <a href="10-triggers.html">Chapter 10</a> on.</p>
+
+<h2>1. How a SQL engine runs a query (slides 2–3)</h2>
+
+<p>SQL is <b class="term">declarative</b>: a query says <em>what</em> rows you want, never <em>how</em> to find them. Before a database can run it, it must turn it into a precise sequence of operations. Slide 2 shows the four stages:</p>
+
+<figure class="wide">
+<svg id="pipe" viewBox="0 0 860 150" width="860" role="img" aria-label="SQL query to relational algebra plan to optimized plan to execution"></svg>
+<figcaption><b>Figure 1.</b> The path of a query through the engine (slide 2). The highlighted stage is the one this lecture is about: relational algebra.</figcaption>
+</figure>
+
+<ol>
+  <li><b>SQL query.</b> The user writes a declarative query.</li>
+  <li><b>Relational algebra (RA) plan.</b> The engine translates the query into an expression of relational algebra: a formula built from a few operators, each taking relations as input and producing a relation.</li>
+  <li><b>Optimized RA plan.</b> Many different RA expressions give the same answer. The optimizer rewrites the expression into an equivalent one that is cheaper to run (<a href="07-query-trees.html">Chapter 7</a>).</li>
+  <li><b>Execution.</b> Each operator of the chosen plan is run by a physical algorithm, such as a scan, a sort or a hash join. Those algorithms are Sukarna sir's Lec 07–08 (<a href="../s07/01-query-processor.html">the query processor</a>).</li>
+</ol>
+
+<p>Slide 3 states the point of the whole topic: <em>relational algebra allows us to translate declarative (SQL) queries into precise and optimizable expressions.</em> "Precise" because every RA operator has an exact mathematical definition. "Optimizable" because algebra has laws (like x·(y+z) = x·y + x·z in arithmetic) that let you rewrite an expression into a faster equivalent one.</p>
+
+<dl class="def">
+  <dt>Relational algebra (RA)</dt>
+  <dd>A set of operators that take one or two relations as input and produce a new relation as output. Expressions are built by applying operators to relations and to the results of other operators.</dd>
+  <dt>Algebra</dt>
+  <dd>In general, a set of <i>operands</i> (here: relations) and <i>operators</i> that build new operands from old ones (textbook §2.4.2). Ordinary arithmetic is an algebra over numbers with +, −, ×, ÷.</dd>
+  <dt>Closure</dt>
+  <dd>The output of every RA operator is again a relation. So operators can be nested to any depth: the output of one is the input of the next. Slide 10 calls this being <b>compositional</b>.</dd>
+  <dt>Relation, tuple, attribute, schema</dt>
+  <dd>A <b>relation</b> is a table. Each row is a <b>tuple</b>, each column an <b>attribute</b>. The <b>schema</b> of a relation is its name plus its list of attributes, written like <code>Students(sid, sname, gpa)</code>. The number of attributes is the relation's <b>arity</b> (degree); the number of tuples is its <b>cardinality</b>.</dd>
+</dl>
+
+<h2>2. The operators (slide 4)</h2>
+
+<p>Slide 4 lists five <b class="term">basic</b> operators. Every other operator can be written using these five, so they are the minimum a query language needs. On top of them come <b class="term">derived</b> (auxiliary) operators, which are shorthands for common combinations, and one <b class="term">special</b> operator, renaming, which only changes names.</p>
+
+<div class="tbl"><table>
+<tr><th>Operator</th><th>Symbol</th><th>Kind</th><th>What it does</th><th>Rough SQL counterpart</th><th>Chapter</th></tr>
+<tr><td>Selection</td><td>σ<sub>c</sub>(R)</td><td>basic, unary</td><td>keeps the rows that satisfy condition c</td><td><code>WHERE c</code></td><td><a href="02-selection-projection.html">2</a></td></tr>
+<tr><td>Projection</td><td>π<sub>A1,…,An</sub>(R)</td><td>basic, unary</td><td>keeps only the listed attributes, then removes duplicates</td><td><code>SELECT DISTINCT A1, …</code></td><td><a href="02-selection-projection.html">2</a></td></tr>
+<tr><td>Cartesian product</td><td>R × S</td><td>basic, binary</td><td>pairs every row of R with every row of S</td><td><code>FROM R, S</code></td><td><a href="03-product-renaming.html">3</a></td></tr>
+<tr><td>Union</td><td>R ∪ S</td><td>basic, binary</td><td>rows in R or in S</td><td><code>UNION</code></td><td><a href="05-set-operations.html">5</a></td></tr>
+<tr><td>Difference</td><td>R − S</td><td>basic, binary</td><td>rows in R but not in S</td><td><code>MINUS</code> (Oracle)</td><td><a href="05-set-operations.html">5</a></td></tr>
+<tr><td>Intersection</td><td>R ∩ S</td><td>derived</td><td>rows in both</td><td><code>INTERSECT</code></td><td><a href="05-set-operations.html">5</a></td></tr>
+<tr><td>Natural join</td><td>R ⋈ S</td><td>derived</td><td>pairs rows that agree on all shared attributes</td><td><code>NATURAL JOIN</code></td><td><a href="04-natural-join.html">4</a></td></tr>
+<tr><td>Theta / equi-join</td><td>R ⋈<sub>θ</sub> S</td><td>derived</td><td>pairs rows that satisfy θ</td><td><code>JOIN … ON θ</code></td><td><a href="06-theta-outer-joins.html">6</a></td></tr>
+<tr><td>Renaming</td><td>ρ<sub>S(B1,…,Bn)</sub>(R)</td><td>special</td><td>changes the relation and/or attribute names</td><td><code>AS</code></td><td><a href="03-product-renaming.html">3</a></td></tr>
+</table></div>
+
+<p>The book and the exam questions also use a few <b>extended</b> operators that the slides do not list: division ÷ (<a href="05-set-operations.html">Chapter 5</a>), outer joins (<a href="06-theta-outer-joins.html">Chapter 6</a>), and grouping γ, sorting τ, duplicate elimination δ and assignment (<a href="09-extended-ra.html">Chapter 9</a>).</p>
+
+<h2>3. Two conventions: sets and named attributes (slide 5)</h2>
+
+<h3>RA operates on sets</h3>
+<p>A <b class="term">set</b> contains each element at most once. A <b class="term">bag</b> (multiset) may contain the same element several times. Real database systems store and return <em>bags</em>: a SQL table can hold two identical rows, and <code>SELECT dept_name FROM instructor</code> returns one row per instructor, repeats included. The relational algebra of these slides works on <em>sets</em>: every relation, including every intermediate result, has no duplicate tuples. Whenever an operator would produce the same tuple twice (projection is the usual culprit), the copy is dropped. That is why π is matched with <code>SELECT DISTINCT</code>, and why the evaluator below always removes duplicates.</p>
+
+<h3>The named perspective</h3>
+<p>The slides use the <b class="term">named perspective</b>: every attribute has a unique name, and you refer to an attribute by its name, never by its position. As a result <b>attribute order does not matter</b>: (sid, sname, gpa) and (gpa, sid, sname) describe the same relation. When two relations with the same attribute name meet (for example in R × S, where both have an attribute B), the attributes are told apart by prefixing the relation name: R.B and S.B.</p>
+
+<div class="q"><h4>Why does the theory use sets when real systems use bags?</h4>
+<p>Sets make the algebra simpler and give it more laws. For example, R ∪ R = R holds for sets but not for bags. Systems use bags because removing duplicates costs a sort or a hash (see <a href="../s07/06-one-pass-unary.html">δ in Lec 07</a>) and because duplicates are often needed, for instance to compute an average correctly. The book treats bag semantics in §5.1. For this lecture, assume sets unless a question says otherwise; one exam question that says "assume bags" is answered in <a href="../s08/07-beyond-the-slides.html">Sukarna sir's Lec 08 chapter</a>.</p>
+</div>
+
+<h2>4. The RA evaluator used in this lecture</h2>
+
+<p>Every chapter of this lecture has a live <b>RA evaluator</b>. You type an expression in a plain-ASCII syntax, it draws the expression as a tree, and then runs it <b>bottom-up</b>, one operator per step, showing each intermediate relation. Below the evaluator, a SQL playground runs the equivalent Oracle SQL on the same data, so you can check that the two agree. Press <b>Syntax</b> for the full list of operators.</p>
+
+<div class="tbl"><table>
+<tr><th>Textbook</th><th>Type into the evaluator</th></tr>
+<tr><td>σ<sub>gpa&gt;3.5</sub>(Students)</td><td><code>select[gpa &gt; 3.5](Students)</code></td></tr>
+<tr><td>π<sub>sname,gpa</sub>(Students)</td><td><code>project[sname, gpa](Students)</code></td></tr>
+<tr><td>Students × People</td><td><code>Students x People</code></td></tr>
+<tr><td>R ⋈ S, R ∪ S, R ∩ S, R − S, R ÷ S</td><td><code>R join S</code>, <code>R union S</code>, <code>R intersect S</code>, <code>R - S</code>, <code>R / S</code></td></tr>
+</table></div>
+
+<p>The data are the slides' <code>Students</code> and <code>People</code> relations, with two extra students so that selections have something to filter. Choose an example from the list, step through it, then edit the expression and press <b>Evaluate</b>.</p>
+
+<figure class="wide">
+<span class="anim-tag">Interactive tool</span>
+<div id="lab"></div>
+</figure>
+
+<p>Try breaking it on purpose: <code>project[sname](Students) union People</code> is rejected because the two sides have different numbers of attributes, and <code>select[address = 'x'](Students)</code> is rejected because Students has no attribute called address. Those are exactly the mistakes examiners look for.</p>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+<div id="try2"></div>
+
+<h3>Exam questions</h3>
+<p>No question-bank question tests this chapter alone. The "write in relational algebra" and "compute the output" questions start in <a href="04-natural-join.html">Chapter 4</a>.</p>
+
+<div class="key"><p><strong>Summary:</strong> A SQL engine translates a declarative query into a relational-algebra expression, optimizes that expression with algebraic laws, and executes it operator by operator. RA has five basic operators (σ, π, ×, ∪, −), derived ones (∩, the joins) and renaming ρ. Every operator returns a relation, so operators compose. In this lecture relations are sets (no duplicates) and attributes are referred to by name, so attribute order does not matter.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/sqlplay.js"></script>
+<script src="lecture.js"></script>
+<script>
+// pipeline figure
+(() => {
+  const boxes = [['SQL', 'Query', 'Declarative query', '(from the user)'], ['Relational', 'Algebra plan', 'Translate to a', 'RA expression'], ['Optimized', 'RA plan', 'Equivalent but', 'cheaper expression'], ['Execution', '', 'Run each operator', 'of the plan']];
+  let s = '';
+  boxes.forEach((b, i) => {
+    const x = 10 + i * 215, hot = i === 1;
+    s += `<rect x="${x}" y="10" width="170" height="62" rx="10" class="${hot ? 'cell-hl' : 'cell'}" ${hot ? 'style="stroke:var(--red);stroke-width:2.5"' : ''}/>`;
+    s += `<text x="${x + 85}" y="${b[1] ? 37 : 46}" text-anchor="middle" class="big" style="font-size:14px">${b[0]}</text>`;
+    if (b[1]) s += `<text x="${x + 85}" y="56" text-anchor="middle" class="big" style="font-size:14px">${b[1]}</text>`;
+    s += `<text x="${x + 85}" y="100" text-anchor="middle" class="lbl" style="font-size:12px">${b[2]}</text><text x="${x + 85}" y="116" text-anchor="middle" class="lbl" style="font-size:12px">${b[3]}</text>`;
+    if (i < 3) s += `<path d="M${x + 174} 41 H${x + 209}" class="s-acc" marker-end="url(#m-acc)"/>`;
+  });
+  s += `<text x="225" y="142" class="lbl red" style="font-size:12px">this lecture</text>`;
+  document.querySelector('#pipe').innerHTML = s;
+})();
+
+raLab('#lab', { db: DB_SLIDES, presets: [
+  { label: 'σ: students with gpa > 3.5', ra: 'select[gpa > 3.5](Students)', sql: 'SELECT *\nFROM Students\nWHERE gpa > 3.5;' },
+  { label: 'π: names and gpas', ra: 'project[sname, gpa](Students)', sql: 'SELECT DISTINCT sname, gpa\nFROM Students;' },
+  { label: 'π of σ: names of students with gpa > 3.5', ra: 'project[sname](select[gpa > 3.5](Students))', sql: 'SELECT DISTINCT sname\nFROM Students\nWHERE gpa > 3.5;' },
+  { label: '×: Students × People', ra: 'Students x People', sql: 'SELECT *\nFROM Students, People;' },
+] });
+
+flashcards('#cards', [
+  { f: 'Relational algebra', b: 'A set of operators that take relations as input and return a relation. Expressions built from them describe queries precisely.' },
+  { f: 'Closure (compositional)', b: 'Every RA operator returns a relation, so the output of one operator can be the input of another.' },
+  { f: 'The five basic operators', b: 'Selection σ, projection π, Cartesian product ×, union ∪, difference −.' },
+  { f: 'Derived operator', b: 'An operator that can be expressed with the basic ones, kept as a shorthand: ∩ and the joins.' },
+  { f: 'Renaming ρ', b: 'A special operator that changes the name of the relation and/or its attributes. The rows do not change.' },
+  { f: 'Set vs bag', b: 'A set holds each tuple at most once; a bag (multiset) may repeat tuples. RA in these slides uses sets; SQL tables are bags.' },
+  { f: 'Named perspective', b: 'Attributes are referred to by name, never by position, so attribute order does not matter. Clashing names are qualified: R.B, S.B.' },
+  { f: 'Arity / cardinality', b: 'Arity = number of attributes (columns). Cardinality = number of tuples (rows).' },
+]);
+quiz('#quiz', [
+  { q: 'In the engine pipeline, what happens between "RA plan" and "Execution"?', opts: ['The SQL is parsed', 'The RA expression is rewritten into an equivalent, cheaper one', 'Duplicates are removed', 'The query is checked for syntax errors'], a: 1, why: 'That is the optimized RA plan stage: logical optimization using algebraic laws (Chapter 7).' },
+  { q: 'Which of these is <b>not</b> one of the five basic operators?', opts: ['Union', 'Difference', 'Intersection', 'Cartesian product'], a: 2, why: 'Intersection is derived: R ∩ S = R − (R − S) (slide 24).' },
+  { q: 'Relation R has 3 attributes and 7 tuples. What are its arity and cardinality?', opts: ['arity 7, cardinality 3', 'arity 3, cardinality 7', 'arity 21, cardinality 1', 'arity 3, cardinality 3'], a: 1, why: 'Arity counts columns, cardinality counts rows.' },
+  { q: 'Why does π correspond to <code>SELECT DISTINCT</code> and not to plain <code>SELECT</code>?', opts: ['Because π sorts the result', 'Because RA relations are sets, so π drops duplicate rows', 'Because SQL cannot project', 'Because DISTINCT is faster'], a: 1, why: 'Plain SELECT returns a bag and may repeat rows; RA works on sets.' },
+  { q: 'Under the named perspective, are (sid, sname, gpa) and (sname, gpa, sid) the same schema?', opts: ['Yes, attribute order does not matter', 'No, the first column must be the key', 'Only if the relation is empty', 'Only in SQL'], a: 0, why: 'Slide 5: attributes are identified by name, so order is irrelevant.' },
+  { q: 'What does "closure" of relational algebra let you do?', opts: ['Close a transaction', 'Nest operators, feeding one result into the next', 'Compute the closure of attributes under FDs', 'Lock a relation'], a: 1, why: 'Each result is a relation, so it can be an operand again.' },
+]);
+ask('#try1', { q: 'Students has 4 tuples. How many tuples can π<sub>sname</sub>(Students) have at most?', a: 4, why: 'Projection never adds tuples; it can only keep them or merge duplicates. With 4 different names, all 4 stay.' });
+ask('#try2', { q: 'Students has 4 tuples and People has 2. How many tuples does Students × People have?', a: 8, why: 'Every Students row pairs with every People row: 4 × 2 = 8. Run the × example in the evaluator to see them.' });
+</script>
+</body>
+</html>

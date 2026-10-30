@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Undo/Redo Logging · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="../s05/lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 06 (Sukarna) · Chapter 3 · Slides 12–16 · Book §17.4.1–17.4.2</div>
+<h1>Undo/Redo Logging</h1>
+<p class="lede">Undo logging writes data too early, redo logging holds it too long. Undo/redo logging logs both the old and the new value, and in exchange drops almost every ordering constraint. This chapter gives rule UR1, the slide's step table, the two-pass recovery (redo, then undo), why the order of the passes is delicate, and the many exam questions on undo/redo recovery.</p>
+
+<h2>1. Why combine the two? (slide 12)</h2>
+
+<ul>
+  <li><strong>Undo logging</strong> requires data to be written to disk before a transaction commits. This increases the number of disk I/Os.</li>
+  <li><strong>Redo logging</strong> requires changed data to stay in buffers until the transaction commits and its log records are flushed. This increases the average number of buffers transactions need.</li>
+  <li>The textbook adds a third problem: when two elements share a buffer, the two methods can contradict each other. If a buffer holds A, changed by a committed transaction, and B, changed by a transaction whose COMMIT is not yet on disk, a redo checkpoint must write the buffer (because of A) and must not write it (because of B).</li>
+</ul>
+<p>Combining both kinds of information in the log removes these conflicts, at the price of bigger log records.</p>
+
+<h2>2. The undo/redo rule (slide 13)</h2>
+
+<dl class="def">
+  <dt>&lt;T, X, v, w&gt;</dt><dd>The undo/redo update record: transaction T changed element X; its previous value was v and its new value is w.</dd>
+  <dt>UR1</dt><dd>Before X is updated on disk because of a change made by T, the log record &lt;T, X, v, w&gt; must appear on disk.</dd>
+</dl>
+<p>UR1 is write-ahead logging and nothing more. It enforces only the constraint that undo and redo logging have in common. In particular <strong>there is no constraint on &lt;COMMIT T&gt;</strong>: it may reach disk before, between or after the changed elements.</p>
+
+<h2>3. The slide's example (slide 14, textbook Fig. 17.9)</h2>
+<div class="tbl"><table>
+<tr><th>Step</th><th>Action</th><th>t</th><th>M-A</th><th>M-B</th><th>D-A</th><th>D-B</th><th>Log</th></tr>
+<tr><td>1</td><td></td><td></td><td></td><td></td><td></td><td></td><td><code>&lt;START T&gt;</code></td></tr>
+<tr><td>2</td><td><code>READ(A,t)</code></td><td>8</td><td>8</td><td></td><td>8</td><td>8</td><td></td></tr>
+<tr><td>3</td><td><code>t := t*2</code></td><td>16</td><td>8</td><td></td><td>8</td><td>8</td><td></td></tr>
+<tr><td>4</td><td><code>WRITE(A,t)</code></td><td>16</td><td>16</td><td></td><td>8</td><td>8</td><td><code>&lt;T,A,8,16&gt;</code></td></tr>
+<tr><td>5</td><td><code>READ(B,t)</code></td><td>8</td><td>16</td><td>8</td><td>8</td><td>8</td><td></td></tr>
+<tr><td>6</td><td><code>t := t*2</code></td><td>16</td><td>16</td><td>8</td><td>8</td><td>8</td><td></td></tr>
+<tr><td>7</td><td><code>WRITE(B,t)</code></td><td>16</td><td>16</td><td>16</td><td>8</td><td>8</td><td><code>&lt;T,B,8,16&gt;</code></td></tr>
+<tr><td>8</td><td><code>FLUSH LOG</code></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+<tr><td>9</td><td><code>OUTPUT(A)</code></td><td>16</td><td>16</td><td>16</td><td>16</td><td>8</td><td></td></tr>
+<tr><td>10</td><td></td><td></td><td></td><td></td><td></td><td></td><td><code>&lt;COMMIT T&gt;</code></td></tr>
+<tr><td>11</td><td><code>OUTPUT(B)</code></td><td>16</td><td>16</td><td>16</td><td>16</td><td>16</td><td></td></tr>
+</table></div>
+<p>The update records now carry both values. As the slide notes, &lt;COMMIT T&gt; is written in the middle of the outputs and is <em>not flushed</em> while A and B are written. Step 10 could equally come before step 8 or 9, or after step 11; all are legal.</p>
+
+<figure class="wide">
+<span class="anim-tag">Interactive animation</span>
+<div id="xt"></div>
+</figure>
+
+<p><strong>A problem with delayed commitment</strong> (textbook sidebar). As with undo logging, a user may be told a transaction committed (say, they booked a seat and logged off), yet the &lt;COMMIT T&gt; record was never flushed; a crash then makes recovery <em>undo</em> the booking. If that is unacceptable, add rule <b class="term">UR2</b>: <em>a &lt;COMMIT T&gt; record must be flushed to disk as soon as it appears in the log</em> (in Fig. 17.9, add FLUSH LOG after step 10).</p>
+
+<h2>4. Recovery with undo/redo logging (slide 15)</h2>
+
+<p>The log has both values, so recovery can undo or redo any transaction. And it must do both, because the flexible rule allows both kinds of damage: a committed transaction may have some changes not yet on disk, and an uncommitted one may have some changes already on disk.</p>
+<pre>Step 1 (redo): redo all committed transactions, earliest first:
+        scan forward; for each &lt;T,X,v,w&gt; with T committed, write X = w.
+Step 2 (undo): undo all incomplete transactions, latest first:
+        scan backward; for each &lt;T,X,v,w&gt; with T incomplete, write X = v.
+Then write &lt;ABORT T&gt; for each incomplete T and flush the log.</pre>
+
+<div class="q">
+<h4>Slide 15 question: what if redo and undo involve the same element X?</h4>
+<p>Suppose uncommitted T1 changed X, then committed T2 changed X, then the system crashed. Concretely: <code>&lt;T1, X, 1, 2&gt;</code>, later <code>&lt;T2, X, 2, 3&gt;</code>, <code>&lt;COMMIT T2&gt;</code>.</p>
+<ul>
+  <li><strong>Redo first, then undo</strong> (the order of the algorithm above): redo sets X = 3, then undo of T1 sets X = 1. T2's committed change is lost, which is what the slide means by “T2's changes will not be reflected”.</li>
+  <li><strong>Undo first, then redo</strong>: undo sets X = 1, then redo sets X = 3. Now T1's change is gone, as it should be, but T2's value 3 was computed from 2, a value written by T1, which never committed. The final state does not correspond to any execution of whole transactions.</li>
+</ul>
+<p>So neither order gives a sensible result. The textbook's conclusion: the problem is not the order of recovery but the fact that T2 was allowed to read or overwrite a value written by an uncommitted transaction. The DBMS must prevent this with concurrency control (Lectures 07–08: for example, a transaction keeps its locks until it commits, so no other transaction can touch X in between). Under that assumption the two passes never touch the same element in conflicting ways and their order does not matter. This book and the simulator use the slides' order: redo, then undo.</p>
+</div>
+
+<h2>5. Analysing the crash points (slide 16, textbook Example 17.11)</h2>
+<div class="q">
+<h4>Slide 16 (worked answers), the log of Fig. 17.9</h4>
+<p><strong>Crash after &lt;COMMIT T&gt; is flushed to disk.</strong> T is committed, so it is redone: write A = 16 and B = 16. Given the order of events, A is already 16 on disk; B may or may not be, depending on whether the crash came before or after step 11. Result A = B = 16.</p>
+<p><strong>Crash before &lt;COMMIT T&gt; reaches disk.</strong> T is incomplete, so it is undone, latest first: write B = 8, then A = 8. If the crash came between steps 9 and 10, A was 16 on disk and the undo is necessary. B was never written, and if the crash came before step 9 neither was A, but recovery cannot know, so it always performs the undo. Then &lt;ABORT T&gt; is logged. Result A = B = 8.</p>
+</div>
+<figure>
+<span class="anim-tag">Animation</span>
+<div id="case2"></div>
+<figcaption>Crash between steps 9 and 10: the log on disk is &lt;START T&gt; &lt;T,A,8,16&gt; &lt;T,B,8,16&gt; and disk holds A = 16, B = 8.</figcaption>
+</figure>
+
+<h3>Try your own log</h3>
+<figure class="wide">
+<span class="anim-tag">Interactive animation</span>
+<div id="rv"></div>
+</figure>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+
+<h3>Exam questions</h3>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 24-25 3c · 11 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-1 | 2024–25 · 11 marks</div>
+  <div class="exam-q"><p>Assume that the database recovery manager takes a redo or undo action which is expressed as &lt;X,V&gt; implying database object X is written with value V in the disk. Consider the sequence of following log records.</p>
+  <pre>&lt;T0 start&gt;; &lt;T0, A, 40, 60&gt;; &lt;T1 start&gt;; &lt;T1, B, 100, 150&gt;; &lt;T0, C, 50, 100&gt;;
+&lt;T2 start&gt;; &lt;T2, D, 100, 70&gt;; &lt;T1, C, 20, 50&gt;; &lt;T1 commit&gt;; &lt;T2, C, 60, 80&gt;;
+&lt;T0 commit&gt;; &lt;T2 commit&gt;</pre>
+  <p>Answer the following questions: (i) For both redo and undo phases, write down the actions of the recovery manager if a system crash happens between &lt;T2, C, 60, 80&gt; and &lt;T0 commit&gt;. (ii) For both redo and undo phases, write down the actions of the recovery manager if a system crash happens between &lt;T1, C, 20, 50&gt; and &lt;T1 commit&gt;. Your answer should consist of a sequence of &lt;X,V&gt; statements in order of their occurrence.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+  <p>Each update record is &lt;T, X, old, new&gt;. Redo writes the new value of committed transactions (forward); undo writes the old value of uncommitted ones (backward). (The values in this question are not mutually consistent, e.g. T1's old value of C is 20 although T0 had set C to 100; recovery does not care, it just copies values from the log.)</p>
+  <p><strong>(i) Crash between &lt;T2,C,60,80&gt; and &lt;T0 commit&gt;.</strong> Committed: T1. Uncommitted: T0, T2.</p>
+  <ul>
+    <li><strong>Redo phase</strong> (forward, T1 only): &lt;T1,B,100,150&gt; → <strong>&lt;B, 150&gt;</strong>; &lt;T1,C,20,50&gt; → <strong>&lt;C, 50&gt;</strong>.</li>
+    <li><strong>Undo phase</strong> (backward, T0 and T2): &lt;T2,C,60,80&gt; → <strong>&lt;C, 60&gt;</strong>; &lt;T2,D,100,70&gt; → <strong>&lt;D, 100&gt;</strong>; &lt;T0,C,50,100&gt; → <strong>&lt;C, 50&gt;</strong>; &lt;T0,A,40,60&gt; → <strong>&lt;A, 40&gt;</strong>.</li>
+  </ul>
+  <p>Sequence: <strong>&lt;B,150&gt;, &lt;C,50&gt;, &lt;C,60&gt;, &lt;D,100&gt;, &lt;C,50&gt;, &lt;A,40&gt;</strong>; then &lt;T0 abort&gt; and &lt;T2 abort&gt; are logged. Final: A = 40, B = 150, C = 50, D = 100.</p>
+  <p><strong>(ii) Crash between &lt;T1,C,20,50&gt; and &lt;T1 commit&gt;.</strong> No transaction has committed.</p>
+  <ul>
+    <li><strong>Redo phase:</strong> nothing to redo.</li>
+    <li><strong>Undo phase</strong> (backward, T0, T1, T2): &lt;T1,C,20,50&gt; → <strong>&lt;C, 20&gt;</strong>; &lt;T2,D,100,70&gt; → <strong>&lt;D, 100&gt;</strong>; &lt;T0,C,50,100&gt; → <strong>&lt;C, 50&gt;</strong>; &lt;T1,B,100,150&gt; → <strong>&lt;B, 100&gt;</strong>; &lt;T0,A,40,60&gt; → <strong>&lt;A, 40&gt;</strong>.</li>
+  </ul>
+  <p>Sequence: <strong>&lt;C,20&gt;, &lt;D,100&gt;, &lt;C,50&gt;, &lt;B,100&gt;, &lt;A,40&gt;</strong>; then aborts for T0, T1, T2. Final: A = 40, B = 100, C = 50, D = 100.</p>
+  <p><em>If the question is meant in the Silberschatz style</em> (the notation &lt;T0 start&gt; and “redo and undo phases” come from that textbook), the redo phase “repeats history”: it replays <em>every</em> update record forward, committed or not, and then the undo phase rolls back the incomplete transactions as above. Then (i) redo is &lt;A,60&gt;, &lt;B,150&gt;, &lt;C,100&gt;, &lt;D,70&gt;, &lt;C,50&gt;, &lt;C,80&gt; and (ii) redo is &lt;A,60&gt;, &lt;B,150&gt;, &lt;C,100&gt;, &lt;D,70&gt;, &lt;C,50&gt;; the undo phases are unchanged and the final values are the same. Write the course method, and mention this variant if the question seems to expect it.</p>
+  <div id="ex111"></div>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2013–14 · 12 marks, and CSE 303 | L-3/T-1 | 2011–12 · 12 marks (parts b, c only)</div>
+  <div class="exam-q"><p>The following is a sequence of undo/redo-log records written by two transactions T and U:</p>
+  <pre>&lt;T, start&gt;; &lt;T, A, 10, 11&gt;; &lt;U, start&gt;; &lt;U, B, 20, 21&gt;; &lt;T, C, 30, 31&gt;;
+&lt;U, D, 40, 41&gt;; &lt;U, commit&gt;; &lt;T, E, 50, 51&gt;; &lt;T, commit&gt;</pre>
+  <p>Describe the action of the recovery manager, including changes to both disk and the log, if there is a crash and the last log record to appear on disk is: (a) &lt;U, start&gt; (b) &lt;U, commit&gt; (c) &lt;T, E, 50, 51&gt; (d) &lt;T, commit&gt;.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+  <p>(Textbook Exercise 17.4.3.) Redo committed transactions forward with new values, then undo incomplete ones backward with old values, then log ABORTs.</p>
+  <p><strong>(a) Last record &lt;U, start&gt;.</strong> No commits; T and U incomplete. Redo: nothing. Undo: &lt;T,A,10,11&gt; → <strong>A = 10</strong>. U has no updates. Log: append &lt;ABORT T&gt; and &lt;ABORT U&gt;, flush.</p>
+  <p><strong>(b) Last record &lt;U, commit&gt;.</strong> U committed, T incomplete. Redo U forward: <strong>B = 21, D = 41</strong>. Undo T backward: <strong>C = 30, A = 10</strong>. Log: append &lt;ABORT T&gt;, flush.</p>
+  <p><strong>(c) Last record &lt;T, E, 50, 51&gt;.</strong> Same, with one more update of T to undo. Redo: <strong>B = 21, D = 41</strong>. Undo: <strong>E = 50, C = 30, A = 10</strong>. Log: &lt;ABORT T&gt;, flush.</p>
+  <p><strong>(d) Last record &lt;T, commit&gt;.</strong> Both committed. Redo forward: <strong>A = 11, B = 21, C = 31, D = 41, E = 51</strong>. Nothing to undo; nothing is added to the log.</p>
+  <p>Unlike undo logging, case (d) still writes everything: under undo/redo logging the COMMIT can reach disk before the data, so the data may be missing.</p>
+  <div id="ex13"></div>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2014–15 · 5 marks</div>
+  <div class="exam-q"><p>After a system crash, the following log records are found: &lt;T0, start&gt;; &lt;T0, commit&gt;; &lt;T1, start&gt;; &lt;T1, C, 800, 600&gt;. Describe the recovery actions for the above log records.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+  <p>The update record has an old and a new value, so this is an undo/redo log.</p>
+  <ul>
+    <li>T0 has START and COMMIT: committed, so it is redone. It has no update records, so redo writes nothing.</li>
+    <li>T1 has START but no COMMIT: incomplete, so it is undone. Backward: &lt;T1, C, 800, 600&gt; → <strong>write C = 800</strong> (the old value).</li>
+    <li>Log: append &lt;T1, abort&gt; and flush.</li>
+  </ul>
+  <p>After recovery C = 800, whether or not 600 had reached disk.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2015–16 · 15 marks</div>
+  <div class="exam-q"><p>The initial account balances of A1, A2 and A3 are 1000, 2000 and 3000 respectively. Two serial transactions are given:</p>
+  <div class="tbl"><table><tr><th>T20</th><th>T21</th></tr>
+  <tr><td><code>READ(A1)<br>A1 = A1 + 100<br>WRITE(A1)<br>READ(A3)<br>A3 = A3 − 100<br>WRITE(A3)<br>COMMIT</code></td><td><code><br><br><br><br><br><br><br>READ(A2)<br>A2 = A2 + 0.1 × A2<br>WRITE(A2)<br>COMMIT</code></td></tr></table></div>
+  <p>(a) Write log records for the above transactions. (b) Show the log-based recovery if a failure occurs after WRITE(A3). (c) Show the recovery if a failure occurs after WRITE(A2).</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+  <p><strong>(a)</strong> With undo/redo logging (old and new values); A1 + 100 = 1100, A3 − 100 = 2900, A2 + 0.1 × 2000 = 2200:</p>
+  <pre>1 &lt;START T20&gt;
+2 &lt;T20, A1, 1000, 1100&gt;
+3 &lt;T20, A3, 3000, 2900&gt;
+4 &lt;COMMIT T20&gt;
+5 &lt;START T21&gt;
+6 &lt;T21, A2, 2000, 2200&gt;
+7 &lt;COMMIT T21&gt;</pre>
+  <p>(READs and the arithmetic are not logged: they do not change the database.) With an undo log the update records would be &lt;T20,A1,1000&gt;, &lt;T20,A3,3000&gt;, &lt;T21,A2,2000&gt;; with a redo log &lt;T20,A1,1100&gt;, &lt;T20,A3,2900&gt;, &lt;T21,A2,2200&gt;.</p>
+  <p><strong>(b) Failure after WRITE(A3).</strong> The log holds records 1–3: T20 has no COMMIT, so it is incomplete. Nothing to redo. Undo backward: <strong>A3 = 3000</strong>, then <strong>A1 = 1000</strong>. Log &lt;ABORT T20&gt;. Final: A1 = 1000, A2 = 2000, A3 = 3000, the state before both transactions. (The user re-runs T20.)</p>
+  <p><strong>(c) Failure after WRITE(A2).</strong> The log holds records 1–6: T20 committed, T21 incomplete. Redo T20 forward: <strong>A1 = 1100, A3 = 2900</strong>. Undo T21: <strong>A2 = 2000</strong>. Log &lt;ABORT T21&gt;. Final: A1 = 1100, A2 = 2000, A3 = 2900. The total money is 6000, as before.</p>
+  <div id="ex11"></div>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2010–11 · 10 marks</div>
+  <div class="exam-q"><p>Describe log-based recovery methodology. For the given transactions ⟨T1, T2, T3⟩, write the log records.</p>
+  <div class="tbl"><table><tr><th>T1</th><th>T3</th><th>T2</th></tr>
+  <tr><td><code>Read(A)<br>A = A − 50<br>Write(A)</code></td><td><code>Read(A)<br>DISPLAY(A)</code></td><td><code>Read(B)<br>Read(A)<br>B = B + 50<br>Write(B)<br>DISPLAY(A+B)</code></td></tr></table></div></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+  <p><strong>Methodology.</strong> Every change a transaction makes is recorded in a log on stable storage: &lt;T start&gt; when T begins, an update record for every write, &lt;T commit&gt; or &lt;T abort&gt; at the end. Write-ahead logging: an update record reaches disk before the changed data does. The record's content depends on the method: undo logging stores the old value (and forces data to disk before the COMMIT), redo logging the new value (and keeps data off disk until the COMMIT is on disk), undo/redo logging both (only WAL is required). After a crash the recovery manager reads the log: committed transactions are redone (forward, new values), incomplete ones undone (backward, old values), and &lt;ABORT T&gt; is logged for each incomplete one. Checkpoints limit how much of the log must be read.</p>
+  <p><strong>Log records.</strong> Reads, local arithmetic and DISPLAY are not logged, only starts, writes and commits. The table shows three separate transactions with no interleaving, so take them as running one after another in the order shown (T1, T3, T2). With initial values A<sub>0</sub>, B<sub>0</sub> and undo/redo records:</p>
+  <pre>&lt;T1 start&gt;
+&lt;T1, A, A0, A0 − 50&gt;
+&lt;T1 commit&gt;
+&lt;T3 start&gt;
+&lt;T3 commit&gt;              -- T3 only reads: no update record
+&lt;T2 start&gt;
+&lt;T2, B, B0, B0 + 50&gt;
+&lt;T2 commit&gt;</pre>
+  <p>For example with A<sub>0</sub> = 1000, B<sub>0</sub> = 2000: &lt;T1, A, 1000, 950&gt; and &lt;T2, B, 2000, 2050&gt;; T3 displays 950 and T2 displays 950 + 2050 = 3000. (If they run in the order T1, T2, T3 instead, move T3's two records to the end.)</p>
+  <p><em>Note:</em> the CSE215 bank's answer interleaves the three transactions row by row and puts &lt;T3 commit&gt; before T1's write. Nothing in the question says the rows are simultaneous, and in that order T3 would display a value of A that T1 later changes; the serial reading above is the natural one.</p>
+  </div></details>
+</div>
+
+<div class="key"><p><strong>Summary:</strong> undo/redo update records &lt;T,X,v,w&gt; hold old and new values. The only rule, UR1, is write-ahead logging; the COMMIT may reach disk before or after the data (UR2 optionally flushes it at once). Recovery redoes committed transactions forward (new values), then undoes incomplete ones backward (old values), then logs ABORTs. When a committed and an uncommitted transaction touched the same element, no order of the two passes is right; concurrency control must prevent that situation.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../s05/lecture.js"></script>
+<script>
+xactTool('#xt', { mode: 'undoredo' });
+recoveryAnim('#case2', '<START T> <T,A,8,16> <T,B,8,16>', 'undoredo', { A: 16, B: 8 });
+recoveryTool('#rv', { log: '<START T1>\n<T1,X,1,2>\n<START T2>\n<T2,Y,5,6>\n<COMMIT T2>\n<T1,Z,7,8>', mode: 'undoredo' });
+recoveryTool('#ex111', { log: '<T0 start>; <T0, A, 40, 60>; <T1 start>; <T1, B, 100, 150>; <T0, C, 50, 100>;\n<T2 start>; <T2, D, 100, 70>; <T1, C, 20, 50>; <T1 commit>; <T2, C, 60, 80>', mode: 'undoredo' });
+recoveryTool('#ex13', { log: '<T, start>; <T, A, 10, 11>; <U, start>; <U, B, 20, 21>; <T, C, 30, 31>;\n<U, D, 40, 41>; <U, commit>; <T, E, 50, 51>', mode: 'undoredo' });
+recoveryAnim('#ex11', '<START T20> <T20,A1,1000,1100> <T20,A3,3000,2900> <COMMIT T20> <START T21> <T21,A2,2000,2200>', 'undoredo', { A1: 1100, A2: 2200, A3: 2900 });
+flashcards('#cards', [
+  { f: '&lt;T,X,v,w&gt;', b: 'T changed X from old value v to new value w.' },
+  { f: 'UR1', b: '&lt;T,X,v,w&gt; must be on disk before X is changed on disk.' },
+  { f: 'Constraint on COMMIT under undo/redo?', b: 'None: it may reach disk before or after the data.' },
+  { f: 'UR2 (optional)', b: 'Flush &lt;COMMIT T&gt; as soon as it is written, so a confirmed commit is never undone.' },
+  { f: 'Undo/redo recovery', b: 'Step 1: redo committed, earliest first. Step 2: undo incomplete, latest first. Then ABORT records.' },
+  { f: 'Cost of undo/redo logging', b: 'Larger log records (both values).' },
+]);
+quiz('#quiz', [
+  { q: 'Under undo/redo logging, may &lt;COMMIT T&gt; reach disk before A does?', opts: ['Yes', 'No', 'Only with UR2', 'Only after a checkpoint'], a: 0, why: 'UR1 constrains only the update record vs the data.' },
+  { q: 'Which values does the redo pass write?', opts: ['Old values of committed transactions', 'New values of committed transactions', 'New values of all transactions', 'Old values of incomplete transactions'], a: 1, why: 'Redo repeats committed changes using w.' },
+  { q: 'Why must undo/redo recovery do both passes?', opts: ['To be idempotent', 'Committed data may be missing from disk and uncommitted data may be on disk', 'Because the log is unordered', 'It does not; one pass is enough'], a: 1, why: 'The free order of COMMIT and data allows both kinds of damage.' },
+  { q: 'Fig. 17.9, crash between steps 9 and 10 (COMMIT not on disk). Recovery writes…', opts: ['A = 16, B = 16', 'B = 8, A = 8', 'A = 8 only', 'nothing'], a: 1, why: 'T is incomplete; undo both, latest first.' },
+  { q: 'The disadvantage that undo/redo logging removes from redo logging is…', opts: ['large log records', 'keeping changed blocks in memory until commit', 'backward scans', 'checkpoints'], a: 1, why: 'Blocks may be written whenever their log record is on disk.' },
+]);
+ask('#try1', { q: 'Undo/redo log: <START T> <T,X,3,4> <START U> <U,Y,7,9> <COMMIT T>, crash. After recovery, Y = ?', a: 7, why: 'U is incomplete, so Y is undone to its old value 7. (X is redone to 4.)' });
+</script>
+</body>
+</html>

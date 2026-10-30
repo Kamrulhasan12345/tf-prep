@@ -1,0 +1,415 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Exam Practice II: University, Flights, Hospital, Projects · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 08–11 (Ishrak) · Chapter 6 · Exam practice</div>
+<h1>Exam Practice II: University, Flights, Hospital, Projects</h1>
+<p class="lede">More full exam questions on joins, grouping and subqueries: three sets on the textbook's university schema (including the restricted versions "without IN or set operations" and "without WITH"), the airline database, a hospital database and an employee–project database. Every part has a model answer and an auto-checked version on invented data.</p>
+
+<h2>1. The university schema</h2>
+<p>Three of the questions use the university schema of Silberschatz, Korth and Sudarshan (also used in Lectures 13–15). The relevant tables and links:</p>
+<pre>department(<u>dept_name</u>, building, budget)
+instructor(<u>ID</u>, name, dept_name → department, salary)
+course    (<u>course_id</u>, title, dept_name → department, credits)
+section   (<u>course_id, sec_id, semester, year</u>, building, room_number, time_slot_id)
+teaches   (<u>ID → instructor, course_id, sec_id, semester, year</u> → section)
+student   (<u>ID</u>, name, dept_name → department, tot_cred)
+takes     (<u>ID → student, course_id, sec_id, semester, year</u> → section, grade)</pre>
+<p>The playground data is invented: 13 instructors in 6 departments (plus Elec. Eng. with no instructors or students), 25 students, sections in 2021 and 2022. Instructor John Doe teaches CS-101 and CS-190; Jane Doe teaches CS-315 and CS-319; section CS-101/1/Fall/2021 has 22 students.</p>
+
+<h2>Exam questions</h2>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 19-20 7b · 10 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-2 | 2019–20 · 20 marks</div>
+  <div class="exam-q"><p>Consider the university schema (classroom, department, course, instructor, section, teaches, student, takes, advisor, time_slot, prereq). Write SQL queries for the following:<br>i. Find all instructors whose salary is above average for their department.<br>ii. Find all courses taught in both the Fall 2022 semester and in the Spring 2022 semester.<br>iii. Find all students who have taken all courses taught by instructor named 'John Doe'.<br>iv. List all departments along with the number of students in each department.<br>v. Find the departments that have the lowest average salary.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+<pre>-- i. correlated comparison with the department average
+SELECT i1.ID, i1.name
+FROM   instructor i1
+WHERE  i1.salary &gt; (SELECT AVG(i2.salary) FROM instructor i2
+                    WHERE  i2.dept_name = i1.dept_name);
+
+-- ii. intersection of the two semesters' course lists
+SELECT course_id FROM section WHERE semester = 'Fall'   AND year = 2022
+INTERSECT
+SELECT course_id FROM section WHERE semester = 'Spring' AND year = 2022;
+
+-- iii. division: no John Doe course that the student has not taken
+SELECT s.ID, s.name
+FROM   student s
+WHERE  NOT EXISTS (
+         SELECT t.course_id FROM teaches t, instructor i
+         WHERE  t.ID = i.ID AND i.name = 'John Doe'
+         MINUS
+         SELECT tk.course_id FROM takes tk WHERE tk.ID = s.ID);
+
+-- iv. left join so that departments without students show 0
+SELECT   d.dept_name, COUNT(s.ID) AS num_students
+FROM     department d LEFT JOIN student s ON s.dept_name = d.dept_name
+GROUP BY d.dept_name;
+
+-- v. minimum average (ties included)
+SELECT   dept_name
+FROM     instructor
+GROUP BY dept_name
+HAVING   AVG(salary) &lt;= ALL (SELECT AVG(salary) FROM instructor GROUP BY dept_name);</pre>
+    <p>Notes. (iii) If John Doe teaches several sections of one course, the MINUS works on course_ids, so a student needs to have taken each course once (any section). If no instructor is called John Doe, every student qualifies vacuously; mention it. (iv) COUNT(s.ID), not COUNT(*), so Elec. Eng. shows 0. (v) Only departments with instructors have an average. The question bank's answers are correct (it uses EXCEPT in (iii); write MINUS in Oracle).</p>
+    <div id="u1"></div><div id="u2"></div><div id="u3"></div><div id="u4"></div><div id="u5"></div>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 18 CT2(A) · 4 × 5 marks (first set)</div>
+  <div class="exam-q"><p>Given the university schema (classroom, department, course, instructor, section, teaches, student, takes, time_slot, prereq), write SQL queries for the following:<br>(1) Find the departments that have the highest average salary.<br>(2) Find all courses taught in both the Spring 2021 semester and in the Fall 2021 semester (you are not allowed to use the 'in' operator and any set operation).<br>(3) Find all students who have taken all courses taught by instructor named 'Jane Doe'.<br>(4) Find all departments where the average salary is greater than the average of the total salary at all departments (you are not allowed to use the 'with' clause).<br>(5) For each course section offered in 2021, find the average total credits of all students enrolled in the section, if the section has at least 20 students.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+<pre>-- (1)
+SELECT   dept_name FROM instructor
+GROUP BY dept_name
+HAVING   AVG(salary) &gt;= ALL (SELECT AVG(salary) FROM instructor GROUP BY dept_name);
+
+-- (2) no IN, no INTERSECT: self-join of section (or EXISTS)
+SELECT DISTINCT s1.course_id
+FROM   section s1, section s2
+WHERE  s1.course_id = s2.course_id
+AND    s1.semester = 'Spring' AND s1.year = 2021
+AND    s2.semester = 'Fall'   AND s2.year = 2021;
+--   equivalently: … FROM section s1 WHERE s1.semester = 'Spring' AND s1.year = 2021
+--                 AND EXISTS (SELECT * FROM section s2 WHERE s2.course_id = s1.course_id
+--                             AND s2.semester = 'Fall' AND s2.year = 2021)
+
+-- (3) division without set operations: double NOT EXISTS
+SELECT s.ID, s.name FROM student s
+WHERE NOT EXISTS (
+        SELECT * FROM teaches t, instructor i
+        WHERE  t.ID = i.ID AND i.name = 'Jane Doe'
+        AND    NOT EXISTS (SELECT * FROM takes tk
+                           WHERE tk.ID = s.ID AND tk.course_id = t.course_id));
+
+-- (4) as worded: department average vs the average of the department totals (no WITH: derived table)
+SELECT   dept_name FROM instructor
+GROUP BY dept_name
+HAVING   AVG(salary) &gt; (SELECT AVG(total) FROM (SELECT SUM(salary) AS total
+                                                FROM instructor GROUP BY dept_name));
+
+-- (5)
+SELECT   tk.course_id, tk.sec_id, tk.semester, AVG(st.tot_cred) AS avg_tot_cred
+FROM     takes tk, student st
+WHERE    tk.ID = st.ID AND tk.year = 2021
+GROUP BY tk.course_id, tk.sec_id, tk.semester, tk.year
+HAVING   COUNT(tk.ID) &gt;= 20;</pre>
+    <p>Notes. (2) DISTINCT, because a course with two Spring or two Fall sections would otherwise appear several times. (3) The question's set version forbids only IN and set operations in part (2), but the double NOT EXISTS is a useful form to know; the MINUS form of the previous question is equally correct here. (4) As worded, the condition compares an <em>average salary</em> with an average of <em>total</em> salaries, which are many times larger, so it is almost never true (on our data no department qualifies). The question is a variant of the textbook's "departments whose <em>total</em> salary is greater than the average of the total salary at all departments" (the next question asks exactly that); state which reading you answer. (5) A section is identified by (course_id, sec_id, semester, year), so group by all four.</p>
+    <div id="v1"></div><div id="v2"></div><div id="v3"></div><div id="v4"></div><div id="v5"></div>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 18 CT2(A) · 4 × 5 marks (second set)</div>
+  <div class="exam-q"><p>Given the same schema, write SQL queries for the following:<br>(1) Find all instructors whose salary is above average for their department.<br>(2) Find all courses taught in both the Fall 2021 semester and in the Spring 2021 semester (you are not allowed to use the 'in' operator and any set operation).<br>(3) Find all students who have taken all courses taught by instructor named 'John Doe'.<br>(4) Find all departments where the total salary is greater than the average of the total salary at all departments (you are not allowed to use the 'with' clause).<br>(5) List all departments along with the number of students in each department.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+<pre>-- (1)
+SELECT i1.ID, i1.name FROM instructor i1
+WHERE  i1.salary &gt; (SELECT AVG(i2.salary) FROM instructor i2 WHERE i2.dept_name = i1.dept_name);
+
+-- (2) EXISTS instead of IN / INTERSECT
+SELECT DISTINCT s1.course_id
+FROM   section s1
+WHERE  s1.semester = 'Fall' AND s1.year = 2021
+AND    EXISTS (SELECT * FROM section s2
+               WHERE  s2.course_id = s1.course_id
+               AND    s2.semester = 'Spring' AND s2.year = 2021);
+
+-- (3)
+SELECT s.ID, s.name FROM student s
+WHERE  NOT EXISTS (SELECT t.course_id FROM teaches t, instructor i
+                   WHERE  t.ID = i.ID AND i.name = 'John Doe'
+                   MINUS
+                   SELECT tk.course_id FROM takes tk WHERE tk.ID = s.ID);
+
+-- (4) total per department vs the average of those totals; derived tables instead of WITH
+SELECT   dept_name FROM instructor
+GROUP BY dept_name
+HAVING   SUM(salary) &gt; (SELECT AVG(total) FROM (SELECT SUM(salary) AS total
+                                                FROM instructor GROUP BY dept_name));
+
+-- (5)
+SELECT   d.dept_name, COUNT(s.ID) AS num_students
+FROM     department d LEFT JOIN student s ON s.dept_name = d.dept_name
+GROUP BY d.dept_name;</pre>
+    <p>(4) is the textbook's WITH example rewritten: the inner derived table lists each department's total, the scalar subquery averages them, and HAVING compares each department's total with it. On our data the totals are Comp. Sci. 374,000, Physics 182,000, Finance 170,000, History 122,000, Biology 72,000 and Music 40,000; their average is 160,000, so Comp. Sci., Physics and Finance qualify.</p>
+    <div id="w2"></div><div id="w4"></div>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2014–15 · 25 marks</div>
+  <div class="exam-q"><p>Consider the following schema: Flights(flno: integer, from: string, to: string, distance: integer, departs: time, arrives: time, price: real), Aircraft(aid: integer, aname: string, cruisingrange: integer), Certified(eid: integer, aid: integer), Employees(eid: integer, ename: string, salary: integer). Write SQL to implement the following queries:<br>(a) Find the names of aircraft such that all pilots certified to operate them have salaries more than $80,000.<br>(b) For each pilot certified for more than three aircraft, find the eid and the maximum cruising range of the aircraft for which she or he is certified.<br>(c) Find the names of pilots whose salary is less than the price of the cheapest route from 'Los Angeles' to 'Honolulu'.<br>(d) Find the aids of all aircraft that can be used on routes from 'Los Angeles' to 'Chicago'.<br>(e) Identify the routes that can be piloted by every pilot who makes more than $100,000.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>Oracle note: FROM and TO are reserved words, so columns with those names would have to be quoted ("FROM") everywhere. We call them <code>from_city</code> and <code>to_city</code>. A <em>pilot</em> is an employee certified for at least one aircraft (Employees also contains other staff).</p>
+<pre>-- (a) aircraft whose certified pilots all earn more than 80,000 (and that have at least one)
+SELECT DISTINCT a.aname
+FROM   Aircraft a, Certified c
+WHERE  a.aid = c.aid
+AND    NOT EXISTS (SELECT * FROM Certified c2, Employees e
+                   WHERE  c2.aid = a.aid AND c2.eid = e.eid AND e.salary &lt;= 80000);
+--   or: GROUP BY a.aid, a.aname HAVING MIN(e.salary) &gt; 80000 over Aircraft ⋈ Certified ⋈ Employees
+
+-- (b)
+SELECT   c.eid, MAX(a.cruisingrange) AS max_range
+FROM     Certified c, Aircraft a
+WHERE    c.aid = a.aid
+GROUP BY c.eid
+HAVING   COUNT(*) &gt; 3;
+
+-- (c) pilots only (certified for something)
+SELECT DISTINCT e.ename
+FROM   Employees e, Certified c
+WHERE  e.eid = c.eid
+AND    e.salary &lt; (SELECT MIN(f.price) FROM Flights f
+                    WHERE  f.from_city = 'Los Angeles' AND f.to_city = 'Honolulu');
+
+-- (d) an aircraft can be used on a route if its range covers the route's distance
+SELECT a.aid
+FROM   Aircraft a
+WHERE  EXISTS (SELECT * FROM Flights f
+               WHERE  f.from_city = 'Los Angeles' AND f.to_city = 'Chicago'
+               AND    a.cruisingrange &gt;= f.distance);
+
+-- (e) division: no high-paid pilot who cannot fly this route
+SELECT f.flno, f.from_city, f.to_city
+FROM   Flights f
+WHERE  NOT EXISTS (
+         SELECT e.eid FROM Employees e, Certified c
+         WHERE  e.eid = c.eid AND e.salary &gt; 100000
+         MINUS
+         SELECT c.eid FROM Certified c, Aircraft a
+         WHERE  c.aid = a.aid AND a.cruisingrange &gt;= f.distance);</pre>
+    <p>Notes. (a) Without the join to Certified in the outer query, an aircraft nobody is certified for would satisfy NOT EXISTS vacuously; the join requires at least one pilot. (c) The question bank's answer compares every employee, not only pilots; the cheapest price subquery is the same. (d) "Can be used on routes" is read as "can fly at least one Los Angeles → Chicago flight"; if all such flights must be possible, compare with MAX(distance) instead. The bank's version uses MIN(distance) with &gt;=, which is equivalent to the EXISTS form. (e) A pilot "can pilot" a route if he is certified for some aircraft whose range covers its distance.</p>
+    <div id="f1"></div><div id="f2"></div><div id="f3"></div><div id="f4"></div><div id="f5"></div>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2013–14 · 25 marks</div>
+  <div class="exam-q"><p>Consider the following schema: Patient(ID, FIRSTNAME, SURNAME, ADMISSION_DATE, DR_ID, ward_no), AILMENT(AILMENTID, NAME, PATIENTID), Ward(ward_no, ward_name), Doctor(ID, SURNAME, FIRSTNAME, no_of_patient, AILMENTID). Write SQL to implement the following queries:<br>(a) List the surnames of all patients of 'Dr. Jones'.<br>(b) List all the doctors who specialise in the ailment suffered by the patient whose surname is 'Thomas'.<br>(c) List the ward number and ward name of the ward(s) which have the most patients.<br>(d) Provide a list of all patients who have not suffered any ailment.<br>(e) Show the Doctor's name who has the third highest no_of_patient.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>Links: Patient.DR_ID = Doctor.ID, Patient.ward_no = Ward.ward_no, AILMENT.PATIENTID = Patient.ID, Doctor.AILMENTID = AILMENT.AILMENTID (the doctor's speciality).</p>
+<pre>-- (a)
+SELECT p.SURNAME
+FROM   Patient p, Doctor d
+WHERE  p.DR_ID = d.ID AND d.SURNAME = 'Jones';
+
+-- (b)
+SELECT d.FIRSTNAME, d.SURNAME
+FROM   Doctor d, AILMENT a, Patient p
+WHERE  d.AILMENTID = a.AILMENTID AND a.PATIENTID = p.ID
+AND    p.SURNAME = 'Thomas';
+
+-- (c)
+SELECT   w.ward_no, w.ward_name
+FROM     Ward w, Patient p
+WHERE    w.ward_no = p.ward_no
+GROUP BY w.ward_no, w.ward_name
+HAVING   COUNT(*) &gt;= ALL (SELECT COUNT(*) FROM Patient GROUP BY ward_no);
+
+-- (d)
+SELECT p.ID, p.FIRSTNAME, p.SURNAME
+FROM   Patient p
+WHERE  NOT EXISTS (SELECT * FROM AILMENT a WHERE a.PATIENTID = p.ID);
+
+-- (e) third highest distinct value: exactly 2 larger distinct values exist
+SELECT d1.FIRSTNAME, d1.SURNAME
+FROM   Doctor d1
+WHERE  2 = (SELECT COUNT(DISTINCT d2.no_of_patient)
+            FROM   Doctor d2
+            WHERE  d2.no_of_patient &gt; d1.no_of_patient);</pre>
+    <p>Notes. (a) The doctor's name is stored as surname 'Jones'; 'Dr.' is a title, not data. (c) A Patient row with a NULL ward_no would form a NULL group in the subquery; add <code>WHERE ward_no IS NOT NULL</code> there if that can happen. (e) "Third highest" means the third highest <em>distinct</em> value, so ties at the top do not push it down; every doctor with that value is listed. With analytic functions (beyond the slides, Chapter 7) it is <code>WHERE DENSE_RANK() OVER (ORDER BY no_of_patient DESC) = 3</code> inside a derived table. The bank's alternative <code>ORDER BY no_of_patient DESC OFFSET 2 ROWS FETCH NEXT 1 ROWS ONLY</code> (Oracle 12c+) returns the third <em>row</em>, which is wrong when there are ties. The rest of the bank's answer is correct. The schema has a design oddity: AILMENT has one PATIENTID per AILMENTID, so a doctor's speciality points at one patient's ailment record; we follow the schema as given.</p>
+    <div id="h1"></div><div id="h2"></div><div id="h3"></div><div id="h4"></div><div id="h5"></div>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2011–12 · 25 marks</div>
+  <div class="exam-q"><p>Consider the following relations: Emp(eno, ename, title, city), Proj(pno, pname, budget, city), Works(eno, pno, resp, dur), Pay(title, salary), where Emp.title is a foreign key to Pay.title, Works.eno is a foreign key to Emp.eno and Works.pno is a foreign key to Proj.pno. Write SQL statements to answer the following queries:<br>(a) For each city, how many projects are located in that city and what is the total budget over all projects in the city?<br>(b) For each project, what fraction of the budget is spent (in total) on salaries for the people working on that project? Sort your answer by the value of the budget.<br>(c) Remove the work assignment of all persons to any projects for which more than 2 persons share the same responsibility.<br>(d) List all projects located in Toronto city and include for each one the number of persons working on the project.<br>(e) Find the names of projects whose budgets are greater than all projects located in Waterloo city.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+<pre>-- (a)
+SELECT   city, COUNT(*) AS num_projects, SUM(budget) AS total_budget
+FROM     Proj
+GROUP BY city;
+
+-- (b) projects without workers spend 0: left joins and NVL
+SELECT   p.pno, p.pname, NVL(SUM(y.salary), 0) / p.budget AS fraction
+FROM     Proj p LEFT JOIN Works w ON w.pno = p.pno
+                LEFT JOIN Emp e   ON e.eno = w.eno
+                LEFT JOIN Pay y   ON y.title = e.title
+GROUP BY p.pno, p.pname, p.budget
+ORDER BY p.budget;
+
+-- (c) delete every assignment to a project in which some responsibility is shared by more than 2 persons
+DELETE FROM Works
+WHERE  pno IN (SELECT pno FROM Works
+               GROUP BY pno, resp
+               HAVING COUNT(*) &gt; 2);
+
+-- (d)
+SELECT   p.pno, p.pname, COUNT(w.eno) AS num_persons
+FROM     Proj p LEFT JOIN Works w ON w.pno = p.pno
+WHERE    p.city = 'Toronto'
+GROUP BY p.pno, p.pname;
+
+-- (e)
+SELECT pname FROM Proj
+WHERE  budget &gt; ALL (SELECT budget FROM Proj WHERE city = 'Waterloo');</pre>
+    <p>Notes. (b) Salary depends on the title (Pay); the left joins and NVL give 0 for a project nobody works on (an inner join would omit it). ORDER BY can use p.budget because it is a grouping column. (c) Two readings exist. The sentence says to remove the assignments of <em>all persons</em> to <em>projects</em> in which more than 2 persons share a responsibility, which is the query above. The narrower reading removes only the assignments that have the over-shared responsibility: <code>DELETE FROM Works WHERE (pno, resp) IN (SELECT pno, resp FROM Works GROUP BY pno, resp HAVING COUNT(*) &gt; 2)</code>, which is the question bank's answer. State your reading. (e) If no project is in Waterloo, &gt; ALL is TRUE for every project, while <code>&gt; (SELECT MAX(budget) …)</code> returns none. The bank's answers to (a), (d) and (e) are correct; its (b) uses inner joins and so omits projects without workers.</p>
+    <div id="e1"></div><div id="e2"></div><div id="e3"></div><div id="e4"></div><div id="e5"></div>
+  </div></details>
+</div>
+
+<h2>More practice</h2>
+<p>Six more exercises on these databases, from easy to exam level.</p>
+<div id="x1"></div><div id="x2"></div><div id="x3"></div><div id="x4"></div><div id="x5"></div><div id="x6"></div>
+
+<div class="key"><p><strong>Summary:</strong> the same handful of patterns covers every question here: correlated comparison with a group average; INTERSECT, a self-join or EXISTS for "both"; NOT EXISTS (… MINUS …) or a double NOT EXISTS for "all"; GROUP BY with HAVING … &gt;= ALL / &lt;= ALL for extremes with ties; derived tables instead of WITH; LEFT JOIN with COUNT(column) and NVL to keep zero rows; and DELETE … WHERE … IN (grouped subquery). Watch Oracle's reserved words (LEVEL, FROM, TO), and state your reading when a question is ambiguous.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/sqlplay.js"></script>
+<script src="../i08/lecture.js"></script>
+<script>
+// ---------- university (invented data) ----------
+const ins = [];
+const I = (t, ...v) => ins.push(`INSERT INTO ${t} VALUES (${v.map(x => typeof x === 'string' ? `'${x}'` : x).join(', ')});`);
+[['Comp. Sci.', 'Taylor', 100000], ['Physics', 'Watson', 70000], ['Finance', 'Painter', 120000], ['History', 'Painter', 50000], ['Music', 'Packard', 80000], ['Biology', 'Watson', 90000], ['Elec. Eng.', 'Taylor', 85000]].forEach(d => I('department', ...d));
+const INS = [[10101, 'Srinivasan', 'Comp. Sci.', 65000], [45565, 'Katz', 'Comp. Sci.', 75000], [83821, 'Brandt', 'Comp. Sci.', 92000], [11111, 'John Doe', 'Comp. Sci.', 70000], [22220, 'Jane Doe', 'Comp. Sci.', 72000],
+  [22222, 'Einstein', 'Physics', 95000], [33456, 'Gold', 'Physics', 87000], [12121, 'Wu', 'Finance', 90000], [76543, 'Singh', 'Finance', 80000], [32343, 'El Said', 'History', 60000], [58583, 'Califieri', 'History', 62000], [15151, 'Mozart', 'Music', 40000], [76766, 'Crick', 'Biology', 72000]];
+INS.forEach(r => I('instructor', ...r));
+[['CS-101', 'Intro. to Computer Science', 'Comp. Sci.', 4], ['CS-190', 'Game Design', 'Comp. Sci.', 4], ['CS-315', 'Robotics', 'Comp. Sci.', 3], ['CS-319', 'Image Processing', 'Comp. Sci.', 3], ['CS-347', 'Database System Concepts', 'Comp. Sci.', 3],
+ ['PHY-101', 'Physical Principles', 'Physics', 4], ['FIN-201', 'Investment Banking', 'Finance', 3], ['HIS-351', 'World History', 'History', 3], ['MU-199', 'Music Video Production', 'Music', 3], ['BIO-101', 'Intro. to Biology', 'Biology', 4]].forEach(c => I('course', ...c));
+const SEC = [['CS-101', 1, 'Fall', 2021, 11111], ['CS-101', 1, 'Spring', 2022, 11111], ['CS-101', 1, 'Fall', 2022, 11111], ['CS-190', 1, 'Spring', 2021, 11111], ['CS-315', 1, 'Spring', 2021, 22220], ['CS-315', 1, 'Fall', 2021, 22220],
+  ['CS-319', 1, 'Spring', 2021, 22220], ['CS-347', 1, 'Fall', 2021, 10101], ['CS-347', 1, 'Spring', 2022, 10101], ['CS-347', 1, 'Fall', 2022, 10101], ['PHY-101', 1, 'Fall', 2021, 22222], ['PHY-101', 1, 'Spring', 2021, 22222],
+  ['FIN-201', 1, 'Spring', 2022, 12121], ['HIS-351', 1, 'Spring', 2022, 32343], ['MU-199', 1, 'Spring', 2021, 15151], ['BIO-101', 1, 'Fall', 2022, 76766]];
+SEC.forEach(s => { I('section', s[0], s[1], s[2], s[3], 'Taylor', 3128, 'A'); I('teaches', s[4], s[0], s[1], s[2], s[3]); });
+const depts = ['Comp. Sci.', 'Physics', 'Finance', 'History', 'Music', 'Biology'];
+const names = ['Zhang', 'Shankar', 'Brandt', 'Chavez', 'Peltier', 'Levy', 'Williams', 'Sanchez', 'Snow', 'Brown', 'Aoi', 'Bourikas', 'Tanaka', 'Rahman', 'Hossain', 'Akter', 'Islam', 'Karim', 'Sultana', 'Haque', 'Mitra', 'Das', 'Roy', 'Paul', 'Sarker'];
+names.forEach((n, k) => I('student', 1001 + k, n, depts[k % 6], 20 + (k * 7) % 100));
+const take = (ids, c, sem, yr) => ids.forEach(k => I('takes', 1000 + k, c, 1, sem, yr, 'A'));
+take([...Array(22)].map((_, k) => k + 1), 'CS-101', 'Fall', 2021);
+take([1, 2, 3, 5, 8], 'CS-190', 'Spring', 2021); take([2, 4, 6], 'CS-315', 'Spring', 2021); take([7, 9], 'CS-315', 'Fall', 2021);
+take([2, 4, 10], 'CS-319', 'Spring', 2021); take([3, 6, 9, 12, 15], 'CS-347', 'Fall', 2021); take([20, 21, 22, 23, 24], 'CS-347', 'Fall', 2022);
+take([25], 'CS-347', 'Spring', 2022); take([10, 11, 12, 13, 14], 'PHY-101', 'Fall', 2021); take([1], 'PHY-101', 'Spring', 2021);
+const UNI = `CREATE TABLE department (dept_name VARCHAR2(20) PRIMARY KEY, building VARCHAR2(15), budget NUMBER(12,2));
+CREATE TABLE instructor (ID NUMBER(5) PRIMARY KEY, name VARCHAR2(20) NOT NULL, dept_name VARCHAR2(20) REFERENCES department(dept_name), salary NUMBER(8,2));
+CREATE TABLE course (course_id VARCHAR2(8) PRIMARY KEY, title VARCHAR2(50), dept_name VARCHAR2(20) REFERENCES department(dept_name), credits NUMBER(2));
+CREATE TABLE section (course_id VARCHAR2(8) REFERENCES course(course_id), sec_id NUMBER(2), semester VARCHAR2(6), year NUMBER(4), building VARCHAR2(15), room_number NUMBER(4), time_slot_id VARCHAR2(4), PRIMARY KEY (course_id, sec_id, semester, year));
+CREATE TABLE teaches (ID NUMBER(5) REFERENCES instructor(ID), course_id VARCHAR2(8), sec_id NUMBER(2), semester VARCHAR2(6), year NUMBER(4), PRIMARY KEY (ID, course_id, sec_id, semester, year));
+CREATE TABLE student (ID NUMBER(5) PRIMARY KEY, name VARCHAR2(20) NOT NULL, dept_name VARCHAR2(20) REFERENCES department(dept_name), tot_cred NUMBER(3));
+CREATE TABLE takes (ID NUMBER(5) REFERENCES student(ID), course_id VARCHAR2(8), sec_id NUMBER(2), semester VARCHAR2(6), year NUMBER(4), grade VARCHAR2(2), PRIMARY KEY (ID, course_id, sec_id, semester, year));
+` + ins.join('\n');
+const ck = (sel, setup, task, solution, x = {}) => sqlCheck(sel, { setup, task, solution, ...x });
+ck('#u1', UNI, 'i. Instructors (ID, name) paid above their department average.', 'SELECT i1.ID, i1.name FROM instructor i1 WHERE i1.salary > (SELECT AVG(i2.salary) FROM instructor i2 WHERE i2.dept_name = i1.dept_name);');
+ck('#u2', UNI, 'ii. Courses taught in both Fall 2022 and Spring 2022.', "SELECT course_id FROM section WHERE semester = 'Fall' AND year = 2022 INTERSECT SELECT course_id FROM section WHERE semester = 'Spring' AND year = 2022;");
+ck('#u3', UNI, "iii. Students (ID, name) who took all of John Doe's courses.", "SELECT s.ID, s.name FROM student s WHERE NOT EXISTS (SELECT t.course_id FROM teaches t, instructor i WHERE t.ID = i.ID AND i.name = 'John Doe' MINUS SELECT tk.course_id FROM takes tk WHERE tk.ID = s.ID);");
+ck('#u4', UNI, 'iv. Every department with its number of students.', 'SELECT d.dept_name, COUNT(s.ID) FROM department d LEFT JOIN student s ON s.dept_name = d.dept_name GROUP BY d.dept_name;');
+ck('#u5', UNI, 'v. Department(s) with the lowest average salary.', 'SELECT dept_name FROM instructor GROUP BY dept_name HAVING AVG(salary) <= ALL (SELECT AVG(salary) FROM instructor GROUP BY dept_name);');
+ck('#v1', UNI, '(1) Department(s) with the highest average salary.', 'SELECT dept_name FROM instructor GROUP BY dept_name HAVING AVG(salary) >= ALL (SELECT AVG(salary) FROM instructor GROUP BY dept_name);');
+ck('#v2', UNI, '(2) Courses taught in both Spring 2021 and Fall 2021, without IN or set operations.', "SELECT DISTINCT s1.course_id FROM section s1, section s2 WHERE s1.course_id = s2.course_id AND s1.semester = 'Spring' AND s1.year = 2021 AND s2.semester = 'Fall' AND s2.year = 2021;");
+ck('#v3', UNI, "(3) Students who took all of Jane Doe's courses.", "SELECT s.ID, s.name FROM student s WHERE NOT EXISTS (SELECT * FROM teaches t, instructor i WHERE t.ID = i.ID AND i.name = 'Jane Doe' AND NOT EXISTS (SELECT * FROM takes tk WHERE tk.ID = s.ID AND tk.course_id = t.course_id));");
+ck('#v4', UNI, '(4) As worded: departments whose average salary exceeds the average of the department totals (expect an empty result on this data).', 'SELECT dept_name FROM instructor GROUP BY dept_name HAVING AVG(salary) > (SELECT AVG(total) FROM (SELECT SUM(salary) AS total FROM instructor GROUP BY dept_name));');
+ck('#v5', UNI, '(5) 2021 sections with at least 20 students: course, section, semester, average tot_cred.', 'SELECT tk.course_id, tk.sec_id, tk.semester, AVG(st.tot_cred) FROM takes tk, student st WHERE tk.ID = st.ID AND tk.year = 2021 GROUP BY tk.course_id, tk.sec_id, tk.semester, tk.year HAVING COUNT(tk.ID) >= 20;');
+ck('#w2', UNI, '(2) Courses taught in both Fall 2021 and Spring 2021, using EXISTS.', "SELECT DISTINCT s1.course_id FROM section s1 WHERE s1.semester = 'Fall' AND s1.year = 2021 AND EXISTS (SELECT * FROM section s2 WHERE s2.course_id = s1.course_id AND s2.semester = 'Spring' AND s2.year = 2021);");
+ck('#w4', UNI, '(4) Departments whose total salary exceeds the average department total (no WITH).', 'SELECT dept_name FROM instructor GROUP BY dept_name HAVING SUM(salary) > (SELECT AVG(total) FROM (SELECT SUM(salary) AS total FROM instructor GROUP BY dept_name));');
+// ---------- flights ----------
+const FL = `CREATE TABLE Flights (flno NUMBER PRIMARY KEY, from_city VARCHAR2(20), to_city VARCHAR2(20), distance NUMBER, departs VARCHAR2(5), arrives VARCHAR2(5), price NUMBER(7,2));
+CREATE TABLE Aircraft (aid NUMBER PRIMARY KEY, aname VARCHAR2(30), cruisingrange NUMBER);
+CREATE TABLE Employees (eid NUMBER PRIMARY KEY, ename VARCHAR2(20), salary NUMBER);
+CREATE TABLE Certified (eid NUMBER REFERENCES Employees(eid), aid NUMBER REFERENCES Aircraft(aid), PRIMARY KEY (eid, aid));
+INSERT INTO Flights VALUES (99, 'Los Angeles', 'Washington D.C.', 2308, '09:30', '21:40', 235.98);
+INSERT INTO Flights VALUES (13, 'Los Angeles', 'Chicago', 1749, '08:45', '20:45', 220.98);
+INSERT INTO Flights VALUES (346, 'Los Angeles', 'Dallas', 1251, '11:50', '19:05', 225.43);
+INSERT INTO Flights VALUES (387, 'Los Angeles', 'Boston', 2606, '07:03', '17:03', 261.56);
+INSERT INTO Flights VALUES (7, 'Los Angeles', 'Sydney', 7487, '22:30', '16:10', 1278.56);
+INSERT INTO Flights VALUES (2, 'Los Angeles', 'Tokyo', 5478, '12:30', '15:55', 780.99);
+INSERT INTO Flights VALUES (33, 'Los Angeles', 'Honolulu', 2551, '09:15', '11:15', 375.23);
+INSERT INTO Flights VALUES (34, 'Los Angeles', 'Honolulu', 2551, '12:45', '15:18', 425.98);
+INSERT INTO Flights VALUES (76, 'Chicago', 'Los Angeles', 1749, '08:32', '10:03', 220.98);
+INSERT INTO Aircraft VALUES (1, 'Boeing 747-400', 8430); INSERT INTO Aircraft VALUES (2, 'Boeing 737-800', 3383);
+INSERT INTO Aircraft VALUES (3, 'Airbus A340-300', 7120); INSERT INTO Aircraft VALUES (4, 'British Aerospace Jetstream 41', 1502);
+INSERT INTO Aircraft VALUES (5, 'Embraer ERJ-145', 1530); INSERT INTO Aircraft VALUES (6, 'SAAB 340', 2128);
+INSERT INTO Aircraft VALUES (7, 'Piper Archer III', 520); INSERT INTO Aircraft VALUES (8, 'Tupolev 154', 4103);
+INSERT INTO Employees VALUES (242518965, 'James Smith', 120433); INSERT INTO Employees VALUES (141582651, 'Mary Johnson', 178345);
+INSERT INTO Employees VALUES (11564812, 'John Williams', 153972); INSERT INTO Employees VALUES (567354612, 'Lisa Walker', 256481);
+INSERT INTO Employees VALUES (552455318, 'Larry West', 101745); INSERT INTO Employees VALUES (550156548, 'Karen Scott', 205187);
+INSERT INTO Employees VALUES (390487451, 'Lawrence Sperry', 212156); INSERT INTO Employees VALUES (274878974, 'Michael Miller', 99890);
+INSERT INTO Employees VALUES (254099823, 'Patricia Jones', 24450); INSERT INTO Employees VALUES (356187925, 'Robert Brown', 44740);
+INSERT INTO Employees VALUES (355548984, 'Angela Martinez', 212156); INSERT INTO Employees VALUES (310454876, 'Joseph Thompson', 212156);
+INSERT INTO Employees VALUES (489456522, 'Linda Davis', 127984); INSERT INTO Employees VALUES (489221823, 'Richard Jackson', 23980);
+INSERT INTO Employees VALUES (548977562, 'William Ward', 84476); INSERT INTO Employees VALUES (159542516, 'Paul Lee', 300);
+INSERT INTO Certified VALUES (567354612, 1); INSERT INTO Certified VALUES (567354612, 2); INSERT INTO Certified VALUES (567354612, 3);
+INSERT INTO Certified VALUES (567354612, 4); INSERT INTO Certified VALUES (567354612, 5); INSERT INTO Certified VALUES (567354612, 8);
+INSERT INTO Certified VALUES (552455318, 2); INSERT INTO Certified VALUES (552455318, 6); INSERT INTO Certified VALUES (550156548, 1);
+INSERT INTO Certified VALUES (550156548, 2); INSERT INTO Certified VALUES (390487451, 3); INSERT INTO Certified VALUES (390487451, 8);
+INSERT INTO Certified VALUES (274878974, 6); INSERT INTO Certified VALUES (274878974, 7); INSERT INTO Certified VALUES (159542516, 7);
+INSERT INTO Certified VALUES (548977562, 4); INSERT INTO Certified VALUES (141582651, 2); INSERT INTO Certified VALUES (141582651, 8);
+INSERT INTO Certified VALUES (11564812, 2); INSERT INTO Certified VALUES (11564812, 3); INSERT INTO Certified VALUES (242518965, 2);
+INSERT INTO Certified VALUES (242518965, 8); INSERT INTO Certified VALUES (310454876, 8); INSERT INTO Certified VALUES (355548984, 8);
+INSERT INTO Certified VALUES (489456522, 2); INSERT INTO Certified VALUES (489456522, 8);`;
+ck('#f1', FL, '(a) Aircraft whose certified pilots all earn more than 80,000. (Data modelled on the Ramakrishnan–Gehrke sample.)', 'SELECT DISTINCT a.aname FROM Aircraft a, Certified c WHERE a.aid = c.aid AND NOT EXISTS (SELECT * FROM Certified c2, Employees e WHERE c2.aid = a.aid AND c2.eid = e.eid AND e.salary <= 80000);');
+ck('#f2', FL, '(b) Pilots certified for more than three aircraft, with their maximum cruising range.', 'SELECT c.eid, MAX(a.cruisingrange) FROM Certified c, Aircraft a WHERE c.aid = a.aid GROUP BY c.eid HAVING COUNT(*) > 3;');
+ck('#f3', FL, '(c) Pilots paid less than the cheapest Los Angeles → Honolulu fare.', "SELECT DISTINCT e.ename FROM Employees e, Certified c WHERE e.eid = c.eid AND e.salary < (SELECT MIN(f.price) FROM Flights f WHERE f.from_city = 'Los Angeles' AND f.to_city = 'Honolulu');");
+ck('#f4', FL, '(d) Aircraft that can fly a Los Angeles → Chicago flight.', "SELECT a.aid FROM Aircraft a WHERE EXISTS (SELECT * FROM Flights f WHERE f.from_city = 'Los Angeles' AND f.to_city = 'Chicago' AND a.cruisingrange >= f.distance);");
+ck('#f5', FL, '(e) Flights that every pilot earning over 100,000 can fly.', 'SELECT f.flno, f.from_city, f.to_city FROM Flights f WHERE NOT EXISTS (SELECT e.eid FROM Employees e, Certified c WHERE e.eid = c.eid AND e.salary > 100000 MINUS SELECT c.eid FROM Certified c, Aircraft a WHERE c.aid = a.aid AND a.cruisingrange >= f.distance);');
+// ---------- hospital ----------
+const HOSP = `CREATE TABLE Ward (ward_no NUMBER PRIMARY KEY, ward_name VARCHAR2(20));
+CREATE TABLE AILMENT (AILMENTID NUMBER PRIMARY KEY, NAME VARCHAR2(20), PATIENTID NUMBER);
+CREATE TABLE Doctor (ID NUMBER PRIMARY KEY, SURNAME VARCHAR2(20), FIRSTNAME VARCHAR2(20), no_of_patient NUMBER, AILMENTID NUMBER REFERENCES AILMENT(AILMENTID));
+CREATE TABLE Patient (ID NUMBER PRIMARY KEY, FIRSTNAME VARCHAR2(20), SURNAME VARCHAR2(20), ADMISSION_DATE DATE, DR_ID NUMBER REFERENCES Doctor(ID), ward_no NUMBER REFERENCES Ward(ward_no));
+INSERT INTO Ward VALUES (1, 'Cardiology'); INSERT INTO Ward VALUES (2, 'Orthopaedics'); INSERT INTO Ward VALUES (3, 'General');
+INSERT INTO AILMENT VALUES (501, 'Arrhythmia', 1); INSERT INTO AILMENT VALUES (502, 'Fracture', 2); INSERT INTO AILMENT VALUES (503, 'Asthma', 4); INSERT INTO AILMENT VALUES (504, 'Fracture', 5);
+INSERT INTO Doctor VALUES (11, 'Jones', 'Mary', 25, 501); INSERT INTO Doctor VALUES (12, 'Rahman', 'Asif', 40, 502); INSERT INTO Doctor VALUES (13, 'Khan', 'Sadia', 40, 503);
+INSERT INTO Doctor VALUES (14, 'Smith', 'Tom', 31, 501); INSERT INTO Doctor VALUES (15, 'Gomez', 'Ana', 18, 504); INSERT INTO Doctor VALUES (16, 'Lee', 'Min', 31, 502);
+INSERT INTO Patient VALUES (1, 'Dylan', 'Thomas', DATE '2024-01-03', 11, 1); INSERT INTO Patient VALUES (2, 'Rina', 'Begum', DATE '2024-01-05', 12, 2);
+INSERT INTO Patient VALUES (3, 'Omar', 'Faruk', DATE '2024-01-06', 11, 3);   INSERT INTO Patient VALUES (4, 'Nadia', 'Islam', DATE '2024-01-07', 13, 3);
+INSERT INTO Patient VALUES (5, 'Paul', 'Grant', DATE '2024-01-09', 15, 2);    INSERT INTO Patient VALUES (6, 'Sara', 'Ahmed', DATE '2024-01-10', 11, 1);
+INSERT INTO Patient VALUES (7, 'Kamal', 'Hasan', DATE '2024-01-12', 14, 1);`;
+ck('#h1', HOSP, "(a) Surnames of Dr. Jones's patients. (Invented data.)", "SELECT p.SURNAME FROM Patient p, Doctor d WHERE p.DR_ID = d.ID AND d.SURNAME = 'Jones';");
+ck('#h2', HOSP, "(b) Doctors specialising in the ailment of the patient surnamed Thomas.", "SELECT d.FIRSTNAME, d.SURNAME FROM Doctor d, AILMENT a, Patient p WHERE d.AILMENTID = a.AILMENTID AND a.PATIENTID = p.ID AND p.SURNAME = 'Thomas';");
+ck('#h3', HOSP, '(c) Ward(s) with the most patients.', 'SELECT w.ward_no, w.ward_name FROM Ward w, Patient p WHERE w.ward_no = p.ward_no GROUP BY w.ward_no, w.ward_name HAVING COUNT(*) >= ALL (SELECT COUNT(*) FROM Patient GROUP BY ward_no);');
+ck('#h4', HOSP, '(d) Patients with no ailment.', 'SELECT p.ID, p.FIRSTNAME, p.SURNAME FROM Patient p WHERE NOT EXISTS (SELECT * FROM AILMENT a WHERE a.PATIENTID = p.ID);');
+ck('#h5', HOSP, '(e) Doctor(s) with the third highest no_of_patient (values 40, 40, 31, 31, 25, 18: the answer is Jones, 25).', 'SELECT d1.FIRSTNAME, d1.SURNAME FROM Doctor d1 WHERE 2 = (SELECT COUNT(DISTINCT d2.no_of_patient) FROM Doctor d2 WHERE d2.no_of_patient > d1.no_of_patient);');
+// ---------- employees and projects ----------
+const EP = `CREATE TABLE Pay (title VARCHAR2(20) PRIMARY KEY, salary NUMBER);
+CREATE TABLE Emp (eno VARCHAR2(4) PRIMARY KEY, ename VARCHAR2(20), title VARCHAR2(20) REFERENCES Pay(title), city VARCHAR2(15));
+CREATE TABLE Proj (pno VARCHAR2(4) PRIMARY KEY, pname VARCHAR2(25), budget NUMBER, city VARCHAR2(15));
+CREATE TABLE Works (eno VARCHAR2(4) REFERENCES Emp(eno), pno VARCHAR2(4) REFERENCES Proj(pno), resp VARCHAR2(15), dur NUMBER, PRIMARY KEY (eno, pno));
+INSERT INTO Pay VALUES ('Elect. Eng.', 40000); INSERT INTO Pay VALUES ('Syst. Anal.', 34000); INSERT INTO Pay VALUES ('Mech. Eng.', 27000); INSERT INTO Pay VALUES ('Programmer', 24000);
+INSERT INTO Emp VALUES ('E1', 'J. Doe', 'Elect. Eng.', 'Toronto'); INSERT INTO Emp VALUES ('E2', 'M. Smith', 'Syst. Anal.', 'Edmonton');
+INSERT INTO Emp VALUES ('E3', 'A. Lee', 'Mech. Eng.', 'Edmonton'); INSERT INTO Emp VALUES ('E4', 'J. Miller', 'Programmer', 'Toronto');
+INSERT INTO Emp VALUES ('E5', 'B. Casey', 'Syst. Anal.', 'Vancouver'); INSERT INTO Emp VALUES ('E6', 'L. Chu', 'Elect. Eng.', 'Toronto');
+INSERT INTO Emp VALUES ('E7', 'R. Davis', 'Mech. Eng.', 'Waterloo'); INSERT INTO Emp VALUES ('E8', 'J. Jones', 'Syst. Anal.', 'Waterloo');
+INSERT INTO Proj VALUES ('P1', 'Instrumentation', 150000, 'Montreal'); INSERT INTO Proj VALUES ('P2', 'Database Develop.', 135000, 'New York');
+INSERT INTO Proj VALUES ('P3', 'CAD/CAM', 250000, 'Toronto'); INSERT INTO Proj VALUES ('P4', 'Maintenance', 310000, 'Paris');
+INSERT INTO Proj VALUES ('P5', 'CAD/CAM', 500000, 'Toronto'); INSERT INTO Proj VALUES ('P6', 'Robotics', 200000, 'Waterloo');
+INSERT INTO Proj VALUES ('P7', 'Sensors', 90000, 'Waterloo');
+INSERT INTO Works VALUES ('E1', 'P1', 'Manager', 12); INSERT INTO Works VALUES ('E2', 'P1', 'Analyst', 24); INSERT INTO Works VALUES ('E2', 'P2', 'Analyst', 6);
+INSERT INTO Works VALUES ('E3', 'P3', 'Consultant', 10); INSERT INTO Works VALUES ('E3', 'P4', 'Engineer', 48); INSERT INTO Works VALUES ('E4', 'P2', 'Programmer', 18);
+INSERT INTO Works VALUES ('E5', 'P2', 'Manager', 24); INSERT INTO Works VALUES ('E6', 'P4', 'Manager', 48); INSERT INTO Works VALUES ('E7', 'P3', 'Engineer', 36);
+INSERT INTO Works VALUES ('E8', 'P3', 'Engineer', 40); INSERT INTO Works VALUES ('E1', 'P3', 'Engineer', 20); INSERT INTO Works VALUES ('E4', 'P4', 'Programmer', 12); INSERT INTO Works VALUES ('E5', 'P1', 'Engineer', 10);`;
+ck('#e1', EP, '(a) Per city: number of projects and total budget. (Data modelled on Özsu–Valduriez.)', 'SELECT city, COUNT(*), SUM(budget) FROM Proj GROUP BY city;');
+ck('#e2', EP, '(b) Per project: fraction of the budget spent on salaries, sorted by budget (ties by pno).', 'SELECT p.pno, p.pname, NVL(SUM(y.salary), 0) / p.budget FROM Proj p LEFT JOIN Works w ON w.pno = p.pno LEFT JOIN Emp e ON e.eno = w.eno LEFT JOIN Pay y ON y.title = e.title GROUP BY p.pno, p.pname, p.budget ORDER BY p.budget, p.pno;', { ordered: true });
+ck('#e3', EP, '(c) Delete all assignments to projects where more than 2 persons share a responsibility (checks Works afterwards; P3 has three Engineers).', 'DELETE FROM Works WHERE pno IN (SELECT pno FROM Works GROUP BY pno, resp HAVING COUNT(*) > 2);', { check: 'state', table: 'Works' });
+ck('#e4', EP, '(d) Toronto projects with the number of persons working on each.', "SELECT p.pno, p.pname, COUNT(w.eno) FROM Proj p LEFT JOIN Works w ON w.pno = p.pno WHERE p.city = 'Toronto' GROUP BY p.pno, p.pname;");
+ck('#e5', EP, '(e) Projects with a budget above every Waterloo project.', "SELECT pname FROM Proj WHERE budget > ALL (SELECT budget FROM Proj WHERE city = 'Waterloo');");
+ck('#x1', UNI, '1. (Easy) Number of instructors per department (departments with instructors only).', 'SELECT dept_name, COUNT(*) FROM instructor GROUP BY dept_name;');
+ck('#x2', UNI, '2. Names of students who took some course taught by Jane Doe (each once).', "SELECT DISTINCT s.name FROM student s, takes tk, teaches t, instructor i WHERE s.ID = tk.ID AND tk.course_id = t.course_id AND tk.sec_id = t.sec_id AND tk.semester = t.semester AND tk.year = t.year AND t.ID = i.ID AND i.name = 'Jane Doe';", { hint: 'A takes row matches a teaches row on all four section columns.' });
+ck('#x3', UNI, '3. Courses that were never offered in 2022.', 'SELECT course_id FROM course c WHERE NOT EXISTS (SELECT * FROM section s WHERE s.course_id = c.course_id AND s.year = 2022);');
+ck('#x4', FL, '4. For each destination reached from Los Angeles, the cheapest fare.', "SELECT to_city, MIN(price) FROM Flights WHERE from_city = 'Los Angeles' GROUP BY to_city;");
+ck('#x5', HOSP, '5. Each ward (ward_no, ward_name) with its number of patients; a ward with no patients must show 0.', 'SELECT w.ward_no, w.ward_name, COUNT(p.ID) FROM Ward w LEFT JOIN Patient p ON p.ward_no = w.ward_no GROUP BY w.ward_no, w.ward_name;');
+ck('#x6', EP, '6. (Exam style, division) Names of the other employees who work on every project that M. Smith (E2) works on.', "SELECT e.ename FROM Emp e WHERE e.eno <> 'E2' AND NOT EXISTS (SELECT pno FROM Works WHERE eno = 'E2' MINUS SELECT pno FROM Works w WHERE w.eno = e.eno);");
+</script>
+</body>
+</html>

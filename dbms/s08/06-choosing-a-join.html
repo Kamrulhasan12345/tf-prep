@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Choosing a Join Algorithm · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="../s07/lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 08 (Sukarna) · Chapter 6 · Slides 6–8, 23–28, 34–35 (review) · Book §15.3–15.5</div>
+<h1>Choosing a Join Algorithm: All the Costs Side by Side</h1>
+<p class="lede">Lectures 07 and 08 gave five ways to join two relations. This chapter puts their formulas and memory conditions in one table, gives a calculator that substitutes your numbers and picks the winner, and works the two exam questions that ask you to compare join algorithms.</p>
+
+<h2>1. The five joins in one table</h2>
+<div class="tbl"><table>
+<tr><th>Algorithm</th><th>Disk I/O</th><th>Memory needed</th><th>Where</th></tr>
+<tr><td>One-pass join</td><td class="num">B(R) + B(S)</td><td>min(B(R), B(S)) ≤ M − 1</td><td>Lec 07, Ch. 7</td></tr>
+<tr><td>Tuple-based nested loop</td><td class="num">up to T(R)·T(S)</td><td>M ≥ 2</td><td>Ch. 1</td></tr>
+<tr><td>Block-based nested loop (S outer)</td><td class="num">B(S) + ⌈B(S)/(M−1)⌉·B(R) ≈ B(R)B(S)/M</td><td>M ≥ 2</td><td>Ch. 1</td></tr>
+<tr><td>Simple sort-join</td><td class="num">5(B(R) + B(S))</td><td>B(R) ≤ M², B(S) ≤ M²</td><td>Ch. 4</td></tr>
+<tr><td>Sort-merge-join (efficient)</td><td class="num">3(B(R) + B(S))</td><td>B(R) + B(S) ≤ M²</td><td>Ch. 4</td></tr>
+<tr><td>Hash join (two-pass)</td><td class="num">3(B(R) + B(S))</td><td>min(B(R), B(S)) ≤ M²</td><td>Ch. 5</td></tr>
+</table></div>
+<p>A practical decision rule follows from the table:</p>
+<ol>
+  <li>If the smaller relation fits in M − 1 buffers, use the <b>one-pass join</b> (block nested loop then does the same thing).</li>
+  <li>Otherwise, if two passes are possible, use <b>hash join</b> or <b>sort-merge-join</b> (both 3 I/Os per block). Hash join needs less memory; sort-merge-join gives sorted output and copes with skew.</li>
+  <li>If only the larger relation is too big for sort-merge-join's sum rule, the <b>simple sort-join</b> (5 per block) or hash join still apply.</li>
+  <li><b>Block nested loop</b> is competitive only when the smaller relation is a small multiple of M (Example 15.4: 5500 versus 4500), and it is the fallback for any memory size and for tuples sharing one join value.</li>
+</ol>
+
+<h2>2. Join cost calculator</h2>
+<p>Enter the sizes. The table shows each formula with your numbers substituted, whether the algorithm can run with this M, and highlights the cheapest one that can. (T(R) and T(S) are optional; they only feed the tuple-based row.)</p>
+<figure class="wide">
+<span class="anim-tag">Interactive tool</span>
+<div id="calc"></div>
+</figure>
+<p>Try the slides' cases: 1000 / 500 / 101 (sort-merge and hash tie at 4500, nested loop 5500, simple sort-join 7500), then 10,000 / 5,000 / 101 (nested loop 505,000, simple sort-join 75,000, hash join 45,000, sort-merge-join infeasible).</p>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+
+<h3>Exam questions</h3>
+<div class="exam">
+  <div class="exam-src">DB QB · 22-23 1b · 8 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-1 | 2022–23 · 8 marks</div>
+  <div class="exam-q"><p>Assume R and S are two database relations, the size of R and S in disk are B(R) = 8000, B(S) = 4000 and the number of available memory buffers is M = 101. Compute the I/O cost of the natural join operation for the following algorithms: (i) block based nested loop join, (ii) sort-based nested loop join, and (iii) hash-based nested-loop join.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+  <p>"Sort-based nested-loop join" and "hash-based nested-loop join" mean the sort-based join and the hash join. The smaller relation is S.</p>
+  <p><b>(i) Block-based nested-loop join</b>, S (smaller) in the outer loop, chunks of M − 1 = 100 blocks:</p>
+  <p class="formula">B(S) + (B(S)/(M − 1))·B(R) = 4000 + (4000/100) × 8000 = 4000 + 40 × 8000 = 324,000</p>
+  <p>(With R outside: 8000 + 80 × 4000 = 328,000, slightly worse.)</p>
+  <p><b>(ii) Sort-based join.</b> First check which version is possible with M = 101.</p>
+  <ul>
+    <li>Efficient sort-merge-join needs B(R) + B(S) ≤ M²: 12,000 &gt; 10,201. Counting sublists: ⌈8000/101⌉ + ⌈4000/101⌉ = 80 + 40 = 120 sublists, but only 101 buffers. <b>Not possible</b> in two passes.</li>
+    <li>Simple sort-join needs each relation to sort with TPMMS: 8000 ≤ 101 × 100 = 10,100 and 4000 ≤ 10,100. <b>Possible.</b> Cost: 4B(R) + 4B(S) to sort and store both, plus B(R) + B(S) to merge: <b>5 × 12,000 = 60,000</b> I/Os.</li>
+  </ul>
+  <p><b>(iii) Hash join.</b> Needs min(B(R), B(S)) ≤ M²: 4000 ≤ 10,201. With 100 buckets, S-buckets are about 40 blocks, which fit in the 100 available buffers. Cost: <b>3 × (8000 + 4000) = 36,000</b> I/Os.</p>
+  <p><b>Ranking:</b> hash join 36,000 &lt; sort-join 60,000 &lt; block nested loop 324,000.</p>
+  <p><i>Note:</i> the question bank's answer gives 332,000 for (i), because it reserves a buffer for output and uses chunks of M − 2 = 99 blocks (41 chunks of S: 4000 + 41 × 8000). That is a different convention from the slides, which do not count the output buffer. It also offers 36,000 as an "optimized" sort-merge cost, but that version is infeasible here (120 sublists &gt; 101 buffers), so the sort-based answer with M = 101 is 60,000.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 24-25 5d · 6 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-1 | 2024–25 · 6 marks</div>
+  <div class="exam-q"><p>Assuming no indexes exist, which one will you apply for faster operation: a Hash Join or a Sort-Merge Join? Explain why.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+  <p><b>Usually the hash join</b>, for an equijoin of unsorted relations:</p>
+  <ul>
+    <li><b>Same I/O, less memory.</b> When both can run in two passes, both cost 3(B(R) + B(S)). But the hash join needs only M ≥ √min(B(R), B(S)), while sort-merge-join needs M ≥ √(B(R) + B(S)). So hash join runs in two passes in cases where sort-merge-join would need a third pass or must fall back to the 5(B(R) + B(S)) simple sort-join. Example: B(R) = 8000, B(S) = 4000, M = 101: hash join 36,000 I/Os, best sort-based join 60,000.</li>
+    <li><b>Less CPU:</b> no sorting of whole sublists, just hashing each tuple once and probing.</li>
+  </ul>
+  <p><b>Choose sort-merge-join instead when:</b></p>
+  <ul>
+    <li>the inputs are already sorted on the join attribute (e.g. clustered on it): then the sorting passes are free and the merge costs only B(R) + B(S);</li>
+    <li>the result must be sorted on the join attribute (ORDER BY, or a later merge-based operator), since sort-merge produces sorted output;</li>
+    <li>the join values are skewed or have few distinct values, so some hash buckets would not fit in memory, whereas sorted runs are always balanced;</li>
+    <li>the condition is a range (non-equi) comparison such as R.a &lt; S.b, which hashing cannot handle but a merge over sorted inputs can.</li>
+  </ul>
+  <p><i>Note on the bank's answer:</i> it argues that sort-merge costs "O(N log N)" I/Os. In the two-pass setting of this course both algorithms are linear, 3 I/Os per block; the real differences are memory, sortedness and skew, as listed above.</p>
+  </div></details>
+</div>
+
+<div class="key"><p><strong>Summary:</strong> one-pass if the smaller relation fits; otherwise hash join or sort-merge-join at 3(B(R) + B(S)), with hash join needing only √min memory and sort-merge-join √sum but giving sorted output; simple sort-join at 5(B(R) + B(S)) when only √max memory is available; block nested loop B(S) + B(S)B(R)/(M − 1) when relations are small multiples of M or memory is tiny.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../s07/lecture.js"></script>
+<script>
+QE.joinCalc('#calc', { BR: 8000, BS: 4000, TR: '', TS: '', M: 101 });
+flashcards('#cards', [
+  { f: 'One-pass join', b: 'B(R) + B(S); needs min(B(R), B(S)) ≤ M − 1.' },
+  { f: 'Block nested loop', b: 'B(S) + ⌈B(S)/(M−1)⌉B(R); any M ≥ 2; quadratic.' },
+  { f: 'Simple sort-join', b: '5(B(R) + B(S)); √max(B(R), B(S)) buffers.' },
+  { f: 'Sort-merge-join', b: '3(B(R) + B(S)); √(B(R) + B(S)) buffers; sorted output.' },
+  { f: 'Hash join', b: '3(B(R) + B(S)); √min(B(R), B(S)) buffers; sensitive to skew.' },
+]);
+quiz('#quiz', [
+  { q: 'B(R) = 1000, B(S) = 500, M = 101. Cheapest algorithm(s) from the slides?', opts: ['Block nested loop (5500)', 'Hash join and sort-merge-join (4500)', 'Simple sort-join (7500)', 'One-pass (1500)'], a: 1, why: 'One-pass is impossible (500 > 100); sort-merge (15 sublists ≤ 101) and hash join both cost 4500.' },
+  { q: 'B(R) = 10,000, B(S) = 100, M = 101. Best?', opts: ['Hash join', 'One-pass join, 10,100 I/Os', 'Sort-merge-join', 'Simple sort-join'], a: 1, why: 'S fits in M − 1 = 100 buffers: B(R) + B(S) = 10,100.' },
+  { q: 'B(R) = 50,000, B(S) = 50,000, M = 101. Which two-pass join is feasible?', opts: ['Hash join', 'Sort-merge-join', 'Simple sort-join', 'None'], a: 3, why: 'min = 50,000 > M² = 10,201, so even hash join needs more passes; nested loop always works.' },
+  { q: 'Why might sort-merge-join be chosen even though hash join needs less memory?', opts: ['It does fewer I/Os', 'The output must be sorted on the join attribute', 'It never needs memory', 'Hash join cannot do equijoins'], a: 1, why: 'Sorted output, presorted inputs, skew and range conditions favour sort-merge.' },
+]);
+ask('#try1', { q: 'Use the calculator: B(R) = 10,000, B(S) = 5,000, M = 101. What does the cheapest feasible algorithm cost?', a: 45000, why: 'Hash join: 3 × 15,000. Sort-merge-join is infeasible (150 sublists > 101).' });
+</script>
+</body>
+</html>

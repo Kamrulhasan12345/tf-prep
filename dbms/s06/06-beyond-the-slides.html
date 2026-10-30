@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Recovery: Beyond the Slides · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="../s05/lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 05–06 (Sukarna) · Chapter 6 · Exam topics beyond the slides</div>
+<h1>Exam Topics Beyond the Slides</h1>
+<p class="lede">Past papers on recovery also ask about buffer policies (steal and force), recoverable and cascadeless schedules, and the Silberschatz/ARIES style of recovery. None of these is on the Lec 05–06 slides, but each connects directly to them. Each topic is explained briefly, then the questions are answered in full.</p>
+
+<h2>1. Steal and force: the buffer policies behind the three logging methods</h2>
+
+<p>The three logging methods differ in <em>when the buffer manager may write a changed block to disk</em>. Two yes/no questions describe this, and other textbooks (Silberschatz, Ramakrishnan) name the answers:</p>
+<dl class="def">
+  <dt>Steal</dt><dd>The buffer manager may write a block changed by an <em>uncommitted</em> transaction to disk (for example to free (“steal”) its buffer frame for another page). <b class="term">No-steal</b>: uncommitted changes never reach disk.</dd>
+  <dt>Force</dt><dd>When a transaction commits, all blocks it changed are <em>forced</em> to disk before the commit completes. <b class="term">No-force</b>: committed changes may stay in memory and be written later.</dd>
+</dl>
+
+<p>Each choice decides what recovery must be able to do:</p>
+<ul>
+  <li><strong>Steal</strong> means uncommitted data can be on disk after a crash, so recovery needs <strong>UNDO</strong> (old values in the log). No-steal: never any undo.</li>
+  <li><strong>No-force</strong> means committed data can be missing from disk after a crash, so recovery needs <strong>REDO</strong> (new values in the log). Force: never any redo.</li>
+</ul>
+
+<div class="tbl"><table>
+<tr><th></th><th>Force</th><th>No-force</th></tr>
+<tr><th>Steal</th><td><strong>Undo logging</strong> (U1 lets uncommitted data reach disk; U2 forces data before COMMIT). Recovery: undo only.</td><td><strong>Undo/redo logging</strong> (only UR1). Recovery: undo and redo. Best for performance; used by real systems (ARIES).</td></tr>
+<tr><th>No-steal</th><td>In principle neither undo nor redo, but only if all of a transaction's blocks can be written to disk atomically at commit (hard; one technique is shadow paging). Every commit pays for the writes, and changed blocks stay pinned in memory until then.</td><td><strong>Redo logging</strong> (R1: data only after COMMIT is on disk; it may wait longer). Recovery: redo only.</td></tr>
+</table></div>
+
+<h2>2. Recoverable and cascadeless schedules</h2>
+
+<p>Logging handles one transaction's own changes. When transactions run concurrently, one transaction can <em>read</em> a value written by another that has not committed yet (a <b class="term">dirty read</b>). That creates a dependency that recovery cannot fix by itself.</p>
+<dl class="def">
+  <dt>Schedule</dt><dd>An interleaving of the actions of several transactions; r<sub>i</sub>(X) and w<sub>i</sub>(X) are a read and a write of X by T<sub>i</sub>, and c<sub>i</sub> is T<sub>i</sub>'s commit.</dd>
+  <dt>T<sub>j</sub> reads from T<sub>i</sub></dt><dd>T<sub>j</sub> reads X after T<sub>i</sub> wrote it, with no other write of X in between.</dd>
+  <dt>Recoverable schedule</dt><dd>Whenever T<sub>j</sub> reads from T<sub>i</sub>, T<sub>i</sub> commits before T<sub>j</sub> commits. Then a committed transaction never depends on one that might still be undone.</dd>
+  <dt>Cascading rollback</dt><dd>Aborting T<sub>i</sub> forces aborting every transaction that read from it, and every transaction that read from those, and so on.</dd>
+  <dt>Cascadeless (avoids cascading rollback)</dt><dd>Every transaction reads only values written by transactions that have already committed. Cascadeless schedules are recoverable.</dd>
+</dl>
+<p>Why does this matter for crash recovery? Recovery undoes every transaction without a COMMIT. If a committed transaction read a value from one of them, its committed result is built on a value that recovery erases, and no log record can fix that. This is the “strange behaviour” the textbook mentions for undo/redo recovery (Lecture 06, Chapter 3), and it is why the DBMS keeps schedules recoverable, usually by holding write locks until commit (textbook §19.1).</p>
+
+<h2>3. Silberschatz/ARIES-style recovery, in one paragraph</h2>
+<p>Some answers in the question banks use the other standard textbook (Silberschatz) or the ARIES algorithm. There, recovery has a <strong>redo phase that “repeats history”</strong>: starting from the last checkpoint it replays <em>every</em> update record forward, committed or not, and builds the list of incomplete transactions. Then an <strong>undo phase</strong> rolls back the incomplete transactions backward, writing a <b class="term">compensation log record</b> (CLR) for each undo so a crash during recovery does not undo anything twice; each page stores the log sequence number (LSN) of the last change applied to it, so redo can skip changes already on the page. The final database state is the same as with this course's undo/redo recovery; only the intermediate writes differ. For this course, use the methods of Lec 05–06, and recognise the other style when a question's wording (“redo phase and undo phase”, &lt;T<sub>0</sub> start&gt;) suggests it.</p>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+
+<h3>Exam questions</h3>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 24-25 4a · 7 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-1 | 2024–25 · 7 marks</div>
+  <div class="exam-q"><p>Compare the force policy and steal policy with respect to how modified buffers are written to disk in a database system. Under which policy does the database recovery manager not need to perform any actions during the redo phase?</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+  <p><strong>The two policies answer different questions.</strong></p>
+  <div class="tbl"><table>
+  <tr><th></th><th>Steal policy</th><th>Force policy</th></tr>
+  <tr><td>Question it answers</td><td>May a buffer changed by an <em>uncommitted</em> transaction be written to disk?</td><td>Must every buffer changed by a transaction be written to disk <em>at commit</em>?</td></tr>
+  <tr><td>Rule</td><td>Yes: the buffer manager may write (steal) a dirty buffer of an active transaction, e.g. to free a frame.</td><td>Yes: commit completes only after all the transaction's changed blocks are on disk.</td></tr>
+  <tr><td>Effect on disk after a crash</td><td>Uncommitted changes may be on disk.</td><td>Every committed change is on disk.</td></tr>
+  <tr><td>Recovery consequence</td><td>Needs UNDO (old values must be logged, write-ahead).</td><td>No REDO is ever needed.</td></tr>
+  <tr><td>Cost / benefit</td><td>Benefit: buffers are freed early, large transactions fit; cost: undo information.</td><td>Cost: many random writes at every commit; benefit: no redo.</td></tr>
+  <tr><td>Opposite</td><td>No-steal: uncommitted data never written; no undo, but buffers pinned until commit.</td><td>No-force: data written later; faster commits, but redo needed.</td></tr>
+  </table></div>
+  <p>In this course's terms: undo logging is <strong>steal + force</strong>, redo logging is <strong>no-steal + no-force</strong>, undo/redo logging is <strong>steal + no-force</strong>.</p>
+  <p><strong>Answer:</strong> under the <strong>force</strong> policy the redo phase has nothing to do: every committed transaction's changes were already on disk when it committed, so a crash can never lose a committed update. (Undo logging, which forces data before the COMMIT record by rule U2, has no redo step at all.)</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 215 | L-2/T-1 | 2023–24 · 10 marks</div>
+  <div class="exam-q"><p>Consider the following schedule where c<sub>i</sub> represents a commit action for transaction T<sub>i</sub>:</p>
+  <p class="formula">w<sub>1</sub>(A); r<sub>2</sub>(A); w<sub>2</sub>(A); w<sub>2</sub>(B); r<sub>3</sub>(B); w<sub>3</sub>(C); c<sub>3</sub>; c<sub>2</sub>; c<sub>1</sub></p>
+  <p>(a) Does the given schedule preserve database consistency in case of system failure? Justify your answer. (b) Rearrange the commit statements so that the schedule preserves database consistency in case of system failure. (c) Rearrange the commit statements so that the schedule avoids cascading rollback.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+  <p><strong>Reads-from relations:</strong> r<sub>2</sub>(A) follows w<sub>1</sub>(A), so <strong>T2 reads from T1</strong>. r<sub>3</sub>(B) follows w<sub>2</sub>(B), so <strong>T3 reads from T2</strong>.</p>
+  <p><strong>(a) No.</strong> The schedule is not recoverable: T3 commits (c<sub>3</sub>) before T2, from which it read, and T2 commits before T1. Suppose the system crashes right after c<sub>3</sub>. Recovery sees COMMIT records only for T3, so it undoes T1 and T2: A and B get their old values. But T3 is committed, and the value of C it wrote was computed from B as written by T2, which no longer exists. The database is left in a state that no execution of complete transactions produces, and recovery cannot fix it because T3's commit is permanent. The same happens if T1 or T2 aborts after c<sub>3</sub>.</p>
+  <p><strong>(b)</strong> Make it recoverable: each transaction commits after the ones it read from, i.e. c<sub>1</sub> before c<sub>2</sub> before c<sub>3</sub>:</p>
+  <p class="formula">w<sub>1</sub>(A); r<sub>2</sub>(A); w<sub>2</sub>(A); w<sub>2</sub>(B); r<sub>3</sub>(B); w<sub>3</sub>(C); c<sub>1</sub>; c<sub>2</sub>; c<sub>3</sub></p>
+  <p>Now a crash at any point leaves a consistent result: whoever has committed only depends on committed transactions. (If T1 aborted, T2 and T3 would still have to be rolled back: a cascading rollback.)</p>
+  <p><strong>(c)</strong> Avoid cascading rollback: every read must see only committed data, so c<sub>1</sub> must come before r<sub>2</sub>(A) and c<sub>2</sub> before r<sub>3</sub>(B). T1's only action is w<sub>1</sub>(A) and T2's last action is w<sub>2</sub>(B), so:</p>
+  <p class="formula">w<sub>1</sub>(A); c<sub>1</sub>; r<sub>2</sub>(A); w<sub>2</sub>(A); w<sub>2</sub>(B); c<sub>2</sub>; r<sub>3</sub>(B); w<sub>3</sub>(C); c<sub>3</sub></p>
+  <p>This schedule is cascadeless (and therefore also recoverable). It is in fact serial: T1, T2, T3. (The CSE215 bank's answers to all three parts agree with these.)</p>
+  </div></details>
+</div>
+
+<div class="key"><p><strong>Summary:</strong> steal → undo needed, no-force → redo needed; undo logging = steal/force, redo logging = no-steal/no-force, undo/redo = steal/no-force; under force there is never anything to redo. A schedule is recoverable if each transaction commits after those it read from, and cascadeless if it reads only committed data. ARIES-style recovery repeats all history in its redo phase and then undoes incomplete transactions, reaching the same final state.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../s05/lecture.js"></script>
+<script>
+flashcards('#cards', [
+  { f: 'Steal', b: 'Uncommitted changes may be written to disk → recovery needs UNDO.' },
+  { f: 'No-force', b: 'Committed changes may still be only in memory → recovery needs REDO.' },
+  { f: 'Undo logging as a policy', b: 'Steal + force.' }, { f: 'Redo logging as a policy', b: 'No-steal + no-force.' },
+  { f: 'Undo/redo logging as a policy', b: 'Steal + no-force.' },
+  { f: 'Recoverable schedule', b: 'If Tj reads from Ti, Ti commits before Tj.' },
+  { f: 'Cascadeless schedule', b: 'Transactions read only values written by committed transactions.' },
+]);
+quiz('#quiz', [
+  { q: 'Under which policy is the redo phase empty?', opts: ['Steal', 'No-steal', 'Force', 'No-force'], a: 2, why: 'Force writes all changes to disk at commit.' },
+  { q: 'Redo logging corresponds to…', opts: ['steal/force', 'steal/no-force', 'no-steal/no-force', 'no-steal/force'], a: 2, why: 'R1 forbids writing uncommitted data (no-steal) and lets committed data wait (no-force).' },
+  { q: 'w1(A); r2(A); c2; c1 is…', opts: ['recoverable', 'not recoverable', 'cascadeless', 'serial'], a: 1, why: 'T2 read from T1 but commits first.' },
+  { q: 'Which real-world combination needs both undo and redo?', opts: ['steal/no-force', 'no-steal/force', 'no-steal/no-force', 'steal/force'], a: 0, why: 'Uncommitted data can be on disk and committed data missing.' },
+]);
+</script>
+</body>
+</html>

@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>One-Pass Algorithms for Unary Operations · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 07 (Sukarna) · Chapter 6 · Slides 35–44 · Book §15.2–15.2.2</div>
+<h1>Kinds of Algorithms, and One-Pass Algorithms for σ, π, δ and γ</h1>
+<p class="lede">Algorithms for physical operators are classified by how many times they read the data (one, two or many passes), and operations by how much of a relation they need at once. This chapter sets up both classifications and then gives the one-pass algorithms for the unary operations: selection, projection, duplicate elimination and grouping, with their costs and memory needs.</p>
+
+<h2>1. One-pass, two-pass and many-pass algorithms (slides 35–36)</h2>
+<dl class="def">
+<dt>One-pass algorithm</dt>
+<dd>Reads each block of data from disk <b>only once</b>. Usually requires <b>at least one argument to fit in main memory</b> (σ and π are the exceptions).</dd>
+<dt>Two-pass algorithm</dt>
+<dd>For relations too large for main memory. It reads the data a first time from disk, processes it in some way, <b>writes it all (or almost all) back to disk</b>, and reads it a second time to finish. So each block is read twice. These are Lecture 08's sort-based and hash-based algorithms.</dd>
+<dt>Many-pass (multipass) algorithm</dt>
+<dd>For data too large even for two passes: three or more passes, so each block is read three or more times. These are recursive generalizations of the two-pass algorithms (Lec 08, Chapter 2 shows the sorting case).</dd>
+</dl>
+<p>The textbook adds a second axis, the <em>method</em>: sorting-based, hash-based and index-based algorithms (§15.2). The nested-loop joins of Lecture 08 sit in between: "one and a half" passes.</p>
+
+<h2>2. Three classes of operations (slides 37–39)</h2>
+<div class="tbl"><table>
+<tr><th>Class</th><th>Operators</th><th>Needs in memory</th><th>One-pass condition</th></tr>
+<tr><td><b>Tuple-at-a-time, unary</b></td><td>σ, π</td><td>one tuple at a time; read one block at a time into a buffer and output</td><td>any size: M ≥ 1</td></tr>
+<tr><td><b>Full-relation, unary</b></td><td>γ (grouping), δ (duplicate elimination)</td><td>all or most of the tuples at once</td><td>roughly B(R) ≤ M</td></tr>
+<tr><td><b>Full-relation, binary</b></td><td>∪, ∩, −, ⋈, × (set and bag versions)</td><td>all of one argument</td><td>at least one argument fits: min(B(R), B(S)) ≤ M (bag union needs nothing)</td></tr>
+</table></div>
+
+<div class="q">
+<h4>Slide 38 question (worked answer): why do γ and δ need all or most of the tuples in memory at once?</h4>
+<p>Because the decision about one tuple depends on tuples that may be anywhere else in R.</p>
+<ul>
+  <li>For <b>δ</b>, deciding whether tuple t is a duplicate means knowing whether t was already seen, and the earlier copy could be in any block read so far. So one copy of every distinct tuple seen so far must stay in memory until the end.</li>
+  <li>For <b>γ</b>, a group's aggregate (say SUM(salary) for the CSE department) is not final until every tuple of that group has been read, and the last one could be in the last block. So every group's running total must stay in memory until R is finished.</li>
+</ul>
+<p>Compare σ: whether a tuple passes the condition depends on that tuple alone, so it can be decided and forgotten at once.</p>
+</div>
+
+<h2>3. One-pass σ and π (slide 40)</h2>
+<p><b>Approach:</b> read the blocks of R one at a time into an input buffer; apply the operation to each tuple; move the selected tuples, or the projected tuples, to the output.</p>
+<figure>
+<svg viewBox="0 0 560 120" width="560" role="img" aria-label="selection or projection with one input buffer">
+  <g style="font-size:12px">
+  <rect x="10" y="30" width="90" height="60" rx="4" class="cell"/><text x="55" y="58" text-anchor="middle">R on disk</text><text x="55" y="74" text-anchor="middle" class="lbl">B(R) blocks</text>
+  <path d="M100 60 H160" class="s-fg" marker-end="url(#m-fg)"/><text x="130" y="52" text-anchor="middle" class="lbl">1 block</text>
+  <rect x="162" y="38" width="100" height="44" rx="4" class="cell-hl"/><text x="212" y="64" text-anchor="middle">input buffer</text>
+  <path d="M262 60 H322" class="s-fg" marker-end="url(#m-fg)"/><text x="292" y="52" text-anchor="middle" class="lbl">σ or π</text>
+  <rect x="324" y="38" width="100" height="44" rx="4" class="cell-new"/><text x="374" y="64" text-anchor="middle">output buffer</text>
+  <path d="M424 60 H484" class="s-fg dash" marker-end="url(#m-fg)"/><text x="520" y="64" text-anchor="middle" class="lbl">next op</text>
+  <text x="10" y="112" class="lbl">only the input buffer is counted: the output buffer belongs to the consumer, so M ≥ 1 is enough</text>
+  </g>
+</svg>
+<figcaption><b>Figure 1.</b> A selection or projection on R (textbook Fig. 15.5).</figcaption>
+</figure>
+<ul>
+  <li><b>Requirement: M ≥ 1</b>, regardless of B(R). The output buffer is not counted because it may be the input buffer of the next operator, or may go straight to the user.</li>
+  <li><b>I/O cost</b> depends only on how R is read: <b>B(R)</b> if R is clustered or a table scan is used; <b>T(R)</b> if R is not clustered and an index scan is used (very expensive, Chapter 4).</li>
+  <li><b>Exception:</b> for a selection whose predicate compares an indexed attribute with a constant (such as <code>eid = 101</code>), use the index to retrieve only a subset of R's blocks. The cost of this index seek is <b>less than B(R)</b>, often much less.</li>
+</ul>
+
+<h2>4. One-pass duplicate elimination δ(R) (slides 41–42)</h2>
+<p><em>Slide slip:</em> slide 41 labels this operation "γ(R) [Duplicate elimination]". Duplicate elimination is <b>δ</b>; γ is grouping.</p>
+<p><b>Memory plan:</b> one buffer holds the current block of R; the remaining <b>M − 1</b> buffers hold a single copy of every tuple seen so far (textbook Fig. 15.6).</p>
+<pre>for each block of R: read it into the input buffer
+    for each tuple t in the block:
+        if t is already among the stored tuples: discard t      (do not output)
+        else: copy t to the output, and store t in the M−1 buffers</pre>
+<p>Try it with your own tuples (tuples per block = 2):</p>
+<figure class="wide">
+<span class="anim-tag">Interactive animation</span>
+<div id="dedup"></div>
+</figure>
+
+<h3>The cost of checking (slide 42)</h3>
+<p>"Is t already stored?" is asked once per tuple of R, so its speed matters:</p>
+<ul>
+  <li>If we just keep a list and compare t with every stored tuple, each check costs <b>O(n)</b>, where n is the number of stored tuples, and the whole operation costs <b>O(n²)</b> processor time. With millions of tuples that is no longer negligible next to the disk time, which breaks the "only I/O matters" assumption.</li>
+  <li>With a <b>hash table</b> with many buckets (or a balanced search tree, O(log n)), each check is <b>O(1)</b> on average, and the whole operation is about linear. The structure needs a little extra space (bucket array, pointers), which we ignore.</li>
+</ul>
+<p><b>Requirement:</b> one copy of each distinct tuple must fit in M − 1 buffers: B(δ(R)) ≤ M − 1, simplified to <b>B(δ(R)) &lt; M</b>. <b>Disk I/O: B(R)</b>.</p>
+<p><b>What if B(δ(R)) &gt; M?</b> The distinct tuples do not fit, so stored tuples must be moved out to disk and back as they are needed for checking. This is <b>thrashing</b>, and it raises the I/O cost sharply. The trouble is that B(δ(R)) is not known until δ(R) has been computed, so the optimizer must estimate it; an underestimate is expensive. Lecture 08's two-pass algorithms avoid the problem.</p>
+
+<h2>5. One-pass grouping γ<sub>L</sub>(R) (slides 43–44)</h2>
+<p>A grouping operation γ<sub>L</sub> has zero or more <b>grouping attributes</b> and one or more <b>aggregated attributes</b>. The algorithm creates <b>one entry per group</b> in main memory (one per value of the grouping attributes), then scans R one block at a time. For each tuple it finds its group's entry and updates the accumulated values:</p>
+<div class="tbl"><table>
+<tr><th>Aggregate</th><th>Kept in the group's entry</th><th>Update per tuple</th></tr>
+<tr><td>MIN(a), MAX(a)</td><td>smallest / largest a seen so far</td><td>replace it if the new a is smaller / larger</td></tr>
+<tr><td>COUNT(a)</td><td>a counter</td><td>add one</td></tr>
+<tr><td>SUM(a)</td><td>a running sum</td><td>add the value of a (skip NULLs)</td></tr>
+<tr><td>AVG(a)</td><td>two accumulations: SUM(a) and COUNT(a)</td><td>update both; at the end output SUM/COUNT</td></tr>
+</table></div>
+<p><b>Result generation (slide 44):</b> only when all tuples of R have been read can the output be produced: one tuple per group, from the entries in memory. (So γ is a blocking operator, Chapter 5.)</p>
+<p><b>Requirements:</b> an efficient structure to find a tuple's group entry, keyed on the grouping attributes only: a hash table or a balanced tree. <b>Disk I/Os: B(R)</b>, as for any one-pass unary algorithm.</p>
+<p><b>Memory:</b> slide 44 states the requirement as "δ(R) &lt; M: size of R with unique rows should fit in M − 1 buffers". More precisely (textbook §15.2.2), what must fit is the set of <b>group entries</b>, one per group, so the real condition is that the number of groups times the entry size fits in M − 1 buffers. That is not tied to B(R) in a simple way: there may be far fewer groups than tuples (then even a huge R works), and an entry may be shorter or longer than a tuple. "B(R) ≤ M" is only a safe rough rule.</p>
+<figure class="wide">
+<span class="anim-tag">Interactive animation</span>
+<div id="group"></div>
+</figure>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+<div id="try2"></div>
+
+<h3>Exam questions</h3>
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2012–13 · 20 marks</div>
+  <div class="exam-q"><p>Write the steps of performing a one-pass algorithm for finding the maximum value of an attribute for relation R. If the buffer size is M, what is the relationship between R and M? Derive the relationship between M and R for a two-pass aggregate operation.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+  <p><b>One-pass MAX(a) over the whole of R</b> (a γ with no grouping attributes, so exactly one group):</p>
+  <ol>
+    <li>Set max := −∞ (or "no value yet"). This single entry is all the memory state.</li>
+    <li>Read R one block at a time into one input buffer.</li>
+    <li>For each tuple t in the block: if t.a is not NULL and t.a &gt; max, set max := t.a.</li>
+    <li>When the last block has been processed, output max.</li>
+  </ol>
+  <p><b>Relationship between R and M:</b> only one buffer (for the current block) plus one value is needed, so <b>M ≥ 1</b> suffices <b>for any B(R)</b>; the cost is B(R) disk I/Os. (If the question means MAX per group, γ<sub>g, MAX(a)</sub>(R), the one-pass algorithm keeps one (g, max) entry per group, and the requirement is that all group entries fit in M − 1 buffers; the rough rule is B(R) ≤ M.)</p>
+  <p><b>Two-pass aggregation</b> (sort-based, Lec 08, Ch. 3): phase 1 reads M blocks at a time, sorts them on the grouping attributes and writes a sorted sublist, giving ⌈B(R)/M⌉ sublists. Phase 2 needs one input buffer per sublist and one output buffer, so</p>
+  <p class="formula">⌈B(R)/M⌉ ≤ M − 1 &nbsp;⟹&nbsp; B(R) ≤ M(M − 1) ≈ M² &nbsp;⟹&nbsp; M ≥ √B(R)</p>
+  <p>The hash-based version gives the same bound: phase 1 makes M − 1 buckets of about B(R)/(M − 1) blocks, and phase 2 needs each bucket's group entries to fit in M buffers, so B(R)/(M − 1) ≤ M, again B(R) ≤ M(M − 1) ≈ M². Either way the cost is 3B(R) I/Os. For example, with M = 101 a two-pass aggregate handles up to 101 × 100 = 10,100 blocks, against 100 for one pass.</p>
+  </div></details>
+</div>
+
+<div class="key"><p><strong>Summary:</strong> one-pass algorithms read each block once and usually need one argument in memory; two-pass algorithms read, write and reread; many-pass ones need three or more passes. σ and π are tuple-at-a-time: M ≥ 1, cost B (T if unclustered via an index, less than B with an index seek). δ keeps one copy of each distinct tuple in M − 1 buffers with a hash table: cost B, needs B(δ(R)) &lt; M, thrashes otherwise. γ keeps one entry per group (MIN, MAX, COUNT, SUM, or SUM and COUNT for AVG), outputs only at the end, costs B, and needs the group entries to fit in memory.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="lecture.js"></script>
+<script>
+QE.form('#dedup', [{ id: 'R', label: 'R: tuples, comma-separated', value: 'a, b, a, c, b, d, a, c', cls: 'wide' }], 'Animate δ(R)', (v, out) => {
+  const R = QE.list(v.R, 'R', 1, 16);
+  out.innerHTML = '<div></div>';
+  QE.onePassAnim(out.firstChild, { op: 'dedup', str: R, tpb: 2, strName: 'R' });
+});
+QE.form('#group', [{ id: 'R', label: 'R(dept, salary): "dept salary" pairs, comma-separated', value: 'CSE 50, EEE 40, CSE 70, ME 30, EEE 60, CSE 20', cls: 'wide' }], 'Animate γ', (v, out) => {
+  const R = QE.list(v.R, 'R', 1, 14);
+  R.forEach(t => { const p = t.split(/\s+/); if (p.length !== 2 || isNaN(+p[1])) throw new Error('Each tuple needs a group name and a number, like "CSE 50".'); });
+  out.innerHTML = '<p style="margin:0 0 6px"><code>γ<sub>dept, COUNT(*), SUM(salary), AVG(salary), MIN(salary), MAX(salary)</sub>(R)</code></p><div></div>';
+  QE.onePassAnim(out.lastChild, { op: 'group', str: R, tpb: 2, strName: 'R' });
+});
+
+flashcards('#cards', [
+  { f: 'One-pass algorithm', b: 'Reads each block once; usually needs one argument in memory.' },
+  { f: 'Two-pass algorithm', b: 'Read, process, write all back, read again. For relations larger than memory.' },
+  { f: 'Tuple-at-a-time ops', b: 'σ, π: M ≥ 1, cost B(R) (T(R) if unclustered via index).' },
+  { f: 'Full-relation unary ops', b: 'δ and γ: need (most of) the relation in memory; one-pass needs ≈ B ≤ M.' },
+  { f: 'One-pass δ memory', b: '1 input buffer + M − 1 buffers holding one copy of each distinct tuple; B(δ(R)) < M.' },
+  { f: 'Thrashing', b: 'Stored tuples do not fit, so blocks move between memory and disk repeatedly; I/O cost explodes.' },
+  { f: 'AVG in γ', b: 'Keep SUM and COUNT per group; divide at the end.' },
+  { f: 'γ output', b: 'Only after all of R is read: one tuple per group. γ is blocking.' },
+]);
+quiz('#quiz', [
+  { q: 'What is the minimum M for a one-pass selection on a 1,000,000-block relation?', opts: ['1', '1,000', '1,000,000', '√1,000,000'], a: 0, why: 'σ is tuple-at-a-time: one input buffer is enough for any B(R).' },
+  { q: 'One-pass δ(R): which structure keeps the work per tuple about O(1)?', opts: ['An unsorted list', 'A hash table on the whole tuple', 'A B+ tree on disk', 'No structure'], a: 1, why: 'A main-memory hash table answers "seen before?" in constant average time; a list costs O(n) per check, O(n²) total.' },
+  { q: 'R has 1,000 blocks but only 50 blocks of distinct tuples; M = 60. Can one-pass δ be used?', opts: ['No, B(R) > M', 'Yes, B(δ(R)) = 50 < M', 'Only with an index', 'Only for bags'], a: 1, why: 'Only the distinct tuples are stored: B(δ(R)) < M is the requirement.' },
+  { q: 'For AVG(salary) per department, each group entry stores…', opts: ['the average so far', 'SUM and COUNT', 'all salaries of the group', 'MIN and MAX'], a: 1, why: 'Averages cannot be combined incrementally; SUM and COUNT can (slide 43).' },
+  { q: 'When does one-pass γ produce its first output tuple?', opts: ['After the first block', 'After each group\'s first tuple', 'Only after all of R has been read', 'Never'], a: 2, why: 'Slide 44: result generation happens when all tuples of R are read.' },
+  { q: 'σ<sub>eid=101</sub>(R) with an index on eid costs…', opts: ['B(R)', 'T(R)', 'less than B(R) (index seek)', 'B(R)²'], a: 2, why: 'Slide 40\'s exception: an index on the compared attribute retrieves only a subset of R\'s blocks.' },
+]);
+ask('#try1', { q: 'R has 2,000 blocks, clustered. What is the disk I/O cost of one-pass γ<sub>dept, SUM(salary)</sub>(R)?', a: 2000, why: 'Every one-pass unary algorithm reads R once: B(R).' });
+ask('#try2', { q: 'Run the δ animation with its default input. How many tuples are output?', a: 4, why: 'Distinct tuples: a, b, c, d.' });
+</script>
+</body>
+</html>

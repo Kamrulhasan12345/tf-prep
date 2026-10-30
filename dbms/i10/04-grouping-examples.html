@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Grouping Examples on the Computer Database · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 10 (Ishrak) · Chapter 4 · Slides 28–37</div>
+<h1>Grouping Examples on the Computer Database</h1>
+<p class="lede">Slide 28 lists seven questions on the Product/PC/Laptop database and slides 29–37 solve them. This chapter works each one on the textbook's sample data, explains why each clause is there, corrects slide 31 (its self-join answers a different question), and finishes with a seven-part exam question on the same schema.</p>
+
+<p>Schema (Lecture 08, Chapter 5): <code>Product(maker, model, type)</code>, <code>PC(model, speed, ram, hd, price)</code>, <code>Laptop(model, speed, ram, hd, screen, price)</code>, plus <code>Printer(model, color, type, price)</code>. The playgrounds use the full textbook data: makers A to H, 13 PCs, 10 laptops, 7 printers.</p>
+
+<h2>1. Makers of at least three different PC models (slides 29–31)</h2>
+<pre>SELECT   maker
+FROM     Product
+WHERE    type = 'pc'
+GROUP BY maker
+HAVING   COUNT(model) &gt;= 3;</pre>
+<p>WHERE keeps only PC rows; GROUP BY makes one group per PC maker; HAVING keeps the groups with at least 3 models. Since model is the key of Product, the models in a group are automatically different, so <code>COUNT(model)</code> counts different models (<code>COUNT(DISTINCT model)</code> would say so explicitly). On the sample data: A has 3 PCs, B 3, C 1, D 3, E 3, so the answer is <strong>A, B, D, E</strong>.</p>
+<div id="p30"></div>
+
+<p>Slide 31 offers a second solution without aggregation, using a three-way self-join:</p>
+<pre>SELECT DISTINCT p1.maker
+FROM   Product p1, Product p2, Product p3
+WHERE  p1.type &lt;&gt; p2.type
+AND    p1.type &lt;&gt; p3.type
+AND    p2.type &lt;&gt; p3.type
+AND    p1.maker = p2.maker
+AND    p1.maker = p3.maker;</pre>
+<div class="q">
+<h4>Question (worked answer): is slide 31's query correct?</h4>
+<p><strong>No: it answers a different question.</strong> It looks for three products of the same maker with three pairwise <em>different types</em>. That is "makers that produce all three types of product" (slide 32's question), and on the sample data it returns only <strong>E</strong>, while the right answer to "at least three different PC models" is A, B, D, E. To ask for three different <em>PC models</em>, require the three rows to be PCs and to have different <em>models</em>:</p>
+<pre>SELECT DISTINCT p1.maker
+FROM   Product p1, Product p2, Product p3
+WHERE  p1.type = 'pc' AND p2.type = 'pc' AND p3.type = 'pc'
+AND    p1.maker = p2.maker AND p1.maker = p3.maker
+AND    p1.model &lt; p2.model AND p2.model &lt; p3.model;</pre>
+<p>Using &lt; instead of &lt;&gt; makes each set of three models appear once (Lecture 08, Chapter 4). The self-join idea works for "at least 3" but becomes clumsy for "at least 10" (ten copies of Product); GROUP BY with HAVING COUNT is the general tool.</p>
+</div>
+<div id="p31"></div>
+
+<h2>2. Makers of all three types (slide 32)</h2>
+<pre>SELECT   maker
+FROM     Product
+GROUP BY maker
+HAVING   COUNT(DISTINCT type) = 3;</pre>
+<p>Each maker's group contains one row per product; the number of <em>different</em> types in the group must be 3 (pc, laptop, printer). DISTINCT is essential: maker A has 6 products but only 2 types. Answer: <strong>E</strong>, the only maker with PCs, laptops and printers.</p>
+<div id="p32"></div>
+
+<h2>3. Only one product type, more than one model (slide 33)</h2>
+<pre>SELECT   maker
+FROM     Product
+GROUP BY maker
+HAVING   COUNT(DISTINCT type) = 1
+AND      COUNT(model) &gt; 1;</pre>
+<p>HAVING may combine several conditions with AND/OR. Answer: <strong>F</strong> (two laptops) and <strong>H</strong> (two printers). C and G also make one type, but only one model each.</p>
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="g33"></div>
+</figure>
+<div id="p33"></div>
+
+<h2>4. Averages (slides 34–36)</h2>
+<p><em>Average speed of PCs</em> (slide 34): no grouping, one number over all 13 PCs.</p>
+<pre>SELECT AVG(speed) FROM PC;            -- 2.4846… GHz</pre>
+<p><em>Average price of PCs made by manufacturer 'A'</em> (slide 35): the maker is in Product, the price in PC, so join first, then aggregate the joined rows.</p>
+<pre>SELECT AVG(price)
+FROM   Product, PC
+WHERE  Product.model = PC.model
+AND    maker = 'A';                   -- (2114 + 995 + 478) / 3 = 1195.67</pre>
+<p><em>For each speed of PC above 2.0, the average price</em> (slide 36): group by speed, after WHERE has removed the slow PCs. Note "above 2.0" means &gt; 2.0, so the 2.00 GHz PC (1009) is excluded.</p>
+<pre>SELECT   speed, AVG(price)
+FROM     PC
+WHERE    speed &gt; 2.0
+GROUP BY speed;</pre>
+<div id="p36"></div>
+
+<h2>5. Maximum PC price per maker (slide 37)</h2>
+<pre>SELECT   maker, MAX(price)
+FROM     PC, Product
+WHERE    PC.model = Product.model
+GROUP BY maker;</pre>
+<p>The join attaches the maker to each PC; GROUP BY maker gathers each maker's PCs; MAX gives the most expensive. Only makers who sell PCs appear, because the join with PC drops everyone else (exactly what "for each manufacturer who sells PCs" asks). A: 2114, B: 1049, C: 510, D: 770, E: 959.</p>
+<div id="p37"></div>
+
+<div class="q">
+<h4>Question (worked answer): how do you also get the model of the most expensive PC of each maker?</h4>
+<p>Not by adding <code>model</code> to the SELECT list: it is not a grouping attribute (Chapter 3, slide 26). You need the maximum first and then the rows that reach it, which is a subquery, the topic of <a href="../i11/02-correlated-subqueries.html">Lecture 11</a>:</p>
+<pre>SELECT maker, PC.model, price
+FROM   Product, PC
+WHERE  Product.model = PC.model
+AND    (maker, price) IN (SELECT maker, MAX(price)
+                          FROM   Product, PC
+                          WHERE  Product.model = PC.model
+                          GROUP BY maker);</pre>
+</div>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+<h3>Try it in SQL</h3>
+<p>All exercises use the computer database.</p>
+<div id="c1"></div><div id="c2"></div><div id="c3"></div><div id="c4"></div><div id="c5"></div><div id="c6"></div>
+
+<h3>Exam questions</h3>
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2015–16 · 28 marks</div>
+  <div class="exam-q"><p>Consider the following relational database schema: Product(maker, model, type), PC(model, speed, ram, hd, price), Laptop(model, speed, ram, hd, screen, price), Printer(model, color, type, price). The Product relation gives the manufacturer, model number and type (PC, laptop, or printer) of various products. We assume for convenience that model numbers are unique over all manufacturers and product types. The PC relation gives for each model number that is a PC the speed (of the processor, in gigahertz), the amount of RAM (in megabytes), the size of the hard disk (in gigabytes), and the price. The Laptop relation is similar, except that the screen size (in inches) is also included. The Printer relation records for each printer model whether the printer produces color output ('T', if so; 'F' otherwise), the process type (laser or ink-jet, typically), and the price. Write the following SQL queries:</p>
+  <p>(a) Find those manufacturers that sell Laptops, but not PCs or Printers.<br>(b) Find those hard disk sizes that occur in two or more PCs.<br>(c) Find those pairs of PC models that have both the same speed and RAM. A pair should be listed only once.<br>(d) Find the manufacturers of PCs with at least three different speeds.<br>(e) Find the makers who produce only one type of product.<br>(f) Find the maker(s) of the cheapest color printer(s).<br>(g) Find the PC model with maximum processing speed without using any aggregate function.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>Results are given for the textbook's sample data (the same data as the playgrounds), where type values are stored in lower case ('pc', 'laptop', 'printer').</p>
+    <p><strong>(a)</strong> Set difference (Lecture 08):</p>
+<pre>SELECT maker FROM Product WHERE type = 'laptop'
+MINUS
+SELECT maker FROM Product WHERE type IN ('pc', 'printer');      -- F, G</pre>
+    <p><strong>(b)</strong> Group the PCs by disk size and keep groups of 2 or more:</p>
+<pre>SELECT hd FROM PC GROUP BY hd HAVING COUNT(*) &gt;= 2;          -- 80, 160, 250</pre>
+    <p><strong>(c)</strong> Self-join; &lt; lists each pair once and excludes a PC paired with itself:</p>
+<pre>SELECT p1.model, p2.model
+FROM   PC p1, PC p2
+WHERE  p1.speed = p2.speed AND p1.ram = p2.ram
+AND    p1.model &lt; p2.model;                                      -- (1004, 1012)</pre>
+    <p><strong>(d)</strong> Join to get the maker, group by maker, count <em>distinct</em> speeds (B has 3 PCs but only 2 speeds, 2.80 and 3.20):</p>
+<pre>SELECT   maker
+FROM     Product, PC
+WHERE    Product.model = PC.model
+GROUP BY maker
+HAVING   COUNT(DISTINCT speed) &gt;= 3;                            -- A, D, E</pre>
+    <p><strong>(e)</strong></p>
+<pre>SELECT maker FROM Product GROUP BY maker HAVING COUNT(DISTINCT type) = 1;   -- C, F, G, H</pre>
+    <p><strong>(f)</strong> The cheapest price among colour printers is a single value, found by a subquery; then the makers of colour printers with that price (ties included):</p>
+<pre>SELECT maker
+FROM   Product, Printer
+WHERE  Product.model = Printer.model
+AND    color = 'T'
+AND    price = (SELECT MIN(price) FROM Printer WHERE color = 'T');   -- E (model 3001, 99)</pre>
+    <p>Both <code>color = 'T'</code> conditions are needed: without the outer one, a black-and-white printer that happened to cost the same minimum would be listed.</p>
+    <p><strong>(g)</strong> Without aggregates: a PC has maximum speed if its speed is ≥ every PC's speed, or equivalently if no PC is faster (Lecture 11, slide 16):</p>
+<pre>SELECT model FROM PC WHERE speed &gt;= ALL (SELECT speed FROM PC);   -- 1005, 1006
+-- or
+SELECT model FROM PC p1
+WHERE NOT EXISTS (SELECT * FROM PC p2 WHERE p2.speed &gt; p1.speed);</pre>
+    <p>Note: the question bank's answer to (a) writes <code>type IN ('PC', 'printer')</code>. Oracle compares strings case-sensitively, so with the data stored as 'pc' the PC makers would not be subtracted and the answer would wrongly include A and B (E is still removed, because it makes printers). Use the stored spelling. The bank also writes EXCEPT, which Oracle accepts only from version 21c; MINUS is the Oracle operator taught in Lecture 08. The bank's other parts are correct.</p>
+    <div id="q18a"></div><div id="q18b"></div><div id="q18c"></div><div id="q18d"></div><div id="q18e"></div><div id="q18f"></div><div id="q18g"></div>
+  </div></details>
+</div>
+
+<div class="key"><p><strong>Summary:</strong> "makers with at least k models / types / speeds" is GROUP BY maker HAVING COUNT(…) ≥ k, with DISTINCT whenever repeated values must count once. When the attribute you aggregate lives in another table, join first and group the joined rows. HAVING can combine conditions. Slide 31's self-join compares types and therefore answers slide 32's question; the corrected version compares models of PC rows.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/sqlplay.js"></script>
+<script src="../i08/lecture.js"></script>
+<script>
+const PR = [['A',1001,'pc'],['A',1002,'pc'],['A',1003,'pc'],['A',2004,'laptop'],['A',2005,'laptop'],['A',2006,'laptop'],['B',1004,'pc'],['B',1005,'pc'],['B',1006,'pc'],['B',2007,'laptop'],['C',1007,'pc'],['D',1008,'pc'],['D',1009,'pc'],['D',1010,'pc'],['D',3004,'printer'],['D',3005,'printer'],['E',1011,'pc'],['E',1012,'pc'],['E',1013,'pc'],['E',2001,'laptop'],['E',2002,'laptop'],['E',2003,'laptop'],['E',3001,'printer'],['E',3002,'printer'],['E',3003,'printer'],['F',2008,'laptop'],['F',2009,'laptop'],['G',2010,'laptop'],['H',3006,'printer'],['H',3007,'printer']];
+stepper('#g33', groupSteps({ head: ['maker', 'model', 'type'], rows: PR, key: r => r[0], keyText: 'maker',
+  aggs: [{ name: 'COUNT(DISTINCT type)', f: rs => new Set(rs.map(r => r[2])).size }, { name: 'COUNT(model)', f: rs => rs.length }],
+  having: r => r[1] === 1 && r[2] > 1, havingText: 'COUNT(DISTINCT type) = 1 AND COUNT(model) &gt; 1', intro: 'Slide 33: all 30 Product rows go to GROUP BY maker (no WHERE).' }));
+const Q = (sel, query, note) => sqlPlay(sel, { setup: PCDB, query, note });
+Q('#p30', "SELECT   maker\nFROM     Product\nWHERE    type = 'pc'\nGROUP BY maker\nHAVING   COUNT(model) >= 3;", 'Slide 30: A, B, D, E.');
+Q('#p31', "-- slide 31 as written: returns E only\nSELECT DISTINCT p1.maker\nFROM   Product p1, Product p2, Product p3\nWHERE  p1.type <> p2.type\nAND    p1.type <> p3.type\nAND    p2.type <> p3.type\nAND    p1.maker = p2.maker\nAND    p1.maker = p3.maker;", 'Replace the WHERE clause with the corrected one above to get A, B, D, E.');
+Q('#p32', 'SELECT   maker\nFROM     Product\nGROUP BY maker\nHAVING   COUNT(DISTINCT type) = 3;', 'Slide 32. Remove DISTINCT to see why it is needed.');
+Q('#p33', 'SELECT   maker\nFROM     Product\nGROUP BY maker\nHAVING   COUNT(DISTINCT type) = 1\nAND      COUNT(model) > 1;', 'Slide 33.');
+Q('#p36', 'SELECT   speed, AVG(price)\nFROM     PC\nWHERE    speed > 2.0\nGROUP BY speed;', 'Slide 36. Also try slide 34 (SELECT AVG(speed) FROM PC) and slide 35.');
+Q('#p37', 'SELECT   maker, MAX(price)\nFROM     PC, Product\nWHERE    PC.model = Product.model\nGROUP BY maker;', 'Slide 37.');
+flashcards('#cards', [
+  { f: 'At least k different X per maker', b: 'GROUP BY maker HAVING COUNT(DISTINCT X) >= k.' },
+  { f: 'All three types', b: 'HAVING COUNT(DISTINCT type) = 3.' },
+  { f: 'Aggregate over another table\'s column', b: 'Join first (Product.model = PC.model), then GROUP BY.' },
+  { f: 'Slide 31\'s bug', b: 'It compares types, so it finds makers of 3 types, not 3 PC models.' },
+  { f: 'speed above 2.0', b: 'WHERE speed > 2.0 (excludes 2.00 exactly).' },
+]);
+quiz('#quiz', [
+  { q: 'Maker B has PCs with speeds 2.80, 3.20, 3.20. COUNT(speed) and COUNT(DISTINCT speed)?', opts: ['3 and 3', '3 and 2', '2 and 2', '1 and 2'], a: 1, why: 'DISTINCT counts 2.80 and 3.20 once each.' },
+  { q: 'Which makers does slide 31\'s query return on the sample data?', opts: ['A, B, D, E', 'E', 'A, E', 'none'], a: 1, why: 'Only E has three different types.' },
+  { q: 'Slide 37 lists which makers?', opts: ['All 8', 'Only makers with PCs (A–E)', 'Only E', 'Makers with laptops'], a: 1, why: 'The join with PC removes the others.' },
+  { q: 'To find makers with exactly one product, which HAVING?', opts: ['COUNT(*) = 1', 'COUNT(DISTINCT type) = 1', 'MAX(model) = 1', 'COUNT(type) > 1'], a: 0, why: 'One row in the maker\'s group (C and G).' },
+]);
+ask('#try1', { q: 'Average price of maker A\'s PCs (2114, 995, 478), to 2 decimal places?', a: 1195.67, tol: 0.01, why: '3587 / 3 = 1195.67.' });
+const C = (sel, task, solution, extra = {}) => sqlCheck(sel, { setup: PCDB, task, solution, ...extra });
+C('#c1', '1. (Easy) For each maker, return the maker and the number of products it makes.', 'SELECT maker, COUNT(*) FROM Product GROUP BY maker;');
+C('#c2', '2. For each RAM size, return the RAM size and the average price of PCs with that RAM.', 'SELECT ram, AVG(price) FROM PC GROUP BY ram;');
+C('#c3', '3. For each screen size, return the screen size and the number of laptops, only for screen sizes used by at least 2 laptops.', 'SELECT screen, COUNT(*) FROM Laptop GROUP BY screen HAVING COUNT(*) >= 2;');
+C('#c4', '4. For each maker of laptops, return the maker and the minimum laptop speed.', 'SELECT maker, MIN(speed) FROM Product, Laptop WHERE Product.model = Laptop.model GROUP BY maker;');
+C('#c5', '5. Find the makers whose PCs have an average price above 800, with that average.', 'SELECT maker, AVG(price) FROM Product, PC WHERE Product.model = PC.model GROUP BY maker HAVING AVG(price) > 800;');
+C('#c6', '6. (Exam style, textbook Exercise 6.4.6) For each maker that makes printers, return the maker, the number of printer models and the average printer price, sorted by average price, highest first.', "SELECT maker, COUNT(*), AVG(price) FROM Product, Printer WHERE Product.model = Printer.model GROUP BY maker ORDER BY AVG(price) DESC;", { ordered: true });
+C('#q18a', '(a) Makers that sell laptops but not PCs or printers.', "SELECT maker FROM Product WHERE type = 'laptop' MINUS SELECT maker FROM Product WHERE type IN ('pc', 'printer');");
+C('#q18b', '(b) Hard-disk sizes that occur in two or more PCs.', 'SELECT hd FROM PC GROUP BY hd HAVING COUNT(*) >= 2;');
+C('#q18c', '(c) Pairs of PC models with the same speed and RAM, each pair once.', 'SELECT p1.model, p2.model FROM PC p1, PC p2 WHERE p1.speed = p2.speed AND p1.ram = p2.ram AND p1.model < p2.model;');
+C('#q18d', '(d) Makers of PCs with at least three different speeds.', 'SELECT maker FROM Product, PC WHERE Product.model = PC.model GROUP BY maker HAVING COUNT(DISTINCT speed) >= 3;');
+C('#q18e', '(e) Makers who produce only one type of product.', 'SELECT maker FROM Product GROUP BY maker HAVING COUNT(DISTINCT type) = 1;');
+C('#q18f', '(f) Maker(s) of the cheapest colour printer(s).', "SELECT maker FROM Product, Printer WHERE Product.model = Printer.model AND color = 'T' AND price = (SELECT MIN(price) FROM Printer WHERE color = 'T');");
+C('#q18g', '(g) PC model(s) with the maximum speed, without aggregate functions.', 'SELECT model FROM PC WHERE speed >= ALL (SELECT speed FROM PC);');
+</script>
+</body>
+</html>

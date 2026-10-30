@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Exam Topics Beyond the Slides: Advanced SQL · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 08–11 (Ishrak) · Chapter 7 · Beyond the slides</div>
+<h1>Exam Topics Beyond the Slides: Advanced SQL</h1>
+<p class="lede">Some exam questions and model answers use SQL features that Lectures 08–11 do not teach: the WITH clause, analytic (window) functions such as RANK, views defined over joins, and hierarchical queries. This chapter teaches each briefly in Oracle syntax, with runnable examples, and works the restaurant view question from the banks.</p>
+
+<h2>1. The WITH clause (subquery factoring)</h2>
+<dl class="def"><dt>WITH name AS (subquery)</dt><dd>Defines a named temporary result (a <b class="term">common table expression</b>, CTE) that the main query can use like a table, as often as it likes. It is a derived table with a name, written before the SELECT. Oracle has supported it since 9i.</dd></dl>
+<pre>WITH dept_total AS (
+       SELECT DEPARTMENTID, SUM(SALARY) AS total
+       FROM   EMPLOYEE
+       WHERE  DEPARTMENTID IS NOT NULL
+       GROUP BY DEPARTMENTID)
+SELECT DEPARTMENTID, total
+FROM   dept_total
+WHERE  total &gt; (SELECT AVG(total) FROM dept_total);</pre>
+<p>Without WITH, dept_total would have to be written out twice as a derived table (Chapter 6 of these notes did exactly that, because one question forbade WITH). WITH adds no power, only readability. Several question-bank answers use it; both forms earn full marks unless WITH is forbidden.</p>
+<div id="p-with"></div>
+
+<h2>2. Analytic (window) functions</h2>
+<p>An aggregate with GROUP BY collapses each group to one row. An <b class="term">analytic function</b> computes a value over a group of rows (a <em>window</em>) but keeps every row. The syntax is <code>function(…) OVER (PARTITION BY … ORDER BY …)</code>.</p>
+<dl class="def">
+<dt>AVG(SALARY) OVER (PARTITION BY DEPARTMENTID)</dt><dd>The department average, printed next to each employee. Solves "print each employee with the difference from his department average" without a derived table.</dd>
+<dt>ROW_NUMBER() OVER (ORDER BY …)</dt><dd>1, 2, 3, … in the given order; ties get different numbers (arbitrarily).</dd>
+<dt>RANK() OVER (ORDER BY …)</dt><dd>Ties share a rank and the next rank is skipped: 1, 2, 2, 4.</dd>
+<dt>DENSE_RANK() OVER (ORDER BY …)</dt><dd>Ties share a rank and nothing is skipped: 1, 2, 2, 3. "Third highest value" = DENSE_RANK 3.</dd>
+</dl>
+<p>Analytic functions are computed after WHERE, GROUP BY and HAVING, so to filter on them, wrap the query in a derived table:</p>
+<pre>-- third highest salary (distinct values), with every employee who earns it
+SELECT LASTNAME, SALARY
+FROM  (SELECT LASTNAME, SALARY, DENSE_RANK() OVER (ORDER BY SALARY DESC) AS rnk
+       FROM EMPLOYEE)
+WHERE rnk = 3;
+
+-- top earner(s) of each department
+SELECT DEPARTMENTID, LASTNAME, SALARY
+FROM  (SELECT e.*, RANK() OVER (PARTITION BY DEPARTMENTID ORDER BY SALARY DESC) AS r
+       FROM EMPLOYEE e)
+WHERE r = 1;</pre>
+<p>Oracle 12c also has the row-limiting clause <code>ORDER BY … FETCH FIRST n ROWS ONLY</code> (or <code>WITH TIES</code>, which keeps rows tied with the last one) and <code>OFFSET k ROWS</code>. Before 12c, top-N queries used the pseudo-column <code>ROWNUM</code> on an ordered subquery: <code>SELECT * FROM (SELECT … ORDER BY SALARY DESC) WHERE ROWNUM &lt;= 3</code> (ROWNUM is assigned before ORDER BY, so the subquery is essential). The playground does not support ROWNUM or WITH TIES.</p>
+<div id="p-rank"></div>
+<figure>
+<div id="rk"></div>
+<figcaption><b>Figure 1.</b> ROW_NUMBER, RANK and DENSE_RANK over the HR salaries in descending order (top 8 rows). De Haan and Kochhar tie at 17000.</figcaption>
+</figure>
+
+<h2>3. Views over joins</h2>
+<dl class="def"><dt>View</dt><dd>A named, stored query: <code>CREATE OR REPLACE VIEW name AS SELECT …</code>. It stores no data; each time it is queried, its SELECT runs. It can join and aggregate, and it can then be queried like a table.</dd></dl>
+<pre>CREATE OR REPLACE VIEW emp_details AS
+SELECT e.EMPLOYEEID, e.LASTNAME, j.JOBTITLE, d.DEPARTMENTNAME, e.SALARY
+FROM   EMPLOYEE e
+       JOIN JOB j             ON j.JOBID = e.JOBID
+       LEFT JOIN DEPARTMENT d ON d.DEPARTMENTID = e.DEPARTMENTID;
+
+SELECT DEPARTMENTNAME, COUNT(*) FROM emp_details GROUP BY DEPARTMENTNAME;</pre>
+<p><strong>Updating through a view.</strong> INSERT, UPDATE and DELETE on a view must be translated into changes of the base tables. For a view over one table with no aggregates, DISTINCT or GROUP BY, that is straightforward. For a join view, Oracle allows a change only if it affects exactly <em>one</em> base table and that table is <b class="term">key-preserved</b> in the view: every key of the base table is still a key of the view's result (each base row appears at most once in the view). In emp_details, EMPLOYEE is key-preserved (each employee appears once), so <code>UPDATE emp_details SET SALARY = SALARY * 1.1 WHERE EMPLOYEEID = 104</code> is allowed; JOB and DEPARTMENT are not (a job appears once per employee holding it), so changing JOBTITLE through the view raises <code>ORA-01779: cannot modify a column which maps to a non key-preserved table</code>. Anything else needs an <code>INSTEAD OF</code> trigger, which tells Oracle explicitly what to do with the base tables. The question bank's question on inserting through a three-table join view (cust_balance) is worked in <a href="../i05/05-beyond-the-slides.html">Lecture 05's beyond-the-slides chapter</a>.</p>
+<div id="p-view"></div>
+
+<h2>4. Hierarchical queries</h2>
+<p>A table with a foreign key to itself (EMPLOYEE.MANAGERID) stores a tree. Oracle's <code>CONNECT BY</code> walks it:</p>
+<pre>SELECT LEVEL, LPAD(' ', 2 * (LEVEL - 1)) || LASTNAME AS org_chart
+FROM   EMPLOYEE
+START WITH MANAGERID IS NULL                 -- the root(s): King
+CONNECT BY PRIOR EMPLOYEEID = MANAGERID      -- children: rows whose MANAGERID is the parent's id
+ORDER SIBLINGS BY LASTNAME;</pre>
+<p><code>LEVEL</code> is the depth (1 for the root), which is why LEVEL is a reserved word in Oracle. CONNECT BY is Oracle-specific and the playground cannot run it. The standard alternative, which Oracle supports since 11g Release 2 and the playground runs, is a <b class="term">recursive WITH</b>: an anchor query UNION ALL a step that joins the CTE to the table.</p>
+<pre>WITH chart (EMPLOYEEID, LASTNAME, lvl) AS (
+       SELECT EMPLOYEEID, LASTNAME, 1 FROM EMPLOYEE WHERE MANAGERID IS NULL       -- anchor
+       UNION ALL
+       SELECT e.EMPLOYEEID, e.LASTNAME, c.lvl + 1                                 -- step
+       FROM   EMPLOYEE e JOIN chart c ON e.MANAGERID = c.EMPLOYEEID)
+SELECT lvl, LASTNAME FROM chart ORDER BY lvl, LASTNAME;</pre>
+<div id="p-rec"></div>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<h3>Try it in SQL</h3>
+<p>All exercises use the HR schema.</p>
+<div id="c1"></div><div id="c2"></div><div id="c3"></div><div id="c4"></div><div id="c5"></div><div id="c6"></div>
+
+<h3>Exam questions</h3>
+<div class="exam">
+  <div class="exam-src">DB QB · 22-23 7b · 20 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-1 | 2022–23 · 20 marks (SQL part)</div>
+  <div class="exam-q"><p>A restaurant has provided a report listing, for each food item, its containing items (for packages, with quantities), its ingredients (for simple items, with unit cost and quantity), its marketed price, and its sales (buyer, date, quantity). For example: Chicken Burger (simple item): Chicken Patty 60 × 1, Lettuce 30 × 0.02, Pickle 5 × 4, Mayonnaise 100 × 0.02, Sause 70 × 0.01, marketed price 200, sales C1 01/02/24 2, C3 02/02/24 4, C8 02/02/24 1, C1 03/02/24 3. Fried Rice (simple item): Raw Rice 50 × 0.1, Egg 7 × 1, Oil 500 × 0.005, price 80, sales C4 02/02/24 1, C9 04/02/24 2. Set Menu 1 (package): Fried Rice 1, Vegetable 1, Chicken Steak 1, price 500, sales C2 01/02/24 3, C4 03/02/24 1, C1 04/02/24 4, C1 05/02/24 2. (Part (a) of the question asks for a relational schema normalized up to BCNF.)</p>
+  <p>(i) Using the schema created in (a), write a SQL query to create a view that contains the total cost of production of each food item. Cost of production depends on the total cost of ingredients (cost of ingredients = unit cost of ingredient × quantity of ingredients used) for simple items and the total cost of containing items (that are simple items) for packages.<br>(ii) Using the schema and the view, find the monthly profit for each food item. Here, profit = (marketed price − cost of production) × quantity sold in the month.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><strong>Schema</strong> (the result of part (a), which belongs to the normalization chapters; each table is in BCNF with the underlined key):</p>
+<pre>Item        (<u>item_name</u>, item_type, price)            -- item_type 'S' simple / 'P' package
+Ingredient  (<u>ingr_name</u>, unit_cost)
+Recipe      (<u>item_name, ingr_name</u>, qty)              -- ingredients of simple items
+PackageItem (<u>package_name, simple_item</u>, qty)         -- contents of packages
+Sale        (<u>item_name, buyer, sale_date</u>, qty)</pre>
+    <p><strong>(i)</strong> Simple items: sum unit_cost × qty over the recipe. Packages: sum, over the contained simple items, qty × that item's cost, which is the first result again, so it appears as a derived table. UNION ALL puts both kinds into one view.</p>
+<pre>CREATE OR REPLACE VIEW item_cost AS
+SELECT   r.item_name, SUM(r.qty * g.unit_cost) AS cost
+FROM     Recipe r JOIN Ingredient g ON g.ingr_name = r.ingr_name
+GROUP BY r.item_name
+UNION ALL
+SELECT   p.package_name, SUM(p.qty * s.cost)
+FROM     PackageItem p
+         JOIN (SELECT r.item_name, SUM(r.qty * g.unit_cost) AS cost
+               FROM   Recipe r JOIN Ingredient g ON g.ingr_name = r.ingr_name
+               GROUP BY r.item_name) s
+         ON s.item_name = p.simple_item
+GROUP BY p.package_name;</pre>
+    <p>Costs: Chicken Burger 60 + 0.6 + 20 + 2 + 0.7 = 83.3; Fried Rice 5 + 7 + 2.5 = 14.5. The report gives no recipes for Vegetable and Chicken Steak, so the check below uses invented ones (Vegetable 21, Chicken Steak 111.4), making Set Menu 1 cost 14.5 + 21 + 111.4 = 146.9.</p>
+    <p><strong>(ii)</strong> The report's dates (01/02/24 …) are read as DD/MM/YY, i.e. February 2024. Group the sales by item and month:</p>
+<pre>SELECT   s.item_name, TO_CHAR(s.sale_date, 'YYYY-MM') AS month,
+         SUM((i.price - c.cost) * s.qty) AS profit
+FROM     Sale s
+         JOIN Item i      ON i.item_name = s.item_name
+         JOIN item_cost c ON c.item_name = s.item_name
+GROUP BY s.item_name, TO_CHAR(s.sale_date, 'YYYY-MM');</pre>
+    <p>February 2024: Chicken Burger (200 − 83.3) × 10 = 1167; Fried Rice (80 − 14.5) × 3 = 196.5; Set Menu 1 (500 − 146.9) × 10 = 3531. (<code>EXTRACT(YEAR FROM …)</code> and <code>EXTRACT(MONTH FROM …)</code>, as in the question bank's answer, also work in Oracle; the bank's view uses a WITH clause inside CREATE VIEW, which Oracle accepts too.)</p>
+    <div id="r1"></div><div id="r2"></div>
+  </div></details>
+</div>
+
+<div class="key"><p><strong>Summary:</strong> WITH names a subquery so it can be reused (a readable derived table). Analytic functions (AVG … OVER, ROW_NUMBER, RANK, DENSE_RANK) compute over a window but keep every row; filter on them from an outer query; DENSE_RANK answers "n-th highest value". A view is a stored query; Oracle lets you modify a join view only through one key-preserved table, otherwise an INSTEAD OF trigger is needed. Oracle's CONNECT BY walks self-referencing hierarchies; recursive WITH is the portable equivalent.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/sqlplay.js"></script>
+<script src="../i08/lecture.js"></script>
+<script>
+sqlPlay('#p-with', { setup: HR, query: 'WITH dept_total AS (\n       SELECT DEPARTMENTID, SUM(SALARY) AS total\n       FROM   EMPLOYEE\n       WHERE  DEPARTMENTID IS NOT NULL\n       GROUP BY DEPARTMENTID)\nSELECT DEPARTMENTID, total\nFROM   dept_total\nWHERE  total > (SELECT AVG(total) FROM dept_total);' });
+sqlPlay('#p-rank', { setup: HR, query: 'SELECT LASTNAME, SALARY\nFROM  (SELECT LASTNAME, SALARY, DENSE_RANK() OVER (ORDER BY SALARY DESC) AS rnk\n       FROM EMPLOYEE)\nWHERE rnk = 3;', note: 'Third highest distinct salary: 14000 (Russell). Try RANK() instead: no row gets rank 3, because the two 17000 salaries share rank 2 and 14000 gets rank 4.' });
+const SAL = [['King', 24000], ['Kochhar', 17000], ['De Haan', 17000], ['Russell', 14000], ['Hartstein', 13000], ['Higgins', 12008], ['Abel', 11000], ['Zlotkey', 10500]];
+let r = 0, d = 0, prev = null;
+const rows = SAL.map((s, i) => { if (s[1] !== prev) { r = i + 1; d++; prev = s[1]; } return [s[0], s[1], i + 1, r, d]; });
+$('#rk').innerHTML = row2(rel('ORDER BY SALARY DESC', ['LASTNAME', 'SALARY', 'ROW_NUMBER', 'RANK', 'DENSE_RANK'], rows, { cls: { 1: 'hl', 2: 'hl' } }));
+sqlPlay('#p-view', { setup: HR, query: 'CREATE OR REPLACE VIEW emp_details AS\nSELECT e.EMPLOYEEID, e.LASTNAME, j.JOBTITLE, d.DEPARTMENTNAME, e.SALARY\nFROM   EMPLOYEE e\n       JOIN JOB j             ON j.JOBID = e.JOBID\n       LEFT JOIN DEPARTMENT d ON d.DEPARTMENTID = e.DEPARTMENTID;\n\nSELECT DEPARTMENTNAME, COUNT(*) FROM emp_details GROUP BY DEPARTMENTNAME;', note: 'SQLite views are read-only, so the playground cannot show updates through the view.' });
+sqlPlay('#p-rec', { setup: HR, query: 'WITH chart (EMPLOYEEID, LASTNAME, lvl) AS (\n       SELECT EMPLOYEEID, LASTNAME, 1 FROM EMPLOYEE WHERE MANAGERID IS NULL\n       UNION ALL\n       SELECT e.EMPLOYEEID, e.LASTNAME, c.lvl + 1\n       FROM   EMPLOYEE e JOIN chart c ON e.MANAGERID = c.EMPLOYEEID)\nSELECT lvl, LASTNAME FROM chart ORDER BY lvl, LASTNAME;', note: 'Four levels: King; his 6 direct reports; their reports; and Hunold\'s and Higgins\'s reports at level 4.' });
+flashcards('#cards', [
+  { f: 'WITH (CTE)', b: 'A named subquery defined before SELECT and usable like a table, several times.' },
+  { f: 'Analytic function', b: 'f(…) OVER (PARTITION BY … ORDER BY …): computed per window, every row kept.' },
+  { f: 'RANK vs DENSE_RANK', b: 'RANK skips after ties (1,2,2,4); DENSE_RANK does not (1,2,2,3).' },
+  { f: 'Key-preserved table', b: 'A base table whose key is still a key of the join view; only such tables can be modified through an Oracle join view.' },
+  { f: 'INSTEAD OF trigger', b: 'Defines how DML on a non-updatable view maps to base tables.' },
+  { f: 'CONNECT BY', b: 'Oracle hierarchical query: START WITH root, CONNECT BY PRIOR id = parent_id, LEVEL = depth.' },
+]);
+quiz('#quiz', [
+  { q: 'Salaries 90, 80, 80, 70. DENSE_RANK of 70 (descending)?', opts: ['3', '4', '2', '1'], a: 0, why: '90→1, 80→2, 80→2, 70→3.' },
+  { q: '…and RANK of 70?', opts: ['3', '4', '2'], a: 1, why: 'RANK skips 3 after the tie.' },
+  { q: 'Why must WHERE rnk = 3 be in an outer query?', opts: ['Oracle forbids aliases', 'Analytic functions are computed after WHERE', 'DENSE_RANK needs GROUP BY', 'It need not be'], a: 1, why: 'WHERE runs before the analytic function exists.' },
+  { q: 'In emp_details (EMPLOYEE ⋈ JOB ⋈ DEPARTMENT), which table is key-preserved?', opts: ['JOB', 'DEPARTMENT', 'EMPLOYEE', 'none'], a: 2, why: 'Each employee appears once; jobs and departments repeat.' },
+]);
+const ck = (sel, task, solution, x = {}) => sqlCheck(sel, { setup: HR, task, solution, ...x });
+ck('#c1', '1. (Easy) Print each employee\'s last name, salary and the average salary of his or her department, using AVG … OVER (PARTITION BY …).', 'SELECT LASTNAME, SALARY, AVG(SALARY) OVER (PARTITION BY DEPARTMENTID) FROM EMPLOYEE;');
+ck('#c2', '2. Number the employees 1, 2, 3, … in order of hire date (earliest first); return last name and the number.', 'SELECT LASTNAME, ROW_NUMBER() OVER (ORDER BY HIREDATE, EMPLOYEEID) FROM EMPLOYEE;', { hint: 'Two employees share a hire date; break the tie with EMPLOYEEID so the numbering is unique.' });
+ck('#c3', '3. Return the last name and salary of the employees with the second highest distinct salary.', 'SELECT LASTNAME, SALARY FROM (SELECT LASTNAME, SALARY, DENSE_RANK() OVER (ORDER BY SALARY DESC) AS r FROM EMPLOYEE) WHERE r = 2;');
+ck('#c4', '4. Using WITH, return the job ids whose average salary is above the overall average salary.', 'WITH j AS (SELECT JOBID, AVG(SALARY) AS a FROM EMPLOYEE GROUP BY JOBID) SELECT JOBID FROM j WHERE a > (SELECT AVG(SALARY) FROM EMPLOYEE);');
+ck('#c5', '5. Return the best-paid employee(s) of each department (department id, last name), using RANK.', 'SELECT DEPARTMENTID, LASTNAME FROM (SELECT e.*, RANK() OVER (PARTITION BY DEPARTMENTID ORDER BY SALARY DESC) AS r FROM EMPLOYEE e) WHERE r = 1;');
+ck('#c6', '6. (Exam style) Using a recursive WITH, list the last names of everyone who reports to Kochhar directly or indirectly.', "WITH sub (EMPLOYEEID, LASTNAME) AS (SELECT EMPLOYEEID, LASTNAME FROM EMPLOYEE WHERE MANAGERID = (SELECT EMPLOYEEID FROM EMPLOYEE WHERE LASTNAME = 'Kochhar') UNION ALL SELECT e.EMPLOYEEID, e.LASTNAME FROM EMPLOYEE e JOIN sub s ON e.MANAGERID = s.EMPLOYEEID) SELECT LASTNAME FROM sub;");
+const REST = `CREATE TABLE Item (item_name VARCHAR2(20) PRIMARY KEY, item_type CHAR(1), price NUMBER(6,2));
+CREATE TABLE Ingredient (ingr_name VARCHAR2(20) PRIMARY KEY, unit_cost NUMBER(8,2));
+CREATE TABLE Recipe (item_name VARCHAR2(20) REFERENCES Item(item_name), ingr_name VARCHAR2(20) REFERENCES Ingredient(ingr_name), qty NUMBER(8,3), PRIMARY KEY (item_name, ingr_name));
+CREATE TABLE PackageItem (package_name VARCHAR2(20) REFERENCES Item(item_name), simple_item VARCHAR2(20) REFERENCES Item(item_name), qty NUMBER, PRIMARY KEY (package_name, simple_item));
+CREATE TABLE Sale (item_name VARCHAR2(20) REFERENCES Item(item_name), buyer VARCHAR2(5), sale_date DATE, qty NUMBER, PRIMARY KEY (item_name, buyer, sale_date));
+INSERT INTO Item VALUES ('Chicken Burger', 'S', 200); INSERT INTO Item VALUES ('Fried Rice', 'S', 80); INSERT INTO Item VALUES ('Set Menu 1', 'P', 500);
+INSERT INTO Item VALUES ('Vegetable', 'S', NULL); INSERT INTO Item VALUES ('Chicken Steak', 'S', NULL);
+INSERT INTO Ingredient VALUES ('Chicken Patty', 60); INSERT INTO Ingredient VALUES ('Lettuce', 30); INSERT INTO Ingredient VALUES ('Pickle', 5);
+INSERT INTO Ingredient VALUES ('Mayonnaise', 100); INSERT INTO Ingredient VALUES ('Sauce', 70); INSERT INTO Ingredient VALUES ('Raw Rice', 50);
+INSERT INTO Ingredient VALUES ('Egg', 7); INSERT INTO Ingredient VALUES ('Oil', 500); INSERT INTO Ingredient VALUES ('Mixed Veg', 80); INSERT INTO Ingredient VALUES ('Chicken Breast', 400);
+INSERT INTO Recipe VALUES ('Chicken Burger', 'Chicken Patty', 1); INSERT INTO Recipe VALUES ('Chicken Burger', 'Lettuce', 0.02); INSERT INTO Recipe VALUES ('Chicken Burger', 'Pickle', 4);
+INSERT INTO Recipe VALUES ('Chicken Burger', 'Mayonnaise', 0.02); INSERT INTO Recipe VALUES ('Chicken Burger', 'Sauce', 0.01);
+INSERT INTO Recipe VALUES ('Fried Rice', 'Raw Rice', 0.1); INSERT INTO Recipe VALUES ('Fried Rice', 'Egg', 1); INSERT INTO Recipe VALUES ('Fried Rice', 'Oil', 0.005);
+INSERT INTO Recipe VALUES ('Vegetable', 'Mixed Veg', 0.2); INSERT INTO Recipe VALUES ('Vegetable', 'Oil', 0.01);
+INSERT INTO Recipe VALUES ('Chicken Steak', 'Chicken Breast', 0.25); INSERT INTO Recipe VALUES ('Chicken Steak', 'Oil', 0.02); INSERT INTO Recipe VALUES ('Chicken Steak', 'Sauce', 0.02);
+INSERT INTO PackageItem VALUES ('Set Menu 1', 'Fried Rice', 1); INSERT INTO PackageItem VALUES ('Set Menu 1', 'Vegetable', 1); INSERT INTO PackageItem VALUES ('Set Menu 1', 'Chicken Steak', 1);
+INSERT INTO Sale VALUES ('Chicken Burger', 'C1', DATE '2024-02-01', 2); INSERT INTO Sale VALUES ('Chicken Burger', 'C3', DATE '2024-02-02', 4);
+INSERT INTO Sale VALUES ('Chicken Burger', 'C8', DATE '2024-02-02', 1); INSERT INTO Sale VALUES ('Chicken Burger', 'C1', DATE '2024-02-03', 3);
+INSERT INTO Sale VALUES ('Fried Rice', 'C4', DATE '2024-02-02', 1); INSERT INTO Sale VALUES ('Fried Rice', 'C9', DATE '2024-02-04', 2);
+INSERT INTO Sale VALUES ('Set Menu 1', 'C2', DATE '2024-02-01', 3); INSERT INTO Sale VALUES ('Set Menu 1', 'C4', DATE '2024-02-03', 1);
+INSERT INTO Sale VALUES ('Set Menu 1', 'C1', DATE '2024-02-04', 4); INSERT INTO Sale VALUES ('Set Menu 1', 'C1', DATE '2024-02-05', 2);`;
+const VIEW = `CREATE OR REPLACE VIEW item_cost AS SELECT r.item_name, SUM(r.qty * g.unit_cost) AS cost FROM Recipe r JOIN Ingredient g ON g.ingr_name = r.ingr_name GROUP BY r.item_name UNION ALL SELECT p.package_name, SUM(p.qty * s.cost) FROM PackageItem p JOIN (SELECT r.item_name, SUM(r.qty * g.unit_cost) AS cost FROM Recipe r JOIN Ingredient g ON g.ingr_name = r.ingr_name GROUP BY r.item_name) s ON s.item_name = p.simple_item GROUP BY p.package_name;`;
+sqlCheck('#r1', { setup: REST, task: '(i) Create the view item_cost and then SELECT * FROM item_cost. (Report data; recipes of Vegetable and Chicken Steak invented.)', solution: VIEW + '\nSELECT * FROM item_cost;' });
+sqlCheck('#r2', { setup: REST + '\n' + VIEW, task: '(ii) Monthly profit per food item (the view item_cost already exists here).', solution: "SELECT s.item_name, TO_CHAR(s.sale_date, 'YYYY-MM'), SUM((i.price - c.cost) * s.qty) FROM Sale s JOIN Item i ON i.item_name = s.item_name JOIN item_cost c ON c.item_name = s.item_name GROUP BY s.item_name, TO_CHAR(s.sale_date, 'YYYY-MM');" });
+</script>
+</body>
+</html>

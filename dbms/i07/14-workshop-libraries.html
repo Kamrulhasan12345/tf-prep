@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ER Design Workshop I: Libraries and Businesses · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 07 (Ishrak) · Chapter 14 · ER design workshop (exam questions)</div>
+<h1>ER Design Workshop I: Libraries, Employees and Shipping</h1>
+<p class="lede">Long "draw the ER diagram" questions from past papers, each answered the way an examiner wants: requirement analysis, stated assumptions, a complete diagram, and the relational schema. This chapter: two library systems, an employee-tracking database and a shipping company.</p>
+
+<h2>1. How to answer a design question</h2>
+<p>Every answer in this workshop follows the same five steps, which are the slides' workflow (Chapter 4) plus conversion (Chapter 11):</p>
+<ol>
+<li><strong>Underline nouns, verbs and facts</strong> in the scenario. Decide for each noun: entity set (it has its own facts, identity or relationships) or attribute (one descriptive value)?</li>
+<li><strong>Write the assumptions</strong> the scenario leaves open (keys that are not given, "one or many?" questions). Examiners give marks for sensible, stated assumptions.</li>
+<li><strong>Draw the diagram</strong>: entity sets and relationships first, attributes next, keys and multiplicities last. Use arrows (or 1/N labels), double lines for total participation, roles on recursive relationships, and design notes for anything else.</li>
+<li><strong>Check</strong> with the slide 93 checklist and a few concrete scenarios.</li>
+<li><strong>Convert</strong> if asked: count the tables first (entity sets + many-to-many relationships + multi-way relationships + multivalued attributes), then write each one with keys and foreign keys.</li>
+</ol>
+<p>The diagrams below use the slides' notation with two additions from Chapter 10 that most papers expect: double lines for total participation and the Chen labels 1/N/M next to arrows where they help.</p>
+
+<h2>Practice</h2>
+<h3>Quick check</h3><div id="quiz"></div>
+<h3>Exam questions</h3>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 23-24 1a · 18 marks · Compulsory &nbsp;·&nbsp; BUET QBank · CSE 215 | L-2/T-1 | 2023–24 · 26 marks &nbsp;·&nbsp; BUET QBank · CSE 303 | L-3/T-1 | 2013–14 · 18 marks</div>
+  <div class="exam-q"><p>A library keeps records of current loans of books to borrowers. Each borrower is identified by a borrower number and each copy of a book by an accession number (library may have more than one copy of any given book). The name and address of each borrower is held so that communications, such as overdue loan reminders, can be sent when necessary. The information held about books is the title, author's name/s, publisher's name, publication date, international standard book number (ISBN a unique book identifier), purchase price, classification (reference or fiction), and number of pages. A given book may be written by a number of different authors, however the library regards a book as only being published by a single publisher. The library assigns its own unique in-house codes for authors and publishers.</p>
+  <p>A book may cover a number of different subjects, and the borrowers can use an on-line catalogue system to select texts by subject as well as title and author's name. There is a restriction on the number of books a borrower may have on loan at any one time and the loan period. These limits depend on the borrower's classification (junior, adult, or organization).</p>
+  <p>When a book is borrowed, the return date is automatically recorded based on the current date and the borrower's classification. Other borrowers, pending their return, may reserve books on on loan. The date on which the reserve was placed is recorded. A special borrower's status flag is maintained - borrowers who hold overdue books or who have reached their loan limit, are flagged to prevent further borrowings.</p>
+  <p>Draw an Entity-Relationship (ER) diagram to represent Library data requirements described above.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><strong>Entity sets.</strong> Book (a title, identified by ISBN) and Copy (a physical copy, identified by accession number) are different things: one book has many copies, and loans are of copies. Author and Publisher have in-house codes, so they are entity sets with keys. Subject is an entity set because borrowers search by it and a book has many subjects. Borrower; BorrowerClass (junior, adult, organization) is an entity set because the loan limit and loan period depend on it.</p>
+    <p><strong>Relationships and multiplicities.</strong></p>
+    <ul>
+    <li>copyOf: Copy → Book, many-to-one, total for Copy (every copy is a copy of one book).</li>
+    <li>writtenBy: Book – Author, many-to-many ("a number of different authors").</li>
+    <li>publishedBy: Book → Publisher, many-to-one ("only … a single publisher"), total for Book.</li>
+    <li>covers: Book – Subject, many-to-many.</li>
+    <li>borrows: Copy → Borrower, many-to-one: the library records <em>current</em> loans, and a copy is on loan to at most one borrower at a time; a borrower has many copies. Attributes loan_date and return_date.</li>
+    <li>reserves: Borrower – Book, many-to-many, with reserve_date. Assumption: a reservation is for a book (any copy), not a particular copy.</li>
+    <li>belongsTo: Borrower → BorrowerClass, many-to-one, total for Borrower.</li>
+    </ul>
+    <p><strong>Other assumptions.</strong> Purchase price belongs to each copy (copies are bought separately), so it is on Copy. Classification (reference/fiction) and number of pages are facts of the book.</p>
+    <figure class="wide"><div id="lib"></div><figcaption>Dashed ovals: derived attributes (part b). Double lines: total participation.</figcaption></figure>
+    <p>Part (b), the derived attributes shown as dashed ovals, is answered in the next question.</p>
+    <p><strong>Note on the question bank's answer:</strong> its diagram for the 2023–24 version treats every loan as many-to-many and omits Author/Publisher codes in places; the 2013–14 version is close to the design above.</p>
+</div></details>
+</div>
+<div class="exam">
+  <div class="exam-src">DB QB · 23-24 1b · 8 marks · Compulsory &nbsp;·&nbsp; BUET QBank · CSE 215 | L-2/T-1 | 2023–24 (part b)</div>
+  <div class="exam-q"><p>Identify two attributes in the scenario presented in Question [23-24 1a] (the library loans scenario above) which can be derived using business rules. Write the schema description to store these business rules.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><strong>Derived attributes and their business rules.</strong> A derived attribute is one whose value follows from other stored data by a rule (Chapter 10). The scenario has two:</p>
+    <ol>
+    <li><strong>return_date</strong> of a loan = loan_date + loan_period of the borrower's class ("automatically recorded based on the current date and the borrower's classification").</li>
+    <li><strong>status_flag</strong> of a borrower = 'BLOCKED' if the borrower holds a copy whose return_date has passed, or if the number of copies on loan has reached the class's loan_limit; otherwise 'OK'.</li>
+    </ol>
+    <p>The rules depend on per-class limits, so the schema stores them in their own table, and the derived values are computed from it:</p>
+    <div id="libRel"></div>
+<pre>-- Oracle: rules table, loans, and the derivations
+CREATE TABLE Borrower_Class (
+  class_name   VARCHAR2(12) PRIMARY KEY CHECK (class_name IN ('junior','adult','organization')),
+  loan_limit   NUMBER(3) NOT NULL,      -- max copies on loan at once
+  loan_period  NUMBER(3) NOT NULL       -- days
+);
+-- return_date is derived when the loan is recorded (a BEFORE INSERT trigger)
+CREATE OR REPLACE TRIGGER loan_return_date
+BEFORE INSERT ON Loan FOR EACH ROW
+DECLARE p NUMBER;
+BEGIN
+  SELECT c.loan_period INTO p
+  FROM Borrower b JOIN Borrower_Class c ON c.class_name = b.class_name
+  WHERE b.borrower_no = :NEW.borrower_no;
+  :NEW.loan_date   := TRUNC(SYSDATE);
+  :NEW.return_date := TRUNC(SYSDATE) + p;
+END;
+/
+-- status_flag is derived on demand by a view
+CREATE OR REPLACE VIEW Borrower_Status AS
+SELECT b.borrower_no,
+       CASE WHEN EXISTS (SELECT 1 FROM Loan l WHERE l.borrower_no = b.borrower_no AND l.return_date &lt; SYSDATE)
+              OR (SELECT COUNT(*) FROM Loan l WHERE l.borrower_no = b.borrower_no) &gt;= c.loan_limit
+            THEN 'BLOCKED' ELSE 'OK' END AS status_flag
+FROM Borrower b JOIN Borrower_Class c ON c.class_name = b.class_name;</pre>
+    <p>The trigger is PL/SQL and does not run in the browser playground; the view does. Try it (sample data invented; Rina is a junior with limit 2 holding 2 copies, Karim has an overdue copy):</p>
+    <div id="libPlay"></div>
+    <p>Why not an Oracle virtual column? A virtual column may use only columns of its own row and deterministic functions. return_date needs loan_period from Borrower_Class (another table), and status_flag needs other Loan rows and SYSDATE, so neither qualifies: return_date is filled by the trigger when the loan is recorded, and status_flag is computed by the view every time it is read, so it can never be stale.</p>
+    <p><strong>Note on the question bank's answer:</strong> it identifies the same two attributes (Return_Date and Borrower_Status) and stores the rules in the same kind of lookup table, Borrower_Class_Rules(Borrower_Class, Max_Loan_Limit, Loan_Period_Days). It is correct, but it only describes how the values are derived; the trigger and the view above show the derivation as schema objects.</p>
+  </div></details>
+</div>
+
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2016–17 · 35 marks</div>
+  <div class="exam-q"><p>There are many books in central library of BUET in different subjects. Each book must have a ISBN number, title, name of authors, subject and number of copies. A book can have multiple copies and each copy is identified by an accession number. The descriptive attributes of each copy of book are edition, price and data of purchase. A publisher publishes many books and a book is published by only one publisher. A publisher is identified by publisher id and described by name, country of origin, address and contact numbers. Book suppliers supply many copies of books to the library by tender in each year. A tender has an id, name, total price and year. For each copy of books, you must store the record of which copy of book has been supplied by which supplier in which tender. A supplier is identified by supplier id and described by name, address and contact numbers. One copy of a book (book-copy) can be issued to multiple borrowers in different times and a borrower can borrow multiple number of book-copies. Borrowers can be teachers, students or staffs. Each borrower must have a borrower id, name, contact number and address. Teachers are described by joining date and designation. Students are described by session, level and term. Staffs are described by office name. When a book-copy is issued to borrower, some information such as issued data, accession number, borrower id, length of period for issue and return date are needed to enter into the database. At the same time, the status of the borrowed book should be labeled as issued and will be cleared after return by the borrower. (a) Draw an ERD for the above library management system. (b) Transform the ERD into tables showing all primary keys and foreign keys.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><strong>Decisions.</strong></p>
+    <ul>
+    <li>Book(<u>isbn</u>, title, subject, {author_name}, /num_copies). Authors have no facts of their own here, so they are a multivalued attribute; number of copies is derived by counting copies.</li>
+    <li>BookCopy(<u>accession_no</u>, edition, price, purchase_date, status), with copyOf → Book (many-to-one, total). status is 'issued' or 'available'.</li>
+    <li>Publisher(<u>pub_id</u>, name, country, address, {contact_no}); publishedBy: Book → Publisher (many-to-one, total).</li>
+    <li>Supplier(<u>supplier_id</u>, name, address, {contact_no}); Tender(<u>tender_id</u>, name, total_price, year).</li>
+    <li><strong>"Which copy was supplied by which supplier in which tender"</strong> is a three-way fact. But a copy is supplied once, so the copy alone determines both the supplier and the tender; the ternary relationship therefore splits without loss into two many-to-one relationships from BookCopy: suppliedBy → Supplier and inTender → Tender. (If a tender could involve only one supplier, add Tender → Supplier instead; the scenario does not say so.)</li>
+    <li>Borrower(<u>borrower_id</u>, name, contact_no, address) isA Teacher(joining_date, designation), Student(session, level, term), Staff(office_name): disjoint and total ("can be teachers, students or staffs").</li>
+    <li><strong>Issues.</strong> The same borrower may borrow the same copy at different times, so a plain many-to-many relationship (one pair once) is not enough. Issue is a weak entity set owned by BookCopy with partial key issue_date (a copy is issued at most once per day), attributes period and return_date, and a many-to-one relationship issuedTo → Borrower.</li>
+    </ul>
+    <figure class="wide"><div id="buet"></div></figure>
+    <p><strong>(b) Tables</strong> (E/R style for the isA; multivalued attributes as tables; num_copies derived, not stored):</p>
+    <div id="buetRel"></div>
+    <p>13 relations: 9 entity sets (Publisher, Book, BookCopy, Supplier, Tender, Borrower, Teacher, Student, Staff), the weak Issue, and 3 multivalued attributes (Book_Author, Publisher_Contact, Supplier_Contact); all many-to-one relationships are foreign keys. Issue's (accession_no, issue_date) is the primary key; borrower_id is a NOT NULL foreign key. "Status labelled issued, cleared after return" is BookCopy.status, set to 'issued' when an Issue row is inserted and back to 'available' when return_date is filled in (a trigger in Oracle). The question bank's answer stores supplier_id and tender_id in BOOK_COPY as well, which agrees with this design; it models Issue as a relationship table keyed by (borrower_id, accession_no), which wrongly forbids a borrower from borrowing the same copy twice.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2011–12 · 25 marks</div>
+  <div class="exam-q"><p>You have been asked to design an employee tracking database for a company. They want to track information about employees, the employee's job history, and their certifications. Employee information includes first name, middle initials, last name, social security number, address, city, state, zip, home phone and email address. Job history would include job title, job description, pay grade, pay range, salary and date of promotion. For certifications, they want certification type and date achieved. An employee can have multiple jobs over time (i.e., Analyst, Sr. Analyst, QA Administrator). Employees can also earn certifications necessary for their jobs. (a) Draw an ER diagram for this application. Mark the multiplicity of each relationship. Identify key attributes. State all assumptions clearly. (15 marks) (b) Translate your ER diagram into a relational schema. Select approaches that yield the fewest number of relations; merge relations where appropriate. Specify the key of each relation in your schema. (10 marks)</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><strong>Assumptions.</strong> (1) SSN identifies an employee. (2) A job (Analyst, Sr. Analyst, …) is a position with a title, description, pay grade and pay range that many employees can hold; title identifies it. (3) Salary and date of promotion describe one employee's holding of one job, so they belong to the relationship. An employee may hold the same title twice (demoted and promoted again), so the date of promotion is part of what identifies a history entry: <em>JobHistory</em> is a weak entity of Employee with partial key promotion_date, linked to Job by forJob (many-to-one). (4) A certification type (e.g. "Oracle DBA") is a fact many employees share; date achieved describes one employee earning it, so <em>earns</em> is many-to-many with attribute date_achieved. (5) name and address are composite.</p>
+    <figure class="wide"><div id="emp"></div></figure>
+    <p><strong>Fewest relations.</strong> Employee and Job become tables. The weak JobHistory becomes a table keyed by (ssn, promotion_date) and absorbs forJob as a foreign key job_title. Certification has only its key, so its table would hold nothing but cert_type; we merge it into the earns table (losing only the list of certification types nobody has earned yet). earns becomes Employee_Cert. Composite attributes are flattened.</p>
+    <div id="empRel"></div>
+    <p><strong>4 relations</strong>: Employee(<u>ssn</u>, first_name, middle_init, last_name, street, city, state, zip, home_phone, email); Job(<u>job_title</u>, job_description, pay_grade, pay_range); Job_History(<u>ssn</u>, <u>promotion_date</u>, job_title, salary); Employee_Cert(<u>ssn</u>, <u>cert_type</u>, date_achieved). Keeping job description, grade and range in Job (instead of repeating them in every history row, as the question bank's 3-relation answer does) avoids redundancy; if the examiner insists on 3, Job can be merged into Job_History at the price of repeating job facts. If an employee can earn the same certification twice (renewal), make date_achieved part of Employee_Cert's key.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 22 CT1 1 · 10 marks</div>
+  <div class="exam-q"><p>Bangladesh Shipping Management (BSM) prides itself over on having up-to-date information on the processing and current location of each shipped item. To do this, BSM relies on a company-wide information system. Shipped items are the heart of the BSM product tracking information system. Shipped items can be characterized by item number (unique), weight, dimensions, insurance amount, destination and final delivery date. Shipped items are received into the BSM system at a single retail center. Retail centers are characterized by their type, uniqueID, and address (i.e., flights, truck delivery, etc). These transportation events are characterized by a unique Schedule Number, a type (i.e., flights, truck delivery, etc), and a delivery route. Please create an Entity Relationship Diagram that captures this information about the BSM system.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>The question text has lost a sentence (it mentions "these transportation events" without introducing them). In the well-known original (the UPS case) it reads: <em>"Shipped items make their way to their destination via one or more standard transportation events (i.e., flights, truck deliveries)."</em> We assume that sentence.</p>
+    <ul>
+    <li>ShippedItem(<u>item_no</u>, weight, dimensions(length, width, height), insurance_amount, destination, final_delivery_date).</li>
+    <li>RetailCenter(<u>center_id</u>, type, address). receivedAt: ShippedItem → RetailCenter, many-to-one, total for ShippedItem ("received … at a single retail center"); a center receives many items. Useful attribute: received_date.</li>
+    <li>TransportationEvent(<u>schedule_no</u>, type, delivery_route). shippedVia: ShippedItem – TransportationEvent, many-to-many ("one or more" events per item; a flight carries many items), total for ShippedItem. The current location of an item is its latest event; an attribute event_time on shippedVia supports "up-to-date location".</li>
+    </ul>
+    <figure class="wide"><div id="bsm"></div></figure>
+    <p>Schema (not asked, but quick): RetailCenter(<u>center_id</u>, type, address); ShippedItem(<u>item_no</u>, weight, length, width, height, insurance_amount, destination, final_delivery_date, <i>center_id</i> NOT NULL, received_date); TransportationEvent(<u>schedule_no</u>, type, delivery_route); Shipped_Via(<u>item_no</u>, <u>schedule_no</u>, event_time).</p>
+  </div></details>
+</div>
+
+<div class="key">
+<p><strong>Summary:</strong> separate the abstract thing from its physical copies (Book vs Copy); give coded things (authors, publishers) their own entity sets; put per-class rules in their own entity set; record repeated events (loans, issues, job holdings) as weak entities or with a date in the key, because a relationship holds each pair only once. State every assumption, mark derived attributes, and count tables before writing the schema.</p>
+</div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/sqlplay.js"></script>
+<script src="lecture.js"></script>
+<script>
+$('#lib').innerHTML = erd({
+  n: [['Publisher', 'E', -460, 0], ['publishedBy', 'R', -230, 0, 'published\nBy'], ['Book', 'E', 0, 0], ['writtenBy', 'R', 230, 0, 'written\nBy'], ['Author', 'E', 460, 0],
+      ['covers', 'R', -230, 150], ['Subject', 'E', -460, 150], ['copyOf', 'R', 0, 160], ['Copy', 'E', 0, 310], ['reserves', 'R', 250, 160], ['borrows', 'R', 240, 310], ['Borrower', 'E', 470, 310],
+      ['belongsTo', 'R', 470, 440, 'belongs\nTo'], ['Class', 'E', 470, 570, 'BorrowerClass']],
+  a: [['Publisher', '_pub_code', -60, -55], ['Publisher', 'name', 60, -55], ['Author', '_author_code', -60, -55], ['Author', 'name', 70, -55],
+      ['Book', '_isbn', -150, -55], ['Book', 'title', -75, -90], ['Book', 'pub_date', 0, -60], ['Book', 'classification', 85, -95], ['Book', 'num_pages', 150, -55],
+      ['Subject', '_subject_name', 0, 55], ['Copy', '_accession_no', -140, -15], ['Copy', 'purchase_price', -130, 40],
+      ['borrows', 'loan_date', -75, 60], ['borrows', '/return_date', 35, 72], ['reserves', 'reserve_date', 120, -30],
+      ['Borrower', '_borrower_no', 150, -40], ['Borrower', 'name', 160, 5], ['Borrower', 'address', 140, 50], ['Borrower', '/status_flag', 105, 95],
+      ['Class', '_class_name', -150, 0], ['Class', 'loan_limit', 150, -20], ['Class', 'loan_period', 140, 30]],
+  l: [['Book', 'publishedBy', { total: true, card: 'N' }], ['Publisher', 'publishedBy', { one: true, card: '1' }], ['Book', 'writtenBy', { total: true, card: 'M' }], ['Author', 'writtenBy', { card: 'N' }],
+      ['Book', 'covers', { card: 'M' }], ['Subject', 'covers', { card: 'N' }], ['Copy', 'copyOf', { total: true, card: 'N' }], ['Book', 'copyOf', { one: true, card: '1' }],
+      ['Book', 'reserves', { card: 'N' }], ['Borrower', 'reserves', { card: 'M' }], ['Copy', 'borrows', { card: 'N' }], ['Borrower', 'borrows', { one: true, card: '1' }],
+      ['Borrower', 'belongsTo', { total: true, card: 'N' }], ['Class', 'belongsTo', { one: true, card: '1' }]],
+});
+const LIBR = [{ n: 'Publisher', c: ['*pub_code', 'name'] }, { n: 'Author', c: ['*author_code', 'name'] }, { n: 'Subject', c: ['*subject_name'] },
+  { n: 'Book', c: ['*isbn', 'title', 'pub_date', 'classification', 'num_pages', 'pub_code!>Publisher'] }, { n: 'Written_By', c: ['*isbn>Book', '*author_code>Author'] }, { n: 'Covers', c: ['*isbn>Book', '*subject_name>Subject'] },
+  { n: 'Copy', c: ['*accession_no', 'purchase_price', 'isbn!>Book'] }, { n: 'Borrower_Class', c: ['*class_name', 'loan_limit', 'loan_period'], cls: 'new' },
+  { n: 'Borrower', c: ['*borrower_no', 'name', 'address', 'class_name!>Borrower_Class'] }, { n: 'Loan', c: ['*accession_no>Copy', 'borrower_no!>Borrower', 'loan_date', 'return_date'] },
+  { n: 'Reserves', c: ['*borrower_no>Borrower', '*isbn>Book', 'reserve_date'] }];
+relInto('#libRel', LIBR);
+sqlPlay('#libPlay', { setup: `CREATE TABLE Borrower_Class (class_name VARCHAR2(12) PRIMARY KEY, loan_limit NUMBER(3) NOT NULL, loan_period NUMBER(3) NOT NULL);
+CREATE TABLE Borrower (borrower_no NUMBER(6) PRIMARY KEY, name VARCHAR2(30), address VARCHAR2(60), class_name VARCHAR2(12) NOT NULL REFERENCES Borrower_Class(class_name));
+CREATE TABLE Loan (accession_no NUMBER(8) PRIMARY KEY, borrower_no NUMBER(6) NOT NULL REFERENCES Borrower(borrower_no), loan_date DATE, return_date DATE);
+INSERT INTO Borrower_Class VALUES ('junior', 2, 14);
+INSERT INTO Borrower_Class VALUES ('adult', 5, 21);
+INSERT INTO Borrower_Class VALUES ('organization', 20, 30);
+INSERT INTO Borrower VALUES (1, 'Rina', 'Mirpur', 'junior');
+INSERT INTO Borrower VALUES (2, 'Karim', 'Uttara', 'adult');
+INSERT INTO Borrower VALUES (3, 'Sumi', 'Banani', 'adult');
+INSERT INTO Loan VALUES (1001, 1, DATE '2099-01-01', DATE '2099-01-15');
+INSERT INTO Loan VALUES (1002, 1, DATE '2099-01-01', DATE '2099-01-15');
+INSERT INTO Loan VALUES (1003, 2, DATE '2020-03-01', DATE '2020-03-22');
+INSERT INTO Loan VALUES (1004, 3, DATE '2099-02-01', DATE '2099-02-22');
+CREATE OR REPLACE VIEW Borrower_Status AS
+SELECT b.borrower_no, b.name,
+       CASE WHEN EXISTS (SELECT 1 FROM Loan l WHERE l.borrower_no = b.borrower_no AND l.return_date < SYSDATE)
+              OR (SELECT COUNT(*) FROM Loan l WHERE l.borrower_no = b.borrower_no) >= c.loan_limit
+            THEN 'BLOCKED' ELSE 'OK' END AS status_flag
+FROM Borrower b JOIN Borrower_Class c ON c.class_name = b.class_name;`, query: 'SELECT * FROM Borrower_Status ORDER BY borrower_no;', note: 'Rina (junior, limit 2) holds 2 copies: BLOCKED. Karim\'s copy was due in 2020: BLOCKED. Sumi: OK. (Future dates are used so the example does not change with today\'s date.)' });
+$('#buet').innerHTML = erd({
+  n: [['Publisher', 'E', -470, 0], ['publishedBy', 'R', -240, 0, 'published\nBy'], ['Book', 'E', 0, 0], ['copyOf', 'R', 0, 140], ['BookCopy', 'E', 0, 280],
+      ['suppliedBy', 'R', -240, 280, 'supplied\nBy'], ['Supplier', 'E', -470, 280], ['inTender', 'R', -240, 410], ['Tender', 'E', -470, 410],
+      ['Issue', 'W', 0, 450], ['ofCopy', 'I', 0, 365, 'of'], ['issuedTo', 'R', 250, 450, 'issued\nTo'], ['Borrower', 'E', 500, 450],
+      ['isA', 'D', 500, 570, 'isA'], ['Teacher', 'E', 330, 680], ['Student', 'E', 500, 680], ['Staff', 'E', 670, 680]],
+  a: [['Publisher', '_pub_id', -70, -55], ['Publisher', 'name', 50, -60], ['Publisher', 'country', -130, 30], ['Publisher', 'address', -60, 60], ['Publisher', '{contact_no}', 70, 60],
+      ['Book', '_isbn', -110, -50], ['Book', 'title', -30, -75], ['Book', 'subject', 60, -70], ['Book', '{author_name}', 145, -35], ['Book', '/num_copies', 140, 25],
+      ['BookCopy', '_accession_no', 150, -45], ['BookCopy', 'edition', 160, -5], ['BookCopy', 'price', 150, 35], ['BookCopy', 'purchase_date', 90, -90], ['BookCopy', 'status', -110, -55],
+      ['Supplier', '_supplier_id', -60, -60], ['Supplier', 'name', 60, -60], ['Supplier', 'address', -140, 20], ['Supplier', '{contact_no}', -150, -25],
+      ['Tender', '_tender_id', -100, 50], ['Tender', 'name', 0, 65], ['Tender', 'total_price', 100, 60], ['Tender', 'year', -140, 0],
+      ['Issue', '~issue_date', -130, 30], ['Issue', 'period', -50, 70], ['Issue', 'return_date', 60, 70],
+      ['Borrower', '_borrower_id', 60, -60], ['Borrower', 'name', 150, -30], ['Borrower', 'contact_no', 160, 15], ['Borrower', 'address', 140, 55],
+      ['Teacher', 'joining_date', -60, 60], ['Teacher', 'designation', 60, 60], ['Student', 'session', -30, 80], ['Student', 'level', 40, 60], ['Student', 'term', 100, 80], ['Staff', 'office_name', 40, 60]],
+  l: [['Book', 'publishedBy', { total: true }], ['Publisher', 'publishedBy', { one: true }], ['BookCopy', 'copyOf', { total: true }], ['Book', 'copyOf', { one: true }],
+      ['BookCopy', 'suppliedBy', { total: true }], ['Supplier', 'suppliedBy', { one: true }], ['BookCopy', 'inTender', { total: true }], ['Tender', 'inTender', { one: true }],
+      ['Issue', 'ofCopy', { total: true }], ['BookCopy', 'ofCopy', { one: true }], ['Issue', 'issuedTo', { total: true }], ['Borrower', 'issuedTo', { one: true }],
+      ['Borrower', 'isA', { total: true }], ['Teacher', 'isA'], ['Student', 'isA'], ['Staff', 'isA']],
+  t: [[600, 572, 'disjoint, total', 'acc']],
+});
+relInto('#buetRel', [{ n: 'Publisher', c: ['*pub_id', 'name', 'country', 'address'] }, { n: 'Publisher_Contact', c: ['*pub_id>Publisher', '*contact_no'] },
+  { n: 'Book', c: ['*isbn', 'title', 'subject', 'pub_id!>Publisher'] }, { n: 'Book_Author', c: ['*isbn>Book', '*author_name'] },
+  { n: 'Supplier', c: ['*supplier_id', 'name', 'address'] }, { n: 'Supplier_Contact', c: ['*supplier_id>Supplier', '*contact_no'] }, { n: 'Tender', c: ['*tender_id', 'name', 'total_price', 'year'] },
+  { n: 'BookCopy', c: ['*accession_no', 'edition', 'price', 'purchase_date', 'status', 'isbn!>Book', 'supplier_id!>Supplier', 'tender_id!>Tender'] },
+  { n: 'Borrower', c: ['*borrower_id', 'name', 'contact_no', 'address'] }, { n: 'Teacher', c: ['*borrower_id>Borrower', 'joining_date', 'designation'] },
+  { n: 'Student', c: ['*borrower_id>Borrower', 'session', 'level', 'term'] }, { n: 'Staff', c: ['*borrower_id>Borrower', 'office_name'] },
+  { n: 'Issue', c: ['*accession_no>BookCopy', '*issue_date', 'period', 'return_date', 'borrower_id!>Borrower'] }]);
+$('#emp').innerHTML = erd({
+  n: [['Employee', 'E', 0, 0], ['earns', 'R', 280, 0], ['Cert', 'E', 520, 0, 'Certification'], ['has', 'I', 0, 160], ['JobHistory', 'W', 0, 300], ['forJob', 'R', 260, 300, 'for\nJob'], ['Job', 'E', 520, 300]],
+  a: [['Employee', '_ssn', -170, -20], ['Employee', 'name', -120, -80], ['Employee.name', 'first_name', -80, -45], ['Employee.name', 'middle_init', 25, -60], ['Employee.name', 'last_name', 125, -40],
+      ['Employee', 'address', -175, 55], ['Employee.address', 'street', -120, 20], ['Employee.address', 'city', -125, 65], ['Employee.address', 'state', -40, 85], ['Employee.address', 'zip', 50, 75],
+      ['Employee', 'home_phone', 120, -60], ['Employee', 'email', 120, 55],
+      ['earns', 'date_achieved', 0, -65], ['Cert', '_cert_type', 0, -60],
+      ['JobHistory', '~promotion_date', -150, 30], ['JobHistory', 'salary', -40, 70], ['Job', '_job_title', -40, -60], ['Job', 'job_description', 110, -55], ['Job', 'pay_grade', 70, 60], ['Job', 'pay_range', -60, 65]],
+  l: [['Employee', 'earns', { card: 'M' }], ['Cert', 'earns', { card: 'N' }], ['Employee', 'has', { one: true, card: '1' }], ['JobHistory', 'has', { total: true, card: 'N' }], ['JobHistory', 'forJob', { total: true, card: 'N' }], ['Job', 'forJob', { one: true, card: '1' }]],
+});
+relInto('#empRel', [{ n: 'Employee', c: ['*ssn', 'first_name', 'middle_init', 'last_name', 'street', 'city', 'state', 'zip', 'home_phone', 'email'] }, { n: 'Job', c: ['*job_title', 'job_description', 'pay_grade', 'pay_range'] },
+  { n: 'Job_History', c: ['*ssn>Employee', '*promotion_date', 'job_title!>Job', 'salary'] }, { n: 'Employee_Cert', c: ['*ssn>Employee', '*cert_type', 'date_achieved'] }]);
+$('#bsm').innerHTML = erd({
+  n: [['Item', 'E', 0, 0, 'ShippedItem'], ['receivedAt', 'R', -270, 0, 'received\nAt'], ['Center', 'E', -520, 0, 'RetailCenter'], ['shippedVia', 'R', 270, 0, 'shipped\nVia'], ['Event', 'E', 540, 0, 'Transportation\nEvent']],
+  a: [['Item', '_item_no', -90, -65], ['Item', 'weight', 0, -80], ['Item', 'dimensions', 95, -70], ['Item.dimensions', 'length', 10, -50], ['Item.dimensions', 'width', 95, -45], ['Item.dimensions', 'height', 120, 5],
+      ['Item', 'insurance_amount', -100, 65], ['Item', 'destination', 15, 80], ['Item', 'final_delivery_date', 130, 65],
+      ['receivedAt', 'received_date', 0, 65], ['Center', '_center_id', -60, -60], ['Center', 'type', 60, -60], ['Center', 'address', 0, 65],
+      ['shippedVia', 'event_time', 0, 70], ['Event', '_schedule_no', -40, -65], ['Event', 'type', 80, -55], ['Event', 'delivery_route', 40, 70]],
+  l: [['Item', 'receivedAt', { total: true, card: 'N' }], ['Center', 'receivedAt', { one: true, card: '1' }], ['Item', 'shippedVia', { total: true, card: 'M' }], ['Event', 'shippedVia', { card: 'N' }]],
+});
+quiz('#quiz', [
+  { q: 'Why are Book and Copy separate entity sets in the library design?', opts: ['To avoid NULLs', 'A book (title, ISBN) has many physical copies, and loans are of copies', 'Copies are weak', 'ISBN is not unique'], a: 1, why: 'Facts about the title belong to Book; accession number, price and loans belong to Copy.' },
+  { q: 'The library records only <em>current</em> loans. What is the multiplicity of borrows (Copy, Borrower)?', opts: ['many-to-many', 'many-to-one from Copy to Borrower', 'one-to-one', 'one-to-many from Copy'], a: 1, why: 'At any moment a copy is with at most one borrower.' },
+  { q: 'A borrower may borrow the same copy several times over the years. A plain relationship is not enough because…', opts: ['relationships cannot have attributes', 'a relationship set holds each (borrower, copy) pair only once', 'copies are weak', 'it would be ternary'], a: 1, why: 'Use a weak entity Issue (or put the date in the key).' },
+  { q: 'Loan limits depend on the borrower\'s classification. Where are they stored?', opts: ['On Borrower', 'On Loan', 'In an entity set BorrowerClass', 'Nowhere'], a: 2, why: 'One row per class; borrowers reference their class.' },
+]);
+</script>
+</body>
+</html>

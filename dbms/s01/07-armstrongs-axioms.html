@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Armstrong's Axioms · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 01 (Sukarna) · Chapter 7 · Slides 29–33 · Book §3.2.7 (box: A Complete Set of Inference Rules)</div>
+<h1>Armstrong's Axioms and Equivalent FD Sets</h1>
+<p class="lede">Three simple rules are enough to derive every FD that follows from a given set. This chapter states them, derives the extra rules from them step by step (including the slide's “prove it” exercise), and defines when two sets of FDs are equivalent.</p>
+
+<h2>1. The three axioms (slide 29)</h2>
+<p>Write X, Y, Z, W for sets of attributes, and XY for X ∪ Y.</p>
+<dl class="def">
+  <dt>Reflexivity</dt><dd>If {B₁, …, Bₘ} ⊆ {A₁, …, Aₙ}, then A₁…Aₙ → B₁…Bₘ. These are the trivial FDs. Example: <code>title year → title</code>.</dd>
+  <dt>Augmentation</dt><dd>If A₁…Aₙ → B₁…Bₘ, then A₁…AₙC₁…Cₖ → B₁…BₘC₁…Cₖ for any attributes C. Add the same attributes to both sides. Example: from <code>title year → length</code>, <code>title year genre → length genre</code>. (Remove duplicate attributes from each side.)</dd>
+  <dt>Transitivity</dt><dd>If A₁…Aₙ → B₁…Bₘ and B₁…Bₘ → C₁…Cₖ, then A₁…Aₙ → C₁…Cₖ (Chapter 4).</dd>
+</dl>
+<p>The slide calls these rules <b class="term">sound and complete</b>:</p>
+<ul>
+  <li><strong>Sound:</strong> every FD they derive really follows (holds in every instance that satisfies the given FDs). Each axiom can be checked with the two-tuple argument of Chapter 4. For augmentation: if two tuples agree on XC, they agree on X, hence on Y (given X → Y), and they agree on C, so they agree on YC.</li>
+  <li><strong>Complete:</strong> every FD that follows can be derived with them. (The proof uses the closure argument; the closure algorithm of Chapter 5 is the practical way to decide “does it follow?”.)</li>
+</ul>
+
+<h2>2. Additional rules (slide 30)</h2>
+<p>These can be derived from the three axioms, so using them never adds anything new; they just shorten proofs.</p>
+<dl class="def">
+  <dt>Decomposition (splitting)</dt><dd>If X → YZ then X → Y and X → Z.</dd>
+  <dt>Union (combining)</dt><dd>If X → Y and X → Z then X → YZ.</dd>
+  <dt>Pseudotransitivity</dt><dd>If X → Y and YZ → W then XZ → W. (Slide 31 writes it as: X → Y and YW → Z give XW → Z. Same rule, letters renamed.)</dd>
+  <dt>Composition (addition)</dt><dd>If X → Y and Z → W then XZ → YW.</dd>
+</dl>
+
+<h2>3. Proofs from the axioms (slides 31–32)</h2>
+<h3>Decomposition (slide 31)</h3>
+<div class="proof"><ol>
+  <li>X → YZ <span class="why">(given)</span></li>
+  <li>YZ → Y and YZ → Z <span class="why">(reflexivity: Y ⊆ YZ, Z ⊆ YZ)</span></li>
+  <li>X → Y <span class="why">(transitivity on 1 and YZ → Y)</span></li>
+  <li>X → Z <span class="why">(transitivity on 1 and YZ → Z)</span></li>
+</ol></div>
+
+<h3>Pseudotransitivity (slide 31: “Prove it [exercise]”)</h3>
+<p>Prove: if X → Y and YW → Z, then XW → Z.</p>
+<figure>
+<span class="anim-tag">Animation: derivation</span>
+<div id="pseudo"></div>
+</figure>
+
+<h3>Left-side augmentation (slide 32)</h3>
+<p>Show that if X → Z then XY → Z. Adding attributes to the left side of an FD keeps it true.</p>
+<div class="proof"><ol>
+  <li>X → Z <span class="why">(given)</span></li>
+  <li>XY → ZY <span class="why">(augmentation with Y)</span></li>
+  <li>XY → Z <span class="why">(decomposition of 2)</span></li>
+</ol></div>
+<p>Intuition from the slide: X → Z says “knowing X fixes Z”. If two tuples agree on X and Y, they in particular agree on X, so they agree on Z. Knowing more (X and Y) still fixes Z. This is why every superset of a key is a superkey.</p>
+
+<h3>Union and composition</h3>
+<div class="figrow">
+<div class="proof"><b>Union:</b> X → Y, X → Z ⊢ X → YZ<ol>
+  <li>X → XY <span class="why">(augment X → Y with X; XX = X)</span></li>
+  <li>XY → YZ <span class="why">(augment X → Z with Y)</span></li>
+  <li>X → YZ <span class="why">(transitivity 1, 2)</span></li>
+</ol></div>
+<div class="proof"><b>Composition:</b> X → Y, Z → W ⊢ XZ → YW<ol>
+  <li>XZ → YZ <span class="why">(augment X → Y with Z)</span></li>
+  <li>YZ → YW <span class="why">(augment Z → W with Y)</span></li>
+  <li>XZ → YW <span class="why">(transitivity 1, 2)</span></li>
+</ol></div>
+</div>
+
+<h2>4. Equivalence of FD sets (slide 33)</h2>
+<dl class="def">
+  <dt>S follows from T</dt><dd>Every relation instance that satisfies all FDs in T also satisfies all FDs in S. Check it FD by FD: for each X → Y in S, compute X⁺ using T and see whether Y ⊆ X⁺ (or derive it with the inference rules).</dd>
+  <dt>S and T are equivalent</dt><dd>S follows from T, and T follows from S. Equivalent sets allow exactly the same instances.</dd>
+</dl>
+<div class="q">
+<h4>Example: are S = {A → B, B → C, A → C} and T = {A → B, B → C} equivalent?</h4>
+<p><strong>T follows from S:</strong> T ⊆ S, so trivially yes. <strong>S follows from T:</strong> A → B and B → C are in T; for A → C, compute A⁺ under T = {A, B, C} ∋ C. Yes. So S ≡ T: the FD A → C adds nothing. Removing such redundant FDs is the first idea behind the minimal basis (Chapter 8).</p>
+<p><strong>Non-example:</strong> {AB → C} and {A → C}. A → C implies AB → C (left augmentation), but under {AB → C}, A⁺ = {A}, so A → C does not follow. Not equivalent.</p>
+</div>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+
+<h3>Exam questions</h3>
+<div class="exam">
+  <div class="exam-src">DB QB · 19-20 8d · 5 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-2 | 2019–20 · 5 marks</div>
+  <div class="exam-q"><p>Write down the six rules with examples to find out the closure of a set of functional dependencies.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>The closure F⁺ of a set of FDs F is the set of all FDs that follow from F. It is generated by Armstrong's three axioms plus three derived rules. Examples use R(studentID, name, dept, deptHead, course, grade) with F = {studentID → name dept, dept → deptHead, studentID course → grade}.</p>
+    <ol>
+      <li><strong>Reflexivity:</strong> if Y ⊆ X then X → Y. Example: <code>studentID course → course</code>.</li>
+      <li><strong>Augmentation:</strong> if X → Y then XZ → YZ. Example: from <code>dept → deptHead</code>, <code>dept course → deptHead course</code>.</li>
+      <li><strong>Transitivity:</strong> if X → Y and Y → Z then X → Z. Example: <code>studentID → dept</code> and <code>dept → deptHead</code> give <code>studentID → deptHead</code>.</li>
+      <li><strong>Union:</strong> if X → Y and X → Z then X → YZ. Example: <code>studentID → name</code> and <code>studentID → deptHead</code> give <code>studentID → name deptHead</code>.</li>
+      <li><strong>Decomposition:</strong> if X → YZ then X → Y and X → Z. Example: <code>studentID → name dept</code> gives <code>studentID → name</code> and <code>studentID → dept</code>.</li>
+      <li><strong>Pseudotransitivity:</strong> if X → Y and YW → Z then XW → Z. Example: add the FD <code>dept course → room</code> (each department teaches a course in one room). With <code>studentID → dept</code> (X = studentID, Y = dept, W = course) we get <code>studentID course → room</code>.</li>
+    </ol>
+    <p>The first three (Armstrong's axioms) are sound and complete; rules 4–6 are derived from them (proofs in section 3) and only shorten derivations.</p>
+  </div></details>
+</div>
+
+<div class="key"><p><strong>Summary:</strong> Armstrong's axioms are reflexivity (trivial FDs), augmentation (add the same attributes to both sides) and transitivity. They are sound and complete. Decomposition, union, pseudotransitivity and composition are derived from them in two or three steps. Two FD sets are equivalent when each follows from the other; test it FD by FD with closures.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="lecture.js"></script>
+<script>
+const lines = [
+  ['X → Y', 'given'], ['YW → Z', 'given'], ['XW → YW', 'augmentation of (1) with W'], ['XW → Z', 'transitivity on (3) and (2)']];
+const frame = n => `<div class="proof"><ol>${lines.map((l, i) => `<li style="${i >= n ? 'visibility:hidden' : ''}${i === n - 1 ? ';background:var(--cell-hl);border-radius:4px' : ''}">${l[0]} <span class="why">(${l[1]})</span></li>`).join('')}</ol></div>`;
+stepper('#pseudo', [
+  { html: frame(2), cap: 'Start from the two given FDs. Goal: XW → Z. The second FD needs both Y and W on its left, so we want to reach YW from XW.' },
+  { html: frame(3), cap: '<b>Augmentation:</b> add W to both sides of X → Y, giving XW → YW.' },
+  { html: frame(4), cap: '<b>Transitivity:</b> XW → YW and YW → Z give <b>XW → Z</b>. Done.' },
+]);
+flashcards('#cards', [
+  { f: 'Reflexivity', b: 'Y ⊆ X ⇒ X → Y (trivial FDs).' },
+  { f: 'Augmentation', b: 'X → Y ⇒ XZ → YZ.' },
+  { f: 'Transitivity', b: 'X → Y, Y → Z ⇒ X → Z.' },
+  { f: 'Sound', b: 'Everything the rules derive really follows.' },
+  { f: 'Complete', b: 'Everything that follows can be derived by the rules.' },
+  { f: 'Pseudotransitivity', b: 'X → Y, YW → Z ⇒ XW → Z.' },
+  { f: 'Equivalent FD sets', b: 'Each set follows from the other.' },
+]);
+quiz('#quiz', [
+  { q: 'Which rule gives AC → BC from A → B?', opts: ['Reflexivity', 'Augmentation', 'Transitivity', 'Union'], a: 1, why: 'Add C to both sides.' },
+  { q: 'Which is NOT one of Armstrong\'s three axioms?', opts: ['Reflexivity', 'Augmentation', 'Union', 'Transitivity'], a: 2, why: 'Union is derived from augmentation and transitivity.' },
+  { q: 'From A → B and BC → D, which follows directly by pseudotransitivity?', opts: ['A → D', 'AC → D', 'B → D', 'C → D'], a: 1, why: 'X = A, Y = B, W = C.' },
+  { q: 'Are {A → B, B → A} and {A → AB, B → AB} equivalent?', opts: ['Yes', 'No'], a: 0, why: 'A → AB splits into A → A (trivial) and A → B; same for B.' },
+  { q: '“Complete” means…', opts: ['the rules never derive a false FD', 'every FD that follows can be derived', 'the rules are minimal', 'every FD is trivial'], a: 1, why: 'Soundness is the other property.' },
+]);
+ask('#try1', { q: 'From A → B and B → C, which single Armstrong axiom gives A → C? (type its name)', a: ['transitivity'], why: 'A → B, B → C ⇒ A → C.' });
+</script>
+</body>
+</html>

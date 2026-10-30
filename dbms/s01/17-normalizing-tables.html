@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Normalizing Real Tables · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 01 (Sukarna) · Chapter 17 · Slides 62–64 (applied)</div>
+<h1>Workshop: Normalizing Real Tables from Sample Data</h1>
+<p class="lede">Many exam questions hand you a table or a report and ask for the FDs, a dependency diagram, and the 1NF/2NF/3NF/BCNF schemas. This chapter gives a fixed procedure and works four such questions in full: an invoice, a booking table, a restaurant report and a book shop.</p>
+
+<h2>1. Why normalize?</h2>
+<p>Normalization replaces a relation that mixes several kinds of facts by smaller relations that each store one kind of fact once. The payoff is the removal of redundancy and of the update, insertion and deletion anomalies (Chapter 9), done without losing information (lossless join, Chapter 12) and, ideally, while keeping every FD checkable (Chapter 13).</p>
+
+<h2>2. The procedure</h2>
+<ol>
+  <li><strong>Name the attributes</strong> and find the <strong>FDs</strong> from the meaning of the data. Use the sample rows only to <em>reject</em> FDs (Chapter 2): two rows that agree on X and differ on Y kill X → Y.</li>
+  <li><strong>Find the key(s)</strong> with closures (Chapter 6). Attributes on no right side are in every key.</li>
+  <li><strong>Draw the dependency diagram</strong>: attributes in a row, key underlined; full dependencies on the key drawn above, partial and transitive dependencies below.</li>
+  <li><strong>1NF</strong>: make every value atomic. A repeating group (several values per entity) moves to its own relation together with the key of the entity.</li>
+  <li><strong>2NF</strong>: for each partial dependency (part of a key → non-key attributes), move those attributes out with that part of the key.</li>
+  <li><strong>3NF</strong>: for each transitive dependency (non-key → non-key), move the dependent attributes out with their determinant.</li>
+  <li><strong>BCNF</strong>: check every remaining FD has a superkey on its left (Chapter 11).</li>
+</ol>
+<p>In the diagrams below, <span class="good">green</span> arrows (above) are dependencies on the whole key, <span class="bad">red</span> ones are partial, <span style="color:var(--accent);font-weight:600">blue</span> ones are transitive.</p>
+
+<h3>The procedure on the invoice table</h3>
+<p>The first exam question below, animated: the 1NF table, then 2NF, then 3NF. Watch the repeated values (orange) disappear.</p>
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="steps"></div>
+</figure>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+
+<h3>Exam questions</h3>
+<div class="exam">
+  <div class="exam-src">DB QB · 23-24 2a · 15 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-1 | 2023–24 · 15 marks &nbsp;|&nbsp; BUET QBank · CSE 303 | L-3/T-1 | 2013–14 · 15 marks (same table)</div>
+  <div class="exam-q"><p>Why is the normalization technique used in database design? Normalize the following table by drawing dependency diagram and identifying all dependencies to derive up to 3NF. Show the schema in 3NF.</p><div id="invt"></div><p class="tbl-note">The 2013–14 version shows the same invoice table in row form (with GH-7781 / ToughGood in the last row); the answer is the same.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><strong>Why normalize:</strong> to remove redundancy and with it the update, insertion and deletion anomalies. In this table, “Rotary sander, vendor 211, NeverFail, $49.95” is stored once per sale of that product; changing the vendor's name means updating many rows (update anomaly); a product cannot be recorded until it is sold (insertion anomaly); deleting invoice 211349 deletes everything known about the power drill and vendor 157 (deletion anomaly).</p>
+    <p><strong>Dependencies.</strong> Each row is one product line of one invoice.</p>
+    <ul>
+      <li>INV_NUM → SALE_DATE (an invoice has one date; 211347's three rows agree)</li>
+      <li>PROD_NUM → PROD_LABEL, VEND_CODE, PROD_PRICE (AA-E3422QW has the same label, vendor and price on both invoices)</li>
+      <li>VEND_CODE → VEND_NAME</li>
+      <li>INV_NUM, PROD_NUM → QUANT_SOLD</li>
+    </ul>
+    <p>Key: INV_NUM and PROD_NUM appear on no right side and together determine everything: <strong>{INV_NUM, PROD_NUM}</strong>.</p>
+    <div id="invd"></div>
+    <p><strong>1NF:</strong> the table (one row per invoice line) has atomic values and the key {INV_NUM, PROD_NUM}: <code>INVOICE_LINE(INV_NUM, PROD_NUM, SALE_DATE, PROD_LABEL, VEND_CODE, VEND_NAME, QUANT_SOLD, PROD_PRICE)</code>.</p>
+    <p><strong>2NF:</strong> remove the partial dependencies on INV_NUM and on PROD_NUM:</p>
+    <ul>
+      <li>INVOICE(<u>INV_NUM</u>, SALE_DATE)</li>
+      <li>PRODUCT(<u>PROD_NUM</u>, PROD_LABEL, VEND_CODE, VEND_NAME, PROD_PRICE)</li>
+      <li>LINE(<u>INV_NUM, PROD_NUM</u>, QUANT_SOLD)</li>
+    </ul>
+    <p><strong>3NF:</strong> PRODUCT still has the transitive dependency PROD_NUM → VEND_CODE → VEND_NAME. Split it:</p>
+    <ul>
+      <li>INVOICE(<u>INV_NUM</u>, SALE_DATE)</li>
+      <li>PRODUCT(<u>PROD_NUM</u>, PROD_LABEL, VEND_CODE, PROD_PRICE), VEND_CODE references VENDOR</li>
+      <li>VENDOR(<u>VEND_CODE</u>, VEND_NAME)</li>
+      <li>LINE(<u>INV_NUM, PROD_NUM</u>, QUANT_SOLD), INV_NUM and PROD_NUM reference INVOICE and PRODUCT</li>
+    </ul>
+    <p>Each relation's only FD has its key on the left, so these are also in BCNF; the decomposition is lossless and preserves every FD (checked with the chase and preservation tools). Design note: if a product's price can change over time, the price charged belongs to the sale, so PROD_PRICE (or a SALE_PRICE) would move to LINE.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2014–15 · 13 marks</div>
+  <div class="exam-q"><p>Normalize the following booking table up to 3NF by drawing a dependency diagram and identifying all dependencies. Show the resulting 3NF schema.</p><div id="bkt"></div></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><strong>Reading the data.</strong> Each row is a customer's booking for an event session; Total is the number of people in the booking; Person is the staff member running the event; Price is the event's price.</p>
+    <ul>
+      <li>Customer → Contact (each customer has one number)</li>
+      <li>Event → Person, Price (Lunch is always Dora Smith at 60; Master Class 120; Dinner 150)</li>
+      <li>Date, Time, Customer → Event, Total (a customer has one booking per session)</li>
+    </ul>
+    <p>Rejected by the data: Date Time → Event (12 Aug, 12.30 PM has Lunch and Master Class), Event → Total. Key: Date, Time and Customer are on no right side and together determine everything: <strong>{Date, Time, Customer}</strong>. (Assumption: Person depends on the event alone, as in every row of the sample; if the host could change per day it would be Date, Time, Event → Person, and the same steps apply.)</p>
+    <div id="bkd"></div>
+    <p><strong>1NF:</strong> already flat, key {Date, Time, Customer}.</p>
+    <p><strong>2NF:</strong> remove the partial dependency Customer → Contact: CUSTOMER(<u>Customer</u>, Contact), BOOKING(<u>Date, Time, Customer</u>, Event, Person, Total, Price).</p>
+    <p><strong>3NF:</strong> remove the transitive dependency Event → Person, Price from BOOKING:</p>
+    <ul>
+      <li>CUSTOMER(<u>Customer</u>, Contact)</li>
+      <li>EVENT(<u>Event</u>, Person, Price)</li>
+      <li>BOOKING(<u>Date, Time, Customer</u>, Event, Total)</li>
+    </ul>
+    <p>All three are in BCNF, the join is lossless and every FD is preserved.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 22-23 7a · 20 marks</div>
+  <div class="exam-q"><p>You have been tasked to prepare a database for a restaurant. The restaurant has provided the following report for you. In the above table, “Qnty” means “quantity of the item”. Now, create a relational schema, find its functional dependencies and normalize the schema. Write down all normalized forms up to BCNF (1NF, 2NF, 3NF, BCNF).</p><div id="rest"></div></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><strong>Attributes.</strong> FoodItem, MarketedPrice; for packages: SimpleItem, ContQty (how many of the simple item the package contains); for simple items: Ingredient, UnitCost, IngQty (amount of the ingredient used); for sales: Buyer, SaleDate, SaleQty.</p>
+    <p><strong>Unnormalized form.</strong> The report has one entry per food item with three repeating groups:</p>
+    <p class="formula">FOOD(FoodItem, MarketedPrice, {SimpleItem, ContQty}, {Ingredient, UnitCost, IngQty}, {Buyer, SaleDate, SaleQty})</p>
+    <p><strong>FDs.</strong></p>
+    <ul>
+      <li>FoodItem → MarketedPrice</li>
+      <li>FoodItem, SimpleItem → ContQty</li>
+      <li>Ingredient → UnitCost (an ingredient has one unit cost whatever it is used in)</li>
+      <li>FoodItem, Ingredient → IngQty</li>
+      <li>FoodItem, Buyer, SaleDate → SaleQty (assuming a buyer's purchases of an item on one date are recorded as one line; C1's two burger purchases are on different dates)</li>
+    </ul>
+    <p><strong>1NF.</strong> Each repeating group moves to its own relation with the key FoodItem. (Flattening everything into one table would be wrong: the three groups are independent of each other, so every simple item would have to be paired with every ingredient and every sale, the multivalued-dependency redundancy of Chapter 15.)</p>
+    <ul>
+      <li>FOOD(<u>FoodItem</u>, MarketedPrice)</li>
+      <li>CONTAINS(<u>FoodItem, SimpleItem</u>, ContQty)</li>
+      <li>RECIPE(<u>FoodItem, Ingredient</u>, UnitCost, IngQty)</li>
+      <li>SALE(<u>FoodItem, Buyer, SaleDate</u>, SaleQty)</li>
+    </ul>
+    <p><strong>2NF.</strong> RECIPE has a partial dependency Ingredient → UnitCost (Ingredient is part of its key): the unit cost of Egg would repeat for every dish using egg. Split:</p>
+    <ul>
+      <li>INGREDIENT(<u>Ingredient</u>, UnitCost)</li>
+      <li>RECIPE(<u>FoodItem, Ingredient</u>, IngQty)</li>
+    </ul>
+    <p>FOOD, CONTAINS and SALE have no partial dependency.</p>
+    <p><strong>3NF.</strong> No relation has a non-key attribute determining another non-key attribute, so the 2NF schema is already in 3NF.</p>
+    <p><strong>BCNF.</strong> Each relation's only nontrivial FD has the relation's key on its left (FoodItem → MarketedPrice; FoodItem SimpleItem → ContQty; Ingredient → UnitCost; FoodItem Ingredient → IngQty; FoodItem Buyer SaleDate → SaleQty). Final BCNF schema:</p>
+    <div class="tbl"><table>
+      <tr><th>Relation</th><th>Key</th><th>Sample rows</th></tr>
+      <tr><td>FOOD(FoodItem, MarketedPrice)</td><td>FoodItem</td><td>(Chicken Burger, 200), (Fried Rice, 80), (Set Menu 1, 500)</td></tr>
+      <tr><td>CONTAINS(FoodItem, SimpleItem, ContQty)</td><td>FoodItem, SimpleItem</td><td>(Set Menu 1, Fried Rice, 1), (Set Menu 1, Vegetable, 1), (Set Menu 1, Chicken Steak, 1)</td></tr>
+      <tr><td>INGREDIENT(Ingredient, UnitCost)</td><td>Ingredient</td><td>(Chicken Patty, 60), (Lettuce, 30), …, (Oil, 500)</td></tr>
+      <tr><td>RECIPE(FoodItem, Ingredient, IngQty)</td><td>FoodItem, Ingredient</td><td>(Chicken Burger, Pickle, 4), (Fried Rice, Egg, 1), …</td></tr>
+      <tr><td>SALE(FoodItem, Buyer, SaleDate, SaleQty)</td><td>FoodItem, Buyer, SaleDate</td><td>(Chicken Burger, C1, 01/02/24, 2), (Set Menu 1, C1, 05/02/24, 2), …</td></tr>
+    </table></div>
+    <p>CONTAINS.SimpleItem is a foreign key to FOOD (Fried Rice is itself a food item; Vegetable and Chicken Steak would be added as food items too). If one buyer could buy the same item twice on one day, add a sale number to SALE's key.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 21 CT2 1 · 14 marks</div>
+  <div class="exam-q"><p>You have been provided the following unnormalized schema for a Book Shop. Sales (Transaction Time, Transaction Type, Transaction Amount, Username, Order Number, Order Date, Book Name, Book Edition, Book ISBN, Book Price, Order Count, Author Name, Author Rating). The dependencies are listed below. Transaction Time, Username, Order Number → Transaction Amount; Transaction Time → Transaction Type; Username, Order Number → Order Date; Username, Order Number, Book Name → Order Count; Book Name → Book Price, Author Name; Book ISBN → Book Name, Book Edition; Author Name → Author Rating. Now, normalize the schema to BCNF. Mention the 2NF and 3NF that you create in the process.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>Abbreviations: TT = Transaction Time, TType, TAmt, U = Username, ON = Order Number, OD = Order Date, BN = Book Name, BE = Book Edition, ISBN, BP = Book Price, OC = Order Count, AN = Author Name, AR = Author Rating.</p>
+    <p><strong>Key.</strong> TT, U, ON and ISBN appear on no right side, so they are in every key. {TT, U, ON, ISBN}⁺: TT → TType; TT U ON → TAmt; U ON → OD; ISBN → BN, BE; BN → BP, AN; AN → AR; U ON BN → OC. That is everything, so the only key is <strong>{TT, U, ON, ISBN}</strong>.</p>
+    <p><strong>2NF</strong> (remove partial dependencies: parts of the key determining non-key attributes):</p>
+    <ul>
+      <li>TT → TType ⇒ R1(<u>TT</u>, TType)</li>
+      <li>U ON → OD ⇒ R2(<u>U, ON</u>, OD)</li>
+      <li>TT U ON → TAmt ⇒ R3(<u>TT, U, ON</u>, TAmt)</li>
+      <li>ISBN → BN BE BP AN AR (BP, AN, AR via BN) ⇒ R4(<u>ISBN</u>, BN, BE, BP, AN, AR)</li>
+      <li>U ON ISBN → OC, but the real FD is U ON BN → OC; keep it with its own determinant ⇒ R5(<u>U, ON, BN</u>, OC)</li>
+      <li>what remains is the key itself ⇒ R6(<u>TT, U, ON, ISBN</u>), which links transactions, orders and books</li>
+    </ul>
+    <p>R4 is in 2NF (single-attribute key) but not 3NF.</p>
+    <p><strong>3NF</strong> (remove transitive dependencies in R4: ISBN → BN → BP, AN and AN → AR):</p>
+    <ul>
+      <li>R4a(<u>ISBN</u>, BN, BE)</li>
+      <li>R4b(<u>BN</u>, BP, AN)</li>
+      <li>R4c(<u>AN</u>, AR)</li>
+    </ul>
+    <p>with R1, R2, R3, R5, R6 unchanged. (This is exactly what the 3NF synthesis algorithm of Chapter 14 produces from these FDs, including R6 as the added key relation.)</p>
+    <p><strong>BCNF.</strong> Checked relation by relation with projected FDs: R1 (TT → TType), R2 (U ON → OD), R3 (TT U ON → TAmt), R4a (ISBN → BN BE), R4b (BN → BP AN), R4c (AN → AR), R5 (U ON BN → OC): every left side is the relation's key; R6 has no nontrivial FD. <strong>All eight relations are in BCNF</strong>, the join is lossless (chase) and all seven FDs are preserved, since each lies inside one relation.</p>
+    <p class="tbl-note">Running the BCNF analysis algorithm directly on Sales (Tool 4 of Chapter 11) also reaches BCNF, but depending on the order of splits it can end with (U, ON, ISBN, OC) in place of (U, ON, BN, OC) and lose U ON BN → OC. The synthesis route above avoids that.</p>
+  </div></details>
+</div>
+
+<div class="key"><p><strong>Summary:</strong> to normalize a sample table, derive FDs from meaning (use the rows only to reject candidates), find the key with closures, and draw the dependency diagram. Then remove repeating groups (1NF), partial dependencies (2NF) and transitive dependencies (3NF), each time moving the dependent attributes out with their determinant, and finish by checking every left side is a key (BCNF).</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="lecture.js"></script>
+<script>
+const L1 = [['211347', 'AA-E3422QW', '15-Jan-2010', 'Rotary sander', '211', 'NeverFail, Inc.', '1', '49.95'], ['211347', 'QD-300932X', '15-Jan-2010', '0.25-in. drill bit', '211', 'NeverFail, Inc.', '8', '3.45'],
+  ['211347', 'RU-995748G', '15-Jan-2010', 'Band saw', '309', 'BeGood, Inc.', '1', '39.99'], ['211348', 'AA-E3422QW', '15-Jan-2010', 'Rotary sander', '211', 'NeverFail, Inc.', '2', '49.95'],
+  ['211349', 'GH-778345P', '16-Jan-2010', 'Power drill', '157', 'ToughGo. Inc.', '1', '87.75']];
+const LH = ['INV_NUM', 'PROD_NUM', 'SALE_DATE', 'PROD_LABEL', 'VEND_CODE', 'VEND_NAME', 'QUANT_SOLD', 'PROD_PRICE'];
+const pick = (rows, cols) => { const seen = new Set(); return rows.map(r => cols.map(c => r[c])).filter(r => { const k = r.join('|'); if (seen.has(k)) return false; seen.add(k); return true; }); };
+const grid = arr => `<div class="figrow">${arr.map(x => `<div>${x}</div>`).join('')}</div>`;
+const dupCells = { '0,2': 'hl', '1,2': 'hl', '2,2': 'hl', '0,5': 'hl', '1,5': 'hl', '3,5': 'hl', '0,3': 'hl', '3,3': 'hl' };
+stepper('#steps', [
+  { html: inst(LH, L1, { cap: '1NF: INVOICE_LINE, key {INV_NUM, PROD_NUM}', cell: dupCells }), cap: '1NF: one row per invoice line, atomic values, key {INV_NUM, PROD_NUM}. Orange: facts stored more than once (the sale date of 211347, NeverFail, Rotary sander).' },
+  { html: grid([inst(['INV_NUM', 'SALE_DATE'], pick(L1, [0, 2]), { cap: 'INVOICE' }), inst(['PROD_NUM', 'PROD_LABEL', 'VEND_CODE', 'VEND_NAME', 'PROD_PRICE'], pick(L1, [1, 3, 4, 5, 7]), { cap: 'PRODUCT', cell: { '0,3': 'hl', '1,3': 'hl' } }), inst(['INV_NUM', 'PROD_NUM', 'QUANT_SOLD'], pick(L1, [0, 1, 6]), { cap: 'LINE' })]),
+    cap: '2NF: the partial dependencies INV_NUM → SALE_DATE and PROD_NUM → PROD_LABEL, VEND_CODE, PROD_PRICE move out with their part of the key. Dates and product facts are now stored once. NeverFail still repeats (orange): a transitive dependency.' },
+  { html: grid([inst(['INV_NUM', 'SALE_DATE'], pick(L1, [0, 2]), { cap: 'INVOICE' }), inst(['PROD_NUM', 'PROD_LABEL', 'VEND_CODE', 'PROD_PRICE'], pick(L1, [1, 3, 4, 7]), { cap: 'PRODUCT' }), inst(['VEND_CODE', 'VEND_NAME'], pick(L1, [4, 5]), { cap: 'VENDOR', rowCls: { 0: 'new' } }), inst(['INV_NUM', 'PROD_NUM', 'QUANT_SOLD'], pick(L1, [0, 1, 6]), { cap: 'LINE' })]),
+    cap: '3NF: VEND_CODE → VEND_NAME moves to VENDOR. Every fact is stored once, and every FD has a key on its left (also BCNF).' },
+]);
+$('#invt').innerHTML = inst(['Attribute', 'Sample', 'Sample', 'Sample', 'Sample', 'Sample'], [
+  ['INV_NUM', '211347', '211347', '211347', '211348', '211349'], ['PROD_NUM', 'AA-E3422QW', 'QD-300932X', 'RU-995748G', 'AA-E3422QW', 'GH-778345P'],
+  ['SALE_DATE', '15-Jan-2010', '15-Jan-2010', '15-Jan-2010', '15-Jan-2010', '16-Jan-2010'], ['PROD_LABEL', 'Rotary sander', '0.25-in. drill bit', 'Band saw', 'Rotary sander', 'Power drill'],
+  ['VEND_CODE', '211', '211', '309', '211', '157'], ['VEND_NAME', 'NeverFail, Inc.', 'NeverFail, Inc.', 'BeGood, Inc.', 'NeverFail, Inc.', 'ToughGo. Inc.'],
+  ['QUANT_SOLD', '1', '8', '1', '2', '1'], ['PROD_PRICE', '$49.95', '$3.45', '$39.99', '$49.95', '$87.75']]);
+$('#invd').innerHTML = '<figure>' + depDiagram(['INV_NUM', 'PROD_NUM', 'SALE_DATE', 'PROD_LABEL', 'VEND_CODE', 'VEND_NAME', 'QUANT_SOLD', 'PROD_PRICE'], ['INV_NUM', 'PROD_NUM'], [
+  { from: ['INV_NUM', 'PROD_NUM'], to: ['QUANT_SOLD'], kind: 'full', label: 'full' },
+  { from: ['INV_NUM'], to: ['SALE_DATE'], kind: 'partial' },
+  { from: ['PROD_NUM'], to: ['PROD_LABEL', 'VEND_CODE', 'PROD_PRICE'], kind: 'partial' },
+  { from: ['VEND_CODE'], to: ['VEND_NAME'], kind: 'transitive' }]) + '<figcaption><b>Figure 1.</b> Dependency diagram of the invoice table. Key underlined.</figcaption></figure>';
+$('#bkt').innerHTML = inst(['Date', 'Time', 'Customer', 'Contact', 'Event', 'Person', 'Total', 'Price'], [
+  ['12 Aug, 10', '12.30 PM', 'Maria Indrawan', '04222223333', 'Lunch', 'Dora Smith', '6', '60'], ['12 Aug, 10', '12.30 PM', 'John Smith', '04113333333', 'Master Class', 'Simon Becket', '1', '120'],
+  ['12 Aug, 10', '7.00 PM', 'Mary Joe', '95671290', 'Dinner', 'Linda Dee', '2', '150'], ['13 Aug, 10', '12.30 PM', 'Lindsay Smith', '99031001', 'Lunch', 'Dora Smith', '4', '60'],
+  ['13 Aug, 10', '12.30 PM', 'Sunshine Dee', '99021900', 'Lunch', 'Dora Smith', '2', '60']]);
+$('#bkd').innerHTML = '<figure>' + depDiagram(['Date', 'Time', 'Customer', 'Contact', 'Event', 'Person', 'Total', 'Price'], ['Date', 'Time', 'Customer'], [
+  { from: ['Date', 'Time', 'Customer'], to: ['Event', 'Total'], kind: 'full', label: 'full' },
+  { from: ['Customer'], to: ['Contact'], kind: 'partial' },
+  { from: ['Event'], to: ['Person', 'Price'], kind: 'transitive' }]) + '<figcaption><b>Figure 2.</b> Dependency diagram of the booking table.</figcaption></figure>';
+const RH = ['Food Item', 'Simple Item', 'Qnty', 'Ingredient', 'Unit Cost', 'Qnty', 'Marketed Price', 'Buyer', 'Date', 'Qnty'];
+$('#rest').innerHTML = inst(RH, [
+  ['Chicken Burger', '', '', 'Chicken Patty', '60', '1', '200', 'C1', '01/02/24', '2'], ['', '', '', 'Lettuce', '30', '0.02', '', 'C3', '02/02/24', '4'],
+  ['', '', '', 'Pickle', '5', '4', '', 'C8', '02/02/24', '1'], ['', '', '', 'Mayonnaise', '100', '0.02', '', 'C1', '03/02/24', '3'], ['', '', '', 'Sause', '70', '0.01', '', '', '', ''],
+  ['Fried Rice', '', '', 'Raw Rice', '50', '0.1', '80', 'C4', '02/02/24', '1'], ['', '', '', 'Egg', '7', '1', '', 'C9', '04/02/24', '2'], ['', '', '', 'Oil', '500', '0.005', '', '', '', ''],
+  ['Set Menu 1', 'Fried Rice', '1', '', '', '', '500', 'C2', '01/02/24', '3'], ['', 'Vegetable', '1', '', '', '', '', 'C4', '03/02/24', '1'], ['', 'Chicken Steak', '1', '', '', '', '', 'C1', '04/02/24', '4'], ['', '', '', '', '', '', '', 'C1', '05/02/24', '2']],
+  { cap: 'Restaurant report (Simple Item/Qnty: containing items for packages; Ingredient/Unit Cost/Qnty: for simple items; Buyer/Date/Qnty: sales)' });
+flashcards('#cards', [
+  { f: 'Dependency diagram', b: 'Attributes in a row, key underlined; arrows for full (above), partial and transitive (below) dependencies.' },
+  { f: 'Repeating group', b: 'Several values per entity in one report entry; moved to its own relation with the entity key (1NF).' },
+  { f: 'Partial dependency', b: 'Part of a key → non-key attribute. Removed for 2NF.' },
+  { f: 'Transitive dependency', b: 'Non-key → non-key. Removed for 3NF.' },
+  { f: 'Using sample rows', b: 'They can only reject an FD, never prove one.' },
+]);
+quiz('#quiz', [
+  { q: 'A sample table has two rows with the same X and different Y. What can you conclude?', opts: ['X → Y holds', 'X → Y does not hold', 'Y → X holds', 'nothing'], a: 1, why: 'One violating pair disproves an FD.' },
+  { q: 'In the invoice table, VEND_CODE → VEND_NAME is a…', opts: ['full dependency', 'partial dependency', 'transitive dependency', 'trivial dependency'], a: 2, why: 'PROD_NUM → VEND_CODE → VEND_NAME, between non-key attributes.' },
+  { q: 'A repeating group in a report is handled at which step?', opts: ['1NF', '2NF', '3NF', 'BCNF'], a: 0, why: 'Non-atomic, repeating values are removed first.' },
+  { q: 'Removing a partial dependency X → Y (X part of the key) creates the relation…', opts: ['(Y)', '(X, Y) with key X', '(key, Y)', '(X) only'], a: 1, why: 'Move Y out together with its determinant X.' },
+]);
+ask('#try1', { q: 'How many relations does the 3NF invoice schema have?', a: 4, why: 'INVOICE, PRODUCT, VENDOR, LINE.' });
+</script>
+</body>
+</html>

@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Compressed Columns · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 14 · Chapter 10 · Slides 27–30</div>
+<h1>Compression, and When to Use Columns</h1>
+<p class="lede">How a column store shrinks its data with dictionary encoding, how it answers queries without fully unpacking it, and why column storage suits data warehouses while row storage suits everyday transactions.</p>
+
+<h2>1. Dictionary encoding (slide 27)</h2>
+
+<p>The slide shows a small parts catalogue with four columns: Part (a chip name), Pins (number of pins), Technology (CMOS or TTL) and Programmable (Yes or No). Here is the table in normal form:</p>
+
+<figure><div id="parts"></div>
+<figcaption><b>Figure 1.</b> The uncompressed data behind the slide's picture, read back from its dictionaries and code vectors.</figcaption></figure>
+
+<p>The compression method is <b class="term">dictionary encoding</b>. For each column:</p>
+<ol>
+  <li>Make a list of the <em>distinct</em> values in the column. This list is the column's <b class="term">dictionary</b>.</li>
+  <li>Give each distinct value a short binary code: its position in the dictionary.</li>
+  <li>Store the column as a list of codes instead of the real values. This list is the <b class="term">code vector</b>.</li>
+</ol>
+
+<p>The number of bits per code depends on how many distinct values there are. <i>k</i> bits can count up to 2<sup><i>k</i></sup> different values:</p>
+
+<figure>
+<div class="figrow" id="dicts"></div>
+<figcaption><b>Figure 2.</b> Each column's dictionary (top) and code vector (bottom), as in the slide. Part has 6 distinct values so it needs 3 bits. Pins has 3 values (2 bits). Technology and Programmable have 2 values each (1 bit).</figcaption>
+</figure>
+
+<p>Look at Technology. Stored as text, “CMOS” and “TTL” take about 4 bytes each, so 6 rows take about 24 bytes. Encoded, they take 6 bits, less than a single byte, plus a tiny dictionary stored once. On a real table with millions of rows and only a handful of distinct values, the saving is enormous.</p>
+
+<p>The slide also shows how the column store keeps track of this. Each column has a small <b class="term">Field</b> descriptor with three pointers: <code>Dict</code> points to the column's dictionary, <code>Vec</code> points to its code vector, and <code>Next</code> points to the next column's Field descriptor, so all the columns of the table are chained together.</p>
+
+<h2>2. Query processing on compressed columns (slide 28)</h2>
+
+<p>The clever part: most of a query can run <em>on the codes</em>, without turning them back into the original values. Take:</p>
+<pre>SELECT Part FROM parts WHERE Technology = 'TTL';</pre>
+
+<figure>
+<svg id="flow" viewBox="0 0 700 270" width="700" role="img" aria-label="Query flow through compression engine, scan, decompression engine">
+  <defs><marker id="ar" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--accent)"/></marker></defs>
+  <rect class="cell-plain" x="10" y="20" width="160" height="50" rx="4"/><text x="90" y="42" text-anchor="middle" class="big">Query</text><text x="90" y="60" text-anchor="middle" class="lbl">Technology = 'TTL'</text>
+  <rect class="cell-hl" x="10" y="120" width="160" height="56" rx="28"/><text x="90" y="144" text-anchor="middle" class="big">Compression</text><text x="90" y="162" text-anchor="middle" class="big">engine</text>
+  <rect class="cell-plain dash" x="10" y="210" width="160" height="44" rx="4" style="stroke-dasharray:4 3"/><text x="90" y="230" text-anchor="middle" class="big">Dictionaries</text><text x="90" y="246" text-anchor="middle" class="lbl">TTL → 1</text>
+  <rect class="cell" x="260" y="120" width="150" height="56" rx="4"/><text x="335" y="144" text-anchor="middle" class="big">Scan</text><text x="335" y="162" text-anchor="middle" class="lbl">find code 1 in Tech vector</text>
+  <rect class="cell-plain" x="260" y="210" width="150" height="44" rx="4"/><text x="335" y="230" text-anchor="middle" class="big">Compressed table</text><text x="335" y="246" text-anchor="middle" class="lbl">0 0 1 1 0 0</text>
+  <rect class="cell-hl" x="500" y="120" width="180" height="56" rx="28"/><text x="590" y="144" text-anchor="middle" class="big">Decompression</text><text x="590" y="162" text-anchor="middle" class="big">engine</text>
+  <rect class="cell-new" x="500" y="20" width="180" height="50" rx="4"/><text x="590" y="42" text-anchor="middle" class="big">Expanded result</text><text x="590" y="60" text-anchor="middle" class="lbl">DMPAL16L8, DMPAL10H8</text>
+  <path d="M90 70 V116" class="s-acc" marker-end="url(#ar)"/><text x="98" y="98" class="lbl">1</text>
+  <path d="M90 206 V180" class="s-acc" marker-end="url(#ar)"/>
+  <path d="M170 148 H256" class="s-acc" marker-end="url(#ar)"/><text x="200" y="140" class="lbl">2: code 1</text>
+  <path d="M335 206 V180" class="s-acc" marker-end="url(#ar)"/>
+  <path d="M410 148 H496" class="s-acc" marker-end="url(#ar)"/><text x="420" y="140" class="lbl">3: rows 3, 4</text>
+  <path d="M590 116 V74" class="s-acc" marker-end="url(#ar)"/><text x="598" y="98" class="lbl">4</text>
+</svg>
+<figcaption><b>Figure 3.</b> The slide's query pipeline, applied to the example. Only the final matching rows are decompressed.</figcaption>
+</figure>
+
+<ol>
+  <li><strong>Compression engine.</strong> The query contains the constant <code>'TTL'</code>. The engine looks it up in the Technology dictionary and finds code <code>1</code>. The condition becomes “Technology code = 1”.</li>
+  <li><strong>Scan.</strong> The scan runs over the compressed Technology vector <code>0 0 1 1 0 0</code> and compares tiny 1-bit codes instead of strings. Rows 3 and 4 match.</li>
+  <li><strong>Decompression engine.</strong> Only for those matching rows, it takes the Part codes (<code>010</code>, <code>011</code>) and looks them up in the Part dictionary.</li>
+  <li><strong>Expanded result table.</strong> The answer is returned in normal, readable form: DMPAL16L8 and DMPAL10H8.</li>
+</ol>
+
+<p>This is why the slide says queries can be processed <em>“in compressed form with a very low decompression overhead”</em>. Comparing codes is faster than comparing strings, more codes fit in each block and in the CPU cache, and only the few result rows ever get decompressed.</p>
+
+<h2>3. Advantages and drawbacks (slide 29)</h2>
+
+<div class="tbl"><table>
+<tr><th>Advantages</th><th>Drawbacks</th></tr>
+<tr><td><strong>Storage efficient.</strong> Repeated values are stored once in a dictionary and referred to by short codes.</td>
+<td><strong>Cost of decompression. What?</strong> The columns are stored compressed, so every query has to decompress something: at least the values it returns. Inserting or updating a value may also need a dictionary lookup, or a new dictionary entry.</td></tr>
+<tr><td><strong>Query efficient.</strong> Filtering and scanning run directly on the compressed codes, and decompression is needed only for the result.</td><td></td></tr>
+</table></div>
+
+<h2>4. Conclusions: which workload suits which storage (slides 29–30)</h2>
+
+<p>Two kinds of database workload need to be told apart:</p>
+
+<dl class="def">
+  <dt>Transaction processing (OLTP)</dt>
+  <dd>The everyday operations of an application: a student registers for a course, a bank transfers money, a shop records an order. Each operation reads or changes <em>a few whole rows</em>, and there are many such operations every second, with lots of inserts, updates and deletes.</dd>
+  <dt>Decision support (OLAP), using a data warehouse</dt>
+  <dd>Analysis to help managers decide things: “What is the average salary per department over the last 10 years?” A <b class="term">data warehouse</b> is a large database built for these questions. Each query reads <em>a few columns of a huge number of rows</em>. Data is loaded in bulk (inserted) and almost never updated or deleted.</dd>
+</dl>
+
+<h3>Columnar is more efficient for decision support. Why?</h3>
+<p>The slide's reasons: the data warehouse uses <em>only a few attributes</em> per query, there are <em>no updates</em>, and data is <em>only inserted</em>. Each of these lines up with a strength from Chapter 9 or avoids a weakness:</p>
+<ul>
+  <li>Few attributes per query → column storage reads only those columns (reduced I/O).</li>
+  <li>Huge scans over one column → better cache use, compression and vector processing.</li>
+  <li>No updates or deletes → the expensive operations of column storage almost never happen.</li>
+</ul>
+
+<h3>Row-oriented is preferable for transaction processing. Why?</h3>
+<p>Transaction processing needs <em>frequent updates and deletions</em> of whole rows. In a row store, each one changes one record in one place. In a column store, each one would touch every column (and possibly re-compress data), and reading a whole row would need tuple reconstruction. Row storage wins here.</p>
+
+<h3>Hybrid row/column stores</h3>
+<p>Some databases support both representations in the same system. These are <b class="term">hybrid row/column stores</b>. For example, recent changes may be kept in row format for fast updates and periodically converted into column format for fast analysis, or the user may choose per table.</p>
+
+<div class="tbl"><table>
+<tr><th></th><th>Row-oriented</th><th>Column-oriented</th></tr>
+<tr><td>Read a few columns of many rows</td><td class="bad">Reads every column</td><td class="good">Reads only those columns</td></tr>
+<tr><td>Read one whole row</td><td class="good">One place</td><td class="bad">Tuple reconstruction</td></tr>
+<tr><td>Insert / update / delete a row</td><td class="good">One place</td><td class="bad">Every column</td></tr>
+<tr><td>Compression</td><td class="mid">Weak</td><td class="good">Strong</td></tr>
+<tr><td>Best for</td><td>Transaction processing (OLTP)</td><td>Decision support, data warehouses (OLAP)</td></tr>
+</table></div>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+
+<div class="key">
+<p><strong>Summary:</strong> dictionary encoding replaces each value with a short code into a per-column dictionary. Queries translate their constants into codes, scan the compressed codes, and decompress only the results. Column storage suits data warehouses (few columns, huge scans, inserts only). Row storage suits transaction processing (many small updates and deletes). Hybrid systems offer both.</p>
+</div>
+</main>
+<script src="../assets/book.js"></script>
+<script>
+const P = { Part: ['ep900', 'ep310', 'DMPAL16L8', 'DMPAL10H8', 'MPM5032', 'CY2901'], Pins: ['40', '20', '28'], Technology: ['CMOS', 'TTL'], Programmable: ['Yes', 'No'] };
+const V = { Part: ['000', '001', '010', '011', '100', '101'], Pins: ['00', '01', '01', '01', '10', '00'], Technology: ['0', '0', '1', '1', '0', '0'], Programmable: ['0', '0', '0', '0', '0', '1'] };
+const keys = Object.keys(P);
+const rows = [0, 1, 2, 3, 4, 5].map(i => keys.map(k => P[k][parseInt(V[k][i], 2)]));
+recTable('#parts', rows.map((r, i) => ({ lab: `row ${i + 1}`, cells: r, cls: r[2] === 'TTL' ? 'hl' : '' })), keys);
+document.querySelector('#dicts').innerHTML = keys.map(k => `<div><div class="figlabel">${k}</div><div id="d-${k}"></div><div style="height:8px"></div><div id="v-${k}"></div></div>`).join('');
+for (const k of keys) {
+  const bits = V[k][0].length;
+  recTable(`#d-${k}`, P[k].map((v, i) => ({ lab: i.toString(2).padStart(bits, '0'), cells: [v] })), ['dictionary']);
+  recTable(`#v-${k}`, V[k].map((c, i) => ({ lab: `row ${i + 1}`, cells: [c] })), [`vector (${bits} bit)`]);
+}
+</script>
+<script>
+flashcards('#cards', [
+  { f: 'Dictionary encoding', b: 'Replace each value of a column by a short code: its position in the list (dictionary) of the column’s distinct values.' },
+  { f: 'Code vector', b: 'The column stored as codes instead of values.' },
+  { f: 'Bits per code', b: '⌈log₂(number of distinct values)⌉; k bits distinguish 2ᵏ values.' },
+  { f: 'Query on compressed data', b: 'Translate the constant into a code, scan the codes, decompress only the result rows.' },
+  { f: 'OLTP vs OLAP', b: 'Transaction processing: many small updates of whole rows (row store). Decision support / data warehouse: few columns of many rows, inserts only (column store).' },
+  { f: 'Hybrid row/column store', b: 'A DBMS that supports both representations.' },
+]);
+quiz('#quiz', [
+  { q: 'A column has 6 distinct values. How many bits per code?', opts: ['2', '3', '6', '8'], a: 1, why: '2² = 4 < 6 ≤ 8 = 2³.' },
+  { q: 'For WHERE Technology = ‘TTL’, what does the compression engine do first?', opts: ['Decompress the Technology column', 'Look up ‘TTL’ in the dictionary to get its code', 'Sort the table', 'Read every column'], a: 1, why: 'The condition is rewritten as “code = 1”, so the scan compares codes.' },
+  { q: 'Why is column storage preferred for a data warehouse?', opts: ['Frequent updates', 'Few attributes per query, no updates, inserts only', 'Whole rows are read', 'It has no compression'], a: 1, why: 'These match the column store’s strengths and avoid its weaknesses.' },
+  { q: 'Why is row storage preferred for transaction processing?', opts: ['Transactions read few columns', 'Frequent updates and deletions of whole rows', 'It compresses better', 'Data is only inserted'], a: 1, why: 'Each update or delete touches one place in a row store but every column in a column store.' },
+]);
+ask('#try1', { q: 'A column has 1000 distinct values. How many bits does each code need?', a: 10, hint: 'Find the smallest k with 2ᵏ ≥ 1000.', why: '2¹⁰ = 1024 ≥ 1000 > 512 = 2⁹.' });
+</script>
+</body>
+</html>

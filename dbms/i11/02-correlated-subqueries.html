@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nested and Correlated Subqueries · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 11 (Ishrak) · Chapter 2 · Slides 8–12</div>
+<h1>Nested and Correlated Subqueries</h1>
+<p class="lede">Slides 8–12 nest subqueries more deeply and, in slide 12, let the inner query refer to the outer row: a correlated subquery, evaluated once per outer row. This chapter unwinds slide 8's double nesting, explains why slide 9 compares (dept, salary) pairs and changes the data, contrasts "above the overall average" with "above the department average", animates the correlated evaluation, and works a 20-mark exam question.</p>
+
+<h2>1. Two levels of nesting (slide 8)</h2>
+<p><em>Find the employee(s) with the highest paid salary</em>, a third way:</p>
+<pre>SELECT id
+FROM   Employee
+WHERE  salary &gt; ALL (SELECT salary
+                     FROM   Employee
+                     WHERE  salary &lt; ANY (SELECT salary
+                                          FROM   Employee));</pre>
+<p>Read it from the inside out. The innermost query returns all salaries {50, 55, 60, 75} (thousands). The middle query keeps the salaries that are <em>less than some salary</em>: every salary except the largest, {50, 55, 60}. The outer query keeps salaries greater than all of those: only 75. Answer: 5004.</p>
+<p>The slide's title calls this "correlated", but none of these subqueries mentions a column of an outer query, so each is evaluated just once; it is a <em>nested</em> (non-correlated) subquery. One quirk: if the table has a single employee, the middle query is empty, and &gt; ALL of an empty set is TRUE, so that employee is (correctly) returned.</p>
+<div id="p8"></div>
+
+<h2>2. The highest paid in each department: row comparison (slide 9)</h2>
+<p><em>Find the highest paid employee(s) in each department.</em> For slide 9 the data changes: employee 5003 (CSE) now earns 55,000, the same as the EEE maximum.</p>
+<pre>SELECT id, dept
+FROM   Employee
+WHERE  (dept, salary) IN (SELECT dept, MAX(salary)
+                          FROM   Employee
+                          GROUP BY dept);</pre>
+<p>The subquery returns one row per department with its maximum: (EEE, 55000) and (CSE, 75000). The outer query keeps an employee when the <em>pair</em> (dept, salary) is in that set. Answer: 5002 (EEE, 55,000) and 5004 (CSE, 75,000).</p>
+<div class="q">
+<h4>Question (worked answer): why compare the pair, and why did the slide change 5003's salary?</h4>
+<p>Suppose we compared only salaries: <code>WHERE salary IN (SELECT MAX(salary) FROM Employee GROUP BY dept)</code>. The subquery gives {55000, 75000}, and 5003 earns 55,000, so 5003 would be returned too, although 55,000 is the maximum of EEE, not of CSE. With the original data (5003 earning 60,000) the bug is invisible; changing 5003 to 55,000 exposes it. Comparing (dept, salary) as a pair forces the maximum to be the maximum <em>of the employee's own department</em>. Oracle allows such multi-column (row) comparisons with IN; the playground does too.</p>
+</div>
+<div id="p9"></div>
+
+<h2>3. Above the average (slides 10–11)</h2>
+<p><em>Find the employees that earn above average.</em> Slide 10 again hard-codes the value (the average of 50, 55, 60 and 75 thousand is 60,000): <code>WHERE salary &gt; 60000</code>. Slide 11 computes it:</p>
+<pre>SELECT *
+FROM   Employee
+WHERE  salary &gt; (SELECT AVG(salary) FROM Employee);       -- 5004</pre>
+<p>The inner query is still independent of the outer row: it is computed once, 60,000, and each employee is compared with it. Note that an aggregate cannot be used directly in WHERE (<code>WHERE salary &gt; AVG(salary)</code> is ORA-00934); the subquery is how you compare rows with an aggregate.</p>
+<div id="p11"></div>
+
+<h2>4. Correlated subqueries (slide 12)</h2>
+<p><em>Find the employees that earn above the average of the employees within their respective department.</em></p>
+<pre>SELECT *
+FROM   Employee s
+WHERE  salary &gt; (SELECT AVG(salary)
+                 FROM   Employee t
+                 WHERE  s.dept = t.dept);</pre>
+<dl class="def">
+<dt>Correlated subquery</dt>
+<dd>A subquery that refers to a column of the outer query (here <code>s.dept</code>). Its value depends on the current outer row, so conceptually it is re-evaluated <strong>once for every row of the outer query</strong>, with the outer row's values plugged in.</dd>
+</dl>
+<p>The two tuple variables are essential: s ranges over the outer Employee, t over the inner one, and <code>s.dept = t.dept</code> ties the inner average to the outer employee's department. (Inside the subquery, an unqualified column name refers to the nearest table, t; to reach the outer table you must qualify with s.) For an EEE employee the subquery returns AVG(50,000, 55,000) = 52,500; for a CSE employee AVG(60,000, 75,000) = 67,500. Answer: 5002 and 5004.</p>
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="corr"></div>
+</figure>
+<div id="p12"></div>
+<p>"Evaluated once per row" describes the meaning, not necessarily the execution: the optimizer may compute each department's average only once, or rewrite the query as a join with a grouped subquery in FROM. All produce the same result. An equivalent uncorrelated formulation, useful when you also want to print the average:</p>
+<pre>SELECT s.id, s.dept, s.salary, a.avg_sal
+FROM   Employee s, (SELECT dept, AVG(salary) AS avg_sal
+                    FROM Employee GROUP BY dept) a
+WHERE  s.dept = a.dept AND s.salary &gt; a.avg_sal;</pre>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+<h3>Try it in SQL</h3>
+<p>Exercises 1–2 use Employee(id, dept, salary) (slide 4 data), 3–4 the computer database, 5–6 the HR schema.</p>
+<div id="c1"></div><div id="c2"></div><div id="c3"></div><div id="c4"></div><div id="c5"></div><div id="c6"></div>
+
+<h3>Exam questions</h3>
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2010–11 · 20 marks</div>
+  <div class="exam-q"><p>Consider the following schema: Product(pid, name, price, category, year, maker_cid), Purchase(buyer_ssn, seller_ssn, store, pid), Company(cid, name, stock_price, country), Person(ssn, name, phone_number, city). In Purchase, buyer_ssn and seller_ssn are foreign keys to Person and pid is a foreign key to Product; in Product, maker_cid is a foreign key to Company. Write SQL statements to answer the following queries:</p>
+  <p>(a) Find names of people buying telephony products.<br>(b) Find products (and their manufacturers) that are more expensive than all products made by the same manufacturer before 1972.<br>(c) Find names of people who bought Bangladeshi products and did not buy Indian products.<br>(d) Find names of products (and their manufacturers) whose prices are less than the average product price of that company.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+<p><strong>(a)</strong> Join buyer → purchase → product; DISTINCT because a person may buy several telephony products.</p>
+<pre>SELECT DISTINCT pe.name
+FROM   Person pe, Purchase pu, Product pr
+WHERE  pe.ssn = pu.buyer_ssn
+AND    pu.pid = pr.pid
+AND    pr.category = 'telephony';</pre>
+<p><strong>(b)</strong> Correlated subquery: for each product p1, the prices of the same company's pre-1972 products.</p>
+<pre>SELECT p1.name, c.name AS manufacturer
+FROM   Product p1, Company c
+WHERE  p1.maker_cid = c.cid
+AND    p1.price &gt; ALL (SELECT p2.price
+                       FROM   Product p2
+                       WHERE  p2.maker_cid = p1.maker_cid
+                       AND    p2.year &lt; 1972);</pre>
+<p>If a company made nothing before 1972, the subquery is empty and &gt; ALL is TRUE, so all its products are listed: they are (vacuously) more expensive than all its pre-1972 products. If the intended reading is "only companies that did make something before 1972", replace &gt; ALL by <code>&gt; (SELECT MAX(p2.price) …)</code>, which is NULL (so FALSE) for an empty set. State the reading you choose.</p>
+<p><strong>(c)</strong> People who bought something Bangladeshi, minus people who bought something Indian. Work with ssn, not name, because two different people may share a name:</p>
+<pre>SELECT pe.name
+FROM   Person pe
+WHERE  pe.ssn IN (SELECT pu.buyer_ssn
+                  FROM   Purchase pu, Product pr, Company c
+                  WHERE  pu.pid = pr.pid AND pr.maker_cid = c.cid
+                  AND    c.country = 'Bangladesh')
+AND    pe.ssn NOT IN (SELECT pu.buyer_ssn
+                      FROM   Purchase pu, Product pr, Company c
+                      WHERE  pu.pid = pr.pid AND pr.maker_cid = c.cid
+                      AND    c.country = 'India');</pre>
+<p>(buyer_ssn is part of every purchase, so it is never NULL and NOT IN is safe here.)</p>
+<p><strong>(d)</strong> Correlated subquery with AVG:</p>
+<pre>SELECT p.name, c.name AS manufacturer
+FROM   Product p, Company c
+WHERE  p.maker_cid = c.cid
+AND    p.price &lt; (SELECT AVG(p2.price)
+                  FROM   Product p2
+                  WHERE  p2.maker_cid = p.maker_cid);</pre>
+<p>The question bank's answers are correct (its (c) uses a join plus NOT IN, which is equivalent). The checks below run each answer on invented data: Walton (Bangladesh), Tata and Micromax (India), Nokia (Finland), with products from 1965 to 2020.</p>
+<div id="q30a"></div><div id="q30b"></div><div id="q30c"></div><div id="q30d"></div>
+  </div></details>
+</div>
+
+<div class="key"><p><strong>Summary:</strong> a subquery may contain further subqueries; evaluate them from the inside out. Comparing a row (dept, salary) with IN keeps the pairing that a single-column comparison would lose. A subquery that mentions a column of the outer query (s.dept) is correlated: it is evaluated once per outer row with that row's values, which is how "above the average of the employee's own department" is expressed. Use different aliases for the outer and inner copies of a table.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/sqlplay.js"></script>
+<script src="../i08/lecture.js"></script>
+<script>
+const EMP = [[5001, 'EEE', 50000], [5002, 'EEE', 55000], [5003, 'CSE', 60000], [5004, 'CSE', 75000]];
+const H = ['id', 'dept', 'salary'];
+const fr = [{ html: row2(rel('Employee s (outer)', H, EMP), rel('Employee t (inner)', H, EMP)), cap: 'For each outer row s, run the subquery with s.dept plugged in: SELECT AVG(salary) FROM Employee t WHERE t.dept = s.dept.' }];
+const kept = [];
+EMP.forEach((e, i) => {
+  const grp = EMP.map((t, j) => t[1] === e[1] ? j : -1).filter(j => j >= 0), avg = grp.reduce((s, j) => s + EMP[j][2], 0) / grp.length, ok = e[2] > avg;
+  if (ok) kept.push(e);
+  fr.push({ html: row2(rel('Employee s (outer)', H, EMP, { cls: { [i]: ok ? 'new' : 'hl' }, side: { [i]: '◀ s' } }), rel(`inner with s.dept = '${e[1]}'`, H, EMP, { cls: Object.fromEntries(EMP.map((t, j) => [j, grp.includes(j) ? 'hl' : 'del'])) }),
+    rel('subquery value', ['AVG(salary)'], [[avg]])), cap: `s = ${e[0]} (${e[1]}): the inner query sees only ${e[1]} rows, average ${avg}. ${e[2]} &gt; ${avg}? ${ok ? '<b>Yes: kept.</b>' : 'No.'}` });
+});
+fr.push({ html: row2(rel('result', H, kept, { cls: { 0: 'new', 1: 'new' } })), cap: 'The subquery ran 4 times, once per outer row (twice with EEE, twice with CSE). Result: 5002 and 5004 (slide 12).' });
+stepper('#corr', fr);
+sqlPlay('#p8', { setup: EMP11, query: 'SELECT id\nFROM   Employee\nWHERE  salary > ALL (SELECT salary\n                     FROM   Employee\n                     WHERE  salary < ANY (SELECT salary\n                                          FROM   Employee));', note: 'Slide 8. Run the middle query on its own to see {50000, 55000, 60000}.' });
+sqlPlay('#p9', { setup: EMP11B, query: 'SELECT id, dept\nFROM   Employee\nWHERE  (dept, salary) IN (SELECT dept, MAX(salary)\n                          FROM   Employee\n                          GROUP BY dept);', note: 'Slide 9 data (5003 earns 55000). Replace "(dept, salary) IN (SELECT dept, MAX(salary)" by "salary IN (SELECT MAX(salary)" to see 5003 wrongly appear.' });
+sqlPlay('#p11', { setup: EMP11, query: 'SELECT *\nFROM   Employee\nWHERE  salary > (SELECT AVG(salary) FROM Employee);', note: 'Slide 11.' });
+sqlPlay('#p12', { setup: EMP11, query: 'SELECT *\nFROM   Employee s\nWHERE  salary > (SELECT AVG(salary)\n                 FROM   Employee t\n                 WHERE  s.dept = t.dept);', note: 'Slide 12.' });
+flashcards('#cards', [
+  { f: 'Nested (uncorrelated) subquery', b: 'Does not mention outer columns; evaluated once.' },
+  { f: 'Correlated subquery', b: 'Mentions an outer column (s.dept); evaluated once per outer row.' },
+  { f: '(a, b) IN (SELECT x, y …)', b: 'Row comparison: the pair must match a row of the subquery.' },
+  { f: 'Why aliases s and t on slide 12?', b: 'Two copies of Employee; s.dept reaches the outer row from inside the subquery.' },
+  { f: 'salary > AVG(salary) in WHERE?', b: 'Illegal (ORA-00934); use salary > (SELECT AVG(salary) …).' },
+]);
+quiz('#quiz', [
+  { q: 'Slide 8\'s middle query returns which salaries?', opts: ['all four', 'all except the maximum', 'only the maximum', 'none'], a: 1, why: '"less than some salary" excludes only the largest.' },
+  { q: 'With slide 9\'s data, which ids does salary IN (SELECT MAX(salary) … GROUP BY dept) return?', opts: ['5002, 5004', '5002, 5003, 5004', '5004', '5003'], a: 1, why: '5003\'s 55000 matches EEE\'s maximum.' },
+  { q: 'How many times is slide 12\'s subquery evaluated (conceptually)?', opts: ['once', 'twice (once per dept)', 'four times', 'sixteen times'], a: 2, why: 'Once per outer row.' },
+  { q: 'Which is correlated?', opts: ['WHERE salary > (SELECT AVG(salary) FROM Employee)', 'WHERE salary > (SELECT AVG(salary) FROM Employee t WHERE t.dept = s.dept)', 'WHERE id IN (SELECT id FROM Employee)', 'WHERE salary >= ALL (SELECT salary FROM Employee)'], a: 1, why: 'It refers to s.dept from the outer query.' },
+]);
+ask('#try1', { q: 'Slide 12 data: what is the CSE department average salary?', a: 67500, why: '(60000 + 75000) / 2.' });
+sqlCheck('#c1', { setup: EMP11, task: '1. (Easy) Return the employees (all columns) earning less than the overall average salary.', solution: 'SELECT * FROM Employee WHERE salary < (SELECT AVG(salary) FROM Employee);' });
+sqlCheck('#c2', { setup: EMP11, task: '2. Return the id of the lowest paid employee of each department, using a row comparison.', solution: 'SELECT id FROM Employee WHERE (dept, salary) IN (SELECT dept, MIN(salary) FROM Employee GROUP BY dept);' });
+sqlCheck('#c3', { setup: PCDB, task: '3. Return the models of PCs whose price is above the average price of PCs with the same RAM.', solution: 'SELECT model FROM PC p WHERE price > (SELECT AVG(price) FROM PC q WHERE q.ram = p.ram);' });
+sqlCheck('#c4', { setup: PCDB, task: '4. For each maker of PCs, return the maker and the model of its most expensive PC.', solution: 'SELECT maker, PC.model FROM Product, PC WHERE Product.model = PC.model AND (maker, price) IN (SELECT maker, MAX(price) FROM Product, PC WHERE Product.model = PC.model GROUP BY maker);' });
+sqlCheck('#c5', { setup: HR, task: '5. Return the last names of employees who earn more than the average salary of their own job (JOBID).', solution: 'SELECT LASTNAME FROM EMPLOYEE e WHERE SALARY > (SELECT AVG(SALARY) FROM EMPLOYEE x WHERE x.JOBID = e.JOBID);' });
+sqlCheck('#c6', { setup: HR, task: '6. (Exam style) Return the last names of employees who were hired earliest in their department (ignore employees without a department).', solution: 'SELECT LASTNAME FROM EMPLOYEE e WHERE HIREDATE = (SELECT MIN(HIREDATE) FROM EMPLOYEE x WHERE x.DEPARTMENTID = e.DEPARTMENTID);' });
+const Q30 = `CREATE TABLE Company (cid NUMBER PRIMARY KEY, name VARCHAR2(20), stock_price NUMBER, country VARCHAR2(20));
+CREATE TABLE Product (pid NUMBER PRIMARY KEY, name VARCHAR2(20), price NUMBER, category VARCHAR2(20), year NUMBER(4), maker_cid NUMBER REFERENCES Company(cid));
+CREATE TABLE Person (ssn NUMBER PRIMARY KEY, name VARCHAR2(20), phone_number VARCHAR2(15), city VARCHAR2(20));
+CREATE TABLE Purchase (buyer_ssn NUMBER REFERENCES Person(ssn), seller_ssn NUMBER REFERENCES Person(ssn), store VARCHAR2(20), pid NUMBER REFERENCES Product(pid));
+INSERT INTO Company VALUES (1, 'Walton', 40, 'Bangladesh'); INSERT INTO Company VALUES (2, 'Tata', 90, 'India');
+INSERT INTO Company VALUES (3, 'Micromax', 15, 'India');    INSERT INTO Company VALUES (4, 'Nokia', 30, 'Finland');
+INSERT INTO Product VALUES (11, 'Primo X', 150, 'telephony', 2018, 1);   INSERT INTO Product VALUES (12, 'Walton TV', 400, 'electronics', 2020, 1);
+INSERT INTO Product VALUES (13, 'Walton Fan', 40, 'appliance', 2015, 1);
+INSERT INTO Product VALUES (21, 'Tata Radio', 60, 'electronics', 1965, 2); INSERT INTO Product VALUES (22, 'Tata Phone', 120, 'telephony', 1970, 2);
+INSERT INTO Product VALUES (23, 'Tata Sky', 100, 'electronics', 2005, 2);
+INSERT INTO Product VALUES (31, 'Canvas', 90, 'telephony', 2012, 3);     INSERT INTO Product VALUES (32, 'Micromax TV', 300, 'electronics', 2016, 3);
+INSERT INTO Product VALUES (41, 'Nokia 1100', 50, 'telephony', 2003, 4); INSERT INTO Product VALUES (42, 'Nokia Cable', 20, 'electronics', 1968, 4);
+INSERT INTO Product VALUES (43, 'Nokia Boots', 35, 'clothing', 1966, 4);
+INSERT INTO Person VALUES (1, 'Rafi', '017111', 'Dhaka'); INSERT INTO Person VALUES (2, 'Sumi', '018222', 'Khulna');
+INSERT INTO Person VALUES (3, 'Tamim', '019333', 'Dhaka'); INSERT INTO Person VALUES (4, 'Nipa', '015444', 'Sylhet');
+INSERT INTO Person VALUES (5, 'Rafi', '016555', 'Rajshahi'); INSERT INTO Person VALUES (6, 'Shop Owner', '011666', 'Dhaka');
+INSERT INTO Purchase VALUES (1, 6, 'Bashundhara', 11); INSERT INTO Purchase VALUES (1, 6, 'Bashundhara', 31);
+INSERT INTO Purchase VALUES (2, 6, 'New Market', 12);  INSERT INTO Purchase VALUES (3, 6, 'Jamuna', 13);
+INSERT INTO Purchase VALUES (3, 6, 'Jamuna', 41);      INSERT INTO Purchase VALUES (4, 6, 'Bashundhara', 22);
+INSERT INTO Purchase VALUES (5, 6, 'New Market', 11);`;
+sqlCheck('#q30a', { setup: Q30, task: '(a) Names of people buying telephony products. (Invented data; note there are two different people called Rafi.)', solution: "SELECT DISTINCT pe.name FROM Person pe, Purchase pu, Product pr WHERE pe.ssn = pu.buyer_ssn AND pu.pid = pr.pid AND pr.category = 'telephony';" });
+sqlCheck('#q30b', { setup: Q30, task: '(b) Products and manufacturers more expensive than all products of the same manufacturer made before 1972 (ALL reading).', solution: 'SELECT p1.name, c.name FROM Product p1, Company c WHERE p1.maker_cid = c.cid AND p1.price > ALL (SELECT p2.price FROM Product p2 WHERE p2.maker_cid = p1.maker_cid AND p2.year < 1972);' });
+sqlCheck('#q30c', { setup: Q30, task: '(c) Names of people who bought Bangladeshi products and did not buy Indian products.', solution: "SELECT pe.name FROM Person pe WHERE pe.ssn IN (SELECT pu.buyer_ssn FROM Purchase pu, Product pr, Company c WHERE pu.pid = pr.pid AND pr.maker_cid = c.cid AND c.country = 'Bangladesh') AND pe.ssn NOT IN (SELECT pu.buyer_ssn FROM Purchase pu, Product pr, Company c WHERE pu.pid = pr.pid AND pr.maker_cid = c.cid AND c.country = 'India');" });
+sqlCheck('#q30d', { setup: Q30, task: '(d) Products (and manufacturers) cheaper than their company\'s average product price.', solution: 'SELECT p.name, c.name FROM Product p, Company c WHERE p.maker_cid = c.cid AND p.price < (SELECT AVG(p2.price) FROM Product p2 WHERE p2.maker_cid = p.maker_cid);' });
+</script>
+</body>
+</html>

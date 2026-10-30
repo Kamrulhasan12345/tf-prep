@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Measuring Cost: M, B, T, V · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 07 (Sukarna) · Chapter 4 · Slides 29–34 · Book §15.1.3–15.1.5</div>
+<h1>Measuring Cost: Disk I/Os and the Parameters M, B, T, V</h1>
+<p class="lede">Every algorithm in Lectures 07 and 08 is judged by one number: how many disk blocks it reads and writes. This chapter states the cost model and its assumptions, defines the parameters every formula uses, and derives the cost of each scan from Chapter 3.</p>
+
+<h2>1. The computation model (slide 29)</h2>
+<p>The slides make two assumptions and choose one cost measure. Both come from the textbook, §15.1.3.</p>
+<ul>
+  <li><b>Assumption 1: the arguments of a physical operator are on disk.</b> Reading them costs disk I/Os.</li>
+  <li><b>Assumption 2: the final result is left in main memory, or is pipelined</b> to the next operator. Writing the result is not charged to the operator.</li>
+  <li><b>Measure of cost: the number of disk I/Os</b> (block reads plus block writes). The slide calls it the primary cost.</li>
+</ul>
+
+<div class="q">
+<h4>Slide 29 question (worked answer): why does disk I/O measure the cost?</h4>
+<p>Getting data from disk takes far longer than doing anything useful with it once it is in memory. A disk block read costs milliseconds (seek plus rotational latency, Lec 13), while comparing or copying the tuples of a block in memory takes microseconds. So the number of block transfers dominates the running time, and an algorithm that does fewer I/Os is faster, almost regardless of its CPU work. (This assumes the in-memory work is close to linear; Chapter 6 shows a case, naive duplicate checking, where it is not.)</p>
+</div>
+
+<div class="q">
+<h4>Slide 29 question (worked answer): "Final result is left in main memory or pipelines; this doesn't matter for cost calculation. Why?"</h4>
+<p>We use the cost to <em>compare algorithms for the same operation</em>. Whatever algorithm computes the result, the result itself is the same set of tuples, so writing it to disk would cost the same number of blocks for every algorithm. Adding that constant changes no comparison. Moreover, often the result is never written at all:</p>
+<ul>
+  <li>If the operator produces the final answer, it is usually sent to the user or an application (printed, displayed), so its disk cost is zero or depends on something outside the DBMS.</li>
+  <li>If the operator is inside a plan, its result is usually <b>pipelined</b> into the parent operator a tuple (or block) at a time (Chapter 5), so it is never written and never re-read.</li>
+</ul>
+<p>When a query really does store its result, we simply add the size of the result in blocks at the end. That is why TPMMS costs "3B, or 4B if the sorted result must be stored on disk" in Lecture 08.</p>
+</div>
+
+<h2>2. The parameters (slides 30–31)</h2>
+<dl class="def">
+<dt>M (main-memory cost metric)</dt>
+<dd>Main memory available for query processing is divided into <b>buffers</b>, each the size of one disk block. <b>M</b> is the number of buffers available to one operator. It may be much less than the whole memory, since several operators can share memory at once.</dd>
+<dt>Block (page)</dt>
+<dd>The unit of transfer between disk and main memory. All counts are in blocks, never in bytes or tuples.</dd>
+<dt>B(R)</dt>
+<dd>The number of disk blocks occupied by relation R. Written B when R is clear from the context.</dd>
+<dt>T(R)</dt>
+<dd>The number of tuples in R. Written T when R is clear. The number of tuples that fit in one block is the ratio <b>T(R)/B(R)</b>. (Slide 31 writes this as "T(B)", which is not standard notation; the textbook uses T/B.)</dd>
+<dt>V(R, a)</dt>
+<dd>The number of <b>distinct values</b> of attribute a in R. More generally V(R, [a<sub>1</sub>, …, a<sub>n</sub>]) is the number of distinct combinations, that is, the number of tuples in δ(π<sub>a<sub>1</sub>,…,a<sub>n</sub></sub>(R)).</dd>
+</dl>
+
+<figure>
+<span class="anim-tag">Animation</span>
+<div id="params"></div>
+</figure>
+
+<h3>Clustered and unclustered relations</h3>
+<dl class="def">
+<dt>Clustered relation</dt>
+<dd>(Textbook §15.1.4.) A relation whose tuples are packed into about B(R) blocks that hold only R's tuples. Reading all of R then costs about B(R) I/Os.</dd>
+<dt>Unclustered relation</dt>
+<dd>A relation whose tuples are scattered among blocks holding tuples of other relations. Reading all of R can then cost one I/O <em>per tuple</em>, that is, about T(R) I/Os.</dd>
+</dl>
+<p>Slide 32 states the default: <b>we assume all relations are clustered (stored as a clustered index) unless stated otherwise.</b> Any relation an operator produces can also be assumed clustered, since there is no reason to store a temporary result in a scattered way.</p>
+
+<h2>3. I/O cost of the scans (slides 32–34)</h2>
+
+<div class="tbl"><table>
+<tr><th>Scan</th><th>What is read</th><th>Disk I/Os</th></tr>
+<tr><td>Table scan of a heap (slide 32)</td><td>all heap data blocks, in sequence</td><td class="num"><b>B</b></td></tr>
+<tr><td>Clustered-index scan (slide 32)</td><td>all leaf (data) blocks of the clustered index</td><td class="num"><b>B</b></td></tr>
+<tr><td>Index scan with a non-clustered index, all of R needed (slide 33)</td><td>the index, B(I) blocks, then one data block per row pointer</td><td class="num"><b>B(I) + T ≈ T</b></td></tr>
+<tr><td>Table scan of an <em>unclustered</em> relation (book)</td><td>every block that holds some tuple of R</td><td class="num">up to <b>T</b></td></tr>
+<tr><td>Sort-scan, R clustered on the sort key (slide 34)</td><td>index scan; tuples already sorted</td><td class="num"><b>B</b></td></tr>
+<tr><td>Sort-scan, R fits in memory (slide 34)</td><td>read R, sort in memory</td><td class="num"><b>B</b></td></tr>
+<tr><td>Sort-scan, R does not fit (slide 34)</td><td>external merge sort (Lec 08)</td><td class="num"><b>&gt; B</b> (3B with TPMMS)</td></tr>
+</table></div>
+
+<h3>The non-clustered index scan, carefully</h3>
+<p>Slide 33 reasons: read the index first (B(I) blocks); then, for each row pointer, read the corresponding data block, assuming <b>one block read per row</b>. That is T block reads for the rows, so the total is <b>B(I) + T(R)</b>, and since the index is much smaller than the relation (B(I) ≪ B(R) ≤ T(R)), it is about <b>T(R)</b>.</p>
+<p><em>Slide slip:</em> the slide's formula line reads "Total = B(R) + B(I) = B(R)", which contradicts its own previous line ("T blocks read for rows"). With one block read per row the data part is T, not B. B(R) + B(I) is the cost when the index is clustered (consecutive entries point into the same block, so each data block is read once). Slide 40 in Chapter 6 uses the correct value: "T(R) if R is not clustered index and index-scan is used [very expensive]".</p>
+
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="clus"></div>
+</figure>
+
+<p>The conclusion of slide 33: a non-clustered index scan is <b>not useful when all of R is required</b>, but it is <b>useful when only part of R is required</b>, because then only the relevant blocks are retrieved (the index seek of Chapter 3).</p>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+<div id="try2"></div>
+<div id="try3"></div>
+
+<h3>Exam questions</h3>
+<p>The bank's question on B+ tree selection costs with seek time t<sub>s</sub> and transfer time t<sub>r</sub> uses a different cost model (Silberschatz's), so it is answered in <a href="../s08/07-beyond-the-slides.html">Lecture 08, Chapter 7</a>.</p>
+
+<div class="key"><p><strong>Summary:</strong> cost = number of disk block I/Os; arguments start on disk and the result is not charged, because writing it costs the same for every algorithm. M = buffers available, B(R) = blocks, T(R) = tuples, T/B = tuples per block, V(R, a) = distinct values. Relations are assumed clustered. Table scan and clustered-index scan cost B; a non-clustered index scan of all of R costs B(I) + T ≈ T; sort-scan costs B with a clustered index or if R fits in memory, and more otherwise.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="lecture.js"></script>
+<script>
+// parameters on a small relation
+const R = [['101', 'CSE'], ['102', 'EEE'], ['103', 'CSE'], ['104', 'ME'], ['105', 'CSE'], ['106', 'EEE'], ['107', 'CE'], ['108', 'CSE'], ['109', 'ME'], ['110', 'EEE']];
+const pv = (hl, cap) => {
+  const blocks = QE.chunk(R, 3);
+  return `<div class="qe-row"><span class="qe-lab">R(id, dept) on disk</span>${blocks.map((b, i) => `<span class="qe-grp"><small>block ${i + 1}</small><span class="qe-blk ${hl === 'B' ? 'hl' : ''}">${b.map(t => `<span class="${hl === 'T' ? 'pick' : ''}">${t[0]} ${hl === 'V' ? `<b>${t[1]}</b>` : t[1]}</span>`).join('')}${b.length < 3 ? '<span class="emp">·</span>'.repeat(3 - b.length) : ''}</span></span>`).join('')}</div><p style="margin:6px 0 0">${cap}</p>`;
+};
+stepper('#params', [
+  { html: pv('', 'A relation R(id, dept) with 3 tuples per block.'), cap: 'A small relation to read the parameters from.' },
+  { html: pv('B', '<b>B(R) = 4</b>: R occupies 4 blocks (the last one is not full).'), cap: 'B counts <b>blocks</b>. A table scan of R costs B(R) = 4 I/Os.' },
+  { html: pv('T', '<b>T(R) = 10</b> tuples; T/B = 10/4 = 2.5 tuples per block on average (at most 3 fit).'), cap: 'T counts <b>tuples</b>.' },
+  { html: pv('V', '<b>V(R, dept) = 4</b>: the distinct values are CSE, EEE, ME, CE. V(R, id) = 10 because id is a key.'), cap: 'V counts <b>distinct values</b> of an attribute; for a key it equals T(R).' },
+]);
+
+// clustered vs non-clustered index scan: 9 rows in 3 blocks
+const rows = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i'];
+const nonClus = [3, 0, 6, 1, 4, 7, 2, 5, 8];   // row index in heap for keys in sorted order
+const cv = (clustered, k) => {
+  const order = clustered ? [0, 1, 2, 3, 4, 5, 6, 7, 8] : nonClus;
+  const blk = r => Math.floor(r / 3);
+  let reads = 0, cur = -1;
+  for (let i = 0; i < k; i++) { const b = blk(order[i]); if (b !== cur) { reads++; cur = b; } }
+  const now = k ? blk(order[k - 1]) : -1;
+  return `<div class="qe-row"><span class="qe-lab">index entries (sorted)</span><span class="qe-blk">${order.map((r, i) => `<span class="${i === k - 1 ? 'pick' : i < k ? 'gone' : ''}">k${i + 1}</span>`).join('')}</span></div>` +
+    `<div class="qe-row"><span class="qe-lab">data blocks</span>${[0, 1, 2].map(b => `<span class="qe-grp"><small>block ${b + 1}</small><span class="qe-blk ${b === now ? 'hl' : ''}">${[0, 1, 2].map(j => { const r = b * 3 + j, key = order.indexOf(r) + 1; return `<span class="${k && order[k - 1] === r ? 'pick' : ''}">k${key}</span>`; }).join('')}</span></span>`).join('')}</div>` +
+    `<div class="qe-io">${clustered ? 'clustered' : 'non-clustered'} · data block reads so far: <b>${reads}</b> (one buffer for data)</div>`;
+};
+const cs = [];
+cs.push({ html: cv(true, 0), cap: '<b>Clustered index:</b> 9 rows (T = 9) in 3 blocks (B = 3). The rows are stored in key order, so consecutive index entries point into the same block.' });
+for (const k of [1, 3, 4, 7, 9]) cs.push({ html: cv(true, k), cap: `Following entries k1…k${k}: a new data block is read only when the pointer leaves the current block.` });
+cs.push({ html: cv(false, 0), cap: '<b>Non-clustered index:</b> the same 9 rows, but stored in no particular key order. Now consecutive entries point to unrelated blocks.' });
+for (const k of [1, 2, 3, 5, 9]) cs.push({ html: cv(false, k), cap: k === 1 ? 'Entry k1: read the block it points to (1 read).' : k < 9 ? `Entry k${k} points to a different block from k${k - 1}: another read. ${k} entries, ${k} reads.` : 'Every single entry needed a new block read: <b>9 reads = T</b>, three times the table scan cost B = 3.' });
+stepper('#clus', cs, { interval: 1500 });
+
+flashcards('#cards', [
+  { f: 'Cost measure', b: 'Number of disk I/Os (block reads + writes). The result\'s write is not counted.' },
+  { f: 'M', b: 'Number of main-memory buffers (each one block) available to an operator.' },
+  { f: 'B(R)', b: 'Number of blocks holding R. Clustered table scan cost.' },
+  { f: 'T(R)', b: 'Number of tuples in R. T/B = tuples per block.' },
+  { f: 'V(R, a)', b: 'Number of distinct values of a in R; = |δ(π_a(R))|.' },
+  { f: 'Clustered relation', b: 'Tuples packed into ≈ B blocks of R only; full read costs B. Unclustered: up to T.' },
+  { f: 'Non-clustered index scan of all R', b: 'B(I) + T ≈ T: one data-block read per row. Only worth it when a small part of R is needed.' },
+]);
+quiz('#quiz', [
+  { q: 'Why is the write of an operator\'s final result left out of its cost?', opts: ['Writes are free', 'It is the same for every algorithm computing that result, and is often not done at all', 'Results are always small', 'The buffer manager pays for it'], a: 1, why: 'The cost is used to compare algorithms; a common constant does not change the comparison, and pipelined or displayed results are never written.' },
+  { q: 'R has T(R) = 20,000 tuples, 50 per block, clustered. A table scan costs…', opts: ['50', '400', '20,000', '1,000,000'], a: 1, why: 'B(R) = 20,000 / 50 = 400 blocks.' },
+  { q: 'Same R, read in full through a non-clustered index of 30 blocks. Cost?', opts: ['430', '400', 'about 20,030', '30'], a: 2, why: 'B(I) + T(R) = 30 + 20,000: one data block per row pointer.' },
+  { q: 'V(R, a) = T(R) tells you that…', opts: ['a is constant', 'a has no duplicates in R (it is a key of this instance)', 'R is clustered', 'R fits in memory'], a: 1, why: 'Every tuple has its own a-value.' },
+  { q: 'R is clustered on A and does not fit in memory. Sort-scan on A costs…', opts: ['B', '3B', 'T', 'B²'], a: 0, why: 'An index scan of a clustered index already returns tuples sorted on A.' },
+]);
+ask('#try1', { q: 'A relation has 1,000,000 tuples; 100 tuples fit in a block. What is B(R)?', a: 10000, why: 'B = T / (tuples per block) = 1,000,000 / 100.' });
+ask('#try2', { q: 'For that relation, what does a full scan through a non-clustered index of 500 blocks cost (slide 33\'s model)?', a: 1000500, tol: 0, why: 'B(I) + T = 500 + 1,000,000 = 1,000,500 ≈ T, a hundred times the table scan.' });
+ask('#try3', { q: 'Relation Student(id, dept) has these dept values: CSE, EEE, CSE, ME, CSE, EEE. What is V(Student, dept)?', a: 3, why: 'Distinct values: CSE, EEE, ME.' });
+</script>
+</body>
+</html>

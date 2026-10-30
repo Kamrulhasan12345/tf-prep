@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>File Organization and Partitioning · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 14 · Chapter 12 · Beyond the slides (asked in exams)</div>
+<h1>File Organization and Table Partitioning</h1>
+<p class="lede">The slides show how records sit inside a block. Exams also ask how records are arranged across the blocks of a file, and how a huge table can be split into smaller pieces. This chapter teaches both, following Silberschatz, <i>Database System Concepts</i>, §13.3, and answers the partitioning question from the bank.</p>
+
+<h2>1. What a file organization is</h2>
+
+<p>Chapters 2–5 answered “where is a record <em>inside</em> a block?”. The next question is “<em>which</em> block does a record go into?”. The rule a DBMS uses to decide this is the file's organization.</p>
+
+<dl class="def">
+  <dt>File organization</dt><dd>The way records of a relation are placed into the blocks of a file. It decides where a new record goes, and therefore how records can be found again.</dd>
+</dl>
+
+<p>Silberschatz lists these organizations:</p>
+<ol>
+  <li><strong>Heap file organization.</strong> Any record can go anywhere in the file where there is space.</li>
+  <li><strong>Sequential file organization.</strong> Records are stored in sorted order of a search key.</li>
+  <li><strong>Multitable clustering file organization.</strong> Records of several relations share one file (Chapter 7).</li>
+  <li><strong>B<sup>+</sup>-tree file organization.</strong> Records are kept in key order inside the leaves of a B<sup>+</sup> tree, which stays ordered under inserts and deletes (Lecture 15).</li>
+  <li><strong>Hashing file organization.</strong> A hash function on an attribute decides the block.</li>
+</ol>
+
+<h2>2. Heap file organization</h2>
+
+<p>In a <b class="term">heap file</b>, a new record is placed in any block that has room, usually the last block or a block found through a free-space map. Records are in no particular order. A <b class="term">free-space map</b> is a small array with one entry per block that records roughly how full the block is (for example in eighths), so the DBMS can find a block with room without reading every block.</p>
+<p>Inserts are cheap: one block write. Finding a record by value needs a full file scan unless there is an index, because the value tells you nothing about the block. Heap files are the default in most systems (PostgreSQL tables are heap files), with indexes added for lookups.</p>
+
+<h2>3. Sequential file organization</h2>
+
+<p>A <b class="term">sequential file</b> keeps records sorted by a <b class="term">search key</b> (any attribute or set of attributes, not necessarily the primary key). The records are linked by pointers in key order, and as far as possible they are also stored in that order physically, so reading the whole file in key order needs few seeks. This makes sorted output and range queries fast, and it is what a primary (clustering) index in Lecture 15 relies on.</p>
+
+<p>The difficulty is keeping the order during inserts and deletes:</p>
+<ul>
+  <li><strong>Deletion</strong> uses pointer chains: the record is removed from the chain (as in the free-list method of Chapter 3).</li>
+  <li><strong>Insertion</strong> first locates the record that comes just before the new one in key order. If there is a free slot in that block, the new record goes there. If not, it goes into an <b class="term">overflow block</b>. In both cases the pointers are adjusted so the chain still visits records in key order.</li>
+  <li>After many overflow inserts, the physical order no longer matches key order and scans need extra seeks. The file is then <b class="term">reorganized</b>: rewritten in sorted order, usually at a quiet time.</li>
+</ul>
+
+<figure>
+<span class="anim-tag">Animation</span>
+<div id="seq"></div>
+<figcaption><b>Figure 1.</b> Inserting (32222, Verdi, Music, 48000) into the instructor file kept sequential on ID, 3 records per block (the example of Silberschatz Figure 13.8). The red side notes are the “next in key order” pointers.</figcaption>
+</figure>
+
+<h2>4. Hashing file organization</h2>
+
+<p>In a <b class="term">hashing file organization</b>, a <b class="term">hash function</b> h is computed on one attribute of each record, and the result is the number of the block (bucket) the record is stored in. To find the record with ID = 76766, compute h(76766) and read only that bucket. This is very fast for equality lookups on the hashed attribute, and useless for range queries, because neighbouring keys go to unrelated buckets. Hashing is taught fully in Lecture 15's hashing chapter.</p>
+
+<figure>
+<div class="figrow" id="hashf"></div>
+<figcaption><b>Figure 2.</b> The instructor relation hashed on ID with h(ID) = ID mod 4: four buckets. Looking up ID 76766 computes 76766 mod 4 = 2 and reads only bucket 2.</figcaption>
+</figure>
+
+<div class="tbl"><table>
+<tr><th>Organization</th><th>Insert</th><th>Equality lookup without index</th><th>Range / sorted scan</th></tr>
+<tr><td>Heap</td><td class="good">Cheap, anywhere</td><td class="bad">Full scan</td><td class="bad">Full scan + sort</td></tr>
+<tr><td>Sequential</td><td class="mid">Find position; overflow blocks; reorganize</td><td class="mid">Binary search on blocks</td><td class="good">Read in order</td></tr>
+<tr><td>Hashing</td><td class="good">One bucket</td><td class="good">One bucket (on the hash attribute)</td><td class="bad">Full scan</td></tr>
+<tr><td>Multitable clustering</td><td class="mid">Next to related records</td><td class="mid">Depends on the key</td><td class="mid">Good for joins on the cluster key</td></tr>
+</table></div>
+
+<h2>5. Table partitioning</h2>
+
+<p>Some tables grow to billions of rows: a bank's transactions, a university's course registrations over decades. Many databases let such a relation be split into smaller relations that are stored separately but still look like one table to SQL. This is <b class="term">table partitioning</b> (Silberschatz §13.3.3).</p>
+
+<dl class="def">
+  <dt>Partition</dt><dd>One of the smaller relations a table is split into. Each partition has the same schema and is stored (and can be indexed, backed up or moved) on its own.</dd>
+  <dt>Partitioning key</dt><dd>The attribute whose value decides which partition a row belongs to, for example the year of a registration.</dd>
+  <dt>Horizontal partitioning</dt><dd>Splitting by rows: each partition holds some of the rows, with all their columns. This is what “table partitioning” usually means.</dd>
+  <dt>Vertical partitioning</dt><dd>Splitting by columns: each piece holds some columns of every row, plus the key to join them back. Column stores (Chapter 9) are the extreme case.</dd>
+</dl>
+
+<p>Horizontal partitioning comes in three common kinds:</p>
+<ul>
+  <li><b class="term">Range partitioning</b>: each partition holds a range of key values, such as year 2005–2009, 2010–2014, …</li>
+  <li><b class="term">List partitioning</b>: each partition holds an explicit list of values, such as department ∈ {CSE, EEE} or division = Dhaka.</li>
+  <li><b class="term">Hash partitioning</b>: the partition is h(key) mod p, which spreads rows evenly over p partitions without any natural order.</li>
+</ul>
+
+<p>The main gain is <b class="term">partition pruning</b>: when a query's condition fixes the partitioning key, the DBMS reads only the matching partitions and skips the rest. A query on this year's registrations reads one small partition instead of 20 years of data.</p>
+
+<figure>
+<span class="anim-tag">Animation</span>
+<div id="part"></div>
+<figcaption><b>Figure 3.</b> A course-registration table range-partitioned by year (one partition per 5 years here; one per year works the same way). Row counts are illustrative.</figcaption>
+</figure>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+<div id="try2"></div>
+
+<h3>Exam questions</h3>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 21-22 7b · 10 marks</div>
+  <div class="exam-q"><p>Suppose, BIIS has a large number of records in its Course Registration table, accumulated over last 20 years. Explain how table partitioning can be done on this table, and what benefits and drawbacks it could offer.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+<p><strong>How to partition.</strong> Almost every query on registrations names a session or year (“this term's registrations”, “results of the 2023 July session”), and old years are rarely touched. So use <strong>horizontal range partitioning on the academic year (or session)</strong>: one partition per year, 20 partitions, plus a new one created each year. Each partition is a separate relation with the same schema. For example, in PostgreSQL syntax:</p>
+<pre>CREATE TABLE course_registration (
+    student_id  char(7), course_code char(10), session char(9),
+    year        int,     grade       char(2)
+) PARTITION BY RANGE (year);
+CREATE TABLE reg_2024 PARTITION OF course_registration
+    FOR VALUES FROM (2024) TO (2025);
+-- … one partition per year, 2005 to 2024</pre>
+<p>A very large year can be sub-partitioned, for example by list on department or by hash on student_id. Inserts go automatically to the partition of their year, and SQL still sees one table.</p>
+<p><strong>Benefits.</strong></p>
+<ul>
+<li><strong>Partition pruning:</strong> a query with <code>year = 2024</code> scans only reg_2024, about 1/20 of the data, instead of the whole table.</li>
+<li><strong>Smaller indexes:</strong> each partition has its own, shallower indexes, so lookups and index rebuilds are cheaper.</li>
+<li><strong>Cheap archiving:</strong> old years can be moved to slower, cheaper storage, compressed or made read-only, and removing a year is “drop or detach a partition” instead of a <code>DELETE</code> of millions of rows.</li>
+<li><strong>Maintenance per partition:</strong> backups, statistics and reorganization can run on the active year only.</li>
+<li><strong>Less contention and more parallelism:</strong> this term's heavy registration load touches one partition; queries over many years can scan partitions in parallel.</li>
+</ul>
+<p><strong>Drawbacks.</strong></p>
+<ul>
+<li>Queries that do not restrict the year get no pruning and must visit every partition, which is slightly slower than one table: for example “all courses a student has ever taken” (a transcript spans about 4–5 yearly partitions) or “every registration for CSE 215 since 2005” (all 20).</li>
+<li>Uniqueness across the whole table (such as a primary key on (student_id, course_code, session)) usually has to include the partitioning key, and global indexes are harder.</li>
+<li>Updating the partitioning key moves the row to another partition (a delete plus an insert).</li>
+<li>More objects to manage: new partitions must be created every year, and too many partitions add planning overhead.</li>
+<li>Load is skewed: nearly all activity hits the current year's partition, so it gets no benefit from being split further unless sub-partitioned.</li>
+</ul>
+  </div></details>
+</div>
+
+<div class="key">
+<p><strong>Summary:</strong> a file organization decides which block a record goes into: anywhere (heap), in key order with pointer chains and overflow blocks (sequential), by a hash function (hashing), next to related records (multitable clustering), or in a B<sup>+</sup> tree. Table partitioning splits a huge relation into separately stored pieces by range, list or hash of a key, so queries that fix the key read only their partition, and old data can be archived or dropped cheaply, at the cost of slower queries that span all partitions.</p>
+</div>
+</main>
+<script src="../assets/book.js"></script>
+<script>
+// ---- sequential file insert (Silberschatz Fig. 13.7/13.8) ----
+const SORTED = INSTR.slice().sort((a, b) => a[0].localeCompare(b[0]));
+const red = t => `<span style="color:var(--red)">${t}</span>`;
+const VERDI = ['32222', 'Verdi', 'Music', '48000'];
+const seqRows = (stage) => {
+  const rows = SORTED.map((r, i) => {
+    const next = stage >= 3 && r[0] === '22222' ? '32222 (overflow)' : i + 1 < SORTED.length ? SORTED[i + 1][0] : 'null';
+    return { lab: `block ${Math.floor(i / 3)}`, cells: r, cls: stage === 1 && r[0] === '22222' ? 'hl' : '', side: red('→ ' + next) };
+  });
+  if (stage >= 2) rows.push({ lab: 'overflow', cells: stage >= 3 ? VERDI : null, cls: stage >= 3 ? 'new' : '', side: stage >= 3 ? red('→ 32343') : 'new overflow block' });
+  return recTable(null, rows);
+};
+const blkMark = html => { const d = document.createElement('div'); d.innerHTML = html; let prev = null;
+  d.querySelectorAll('tr').forEach((tr, k) => { const l = tr.querySelector('td.lab')?.textContent || ''; if (k > 1 && l !== prev) tr.classList.add('blk'); prev = l; }); return d.innerHTML; };
+stepper('#seq', [
+  { html: blkMark(seqRows(0)), cap: 'The file is sorted on ID, 3 records per block (4 full blocks). Each record also points to the next record in key order.' },
+  { html: blkMark(seqRows(1)), cap: 'Insert <b>32222 Verdi</b>. Locate the record that precedes it in key order: <b>22222 Einstein</b> in block 1. Block 1 is full, so Verdi cannot go next to it.' },
+  { html: blkMark(seqRows(2)), cap: 'No free slot, so an <b>overflow block</b> is allocated at the end of the file.' },
+  { html: blkMark(seqRows(3)), cap: 'Verdi is written in the overflow block. Pointers: <b>22222 → 32222 → 32343</b>. Following the chain still gives key order, but the scan now seeks to the overflow block and back. After many such inserts the file is <b>reorganized</b> (rewritten in sorted order).' },
+]);
+
+// ---- hashing file organization ----
+document.querySelector('#hashf').innerHTML = [0, 1, 2, 3].map(b =>
+  `<div><div class="figlabel">bucket ${b}</div>${recTable(null, INSTR.filter(r => +r[0] % 4 === b).map(r => ({ cells: [r[0], r[1]], cls: r[0] === '76766' ? 'hl' : '' })), ['ID', 'Name'])}</div>`).join('');
+
+// ---- partitioning ----
+const PARTS = [['2005–2009', '1.6 M'], ['2010–2014', '2.1 M'], ['2015–2019', '2.7 M'], ['2020–2024', '3.4 M']];
+function partSVG(state) {
+  let s = '';
+  const one = state === 0;
+  if (one) {
+    s += `<rect class="cell" x="10" y="40" width="680" height="70" rx="4"/><text x="350" y="72" text-anchor="middle" class="big">course_registration: 9.8 M rows, 20 years, one heap file</text><text x="350" y="94" text-anchor="middle" class="lbl">every query scans or indexes all of it</text>`;
+  } else {
+    PARTS.forEach(([y, n], i) => {
+      const x = 10 + i * 172;
+      let cls = 'cell';
+      if (state === 2) cls = i === 3 ? 'cell-hl' : 'cell-dim';
+      if (state === 3) cls = i === 0 ? 'cell-del' : 'cell';
+      s += `<rect class="${cls}" x="${x}" y="40" width="162" height="70" rx="4"/>`;
+      s += `<text x="${x + 81}" y="66" text-anchor="middle" class="big ${state === 2 && i !== 3 ? 'dimt' : ''}">reg ${y}</text><text x="${x + 81}" y="88" text-anchor="middle" class="lbl">${n} rows</text>`;
+      if (state === 2) s += `<text x="${x + 81}" y="130" text-anchor="middle" class="lbl ${i === 3 ? 'red' : ''}">${i === 3 ? 'scanned' : 'pruned (skipped)'}</text>`;
+      if (state === 3 && i === 0) s += `<text x="${x + 81}" y="130" text-anchor="middle" class="lbl red">detached → archive storage</text>`;
+    });
+    s += `<text x="10" y="24" class="lbl">course_registration PARTITION BY RANGE (year)</text>`;
+  }
+  if (state === 2) s += `<text x="10" y="160" class="lbl">SELECT … WHERE year = 2024 AND course_code = 'CSE 215'</text>`;
+  return `<svg viewBox="0 0 700 172" width="700" role="img" aria-label="partitioned table">${s}</svg>`;
+}
+stepper('#part', [
+  { html: partSVG(0), cap: 'Without partitioning: 20 years of registrations in one table. A query about this year still works over the whole table and its large indexes.' },
+  { html: partSVG(1), cap: 'Range partitioning on <b>year</b>: four partitions, each a separate relation with its own indexes. SQL still sees one table; each insert goes to the partition of its year.' },
+  { html: partSVG(2), cap: '<b>Partition pruning</b>: the condition year = 2024 can only match the 2020–2024 partition, so the other three are never read. 3.4 M rows instead of 9.8 M (with one partition per year, about 1/20).' },
+  { html: partSVG(3), cap: '<b>Archiving</b>: the oldest partition is detached and moved to cheap storage (or dropped) in one step, instead of deleting 1.6 M rows one by one.' },
+]);
+
+// ---- practice ----
+flashcards('#cards', [
+  { f: 'File organization', b: 'The rule that decides which block of a file each record goes into.' },
+  { f: 'Heap file', b: 'Records go anywhere there is space. Cheap inserts; lookups need a scan or an index.' },
+  { f: 'Sequential file', b: 'Records kept in search-key order with pointer chains; inserts may go to overflow blocks; periodic reorganization.' },
+  { f: 'Hashing file organization', b: 'h(attribute) gives the bucket (block) of each record. Fast equality lookups, no help for ranges.' },
+  { f: 'Table partitioning', b: 'Splitting a relation into smaller, separately stored relations by the value of a partitioning key.' },
+  { f: 'Range / list / hash partitioning', b: 'Partition by key ranges, by explicit lists of values, or by h(key) mod p.' },
+  { f: 'Partition pruning', b: 'Skipping partitions that cannot contain rows matching the query’s condition on the partitioning key.' },
+]);
+quiz('#quiz', [
+  { q: 'Which organization gives the cheapest insert?', opts: ['Sequential', 'Heap', 'Multitable clustering', 'B+ tree'], a: 1, why: 'A heap file puts the record in any block with space; no ordering to maintain.' },
+  { q: 'A sequential file has no free slot next to the new record’s position. What happens?', opts: ['The insert fails', 'The record goes to an overflow block and pointers are adjusted', 'The whole file is rewritten immediately', 'The record is put in a heap file'], a: 1, why: 'Overflow blocks keep the key order via pointers; reorganization happens later.' },
+  { q: 'Which query does a hashing file organization on ID NOT help?', opts: ['WHERE ID = 76766', 'WHERE ID = 10101', 'WHERE ID BETWEEN 20000 AND 40000', 'Insert of ID 55555'], a: 2, why: 'Hashing scatters neighbouring keys, so a range must scan every bucket.' },
+  { q: 'A registration table is range-partitioned by year. Which query gets NO pruning?', opts: ['All registrations in 2023', 'Grades of session 2024 July', 'Every course student 1805001 has taken since admission', 'Registrations between 2010 and 2012'], a: 2, why: 'The condition is on student_id, not year, so every partition must be searched (or at least every year the student could appear in).' },
+  { q: 'Splitting a table into groups of columns is called…', opts: ['range partitioning', 'vertical partitioning', 'hash partitioning', 'list partitioning'], a: 1, why: 'Vertical partitioning splits by columns; the others split by rows.' },
+]);
+ask('#try1', { q: 'In h(ID) = ID mod 4, which bucket holds ID 45565?', a: 1, why: '45565 = 4 × 11391 + 1, so bucket 1.' });
+ask('#try2', { q: 'A table has 20 equal yearly partitions of 500,000 rows. A full scan for one year reads how many rows with pruning?', a: 500000, why: 'Only the matching year’s partition is read: 500,000 rows instead of 10,000,000.' });
+</script>
+</body>
+</html>

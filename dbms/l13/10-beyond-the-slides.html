@@ -1,0 +1,300 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Storage Exam Topics Beyond the Slides · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 13 · Chapter 10 · Beyond the slides · Book §13.4</div>
+<h1>Exam Topics Beyond the Slides: Disk Failures, Stable Storage, RAID 6 Codes, Buffers</h1>
+<p class="lede">Past papers ask about things Lec 13's slides do not cover: the kinds of disk failure, stable storage, how to design RAID 6 schemes from parity-check matrices (the textbook's Hamming-code method), and how blocks move between disk, buffer and a transaction. Each topic is taught briefly here, then the exam questions are answered.</p>
+
+<h2>1. Kinds of disk failure (textbook §13.4)</h2>
+
+<dl class="def">
+  <dt>Intermittent failure</dt><dd>A read or write of a sector fails, but succeeds if tried again. The controller simply retries (up to some limit).</dd>
+  <dt>Media decay</dt><dd>Bits of a sector are permanently corrupted, so it can never be read correctly again.</dd>
+  <dt>Write failure</dt><dd>A write neither succeeds nor leaves the old contents readable, e.g. because the power failed in the middle of writing the sector.</dd>
+  <dt>Disk crash (head crash)</dt><dd>The whole disk suddenly and permanently becomes unreadable.</dd>
+  <dt>Checksum</dt><dd>Extra bits stored with each sector, computed from its data bits, used to tell a good read from a bad one. The simplest is one <b class="term">parity bit</b>: 1 if the data has an odd number of 1s, so that data + parity always has an even number of 1s. Example: 01101000 has three 1s, parity bit 1, stored as 011010001. Any single-bit error makes the count odd and is detected. With <i>n</i> independent check bits the chance of missing a random massive error is 1/2<sup><i>n</i></sup>.</dd>
+</dl>
+
+<p>Checksums turn the first three kinds of error into “this sector is bad” signals; retrying handles intermittent failures, stable storage (Section 2) handles media decay and write failures, and redundancy across disks (RAID) handles crashes.</p>
+
+<p><strong>How likely is data loss?</strong> Disk failure rates are measured by the <b class="term">mean time to failure</b>. The textbook's Example 13.8: if each disk fails with probability 10% per year and a failed mirror is replaced and copied in 3 hours (1/2920 of a year), data is lost only if the second disk fails during those 3 hours: probability 0.1 × 1/2920 = 1/29,200 per failure. A pair has a failure about every 5 years, so the mean time to data loss is 5 × 29,200 = 146,000 years.</p>
+
+<h2>2. Stable storage (textbook §13.4.3–13.4.4)</h2>
+
+<dl class="def">
+  <dt>Stable storage</dt><dd>A way of organising a disk so that a value X is never lost to media decay or to a failed write. Sectors are used in pairs: X is stored twice, in a “left” copy X<sub>L</sub> and a “right” copy X<sub>R</sub>, ideally on different disks, each with enough checksum bits that a bad copy is always recognised.</dd>
+</dl>
+<p><strong>Writing policy.</strong> (1) Write X into X<sub>L</sub> and read it back to check that its status is good; if not, rewrite, and after a set number of failed tries treat the sector as decayed and substitute a spare sector. (2) Only then do the same for X<sub>R</sub>.</p>
+<p><strong>Reading policy.</strong> Read X<sub>L</sub>; if it is bad, read X<sub>R</sub>; alternate between them until a good value is returned. X is unreadable only if both copies stay bad after many tries.</p>
+
+<figure>
+<span class="anim-tag">Animation</span>
+<div id="stable"></div>
+</figure>
+
+<p>Why it works: the two copies are never being written at the same moment. If one copy decays, the other is read. If the power fails while X<sub>L</sub> is being written, X<sub>L</sub> is bad but X<sub>R</sub> still holds the old value; if it fails after X<sub>L</sub> is done, X<sub>L</sub> holds the new value. Either way, after the failure we get a consistent value (old or new) and repair the other copy from it. Databases use stable storage for the log, which must survive every failure.</p>
+
+<h2>3. RAID 6 with parity-check matrices (textbook §13.4.9)</h2>
+
+<p>Chapter 8 described RAID 6 with P and Q, where Q needs Reed–Solomon arithmetic. The textbook shows a scheme that uses only XOR, built from a <b class="term">Hamming code</b>. Number the disks 1 to 7: disks 1–4 hold data, disks 5–7 are redundant, and a 3 × 7 matrix of 0s and 1s says which disks each redundant disk checks:</p>
+
+<div class="tbl"><table style="max-width:520px">
+<tr><th></th><th colspan="4">data</th><th colspan="3">redundant</th></tr>
+<tr><th>disk</th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th><th>7</th></tr>
+<tr><td>row 1</td><td>1</td><td>1</td><td>1</td><td>0</td><td>1</td><td>0</td><td>0</td></tr>
+<tr><td>row 2</td><td>1</td><td>1</td><td>0</td><td>1</td><td>0</td><td>1</td><td>0</td></tr>
+<tr><td>row 3</td><td>1</td><td>0</td><td>1</td><td>1</td><td>0</td><td>0</td><td>1</td></tr>
+</table></div>
+
+<p>Rule: in each row, the XOR of the disks that have a 1 in that row must be all zeros. So each row is a little RAID 4 group: disk 5 = 1 ⊕ 2 ⊕ 3, disk 6 = 1 ⊕ 2 ⊕ 4, disk 7 = 1 ⊕ 3 ⊕ 4. The matrix has three properties:</p>
+<ol>
+  <li>every possible non-zero column of three bits appears exactly once, so <strong>all columns are different</strong>;</li>
+  <li>redundant disks have a single 1 in their column;</li>
+  <li>data disks have at least two 1s.</li>
+</ol>
+
+<p><strong>Reading</strong> data disks is normal. <strong>Writing</strong> a data block: compute old ⊕ new, and XOR that into every redundant disk that has a 1 in a row where the written disk has a 1.</p>
+
+<p><strong>Recovering two failed disks a and b.</strong> Their columns are different, so some row <i>r</i> has a 1 for one of them (say b) and a 0 for the other. In that row b is the only unknown, so b = XOR of the other disks with a 1 in row <i>r</i>. Now only a is missing; any row where a has a 1 gives it. The animation runs the textbook's Example 13.14 (8-bit blocks, disks 2 and 5 fail).</p>
+
+<figure>
+<span class="anim-tag">Animation</span>
+<div id="ham"></div>
+</figure>
+
+<p><strong>The general construction.</strong> With <i>k</i> redundant disks, write every non-zero column of <i>k</i> bits: 2<sup><i>k</i></sup> − 1 columns. The <i>k</i> columns with a single 1 are the redundant disks and the other 2<sup><i>k</i></sup> − <i>k</i> − 1 are data disks. Since all columns are distinct and non-zero, any 2 failures can be recovered. In coding terms, the code has <b class="term">minimum distance</b> 3, and a code of minimum distance <i>d</i> survives <i>d</i> − 1 simultaneous disk failures. To survive 3 failures, any 3 columns must be linearly independent (no 3 of them XOR to zero), which needs distance 4.</p>
+
+<div class="tbl"><table style="max-width:520px">
+<tr><th>redundant disks k</th><th>total disks 2<sup>k</sup> − 1</th><th>data disks</th></tr>
+<tr><td class="num">3</td><td class="num">7</td><td class="num">4</td></tr>
+<tr><td class="num">4</td><td class="num">15</td><td class="num">11</td></tr>
+<tr><td class="num">5</td><td class="num">31</td><td class="num">26</td></tr>
+</table></div>
+
+<h2>4. Disk, buffer and a transaction's work area</h2>
+
+<dl class="def">
+  <dt>Physical blocks</dt><dd>Blocks on disk.</dd>
+  <dt>Buffer blocks</dt><dd>Copies of disk blocks held in the main-memory <b class="term">buffer</b>, managed by the buffer manager.</dd>
+  <dt>input(B), output(B)</dt><dd>Transfer block B from disk into the buffer, or from the buffer back to disk.</dd>
+  <dt>Work area</dt><dd>A private area of memory for each transaction T<sub>i</sub>, holding its local copies x<sub>i</sub> of the data items it uses.</dd>
+  <dt>read(X), write(X)</dt><dd>read(X) assigns the value of X from its buffer block to the local variable x<sub>i</sub> (calling input first if the block is not in the buffer). write(X) assigns x<sub>i</sub> to X in its buffer block (again inputting the block first if needed). Neither one writes to disk; output(B) happens later, when the buffer manager decides (to free space, at a checkpoint, or because the recovery protocol forces it).</dd>
+</dl>
+
+<figure>
+<span class="anim-tag">Animation</span>
+<div id="buf"></div>
+</figure>
+
+<h2>Practice</h2>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+
+<h3>Exam questions</h3>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2011–12 · 8 marks</div>
+  <div class="exam-q"><p>What are the different types of disk failures? How does a DBMS handle a disk crash?</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><strong>Types</strong> (Section 1): (1) <strong>intermittent failure</strong>, where a read or write fails but succeeds when retried; (2) <strong>media decay</strong>, where bits of a sector are permanently corrupted; (3) <strong>write failure</strong>, where a write neither completes nor leaves the old value readable, e.g. after a power cut; (4) <strong>disk crash</strong>, where the whole disk becomes unreadable. Checksums detect bad sectors; retries handle intermittent errors; stable storage handles decay and failed writes.</p>
+    <p><strong>Handling a disk crash.</strong></p>
+    <ol>
+      <li><strong>Redundancy (RAID).</strong> With mirroring (RAID 1) the system keeps running from the mirror and copies it onto the replacement disk. With parity (RAID 4/5) each lost block is the XOR of the other blocks of its stripe; with RAID 6 even two simultaneous crashes are recoverable. Data is lost only if more disks fail than the scheme tolerates before the rebuild finishes, which is very unlikely (mean time to data loss of the order of 100,000 years for mirrored disks in the textbook's example).</li>
+      <li><strong>Backup and log.</strong> If the redundancy is not enough, the DBMS restores the most recent <em>archival dump</em> (backup) of the database, kept on tertiary storage such as tape, and then uses the <em>log</em>, kept on stable storage (often mirrored, on a different disk), to redo the changes of the transactions that committed after the dump.</li>
+    </ol>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2016–17 · 10 marks</div>
+  <div class="exam-q"><p>What is stable storage? Briefly explain the idea of reading and writing policy in stable storage.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><strong>Stable storage</strong> is storage organised so that information is never lost to media decay or to a write that fails midway (e.g. at a power failure). It is implemented by keeping every value X in a pair of sectors, X<sub>L</sub> and X<sub>R</sub> (preferably on different disks), each protected by checksum bits so that a bad copy is always detected.</p>
+    <p><strong>Writing policy.</strong> Write X into X<sub>L</sub>; read it back and check the checksum; if bad, write again; after several failures assume media decay and use a spare sector instead. Only after X<sub>L</sub> is good, repeat the same for X<sub>R</sub>.</p>
+    <p><strong>Reading policy.</strong> Read X<sub>L</sub>; if it is bad, read X<sub>R</sub>; keep alternating until a good copy is returned. Only after a large number of failures is X declared unreadable.</p>
+    <p><strong>Why this is safe.</strong> Media failure: if one copy decays, the other is still good (both decaying is extremely unlikely). Write failure: if the crash happens while writing X<sub>L</sub>, X<sub>L</sub> is bad and X<sub>R</sub> still has the old value; if it happens after X<sub>L</sub> was written, X<sub>L</sub> has the new value. Either way a correct (old or new) value is obtained, and the other copy is repaired from it. The DBMS keeps its log on stable storage for this reason.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 17-18 1a · 16 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-2 | 2017–18 · 16 marks</div>
+  <div class="exam-q"><p>Viru Sahastrabudhhe has taught different RAID levels to Farhan. To check whether Farhan has understood RAID levels or not, Viru has given a system with six data disks numbered from 1 to 6 to Farhan and asked him to answer the following questions: (i) Design a RAID level 6 scheme for the given data disks using the minimum number of redundant disks possible. You are not allowed to use any data disk as a redundant disk for the design. (ii) Describe the recovery process of your designed system if Disk 1 and Disk 3 fail simultaneously. (iii) Describe the recovery process of your designed system if disks 1, 3 and 6 fail simultaneously. Now, write down the correct and complete answer that Farhan should provide in reply to Viru's tricky (i) question.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><strong>(i) Design.</strong> Using the textbook's XOR (Hamming-code) construction, each disk gets a distinct non-zero column of <i>k</i> bits, the redundant disks get the columns with a single 1, and data disks get columns with at least two 1s. With <i>k</i> = 3 redundant disks there are only 2³ − 3 − 1 = 4 such data columns, too few for 6 data disks. So the minimum is <strong>k = 4 redundant disks</strong> (disks 7–10), which allows up to 11 data disks; choose 6 of the 11 columns. The tricky part is to choose them so that (iii) also works:</p>
+    <div class="tbl"><table>
+      <tr><th>disk</th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th><th>7</th><th>8</th><th>9</th><th>10</th></tr>
+      <tr><td>row 1</td><td>1</td><td>1</td><td>0</td><td>0</td><td>1</td><td>0</td><td>1</td><td>0</td><td>0</td><td>0</td></tr>
+      <tr><td>row 2</td><td>1</td><td>0</td><td>1</td><td>1</td><td>0</td><td>0</td><td>0</td><td>1</td><td>0</td><td>0</td></tr>
+      <tr><td>row 3</td><td>0</td><td>1</td><td>1</td><td>0</td><td>0</td><td>1</td><td>0</td><td>0</td><td>1</td><td>0</td></tr>
+      <tr><td>row 4</td><td>0</td><td>0</td><td>0</td><td>1</td><td>1</td><td>1</td><td>0</td><td>0</td><td>0</td><td>1</td></tr>
+    </table></div>
+    <p>Redundant disks: disk 7 = D1 ⊕ D2 ⊕ D5; disk 8 = D1 ⊕ D3 ⊕ D4; disk 9 = D2 ⊕ D3 ⊕ D6; disk 10 = D4 ⊕ D5 ⊕ D6 (bit by bit, for every block). All 10 columns are distinct and non-zero, so any two simultaneous failures are recoverable. A write to a data disk updates the two redundant disks of its rows with old ⊕ new.</p>
+    <p><strong>(ii) Disks 1 and 3 fail.</strong> Row 1 contains disk 1 but not disk 3, so D1 = D2 ⊕ D5 ⊕ D7. Row 3 contains disk 3 but not disk 1, so D3 = D2 ⊕ D6 ⊕ D9 (or, once D1 is known, D3 = D1 ⊕ D4 ⊕ D8 from row 2). Both are rebuilt block by block on replacement disks.</p>
+    <p><strong>(iii) Disks 1, 3 and 6 fail.</strong> A two-failure code does not guarantee recovery from three failures (e.g. disks 1, 2 and 3 together could not be recovered, because their columns 1100 ⊕ 1010 ⊕ 0110 = 0000). But this design was chosen so that disks 1, 3 and 6 can be:</p>
+    <ul>
+      <li>row 1 contains only disk 1 of the three: D1 = D2 ⊕ D5 ⊕ D7;</li>
+      <li>row 4 contains only disk 6 of the three: D6 = D4 ⊕ D5 ⊕ D10;</li>
+      <li>now only disk 3 is missing: D3 = D1 ⊕ D4 ⊕ D8 (row 2) or D2 ⊕ D6 ⊕ D9 (row 3).</li>
+    </ul>
+    <p>So all three are recovered. In general, a set of failed disks is recoverable exactly when their columns are linearly independent (no subset of them XORs to zero).</p>
+    <p>Note: the question bank's answer uses the P+Q (Reed–Solomon) form of RAID 6 with 2 redundant disks. That is valid if Galois-field arithmetic is allowed, and 2 is then the minimum, but such a design cannot recover from the three failures in (iii). The question's “tricky” part points to the textbook's XOR construction above.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2013–14 · 15 marks</div>
+  <div class="exam-q"><p>Find a RAID level 6 scheme with 15 disks, four of which are redundant.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>15 = 2⁴ − 1, so this is the Hamming-code scheme with <i>k</i> = 4: write all 15 non-zero columns of 4 bits. Disks 1–11 (columns with two or more 1s) hold data; disks 12–15 (one 1 each) are redundant.</p>
+    <div class="tbl"><table>
+      <tr><th>disk</th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th><th>7</th><th>8</th><th>9</th><th>10</th><th>11</th><th>12</th><th>13</th><th>14</th><th>15</th></tr>
+      <tr><td>row 1</td><td>1</td><td>1</td><td>1</td><td>1</td><td>0</td><td>1</td><td>1</td><td>1</td><td>0</td><td>0</td><td>0</td><td>1</td><td>0</td><td>0</td><td>0</td></tr>
+      <tr><td>row 2</td><td>1</td><td>1</td><td>1</td><td>0</td><td>1</td><td>1</td><td>0</td><td>0</td><td>1</td><td>1</td><td>0</td><td>0</td><td>1</td><td>0</td><td>0</td></tr>
+      <tr><td>row 3</td><td>1</td><td>1</td><td>0</td><td>1</td><td>1</td><td>0</td><td>1</td><td>0</td><td>1</td><td>0</td><td>1</td><td>0</td><td>0</td><td>1</td><td>0</td></tr>
+      <tr><td>row 4</td><td>1</td><td>0</td><td>1</td><td>1</td><td>1</td><td>0</td><td>0</td><td>1</td><td>0</td><td>1</td><td>1</td><td>0</td><td>0</td><td>0</td><td>1</td></tr>
+    </table></div>
+    <p>Redundant disks (XOR, bit by bit):</p>
+    <ul>
+      <li>disk 12 = D1 ⊕ D2 ⊕ D3 ⊕ D4 ⊕ D6 ⊕ D7 ⊕ D8</li>
+      <li>disk 13 = D1 ⊕ D2 ⊕ D3 ⊕ D5 ⊕ D6 ⊕ D9 ⊕ D10</li>
+      <li>disk 14 = D1 ⊕ D2 ⊕ D4 ⊕ D5 ⊕ D7 ⊕ D9 ⊕ D11</li>
+      <li>disk 15 = D1 ⊕ D3 ⊕ D4 ⊕ D5 ⊕ D8 ⊕ D10 ⊕ D11</li>
+    </ul>
+    <p><strong>Reading:</strong> from the data disks directly. <strong>Writing</strong> data disk <i>j</i>: XOR old ⊕ new into each redundant disk whose row has a 1 in column <i>j</i>. <strong>Recovery:</strong> all columns are distinct, so for two failed disks a and b find a row where exactly one of them has a 1; rebuild that one from the other disks of the row, then rebuild the other from any row containing it. Example: disks 1 and 2 fail; row 4 contains disk 1 but not 2, so D1 = D3 ⊕ D4 ⊕ D5 ⊕ D8 ⊕ D10 ⊕ D11 ⊕ D15; then D2 from row 1. The scheme survives any 2 simultaneous failures (minimum distance 3), with 11 of 15 disks holding data.</p>
+    <p>Note: the question bank's answer builds a Reed–Solomon code with four check blocks that survives 4 failures. That needs Galois-field arithmetic; the XOR scheme the question refers to (15 = 2⁴ − 1 disks, 4 redundant) tolerates 2.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2011–12 · 15 marks (similar: CSE 215 | L-3/T-1 | 2012–13)</div>
+  <div class="exam-q"><p>Find a RAID level 6 scheme with ten disks, such that it is possible to recover from the failure of any three disks simultaneously. You should use as many data disks as you can.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><strong>Condition.</strong> With an XOR parity-check matrix, any 3 failed disks can be rebuilt exactly when <em>every 3 columns are linearly independent</em>: no column is zero, no two are equal, and no three XOR to zero (minimum distance 4).</p>
+    <p><strong>How many redundant disks?</strong> One redundant disk per row. With 4 rows, at most 8 columns can have the property (it is achieved by the 8 columns with an odd number of 1s, and no set of 9 works), so 10 disks need <strong>5 redundant disks</strong>, leaving <strong>5 data disks</strong>.</p>
+    <p><strong>Design.</strong> Give every disk a column with an <em>odd</em> number of 1s in 5 bits: redundant disks 6–10 get the five single-1 columns; data disks 1–5 get five columns with three 1s. The XOR of two odd-weight columns has even weight (and is non-zero if they differ); the XOR of three has odd weight, so it is never zero. Hence any 3 columns are independent.</p>
+    <div class="tbl"><table>
+      <tr><th>disk</th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th><th>7</th><th>8</th><th>9</th><th>10</th></tr>
+      <tr><td>row 1</td><td>1</td><td>1</td><td>1</td><td>1</td><td>1</td><td>1</td><td>0</td><td>0</td><td>0</td><td>0</td></tr>
+      <tr><td>row 2</td><td>1</td><td>1</td><td>1</td><td>0</td><td>0</td><td>0</td><td>1</td><td>0</td><td>0</td><td>0</td></tr>
+      <tr><td>row 3</td><td>1</td><td>0</td><td>0</td><td>1</td><td>1</td><td>0</td><td>0</td><td>1</td><td>0</td><td>0</td></tr>
+      <tr><td>row 4</td><td>0</td><td>1</td><td>0</td><td>1</td><td>0</td><td>0</td><td>0</td><td>0</td><td>1</td><td>0</td></tr>
+      <tr><td>row 5</td><td>0</td><td>0</td><td>1</td><td>0</td><td>1</td><td>0</td><td>0</td><td>0</td><td>0</td><td>1</td></tr>
+    </table></div>
+    <p>Redundant disks: D6 = D1 ⊕ D2 ⊕ D3 ⊕ D4 ⊕ D5; D7 = D1 ⊕ D2 ⊕ D3; D8 = D1 ⊕ D4 ⊕ D5; D9 = D2 ⊕ D4; D10 = D3 ⊕ D5. (All 120 triples of failed disks were checked by program to be recoverable.)</p>
+    <p><strong>Recovery example.</strong> Disks 1, 2 and 3 fail. Row 3 contains only disk 1 of them: D1 = D4 ⊕ D5 ⊕ D8. Row 4 contains only disk 2: D2 = D4 ⊕ D9. Row 5 contains only disk 3: D3 = D5 ⊕ D10.</p>
+    <p>Note: the question bank's answer uses a Reed–Solomon code with 3 redundant and 7 data disks. That is possible with Galois-field arithmetic (any 3 check blocks can then cover 3 failures), but with XOR parity checks, as in the textbook's RAID 6 section, 5 data disks is the maximum for 10 disks.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 20-21 4a · 10 marks</div>
+  <div class="exam-q"><p>Show the relationship among memory buffer, transaction work area and disk storage and explain how data A is read from disk for a transaction and data B is written to the disk for a transaction.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><strong>Relationship</strong> (see the animation in Section 4). The database is on disk as physical blocks. The main-memory buffer holds copies of some blocks (buffer blocks). Each transaction T<sub>i</sub> has a private work area with local copies of the items it uses. Blocks move between disk and buffer by input(B) and output(B); items move between buffer and work area by read(X) and write(X).</p>
+    <p><strong>Reading A</strong> (A is in block B<sub>A</sub>), read(A) by T<sub>i</sub>:</p>
+    <ol>
+      <li>If B<sub>A</sub> is not in the buffer, the buffer manager executes input(B<sub>A</sub>), copying the block from disk into a free buffer frame (writing out a victim block first if the buffer is full).</li>
+      <li>The value of A in the buffer block is copied into T<sub>i</sub>'s local variable a<sub>i</sub>. T<sub>i</sub> now works on a<sub>i</sub>.</li>
+    </ol>
+    <p><strong>Writing B</strong> (B in block B<sub>B</sub>), write(B) by T<sub>i</sub>:</p>
+    <ol>
+      <li>If B<sub>B</sub> is not in the buffer, input(B<sub>B</sub>) first.</li>
+      <li>The value of T<sub>i</sub>'s local b<sub>i</sub> is copied into B in the buffer block, which is now <em>dirty</em> (different from disk).</li>
+      <li>Later the buffer manager executes output(B<sub>B</sub>), writing the whole block to disk: when the frame is needed, at a checkpoint, or when the recovery protocol requires it (e.g. the log records describing the change must reach stable storage first). Until then the new value of B exists only in volatile memory.</li>
+    </ol>
+  </div></details>
+</div>
+
+<div class="key"><p><strong>Summary:</strong> Disks fail intermittently, by media decay, by failed writes, or by crashing; checksums detect bad sectors. Stable storage keeps each value in two sectors written one after the other and read alternately, so an old or new value always survives. RAID 6 can be built with XOR alone from a parity-check matrix whose columns are distinct (2 failures) or have every 3 independent (3 failures); with k redundant disks the Hamming scheme supports 2<sup>k</sup> − k − 1 data disks. A transaction reads and writes items in its own work area; read/write move values between work area and buffer, input/output move whole blocks between buffer and disk.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="lecture.js"></script>
+<script>
+// Stable storage animation
+(() => {
+  const fig = (l, r, note, bad = '') => {
+    const box = (x, lab, v, st) => `<rect x="${x}" y="40" width="200" height="56" class="${st === 'bad' ? 'cell-del' : st === 'new' ? 'cell-new' : st === 'busy' ? 'cell-hl' : 'cell'}"/><text x="${x + 100}" y="62" text-anchor="middle" class="big">${lab}</text><text x="${x + 100}" y="84" text-anchor="middle" style="font-size:12px">${v}</text>`;
+    return `<svg viewBox="0 0 520 130" width="520" role="img" aria-label="Stable storage: left and right copies">${box(30, 'X_L (disk 1)', l[0], l[1])}${box(290, 'X_R (disk 2)', r[0], r[1])}<text x="30" y="20" class="lbl">${note}</text><text x="30" y="122" class="lbl red">${bad}</text></svg>`;
+  };
+  stepper('#stable', [
+    { html: fig(['old = 500', ''], ['old = 500', ''], 'X = account balance, stored twice.'), cap: 'Both copies hold the old value 500, each with its checksum.' },
+    { html: fig(['writing 600 …', 'busy'], ['old = 500', ''], 'Write step 1: write X_L, read it back, check the checksum.'), cap: 'Step 1: write the new value 600 into X<sub>L</sub> and verify it. X<sub>R</sub> is not touched yet.' },
+    { html: fig(['?? garbled', 'bad'], ['old = 500', ''], 'Crash during step 1:', 'X_L fails its checksum, X_R is good → recover old value 500, copy it to X_L.'), cap: 'If the power fails during step 1, X<sub>L</sub> is half-written and fails its checksum, but X<sub>R</sub> still holds 500. The read policy returns 500 (the old, consistent value) and X<sub>L</sub> is repaired from X<sub>R</sub>.' },
+    { html: fig(['new = 600', 'new'], ['writing 600 …', 'busy'], 'Write step 2: only after X_L is good, write X_R.'), cap: 'Step 2: once X<sub>L</sub> is verified, write and verify X<sub>R</sub>. A crash now leaves X<sub>L</sub> = 600 good, so the new value is read and copied into X<sub>R</sub>.' },
+    { html: fig(['new = 600', 'new'], ['new = 600', 'new'], 'Both copies hold 600.'), cap: 'Done. Reading alternates between X<sub>L</sub> and X<sub>R</sub> until one passes its checksum, so one decayed copy never loses X.' },
+  ], { interval: 2600 });
+})();
+
+// Hamming RAID 6 recovery (textbook Example 13.14)
+(() => {
+  const blk = ['11110000', '00001111', '00111000', '01000001', '11000111', '10111110', '10001001'];
+  const M = ['1110100', '1101010', '1011001'];
+  const x = idx => idx.map(i => parseInt(blk[i], 2)).reduce((a, b) => a ^ b).toString(2).padStart(8, '0');
+  const fig = (lost, hlRow, src, tgt) => {
+    let s = '';
+    for (let d = 0; d < 7; d++) {
+      const y = 30 + d * 30, gone = lost.includes(d), cls = d === tgt ? 'cell-new' : src.includes(d) ? 'cell-hl' : gone ? 'cell-del' : 'cell';
+      s += `<text x="20" y="${y + 17}" class="big" style="font-size:12px">disk ${d + 1}${d >= 4 ? ' (red.)' : ''}</text>`;
+      s += `<rect x="120" y="${y}" width="110" height="24" class="${cls}"/><text x="175" y="${y + 17}" text-anchor="middle" style="font-size:12px">${gone && d !== tgt ? '????????' : blk[d]}</text>`;
+      M.forEach((row, r) => { s += `<rect x="${280 + r * 40}" y="${y}" width="30" height="24" class="${r === hlRow ? (row[d] === '1' ? 'cell-hl' : 'cell-dim') : 'cell-plain'}"/><text x="${295 + r * 40}" y="${y + 17}" text-anchor="middle" style="font-size:12px">${row[d]}</text>`; });
+    }
+    M.forEach((_, r) => { s += `<text x="${295 + r * 40}" y="20" text-anchor="middle" class="lbl">row ${r + 1}</text>`; });
+    s += `<text x="120" y="20" class="lbl">first block</text>`;
+    return `<svg viewBox="0 0 420 250" width="420" role="img" aria-label="Hamming-code RAID 6 recovery">${s}</svg>`;
+  };
+  stepper('#ham', [
+    { html: fig([], -1, [], -1), cap: 'First blocks of the seven disks (textbook Fig. 13.12) and the matrix columns. Each row\'s disks XOR to zero, e.g. row 1: disks 1, 2, 3, 5.' },
+    { html: fig([1, 4], -1, [], -1), cap: 'Disks 2 and 5 fail at the same time.' },
+    { html: fig([1, 4], 1, [], -1), cap: 'Find a row where the two columns differ. Row 2: disk 2 has 1, disk 5 has 0. In row 2, disk 2 is the only unknown (row 2 = disks 1, 2, 4, 6).' },
+    { html: fig([1, 4], 1, [0, 3, 5], 1), cap: `Disk 2 = disk 1 ⊕ disk 4 ⊕ disk 6 = 11110000 ⊕ 01000001 ⊕ 10111110 = <b>${x([0, 3, 5])}</b>.` },
+    { html: fig([4], 0, [0, 1, 2], 4), cap: `Now only disk 5 is missing. Its column has a 1 in row 1 (disks 1, 2, 3, 5): disk 5 = 11110000 ⊕ 00001111 ⊕ 00111000 = <b>${x([0, 1, 2])}</b>. Both disks are recovered.` },
+  ], { interval: 2600 });
+})();
+
+// Disk / buffer / work area animation
+(() => {
+  const fig = (o) => {
+    const b = (x, y, w, lab, v, cls) => `<rect x="${x}" y="${y}" width="${w}" height="30" class="${cls || 'cell'}"/><text x="${x + w / 2}" y="${y + 20}" text-anchor="middle" style="font-size:12px">${lab}${v != null ? ' = ' + v : ''}</text>`;
+    let s = `<rect x="10" y="20" width="160" height="150" class="cell-plain"/><text x="90" y="40" text-anchor="middle" class="big">disk</text>`;
+    s += b(25, 60, 130, 'B_A: A', 100, o.dA) + b(25, 110, 130, 'B_B: B', o.diskB ?? 50, o.dB);
+    s += `<rect x="210" y="20" width="160" height="150" class="cell-plain"/><text x="290" y="40" text-anchor="middle" class="big">buffer (memory)</text>`;
+    if (o.bufA) s += b(225, 60, 130, 'B_A: A', 100, o.bA);
+    if (o.bufB) s += b(225, 110, 130, 'B_B: B', o.bufB, o.bB);
+    s += `<rect x="410" y="20" width="160" height="150" class="cell-plain"/><text x="490" y="40" text-anchor="middle" class="big">work area of T1</text>`;
+    if (o.a1) s += b(425, 60, 130, 'a1', 100, o.wa);
+    if (o.b1) s += b(425, 110, 130, 'b1', o.b1, o.wb);
+    if (o.arrow) s += `<path d="${o.arrow}" class="s-red" marker-end="url(#m-red)"/>`;
+    if (o.lab) s += `<text x="290" y="195" text-anchor="middle" class="lbl red">${o.lab}</text>`;
+    return `<svg viewBox="0 0 580 210" width="580" role="img" aria-label="Disk, buffer and work area">${s}</svg>`;
+  };
+  stepper('#buf', [
+    { html: fig({}), cap: 'A is in disk block B<sub>A</sub>, B in block B<sub>B</sub>. Neither block is in the buffer yet. T1 executes read(A).' },
+    { html: fig({ bufA: 1, bA: 'cell-new', dA: 'cell-hl', arrow: 'M157 75 H221', lab: 'input(B_A)' }), cap: 'B<sub>A</sub> is not in the buffer, so input(B<sub>A</sub>) copies the whole block from disk into a buffer frame.' },
+    { html: fig({ bufA: 1, bA: 'cell-hl', a1: 1, wa: 'cell-new', arrow: 'M357 75 H421', lab: 'read(A): a1 := A' }), cap: 'read(A) copies A from the buffer block into T1\'s local variable a1. T1 now works with a1.' },
+    { html: fig({ bufA: 1, a1: 1, b1: 70, wb: 'cell-hl' }), cap: 'T1 computes a new value for B in its work area: b1 = 70. Then it executes write(B).' },
+    { html: fig({ bufA: 1, a1: 1, b1: 70, bufB: 50, bB: 'cell-new', dB: 'cell-hl', arrow: 'M157 125 H221', lab: 'input(B_B)' }), cap: 'B<sub>B</sub> is not in the buffer, so it is input first.' },
+    { html: fig({ bufA: 1, a1: 1, b1: 70, wb: 'cell-hl', bufB: 70, bB: 'cell-new', arrow: 'M421 125 H357', lab: 'write(B): B := b1' }), cap: 'write(B) copies b1 into B in the buffer block. The block is now dirty: memory says 70, disk still says 50.' },
+    { html: fig({ bufA: 1, a1: 1, b1: 70, bufB: 70, bB: 'cell-hl', diskB: 70, dB: 'cell-new', arrow: 'M221 125 H157', lab: 'output(B_B), later' }), cap: 'Later, when the buffer manager decides (frame needed, checkpoint, or the recovery protocol), output(B<sub>B</sub>) writes the whole block to disk.' },
+  ], { interval: 2400 });
+})();
+
+quiz('#quiz', [
+  { q: 'What is the parity bit of 10101101?', opts: ['0', '1'], a: 1, why: 'Five 1s, an odd number, so the parity bit is 1.' },
+  { q: 'In stable storage, why is X_R written only after X_L is verified?', opts: ['To save time', 'So that at any moment at least one copy holds a complete (old or new) value', 'Because X_R is on a slower disk', 'To compute parity'], a: 1, why: 'A crash can garble only the copy being written.' },
+  { q: 'With 3 redundant disks in the Hamming scheme, how many data disks?', opts: ['3', '4', '7', '11'], a: 1, why: '2³ − 3 − 1 = 4.' },
+  { q: 'Two disks failed in a Hamming RAID 6. What must you find first?', opts: ['A row with 1s for both', 'A row where exactly one of the two has a 1', 'The parity disk', 'A mirror'], a: 1, why: 'In that row the other disk is not involved, so the one unknown can be solved.' },
+  { q: 'write(X) by a transaction…', opts: ['writes X to disk immediately', 'copies the local value into the buffer block; disk is updated later by output', 'reads X from disk', 'deletes the buffer block'], a: 1, why: 'Disk writes happen only through output(B).' },
+]);
+ask('#try1', { q: 'RAID 4 with one-byte blocks: data disks hold 11110000, 11111000, 00111111, 00000001. What is the redundant block? (textbook Exercise 13.4.6 b)', a: ['00110110'], hint: 'XOR the four bytes.', why: '11110000 ⊕ 11111000 = 00001000; ⊕ 00111111 = 00110111; ⊕ 00000001 = 00110110.' });
+</script>
+</body>
+</html>

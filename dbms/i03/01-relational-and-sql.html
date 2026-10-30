@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SQL and Relational Databases · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="../i03/lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 03 (Ishrak) · Chapter 1 · Slides 1–9 · Book §2.3.1</div>
+<h1>SQL and Relational Databases</h1>
+<p class="lede">What SQL is, where it came from, how relational and non-relational databases differ, and how SQL splits into a data definition part (DDL) and a data manipulation part (DML). This chapter also introduces the four basic operations every database supports: Create, Read, Update and Delete.</p>
+
+<h2>1. What this lecture covers (slide 2)</h2>
+<p>Lecture 3 has five parts, and this book gives each part its own chapter:</p>
+<ol>
+  <li><strong>Relational model vs non-relational model</strong>: this chapter (Lecture 2 treats the models in depth).</li>
+  <li><strong>SQL introduction and brief history</strong>: this chapter.</li>
+  <li><strong>Data in SQL</strong>: tables, schemas and domains (Chapter 2), character and number types (Chapter 3), dates (Chapter 4) and NULL (Chapter 5).</li>
+  <li><strong>Basic schema definition</strong>: <code>CREATE TABLE</code> (Chapters 2 and 5).</li>
+  <li><strong>Keys and constraints</strong>: primary keys and UNIQUE (Chapter 6).</li>
+</ol>
+<p>The slide footers say "CSE303: Ashikur Rahman" and the title slide says "Lecture 02": the slides were reused from an older course. The content is the same as CSE215 Lecture 3.</p>
+
+<h2>2. Two kinds of databases (slides 3–5)</h2>
+<dl class="def">
+  <dt>Relational database</dt>
+  <dd>A database that organizes data into one or more <b class="term">tables</b>. Each table has named columns and a set of rows, and a <b class="term">key</b> (a column or set of columns whose value is unique in every row) identifies each row.</dd>
+  <dt>Non-relational (NoSQL) database</dt>
+  <dd>A database that organizes data in some structure other than tables: <b class="term">key-value pairs</b> (a value looked up by a key, like a hash map), <b class="term">documents</b> (self-describing records in JSON or XML), or <b class="term">graphs</b> (nodes connected by labelled edges).</dd>
+</dl>
+<p>Slide 4 shows two relational tables. In the Student table the column <code>ID #</code> is marked with an asterisk because it is the key: no two students share an ID. In the Users table the key is <code>Username</code>. Slide 5 shows the same four students stored three non-relational ways. The figure below redraws both slides so you can compare them directly.</p>
+<figure class="wide">
+<svg viewBox="0 0 860 250" width="860" role="img" aria-label="The same student data stored as a relational table, as JSON documents, as key-value pairs and as a graph">
+  <text x="10" y="18" class="big">Relational: one table</text>
+  <g id="relT"></g>
+  <text x="250" y="18" class="big">Document (JSON)</text>
+  <rect x="250" y="28" width="185" height="200" rx="6" class="cell-plain"/>
+  <text x="260" y="48" style="font-size:12px">[ { "_id": 1,</text>
+  <text x="260" y="64" style="font-size:12px">    "name": "Jack",</text>
+  <text x="260" y="80" style="font-size:12px">    "major": "Biology" },</text>
+  <text x="260" y="96" style="font-size:12px">  { "_id": 2,</text>
+  <text x="260" y="112" style="font-size:12px">    "name": "Kate",</text>
+  <text x="260" y="128" style="font-size:12px">    "major": "Sociology",</text>
+  <text x="260" y="144" style="font-size:12px">    "minor": "Art" },</text>
+  <text x="260" y="160" style="font-size:12px">  … ]</text>
+  <text x="258" y="190" class="lbl">each record carries its</text>
+  <text x="258" y="204" class="lbl">own field names, which</text><text x="258" y="218" class="lbl">may differ per record</text>
+  <text x="450" y="18" class="big">Key-value</text>
+  <g id="kvT"></g>
+  <text x="650" y="18" class="big">Graph</text>
+  <circle cx="690" cy="80" r="24" class="cell"/><text x="690" y="84" text-anchor="middle" style="font-size:12px">Jack</text>
+  <circle cx="800" cy="70" r="24" class="cell"/><text x="800" y="74" text-anchor="middle" style="font-size:12px">Kate</text>
+  <circle cx="745" cy="175" r="28" class="cell-hl"/><text x="745" y="179" text-anchor="middle" style="font-size:11px">Biology</text>
+  <path d="M700 102 L733 150" class="s-fg" marker-end="url(#m-fg)"/><text x="708" y="135" text-anchor="end" class="lbl">majors in</text>
+  <path d="M714 78 L774 72" class="s-fg" marker-end="url(#m-fg)"/><text x="744" y="60" text-anchor="middle" class="lbl">friend of</text>
+  <path d="M790 93 L758 148" class="s-fg dash" marker-end="url(#m-fg)"/><text x="780" y="130" class="lbl">took a class</text>
+</svg>
+<figcaption><b>Figure 1.</b> Slides 4–5 side by side. The relational table forces every row into the same columns. A document store lets Kate have a <code>minor</code> field that Jack does not have. A key-value store only knows "key → opaque value". A graph stores the relationships themselves as edges.</figcaption>
+</figure>
+<p>This course is about relational databases, and the rest of the book uses them only. The slide's "Link" on slide 5 points to an article comparing the two; the main points are: relational systems give a fixed schema, a powerful standard query language (SQL) and strong consistency guarantees; non-relational systems give flexible schemas and easy horizontal scaling for very large or loosely structured data, usually at the cost of a weaker query language.</p>
+
+<h2>3. What SQL is (slide 6)</h2>
+<dl class="def">
+  <dt>SQL</dt>
+  <dd><b class="term">Structured Query Language</b>: the standard language for defining, querying and changing data in a relational database. It was first called <b class="term">SEQUEL</b> (Structured English QUEry Language) at IBM; the name was shortened for trademark reasons. The slide recommends the pronunciation "S-Q-L"; "sequel" is also common in industry.</dd>
+  <dt>Declarative language</dt>
+  <dd>A language in which you state <em>what</em> result you want and the system works out <em>how</em> to compute it. SQL is declarative: <code>SELECT name FROM Students WHERE gpa &gt; 3.5</code> says nothing about loops, files or indexes. The DBMS's query optimizer chooses the method (Lectures 13–15 show what happens underneath).</dd>
+</dl>
+
+<h2>4. A short history (slide 7)</h2>
+<figure class="wide">
+<svg viewBox="0 0 860 200" width="860" role="img" aria-label="Timeline of SQL from the 1970s to 2023">
+  <g id="tl"></g>
+</svg>
+<figcaption><b>Figure 2.</b> The chronology from slide 7 (above the line) and the later SQL standards (below the line). The red marks are corrections to the slide, explained below.</figcaption>
+</figure>
+<ul>
+  <li><strong>1970s, IBM.</strong> E. F. Codd at IBM published the relational model in 1970. IBM built the first relational prototype, <b class="term">System R</b>, whose query language became SQL; its commercial successor is <b class="term">DB2</b>. Other early systems had their own languages: Ingres used <b class="term">QUEL</b>, Digital had the Relational Database Operator, ISBL was a relational-algebra language, and the dBase family ran on PCs.</li>
+  <li><strong>1979, Oracle.</strong> Relational Software Inc. (later renamed Oracle) shipped the first commercial SQL database. This course uses Oracle.</li>
+  <li><strong>1980s, standardisation.</strong> The slide says the ISO standard came in 1984. The first SQL standard was actually published by ANSI in 1986 and adopted by ISO in 1987 ("SQL-86"); it had many gaps but was adopted everywhere.</li>
+  <li><strong>1992, SQL-92.</strong> The big revision that is still the core of every SQL system.</li>
+  <li><strong>1999, SQL:1999.</strong> Added triggers, recursive queries and object features. Oracle conforms to the core of SQL:1999.</li>
+  <li><strong>2003, SQL:2003.</strong> The slide calls it the current standard, which was true when the slide was written. Later revisions are SQL:2006, 2008, 2011, 2016 and SQL:2023. No product implements all of any standard; every system has its own <b class="term">dialect</b>, and Oracle's is the one used in this book.</li>
+</ul>
+
+<h2>5. The four basic operations: CRUD (slide 8)</h2>
+<p>Every database system, relational or not, must support four operations on stored data, remembered as <b class="term">CRUD</b>. In SQL each one is a single statement:</p>
+<div class="tbl"><table>
+<tr><th>CRUD operation</th><th>Meaning</th><th>SQL statement</th><th>Taught in</th></tr>
+<tr><td><strong>C</strong>reate</td><td>add new rows</td><td><code>INSERT</code></td><td>Chapter 6 here; Lec 05 Chapter 1</td></tr>
+<tr><td><strong>R</strong>ead</td><td>retrieve rows</td><td><code>SELECT</code></td><td>Lec 04</td></tr>
+<tr><td><strong>U</strong>pdate</td><td>change values in existing rows</td><td><code>UPDATE</code></td><td>Lec 05 Chapter 3</td></tr>
+<tr><td><strong>D</strong>elete</td><td>remove rows</td><td><code>DELETE</code></td><td>Lec 05 Chapter 2</td></tr>
+</table></div>
+<p>Notice that "Create" in CRUD means creating <em>data</em> (rows). Creating a <em>table</em> is a different kind of statement, which leads to the DDL/DML split.</p>
+
+<h2>6. The two halves of SQL: DDL and DML (slide 9)</h2>
+<dl class="def">
+  <dt>Data Definition Language (DDL)</dt>
+  <dd>The statements that create, change and remove the <em>structure</em> of the database: tables, their attributes (columns) and their constraints. The main DDL statements are <code>CREATE TABLE</code>, <code>ALTER TABLE</code> and <code>DROP TABLE</code>. This lecture teaches DDL.</dd>
+  <dt>Data Manipulation Language (DML)</dt>
+  <dd>The statements that work on the <em>data</em> inside tables: querying (<code>SELECT</code>) and modifying (<code>INSERT</code>, <code>UPDATE</code>, <code>DELETE</code>). Lectures 4 and 5 teach DML.</dd>
+</dl>
+<p>Oracle's documentation also names two smaller groups that the slides do not list: <b class="term">transaction control</b> (<code>COMMIT</code>, <code>ROLLBACK</code>) and <b class="term">data control</b> (<code>GRANT</code>, <code>REVOKE</code>, which give and take away permissions; see <a href="../i05/05-beyond-the-slides.html">Lec 05 Chapter 5</a>). One practical difference matters in Oracle: every DDL statement commits the current transaction automatically, while DML changes stay uncommitted until you issue <code>COMMIT</code>.</p>
+
+<figure>
+<svg viewBox="0 0 640 170" width="640" role="img" aria-label="SQL splits into DDL acting on the schema and DML acting on the data">
+  <rect x="250" y="10" width="140" height="34" rx="6" class="cell-hl"/><text x="320" y="32" text-anchor="middle" class="big">SQL</text>
+  <path d="M290 44 L150 74" class="s-fg" marker-end="url(#m-fg)"/><path d="M350 44 L490 74" class="s-fg" marker-end="url(#m-fg)"/>
+  <rect x="40" y="78" width="220" height="80" rx="6" class="cell"/>
+  <text x="150" y="98" text-anchor="middle" class="big">DDL: the schema</text>
+  <text x="150" y="118" text-anchor="middle" style="font-size:12px">CREATE TABLE</text>
+  <text x="150" y="134" text-anchor="middle" style="font-size:12px">ALTER TABLE · DROP TABLE</text>
+  <text x="150" y="150" text-anchor="middle" class="lbl">this lecture</text>
+  <rect x="380" y="78" width="220" height="80" rx="6" class="cell-new"/>
+  <text x="490" y="98" text-anchor="middle" class="big">DML: the data</text>
+  <text x="490" y="118" text-anchor="middle" style="font-size:12px">SELECT (query)</text>
+  <text x="490" y="134" text-anchor="middle" style="font-size:12px">INSERT · UPDATE · DELETE</text>
+  <text x="490" y="150" text-anchor="middle" class="lbl">Lectures 4 and 5</text>
+</svg>
+<figcaption><b>Figure 3.</b> DDL changes what tables exist and what they look like; DML reads and changes the rows inside them.</figcaption>
+</figure>
+
+<h2>7. A first look at SQL</h2>
+<p>The box below is a live SQL playground. It holds the sample tables used throughout Lecture 3 (<code>Students</code>, <code>Movie</code>, <code>MovieStar</code>, <code>Course</code> and an empty <code>Student</code>). Press <b>Show tables</b> to see them, then run the query. Every statement in this book is written in Oracle SQL; the playground translates it for the SQLite engine that runs inside your browser.</p>
+<div id="p1"></div>
+<p>Try the four CRUD statements one after another in the same box (each one changes the data until you press Reset):</p>
+<pre>INSERT INTO Movie VALUES ('Titanic', 1997, 194, 'drama');          -- Create
+SELECT * FROM Movie;                                               -- Read
+UPDATE Movie SET length = 195 WHERE title = 'Titanic';             -- Update
+DELETE FROM Movie WHERE title = 'Titanic';                         -- Delete</pre>
+<div id="p2"></div>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+<h3>SQL exercises</h3>
+<p>The task tells you the statement form when it has not been taught yet. Press <b>Show tables</b> to see the data.</p>
+<div id="c1"></div><div id="c2"></div><div id="c3"></div><div id="c4"></div><div id="c5"></div>
+
+<div class="key"><p><strong>Summary:</strong> a relational database stores data in tables of rows and columns, with a key identifying each row; non-relational databases use key-value pairs, documents or graphs. SQL (originally SEQUEL, from IBM's System R) is the standard, declarative language for relational databases; Oracle shipped the first commercial SQL product in 1979. Every database supports CRUD: INSERT, SELECT, UPDATE, DELETE. SQL's DDL defines structure (CREATE/ALTER/DROP TABLE) and its DML queries and changes data (SELECT, INSERT, UPDATE, DELETE).</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/sqlplay.js"></script>
+<script src="../i03/lecture.js"></script>
+<script>
+// relational table and key-value figure parts
+(() => {
+  const rows = [['1', 'Jack', 'Biology'], ['2', 'Kate', 'Sociology'], ['3', 'Claire', 'English'], ['4', 'John', 'Chemistry']];
+  let s = '', w = [34, 70, 90];
+  const xs = [10, 44, 114];
+  ['ID #*', 'Name', 'Major'].forEach((h, j) => s += `<rect x="${xs[j]}" y="28" width="${w[j]}" height="24" class="cell-hl"/><text x="${xs[j] + 5}" y="45" style="font-size:12px;font-weight:600">${h}</text>`);
+  rows.forEach((r, i) => r.forEach((c, j) => s += `<rect x="${xs[j]}" y="${52 + i * 24}" width="${w[j]}" height="24" class="cell"/><text x="${xs[j] + 5}" y="${69 + i * 24}" style="font-size:12px">${c}</text>`));
+  s += '<text x="10" y="170" class="lbl">same columns in every row;</text><text x="10" y="184" class="lbl">ID # is the key</text>';
+  document.querySelector('#relT').innerHTML = s;
+  let k = '';
+  [['"xyz"', 'string'], ['"abc"', 'JSON'], ['"pqr"', 'BLOB'], ['"lmno"', 'etc.']].forEach(([a, b], i) => {
+    k += `<rect x="450" y="${28 + i * 30}" width="70" height="26" class="cell-hl"/><text x="458" y="${46 + i * 30}" style="font-size:12px">${a}</text>`;
+    k += `<path d="M522 ${41 + i * 30} L548 ${41 + i * 30}" class="s-fg" marker-end="url(#m-fg)"/>`;
+    k += `<rect x="552" y="${28 + i * 30}" width="70" height="26" class="cell"/><text x="560" y="${46 + i * 30}" style="font-size:12px;font-style:italic">${b}</text>`;
+  });
+  k += '<text x="450" y="160" class="lbl">key → value; the store</text><text x="450" y="174" class="lbl">never looks inside the value</text>';
+  document.querySelector('#kvT').innerHTML = k;
+  // timeline
+  const X = y => 40 + (y - 1970) * 14.5;
+  let t = `<path d="M30 100 L${X(2025)} 100" class="s-fg" marker-end="url(#m-fg)"/>`;
+  for (let y = 1970; y <= 2020; y += 10) t += `<path d="M${X(y)} 96 L${X(y)} 104" class="s-fg"/><text x="${X(y)}" y="118" text-anchor="middle" class="lbl">${y}</text>`;
+  const up = [[1974, 'IBM System R → DB2', 1], [1979, 'Oracle', 0], [1986, 'SQL-86 (ANSI; ISO 1987)', 2, 'red'], [1992, 'SQL-92', 0], [1999, 'SQL:1999', 1, '', 'end'], [2003, 'SQL:2003', 2]];
+  up.forEach(([y, l, lev, c, an]) => { const yy = 84 - lev * 22; t += `<circle cx="${X(y)}" cy="100" r="4" class="${c ? 'cell-del' : 'cell-hl'}"/><path d="M${X(y)} 96 L${X(y)} ${yy + 4}" class="s-fg dash"/><text x="${an ? X(y) - 3 : X(y) + 3}" y="${yy}" ${an ? 'text-anchor="end"' : ''} style="font-size:12px" class="${c || ''}">${l}</text>`; });
+  const down = [[2008, 'SQL:2008', 0], [2011, '2011', 1], [2016, '2016', 0], [2023, 'SQL:2023', 1]];
+  down.forEach(([y, l, lev]) => { const yy = 140 + lev * 20; t += `<circle cx="${X(y)}" cy="100" r="4" class="cell-new"/><path d="M${X(y)} 104 L${X(y)} ${yy - 12}" class="s-fg dash"/><text x="${X(y) - 3}" y="${yy}" text-anchor="middle" style="font-size:12px" class="red">${l}</text>`; });
+  t += `<text x="40" y="190" class="lbl">above the line: slide 7 · below: standards published after the slide</text>`;
+  document.querySelector('#tl').innerHTML = t;
+})();
+sqlPlay('#p1', { setup: UNI, query: 'SELECT * FROM Students;', note: 'Try <code>SELECT * FROM Movie;</code> or <code>SELECT * FROM Course;</code> as well.' });
+sqlPlay('#p2', { setup: UNI, query: "INSERT INTO Movie VALUES ('Titanic', 1997, 194, 'drama');\nSELECT * FROM Movie;", note: 'Run, then replace the text with the UPDATE and then the DELETE line above and run each. Reset restores the original data.' });
+flashcards('#cards', [
+  { f: 'Relational database', b: 'Data organized as tables (rows and columns); a key identifies each row.' },
+  { f: 'Three non-relational shapes', b: 'Key-value pairs, documents (JSON/XML), graphs.' },
+  { f: 'SQL', b: 'Structured Query Language; originally SEQUEL (Structured English QUEry Language), from IBM System R.' },
+  { f: 'Declarative', b: 'You say what result you want; the DBMS decides how to compute it.' },
+  { f: 'CRUD', b: 'Create, Read, Update, Delete = INSERT, SELECT, UPDATE, DELETE.' },
+  { f: 'DDL', b: 'Data Definition Language: CREATE / ALTER / DROP TABLE. Changes the schema.' },
+  { f: 'DML', b: 'Data Manipulation Language: SELECT, INSERT, UPDATE, DELETE. Works on rows.' },
+  { f: 'First commercial SQL DBMS', b: 'Oracle, 1979.' },
+]);
+quiz('#quiz', [
+  { q: 'Which statement is part of the DDL?', opts: ['SELECT', 'INSERT', 'CREATE TABLE', 'UPDATE'], a: 2, why: 'DDL defines structure. SELECT, INSERT and UPDATE are DML.' },
+  { q: 'The "C" in CRUD corresponds to which SQL statement?', opts: ['CREATE TABLE', 'INSERT', 'COMMIT', 'CONSTRAINT'], a: 1, why: 'CRUD is about data. Creating a row is INSERT; CREATE TABLE creates structure (DDL).' },
+  { q: 'A store that maps "user42" to an opaque blob, with no way to query inside the blob, is a…', opts: ['relational database', 'document store', 'key-value store', 'graph database'], a: 2, why: 'Key-value stores only look values up by key.' },
+  { q: 'What does it mean that SQL is declarative?', opts: ['Statements must be declared before use', 'You describe the result; the DBMS picks the algorithm', 'Every variable has a declared type', 'Queries run in the order written'], a: 1, why: 'The query optimizer chooses scans, indexes and join methods.' },
+  { q: 'The first SQL standard was published in…', opts: ['1979', '1984', '1986 (ANSI), 1987 (ISO)', '1992'], a: 2, why: 'Slide 7 says 1984, but SQL-86 is the first standard. 1979 is Oracle\'s first release.' },
+  { q: 'In which data model does each record carry its own field names, so two records can have different fields?', opts: ['Relational', 'Document', 'Key-value', 'Hierarchical files'], a: 1, why: 'JSON/XML documents are self-describing.' },
+]);
+ask('#try1', { q: 'Classify: <code>DROP TABLE Movie</code>. Type DDL or DML.', a: ['DDL'], why: 'It removes a table (structure), so it is DDL.' });
+chk('#c1', UNI, '<b>Read (easy).</b> Show every row and column of the <code>Movie</code> table. Form: <code>SELECT * FROM table;</code>', 'SELECT * FROM Movie;');
+chk('#c2', UNI, '<b>Read.</b> Show every row and column of the <code>Course</code> table.', 'SELECT * FROM Course;');
+chk('#c3', UNI, '<b>Create.</b> Add the movie <i>Titanic</i> (1997, 194 minutes, genre drama) to <code>Movie</code>. Form: <code>INSERT INTO table VALUES (v1, v2, …);</code> Strings go in single quotes.', "INSERT INTO Movie VALUES ('Titanic', 1997, 194, 'drama');", { check: 'state', table: 'Movie' });
+chk('#c4', UNI, '<b>Update.</b> Change the length of <i>Star Wars</i> (1977) to 121. Form: <code>UPDATE table SET column = value WHERE condition;</code>', "UPDATE Movie SET length = 121 WHERE title = 'Star Wars' AND year = 1977;", { check: 'state', table: 'Movie', hint: 'The key of Movie is (title, year), so a safe condition names both.' });
+chk('#c5', UNI, '<b>Delete.</b> Remove the 1933 <i>King Kong</i>, and keep the 2005 one. Form: <code>DELETE FROM table WHERE condition;</code>', "DELETE FROM Movie WHERE title = 'King Kong' AND year = 1933;", { check: 'state', table: 'Movie', hint: 'title = \'King Kong\' alone would delete both films.' });
+</script>
+</body>
+</html>

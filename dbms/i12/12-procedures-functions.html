@@ -1,0 +1,400 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stored Procedures and Functions · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="lecture.css">
+<style>
+.code-tr pre.code { margin: 0; font-size: 13px; line-height: 1.55; }
+.code-tr pre.code span { display: block; padding: 0 6px; border-radius: 3px; }
+.code-tr pre.code span.on { background: var(--cell-hl); font-weight: 600; box-shadow: inset 3px 0 0 var(--red); }
+.code-tr { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 12px; }
+@media (max-width: 800px) { .code-tr { grid-template-columns: 1fr; } }
+.vars td:first-child { font-weight: 600; }
+</style>
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 12 (Ishrak) · Chapter 12 · Exam topics beyond the slides · Book §9.4</div>
+<h1>Exam Topics Beyond the Slides: Stored Procedures and Functions in PL/SQL</h1>
+<p class="lede">Triggers are one kind of stored program; the question bank also asks you to write stored procedures and functions. This chapter teaches just enough PL/SQL to write them (blocks, variables, SELECT INTO, IF, loops, cursors, exceptions, parameters), traces a procedure step by step, and answers the bank's four questions.</p>
+
+<h2>1. PL/SQL blocks</h2>
+<dl class="def">
+  <dt>PL/SQL</dt>
+  <dd>Oracle's procedural extension of SQL: variables, IF, loops and exception handling around ordinary SQL statements. Trigger bodies are PL/SQL. The SQL standard's version is called SQL/PSM (persistent stored modules), textbook §9.4.</dd>
+  <dt>Block</dt>
+  <dd>The unit of PL/SQL code: an optional <code>DECLARE</code> section for variables, a <code>BEGIN … END;</code> section of statements, and an optional <code>EXCEPTION</code> section for error handlers. A block without a name is an <b>anonymous block</b>; it runs once and is not stored.</dd>
+</dl>
+<pre>SET SERVEROUTPUT ON            -- SQL*Plus / SQL Developer: show DBMS_OUTPUT text
+
+DECLARE
+  v_count  NUMBER;                       -- a variable
+  v_name   instructor.name%TYPE;         -- same type as the column instructor.name
+BEGIN
+  SELECT COUNT(*) INTO v_count FROM instructor WHERE dept_name = 'Physics';
+  IF v_count = 0 THEN
+    DBMS_OUTPUT.PUT_LINE('No physicists');
+  ELSIF v_count = 1 THEN
+    DBMS_OUTPUT.PUT_LINE('One physicist');
+  ELSE
+    DBMS_OUTPUT.PUT_LINE(v_count || ' physicists');
+  END IF;
+EXCEPTION
+  WHEN OTHERS THEN
+    DBMS_OUTPUT.PUT_LINE('Error: ' || SQLERRM);
+END;
+/</pre>
+<div class="tbl"><table>
+<tr><th>Construct</th><th>Meaning</th></tr>
+<tr><td><code>v NUMBER := 0;</code></td><td>Declare a variable with an initial value. Assignment is <code>:=</code>; <code>=</code> is comparison.</td></tr>
+<tr><td><code>t.col%TYPE</code>, <code>t%ROWTYPE</code></td><td>"The type of column t.col" / "a record with all columns of t". Keeps code correct if the column type changes.</td></tr>
+<tr><td><code>SELECT … INTO v FROM …</code></td><td>Runs a query that must return <b>exactly one row</b> and stores it in variables. No row raises NO_DATA_FOUND, several raise TOO_MANY_ROWS. Aggregates without GROUP BY always return one row.</td></tr>
+<tr><td><code>IF … THEN … ELSIF … ELSE … END IF;</code></td><td>Branching (note ELSIF, one word, no E).</td></tr>
+<tr><td><code>FOR i IN 1 .. n LOOP … END LOOP;</code></td><td>Counting loop. Also <code>WHILE cond LOOP</code> and <code>LOOP … EXIT WHEN cond; END LOOP;</code>.</td></tr>
+<tr><td><code>FOR r IN (SELECT …) LOOP … r.col … END LOOP;</code></td><td>Cursor FOR loop: run a query and process its rows one by one.</td></tr>
+<tr><td><code>DBMS_OUTPUT.PUT_LINE(text)</code></td><td>Print a line (visible after SET SERVEROUTPUT ON). <code>||</code> concatenates strings.</td></tr>
+<tr><td><code>EXCEPTION WHEN NO_DATA_FOUND THEN …</code></td><td>Handle an error; <code>WHEN OTHERS</code> catches everything, <code>SQLERRM</code> is the message.</td></tr>
+</table></div>
+
+<h2>2. Stored procedures</h2>
+<dl class="def">
+  <dt>Stored procedure</dt>
+  <dd>A named PL/SQL block stored in the database, with parameters, that you call explicitly. It performs actions (queries, updates, output) and returns nothing directly, though OUT parameters can pass values back.</dd>
+  <dt>Parameter modes</dt>
+  <dd><code>IN</code> (default): a value passed in, read-only. <code>OUT</code>: the procedure assigns it and the caller receives it. <code>IN OUT</code>: both. Parameter types are written without a size (<code>VARCHAR2</code>, not <code>VARCHAR2(20)</code>).</dd>
+</dl>
+<pre>CREATE OR REPLACE PROCEDURE raise_dept (
+  p_dept IN  instructor.dept_name%TYPE,
+  p_pct  IN  NUMBER,
+  p_rows OUT NUMBER) IS
+BEGIN
+  UPDATE instructor SET salary = salary * (1 + p_pct / 100)
+  WHERE dept_name = p_dept;
+  p_rows := SQL%ROWCOUNT;              -- rows changed by the last SQL statement
+END raise_dept;
+/
+
+-- calling it
+DECLARE n NUMBER;
+BEGIN
+  raise_dept('Physics', 10, n);
+  DBMS_OUTPUT.PUT_LINE(n || ' salaries raised');
+END;
+/
+EXEC raise_dept('Physics', 10, :n)    -- SQL*Plus shorthand, with a bind variable :n</pre>
+<p>The IS/AS keyword starts the declaration section (no DECLARE inside a procedure). Whether to COMMIT is usually left to the caller, so that a procedure can be part of a bigger transaction.</p>
+
+<h2>3. Stored functions</h2>
+<dl class="def">
+  <dt>Stored function</dt>
+  <dd>Like a procedure, but it <b>returns a value</b> with <code>RETURN</code>, so it can be used inside expressions, including SQL queries: <code>SELECT f(x) FROM …</code>. A function called from a SQL query may not modify the database.</dd>
+</dl>
+<pre>CREATE OR REPLACE FUNCTION dept_avg (p_dept IN VARCHAR2) RETURN NUMBER IS
+  v NUMBER;
+BEGIN
+  SELECT AVG(salary) INTO v FROM instructor WHERE dept_name = p_dept;
+  RETURN v;
+END;
+/
+SELECT name, salary, dept_avg(dept_name) FROM instructor;   -- used in SQL
+SELECT dept_avg('Physics') FROM dual;                        -- dual: Oracle's one-row table</pre>
+
+<div class="tbl"><table>
+<tr><th></th><th>Procedure</th><th>Function</th><th>Trigger</th></tr>
+<tr><td>Runs when</td><td>called: <code>EXEC p(…)</code> or <code>p(…);</code> in a block</td><td>called inside an expression</td><td>automatically, on INSERT/UPDATE/DELETE</td></tr>
+<tr><td>Returns</td><td>nothing (OUT parameters)</td><td>one value (RETURN)</td><td>nothing</td></tr>
+<tr><td>Parameters</td><td>IN, OUT, IN OUT</td><td>usually IN only</td><td>none (uses :NEW/:OLD)</td></tr>
+<tr><td>Usable in a SELECT</td><td>no</td><td>yes (if it does no DML)</td><td>no</td></tr>
+</table></div>
+<p>The playground cannot run PL/SQL, so the exercises below check the SQL statements that go inside the procedures; the PL/SQL around them is shown and explained.</p>
+
+<h2>4. Tracing a procedure</h2>
+<p>The bank's IncreaseOrDecrease procedure (worked in full below) decides between a raise and a cut using two averages. Pick an employee and a reading of the question, and step through the procedure: the highlighted line is executing, and the panel on the right shows its variables.</p>
+<div class="trg-tool" id="tracer"></div>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+<h3>Write the SQL inside the procedures (auto-checked)</h3>
+<div id="ex1"></div>
+<div id="ex2"></div>
+<div id="ex3"></div>
+<div id="ex4"></div>
+<div id="ex5"></div>
+
+<h3>Exam questions</h3>
+<div class="exam">
+  <div class="exam-src">DB QB · 24-25 6a · 12 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-1 | 2024–25 Q1 · 12 marks</div>
+  <div class="exam-q"><p>Consider the following relational database schema: Planet(planet_id, name, type, distance_sun_au), planet_id is the primary key; Moon(moon_id, name, planet_id, diameter_km), moon_id is the primary key, and planet_id is a foreign key referencing Planet(planet_id).</p>
+  <p>(i) Write an SQL function total_moons() that returns a single integer value representing the total number of moons possessed by all planets. Then write the SQL statement to call the function.<br>(ii) Find the names of all planets whose name contains a substring that starts with "Ma", then has exactly two unknown characters, and ends with "s".</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><b>(i)</b></p>
+<pre>CREATE OR REPLACE FUNCTION total_moons RETURN NUMBER IS
+  v_total NUMBER;
+BEGIN
+  SELECT COUNT(planet_id) INTO v_total FROM Moon;
+  RETURN v_total;
+END total_moons;
+/
+
+SELECT total_moons() AS total FROM dual;</pre>
+    <p>The function has no parameters, so it is declared without brackets (calling it with or without <code>()</code> both work). COUNT(planet_id) counts the moons that belong to a planet; if planet_id is declared NOT NULL this is the same as COUNT(*). SELECT … INTO with an aggregate always returns exactly one row, so no NO_DATA_FOUND handler is needed (an empty Moon table gives 0). It can also be called from PL/SQL: <code>BEGIN DBMS_OUTPUT.PUT_LINE('Moons: ' || total_moons); END;</code>.</p>
+    <p><b>(ii)</b> In LIKE, <code>%</code> matches any string (including the empty string) and <code>_</code> exactly one character. "Contains a substring Ma, two characters, s" is therefore:</p>
+<pre>SELECT name
+FROM Planet
+WHERE name LIKE '%Ma__s%';</pre>
+    <p>Mars does <em>not</em> match: between "Ma" and "s" it has only one character (r). In the sample data below, Matisse (Ma-ti-s) and Magus Prime (Ma-gu-s) match. Oracle's LIKE is case-sensitive, so "ma" in lower case would not count; the playground's SQLite ignores case for ASCII letters, which is why the sample data has no such names.</p>
+    <div id="sqMoon"></div>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">DB QB · Jan 20 7 · 10 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-2 | 2018–19 · 10 marks</div>
+  <div class="exam-q"><p>Write a procedure named IncreaseOrDecrease which takes an employee id as input. If the salary of the employee is greater than the average salaries of all the departments except for his/her own, but less than the average salary of his/her own department, then the procedure will increase his/her salary by 10%. Otherwise, it will decrease his/her salary by 5%. During the execution, as output, it will print "Increasing Salary", or "Decreasing Salary", accordingly. (Schema: the Oracle HR schema, employees(employee_id, first_name, …, salary, …, department_id, …).)</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><b>Reading the condition.</b> "Greater than the average salaries of all the departments except his/her own" most naturally means: compute each other department's average salary; the employee must earn more than every one of them, i.e. more than the <b>largest</b> of those averages. (A second reading compares with the single average of all employees outside the department; the bank's answer uses that one. State which you use; the procedure changes in one query.)</p>
+<pre>CREATE OR REPLACE PROCEDURE IncreaseOrDecrease (
+  p_emp_id IN employees.employee_id%TYPE) IS
+  v_salary   employees.salary%TYPE;
+  v_dept     employees.department_id%TYPE;
+  v_own_avg  NUMBER;
+  v_other    NUMBER;
+BEGIN
+  SELECT salary, department_id INTO v_salary, v_dept
+  FROM employees WHERE employee_id = p_emp_id;
+
+  SELECT AVG(salary) INTO v_own_avg
+  FROM employees WHERE department_id = v_dept;
+
+  SELECT MAX(AVG(salary)) INTO v_other          -- largest other-department average
+  FROM employees
+  WHERE department_id &lt;&gt; v_dept
+  GROUP BY department_id;
+  -- second reading instead:  SELECT AVG(salary) INTO v_other
+  --                          FROM employees WHERE department_id &lt;&gt; v_dept;
+
+  IF v_salary &gt; v_other AND v_salary &lt; v_own_avg THEN
+    UPDATE employees SET salary = salary * 1.10 WHERE employee_id = p_emp_id;
+    DBMS_OUTPUT.PUT_LINE('Increasing Salary');
+  ELSE
+    UPDATE employees SET salary = salary * 0.95 WHERE employee_id = p_emp_id;
+    DBMS_OUTPUT.PUT_LINE('Decreasing Salary');
+  END IF;
+EXCEPTION
+  WHEN NO_DATA_FOUND THEN
+    DBMS_OUTPUT.PUT_LINE('No employee with id ' || p_emp_id);
+END IncreaseOrDecrease;
+/
+
+SET SERVEROUTPUT ON
+EXEC IncreaseOrDecrease(103)</pre>
+    <p>Notes for full marks: %TYPE anchors the variable types to the columns; SELECT INTO with the employee's id returns one row or raises NO_DATA_FOUND, which is handled; Oracle allows the nested aggregate MAX(AVG(salary)) with GROUP BY; if the employee's department is the only one, v_other is NULL, the comparison is unknown, and the ELSE branch (decrease) runs, which matches "otherwise". The two updates run inside the caller's transaction (the bank's version adds COMMIT, which is allowed in a procedure but takes the decision away from the caller).</p>
+    <p>Check the logic on the sample data with the tracer above: employee 103 (7400 in a department averaging 7633.33, other averages 4500 and 6750) is raised under both readings, while employee 101 (6000) is cut under the first reading (6000 &lt; 6750) but raised under the second (6000 &gt; 5625).</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 17-18 8b · 10 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-2 | 2017–18 · 10 marks</div>
+  <div class="exam-q"><p>Consider the following schema: Movie(title, year, filmType, inColor, studioId), Studio(studioId, name, address). Write a stored procedure that takes as input the name of a studio and a year. It then counts and prints the number of black and white movies produced by that studio in the specified year.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>Assume inColor holds 'T' for colour and 'F' for black and white (the textbook stores it as a boolean; in Oracle a CHAR(1) 'T'/'F' is the usual encoding, as for Printer.color in slide 46).</p>
+<pre>CREATE OR REPLACE PROCEDURE CountBWMovies (
+  p_studio IN Studio.name%TYPE,
+  p_year   IN Movie.year%TYPE) IS
+  v_count NUMBER;
+BEGIN
+  SELECT COUNT(*) INTO v_count
+  FROM Movie m JOIN Studio s ON m.studioId = s.studioId
+  WHERE s.name = p_studio
+    AND m.year = p_year
+    AND m.inColor = 'F';
+
+  DBMS_OUTPUT.PUT_LINE(p_studio || ' produced ' || v_count ||
+                       ' black and white movie(s) in ' || p_year);
+END CountBWMovies;
+/
+
+SET SERVEROUTPUT ON
+EXEC CountBWMovies('MGM', 1939)</pre>
+    <p>COUNT(*) always returns one row, so the SELECT INTO cannot raise NO_DATA_FOUND; an unknown studio simply prints 0. On the sample data below the call prints "MGM produced 2 black and white movie(s) in 1939".</p>
+    <div id="sqBW"></div>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2016–17 · 10 marks</div>
+  <div class="exam-q"><p>Write constructor functions for the car rental SQL:99 schema (Trucks, Sports car, Bus) and insert statement to insert data into the tables.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>The schema this question refers to is not reproduced in the bank, so assume a supertype of vehicles with three subtypes. In SQL:99's object-relational model, a <b>user-defined type</b> (UDT) can inherit from another (UNDER), a table can be declared as a table <b>OF</b> a type (each row is an object of that type), and every UDT gets a system-generated <b>constructor function</b> with the type's name and no arguments, which returns a new object with all attributes NULL. A user-defined constructor takes attribute values and fills them in (textbook style):</p>
+<pre>CREATE TYPE VehicleType AS (
+  regNo     VARCHAR(10),
+  make      VARCHAR(20),
+  model     VARCHAR(20),
+  dailyRate DECIMAL(8,2)
+) NOT FINAL;
+
+CREATE TYPE TruckType     UNDER VehicleType AS (capacityTons DECIMAL(5,1), axles INT) FINAL;
+CREATE TYPE SportsCarType UNDER VehicleType AS (topSpeed INT, convertible CHAR(1)) FINAL;
+CREATE TYPE BusType       UNDER VehicleType AS (seats INT, hasAC CHAR(1)) FINAL;
+
+CREATE TABLE Trucks     OF TruckType;
+CREATE TABLE SportsCars OF SportsCarType;
+CREATE TABLE Buses      OF BusType;
+
+CREATE FUNCTION TruckType(r VARCHAR(10), mk VARCHAR(20), md VARCHAR(20),
+                          rate DECIMAL(8,2), cap DECIMAL(5,1), ax INT)
+RETURNS TruckType
+BEGIN
+  DECLARE t TruckType;
+  SET t = TruckType();          -- system constructor: all attributes NULL
+  SET t.regNo = r;  SET t.make = mk;  SET t.model = md;  SET t.dailyRate = rate;
+  SET t.capacityTons = cap;  SET t.axles = ax;
+  RETURN t;
+END;
+
+CREATE FUNCTION SportsCarType(r VARCHAR(10), mk VARCHAR(20), md VARCHAR(20),
+                              rate DECIMAL(8,2), spd INT, conv CHAR(1))
+RETURNS SportsCarType
+BEGIN
+  DECLARE s SportsCarType;
+  SET s = SportsCarType();
+  SET s.regNo = r;  SET s.make = mk;  SET s.model = md;  SET s.dailyRate = rate;
+  SET s.topSpeed = spd;  SET s.convertible = conv;
+  RETURN s;
+END;
+
+CREATE FUNCTION BusType(r VARCHAR(10), mk VARCHAR(20), md VARCHAR(20),
+                        rate DECIMAL(8,2), n INT, ac CHAR(1))
+RETURNS BusType
+BEGIN
+  DECLARE b BusType;
+  SET b = BusType();
+  SET b.regNo = r;  SET b.make = mk;  SET b.model = md;  SET b.dailyRate = rate;
+  SET b.seats = n;  SET b.hasAC = ac;
+  RETURN b;
+END;
+
+INSERT INTO Trucks     VALUES (TruckType('DHA-T-1001', 'Tata', 'LPT 1613', 3500.00, 10.0, 2));
+INSERT INTO SportsCars VALUES (SportsCarType('DHA-S-2001', 'Porsche', '911', 25000.00, 293, 'F'));
+INSERT INTO Buses      VALUES (BusType('DHA-B-3001', 'Hino', 'AK1J', 9000.00, 40, 'T'));</pre>
+    <p>A subtype's object has the supertype's attributes first, then its own, which is why each constructor sets regNo, make, model and dailyRate too. In <b>Oracle</b>, which this course uses, the same schema is written with <code>CREATE TYPE vehicle_t AS OBJECT (…) NOT FINAL;</code> and <code>CREATE TYPE truck_t UNDER vehicle_t (…);</code>. Oracle generates an attribute-value constructor automatically, so <code>INSERT INTO Trucks VALUES (truck_t('DHA-T-1001', 'Tata', 'LPT 1613', 3500, 10, 2));</code> works without writing any function; a custom one is declared in the type as <code>CONSTRUCTOR FUNCTION truck_t(…) RETURN SELF AS RESULT</code> and implemented in <code>CREATE TYPE BODY</code>, assigning <code>SELF.attr := …</code> and ending with <code>RETURN;</code>.</p>
+  </div></details>
+</div>
+
+<div class="key"><p><strong>Summary:</strong> A PL/SQL block is DECLARE / BEGIN / EXCEPTION / END. SELECT … INTO needs exactly one row (NO_DATA_FOUND, TOO_MANY_ROWS); := assigns; IF … ELSIF … END IF; DBMS_OUTPUT.PUT_LINE prints. A procedure (CREATE OR REPLACE PROCEDURE p(x IN type) IS … BEGIN … END; /) is called with EXEC and returns nothing; a function adds RETURN type and RETURN value and can be used in SQL (SELECT f() FROM dual). Triggers run by themselves; procedures and functions are called.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/sqlplay.js"></script>
+<script src="lecture.js"></script>
+<script>
+// ----- IncreaseOrDecrease tracer -----
+const EMPS = [
+  [101, 'Asha', 6000, 10], [102, 'Bilal', 9500, 10], [103, 'Chaity', 7400, 10],
+  [201, 'Dipu', 4000, 20], [202, 'Eva', 5000, 20],
+  [301, 'Farhan', 6500, 30], [302, 'Gita', 7000, 30],
+];
+const CODE = [
+  ['1', 'SELECT salary, department_id INTO v_salary, v_dept'],
+  ['1b', '  FROM employees WHERE employee_id = p_emp_id;'],
+  ['2', 'SELECT AVG(salary) INTO v_own_avg'],
+  ['2b', '  FROM employees WHERE department_id = v_dept;'],
+  ['3', 'SELECT … INTO v_other  (largest other-dept average  |  overall other average)'],
+  ['4', 'IF v_salary > v_other AND v_salary < v_own_avg THEN'],
+  ['5', '  UPDATE … salary * 1.10 …; PUT_LINE(\'Increasing Salary\');'],
+  ['6', 'ELSE'],
+  ['7', '  UPDATE … salary * 0.95 …; PUT_LINE(\'Decreasing Salary\');'],
+  ['8', 'END IF;'],
+];
+const r2 = x => Math.round(x * 100) / 100;
+function traceIoD(id, reading) {
+  const me = EMPS.find(e => e[0] === id), steps = [], vars = {};
+  const html = (line, out = '') => `<div class="code-tr"><pre class="code">${CODE.map(([n, t]) => `<span class="${n === line || n === line + 'b' ? 'on' : ''}">${t.replace(/</g, '&lt;')}</span>`).join('')}</pre>
+    <div><table class="ra-t vars"><tr><th>variable</th><th>value</th></tr>${['p_emp_id', 'v_salary', 'v_dept', 'v_own_avg', 'v_other'].map(k => `<tr><td>${k}</td><td>${vars[k] ?? '<span class="sq-null">NULL</span>'}</td></tr>`).join('')}</table>${out ? `<pre style="margin-top:8px">${out}</pre>` : ''}</div></div>`;
+  vars.p_emp_id = id;
+  vars.v_salary = me[2]; vars.v_dept = me[3];
+  steps.push({ html: html('1'), cap: `Fetch employee ${id} (${me[1]}): salary ${me[2]}, department ${me[3]}. Exactly one row, so SELECT INTO succeeds.` });
+  const own = EMPS.filter(e => e[3] === me[3]);
+  vars.v_own_avg = r2(own.reduce((s, e) => s + e[2], 0) / own.length);
+  steps.push({ html: html('2'), cap: `Average of department ${me[3]}: (${own.map(e => e[2]).join(' + ')}) / ${own.length} = <b>${vars.v_own_avg}</b>.` });
+  const others = EMPS.filter(e => e[3] !== me[3]);
+  if (reading === 'max') {
+    const depts = [...new Set(others.map(e => e[3]))], avgs = depts.map(d => { const g = others.filter(e => e[3] === d); return r2(g.reduce((s, e) => s + e[2], 0) / g.length); });
+    vars.v_other = Math.max(...avgs);
+    steps.push({ html: html('3'), cap: `Reading 1: other departments' averages are ${depts.map((d, i) => `dept ${d}: ${avgs[i]}`).join(', ')}. The employee must beat all of them, so v_other = the largest, <b>${vars.v_other}</b>.` });
+  } else {
+    vars.v_other = r2(others.reduce((s, e) => s + e[2], 0) / others.length);
+    steps.push({ html: html('3'), cap: `Reading 2: average over all ${others.length} employees outside department ${me[3]} = <b>${vars.v_other}</b>.` });
+  }
+  const a = me[2] > vars.v_other, b = me[2] < vars.v_own_avg, inc = a && b;
+  steps.push({ html: html('4'), cap: `Test: ${me[2]} &gt; ${vars.v_other} is <b>${a}</b>; ${me[2]} &lt; ${vars.v_own_avg} is <b>${b}</b>. Together: <b>${inc}</b>.` });
+  const ns = r2(me[2] * (inc ? 1.10 : 0.95));
+  steps.push({ html: html(inc ? '5' : '7', `Output:\n${inc ? 'Increasing Salary' : 'Decreasing Salary'}`), cap: `${inc ? 'THEN branch: salary × 1.10' : 'ELSE branch: salary × 0.95'} → employee ${id}'s salary becomes <b>${ns}</b>, and the message is printed.` });
+  return steps;
+}
+(() => {
+  const host = document.querySelector('#tracer');
+  host.innerHTML = `<div class="trg-form"><label><span>Employee</span><select name="e">${EMPS.map(e => `<option value="${e[0]}"${e[0] === 101 ? ' selected' : ''}>${e[0]} ${e[1]}: salary ${e[2]}, dept ${e[3]}</option>`).join('')}</select></label>
+    <label><span>Reading of "average salaries of all the other departments"</span><select name="r"><option value="max">1: beat every other department's average</option><option value="all">2: beat the average of all other employees</option></select></label></div>
+    <div class="trg-out" style="margin-top:12px"><div></div></div>`;
+  const run = () => { const out = host.querySelector('.trg-out'); out.innerHTML = '<div></div>'; stepper(out.firstChild, traceIoD(+host.querySelector('[name=e]').value, host.querySelector('[name=r]').value), { interval: 2600 }); };
+  host.querySelectorAll('select').forEach(s => s.addEventListener('change', run));
+  run();
+})();
+
+const PLANETS = `CREATE TABLE Planet (planet_id NUMBER PRIMARY KEY, name VARCHAR2(20), type VARCHAR2(20), distance_sun_au NUMBER);
+CREATE TABLE Moon (moon_id NUMBER PRIMARY KEY, name VARCHAR2(20), planet_id NUMBER REFERENCES Planet(planet_id), diameter_km NUMBER);
+INSERT INTO Planet VALUES (1, 'Mercury', 'terrestrial', 0.39); INSERT INTO Planet VALUES (2, 'Venus', 'terrestrial', 0.72);
+INSERT INTO Planet VALUES (3, 'Earth', 'terrestrial', 1.00); INSERT INTO Planet VALUES (4, 'Mars', 'terrestrial', 1.52);
+INSERT INTO Planet VALUES (5, 'Jupiter', 'gas giant', 5.20); INSERT INTO Planet VALUES (6, 'Saturn', 'gas giant', 9.58);
+INSERT INTO Planet VALUES (7, 'Matisse', 'exoplanet', 412.0); INSERT INTO Planet VALUES (8, 'Magus Prime', 'exoplanet', 980.5);
+INSERT INTO Moon VALUES (1, 'Moon', 3, 3474); INSERT INTO Moon VALUES (2, 'Phobos', 4, 22); INSERT INTO Moon VALUES (3, 'Deimos', 4, 12);
+INSERT INTO Moon VALUES (4, 'Io', 5, 3643); INSERT INTO Moon VALUES (5, 'Europa', 5, 3122); INSERT INTO Moon VALUES (6, 'Ganymede', 5, 5268);
+INSERT INTO Moon VALUES (7, 'Callisto', 5, 4821); INSERT INTO Moon VALUES (8, 'Titan', 6, 5150); INSERT INTO Moon VALUES (9, 'Enceladus', 6, 504);`;
+sqlPlay('#sqMoon', { setup: PLANETS, query: "SELECT name FROM Planet WHERE name LIKE '%Ma__s%';\n-- the query inside total_moons:\n-- SELECT COUNT(planet_id) FROM Moon;", note: 'The LIKE query runs as in Oracle. The function itself is PL/SQL and cannot run here; its inner query gives 9.' });
+
+const BW = `CREATE TABLE Studio (studioId NUMBER, name VARCHAR2(20), address VARCHAR2(30));
+CREATE TABLE Movie (title VARCHAR2(40), year NUMBER, filmType VARCHAR2(10), inColor CHAR(1), studioId NUMBER);
+INSERT INTO Studio VALUES (1, 'Disney', 'Burbank'); INSERT INTO Studio VALUES (2, 'MGM', 'Culver City'); INSERT INTO Studio VALUES (3, 'Warner', 'Burbank');
+INSERT INTO Movie VALUES ('Snow White', 1937, 'animation', 'T', 1);
+INSERT INTO Movie VALUES ('Pinocchio', 1940, 'animation', 'T', 1);
+INSERT INTO Movie VALUES ('The Wizard of Oz', 1939, 'feature', 'T', 2);
+INSERT INTO Movie VALUES ('Ninotchka', 1939, 'feature', 'F', 2);
+INSERT INTO Movie VALUES ('Goodbye, Mr. Chips', 1939, 'feature', 'F', 2);
+INSERT INTO Movie VALUES ('Casablanca', 1942, 'feature', 'F', 3);
+INSERT INTO Movie VALUES ('Dark Victory', 1939, 'feature', 'F', 3);`;
+sqlPlay('#sqBW', { setup: BW, query: "-- the query inside CountBWMovies('MGM', 1939)\nSELECT COUNT(*)\nFROM Movie m JOIN Studio s ON m.studioId = s.studioId\nWHERE s.name = 'MGM' AND m.year = 1939 AND m.inColor = 'F';", note: 'In this data MGM made two black-and-white films in 1939 (Ninotchka and Goodbye, Mr. Chips); The Wizard of Oz is in colour.' });
+
+flashcards('#cards', [
+  { f: 'PL/SQL block', b: 'DECLARE (optional) / BEGIN … / EXCEPTION (optional) / END; then / to run.' },
+  { f: 'SELECT … INTO', b: 'Stores a one-row query result in variables. 0 rows → NO_DATA_FOUND, 2+ rows → TOO_MANY_ROWS.' },
+  { f: '%TYPE', b: 'Declare a variable with the type of a column: v employees.salary%TYPE.' },
+  { f: 'Procedure', b: 'Named, stored block with IN/OUT parameters, called explicitly (EXEC p(…)). Returns nothing directly.' },
+  { f: 'Function', b: 'Stored block with RETURN type; returns one value; usable in SQL expressions if it does no DML.' },
+  { f: 'DBMS_OUTPUT.PUT_LINE', b: 'Prints a line; visible after SET SERVEROUTPUT ON.' },
+  { f: 'dual', b: 'Oracle\'s one-row, one-column table, used to evaluate an expression: SELECT f() FROM dual.' },
+  { f: 'LIKE wildcards', b: '% = any string (possibly empty), _ = exactly one character.' },
+]);
+quiz('#quiz', [
+  { q: 'SELECT salary INTO v FROM employees WHERE department_id = 10 — department 10 has three employees. What happens?', opts: ['v gets the first salary', 'TOO_MANY_ROWS is raised', 'v gets the average', 'NO_DATA_FOUND'], a: 1, why: 'SELECT INTO needs exactly one row.' },
+  { q: 'Which can be used inside a SELECT statement?', opts: ['A procedure', 'A function', 'A trigger', 'An anonymous block'], a: 1, why: 'Functions return a value.' },
+  { q: 'PL/SQL assignment is written…', opts: ['v = 5;', 'v := 5;', 'SET v = 5;', 'v <- 5;'], a: 1, why: '= is comparison in PL/SQL. (SET v = 5 is SQL/PSM syntax.)' },
+  { q: 'Which names match LIKE \'%Ma__s%\'?', opts: ['Mars', 'Matisse', 'Mass', 'Maps'], a: 1, why: 'Ma + exactly two characters + s: Ma-ti-s. Mars, Mass and Maps have too few characters between.' },
+  { q: 'A parameter declared OUT…', opts: ['is read-only', 'is set by the procedure and passed back to the caller', 'cannot be a number', 'must have a default'], a: 1, why: 'IN = input, OUT = output, IN OUT = both.' },
+  { q: 'Where is ELSIF used?', opts: ['In SQL WHERE clauses', 'In PL/SQL IF statements', 'In CASE expressions', 'In triggers only'], a: 1, why: 'IF … THEN … ELSIF … THEN … ELSE … END IF.' },
+]);
+ask('#try1', { q: 'With the tracer\'s data, what is employee 103\'s salary after IncreaseOrDecrease(103)?', a: 8140, why: '7400 &gt; 6750 and 7400 &lt; 7633.33, so ×1.10 = 8140.' });
+
+const EMPSET = 'CREATE TABLE employees (employee_id NUMBER, first_name VARCHAR2(20), salary NUMBER, department_id NUMBER);\n' + EMPS.map(e => `INSERT INTO employees VALUES (${e[0]}, '${e[1]}', ${e[2]}, ${e[3]});`).join('\n');
+sqlCheck('#ex1', { setup: PLANETS, task: '1. (Easy) The query inside total_moons(): the number of moons that belong to some planet.', solution: 'SELECT COUNT(planet_id) FROM Moon;' });
+sqlCheck('#ex2', { setup: PLANETS, task: '2. For each planet, its name and number of moons, including planets with no moons (0).', solution: 'SELECT p.name, COUNT(m.moon_id)\nFROM Planet p LEFT OUTER JOIN Moon m ON p.planet_id = m.planet_id\nGROUP BY p.planet_id, p.name;', hint: 'LEFT OUTER JOIN, and COUNT a column of Moon so unmatched planets count 0.' });
+sqlCheck('#ex3', { setup: EMPSET, task: '3. The average salary of employee 103\'s own department (the second SELECT INTO of IncreaseOrDecrease, with v_dept replaced by a subquery).', solution: 'SELECT AVG(salary) FROM employees\nWHERE department_id = (SELECT department_id FROM employees WHERE employee_id = 103);' });
+sqlCheck('#ex4', { setup: EMPSET, task: '4. (Exam style) The largest average salary among the departments other than employee 101\'s department. (Oracle would allow MAX(AVG(salary)) … GROUP BY; here use a subquery in FROM.)', solution: 'SELECT MAX(a) FROM (\n  SELECT AVG(salary) AS a FROM employees\n  WHERE department_id <> (SELECT department_id FROM employees WHERE employee_id = 101)\n  GROUP BY department_id);' });
+sqlCheck('#ex5', { setup: BW, task: '5. (Exam style) The query inside CountBWMovies: the number of black-and-white (inColor = \'F\') movies made by Warner in 1939.', solution: "SELECT COUNT(*)\nFROM Movie m JOIN Studio s ON m.studioId = s.studioId\nWHERE s.name = 'Warner' AND m.year = 1939 AND m.inColor = 'F';" });
+</script>
+</body>
+</html>

@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tables, Schemas and Domains · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="../i03/lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 03 (Ishrak) · Chapter 2 · Slides 10–14 · Book §2.3.1, §2.3.3</div>
+<h1>Tables, Schemas and Domains</h1>
+<p class="lede">The vocabulary of relational data: table, attribute, tuple, schema, instance, domain. Then the first DDL statement, CREATE TABLE, compared with a C struct, and the three kinds of relations SQL knows about.</p>
+
+<h2>1. The parts of a table (slide 10)</h2>
+<p>Slide 10 labels the parts of the <code>Product</code> table. The same labels appear in the figure below, together with the formal name of each part.</p>
+<figure>
+<svg viewBox="0 0 640 270" width="640" role="img" aria-label="The Product table with its name, attribute names and tuples labelled">
+  <g id="ptab"></g>
+</svg>
+<figcaption><b>Figure 1.</b> Slide 10's table. The column headers are the <b>attributes</b>; each row is a <b>tuple</b>; the name above the table is the <b>relation name</b>.</figcaption>
+</figure>
+<dl class="def">
+  <dt>Table (relation)</dt>
+  <dd>A named two-dimensional structure of rows and columns. The relational model, proposed by E. F. Codd at IBM in 1970, calls it a <b class="term">relation</b>; SQL calls it a <b class="term">table</b>. Slide 11: "a relation is a table".</dd>
+  <dt>Attribute (column)</dt>
+  <dd>A named column of a table, such as <code>Price</code>. Every value in that column describes the same property of the rows.</dd>
+  <dt>Tuple (row, record)</dt>
+  <dd>One row of a table: one value for each attribute. Slide 12's example: <code>(SingleTouch, 149.99, Photography, Canon)</code>.</dd>
+</dl>
+
+<h2>2. Schemas and databases (slide 11)</h2>
+<dl class="def">
+  <dt>Relation schema</dt>
+  <dd>The table's name followed by its list of attributes: <code>Product(PName, Price, Category, Manufacturer)</code>. A full schema also gives each attribute's type and the keys. (The slide spells it "Manfacturer"; that is a typo.)</dd>
+  <dt>Database</dt>
+  <dd>A collection of relations (tables).</dd>
+  <dt>Database schema</dt>
+  <dd>The set of the relation schemas of all tables in the database.</dd>
+  <dt>Relation instance</dt>
+  <dd>The set of tuples a table holds at one moment. The schema changes rarely (by DDL); the instance changes all the time (by INSERT, UPDATE, DELETE). The textbook (§2.2.6) makes the same distinction.</dd>
+</dl>
+<p>Think of the schema as the empty form with labelled boxes and the instance as the pile of filled-in forms. <code>CREATE TABLE</code> prints the empty form; <code>INSERT</code> adds filled-in copies.</p>
+
+<h2>3. A table is a set of tuples (slide 12)</h2>
+<p>Slide 12 says a table is "like a list, but unordered: no first(), no next(), no last()". In the relational model a relation is a <b class="term">set</b>: its tuples have no position. Two consequences follow.</p>
+<ul>
+  <li><strong>There is no "third row".</strong> A query cannot ask for "the row after Gizmo". Rows are found only by their <em>values</em> (for example <code>WHERE pname = 'Gizmo'</code>).</li>
+  <li><strong>Output order is not guaranteed.</strong> <code>SELECT * FROM Product</code> may return the rows in any order, and the order may change after an update or on another day. If the order matters, ask for it with <code>ORDER BY</code> (Lec 04, Chapter 6).</li>
+</ul>
+<p>One refinement: a mathematical set has no duplicates, but an SQL table may contain two identical rows unless a key forbids it. SQL tables are therefore <b class="term">bags</b> (multisets). This matters for <code>DISTINCT</code> in Lecture 4.</p>
+<div id="p1"></div>
+
+<h2>4. Domains: every attribute has a type (slide 13)</h2>
+<dl class="def">
+  <dt>Domain</dt>
+  <dd>The set of values an attribute may take, given by its data type. The domain of <code>PName</code> is strings; the domain of <code>Price</code> is real numbers.</dd>
+  <dt>Atomic value</dt>
+  <dd>A value of an elementary type (an integer, a string, a date) that the database does not split into parts. The relational model requires every attribute value to be atomic: a cell cannot hold a list, a set or a nested table. (This rule is the <b class="term">first normal form</b>, studied in Sukarna sir's normalization lectures.)</dd>
+</dl>
+<p>For example, a student with two phone numbers cannot have <code>phone = {01711…, 01811…}</code> in one cell. The design must use two rows, or a separate <code>Phone</code> table.</p>
+
+<h2>5. CREATE TABLE compared with a C struct (slide 14)</h2>
+<p>The <code>CREATE TABLE</code> statement declares a relation schema: the table name, then each attribute with its type. Slide 14 puts it next to a C structure with the same fields:</p>
+<div class="figrow">
+<pre>CREATE TABLE Student (
+    name     CHAR(50),
+    id       NUMBER(10),
+    gender   CHAR(1),
+    address  CHAR(100),
+    gpa      FLOAT
+);</pre>
+<pre>struct Student {
+    char  name[50];
+    int   id;
+    char  gender[1];
+    char  address[100];
+    float gpa;
+};</pre>
+</div>
+<p>The slide's point is the word order: <strong>in SQL the attribute name comes first and the type second; in C the type comes first.</strong> Other differences worth knowing:</p>
+<ul>
+  <li>SQL separates attributes with <strong>commas</strong> and has <strong>no comma after the last one</strong>; C ends every field with a semicolon. The SQL statement ends with <code>);</code>.</li>
+  <li>A C struct only describes the layout of one record in memory. A <code>CREATE TABLE</code> creates a persistent, named table in the database that can hold any number of rows, survives program exits, and can be shared by many users.</li>
+  <li><code>NUMBER(10)</code> is a decimal number of up to 10 digits (Chapter 3), not a fixed 32-bit binary integer like C's <code>int</code>.</li>
+  <li>In C, <code>char gender[1]</code> leaves no room for the terminating <code>'\0'</code>, so it cannot hold a C string; SQL's <code>CHAR(1)</code> holds exactly one character.</li>
+</ul>
+<p>Run the slide's statement. The table is created with no rows; its schema exists, its instance is empty.</p>
+<div id="p2"></div>
+<p>In Oracle's SQL*Plus or SQL Developer you can see a table's schema with <code>DESCRIBE Student</code>. That is a client command, so the playground does not support it; use <b>Show tables</b> instead.</p>
+
+<h2>6. Three kinds of relations in SQL (textbook §2.3.1)</h2>
+<p>The textbook separates three kinds of relations, and an exam question asks for them:</p>
+<ol>
+  <li><strong>Stored relations (tables).</strong> Declared with <code>CREATE TABLE</code>, stored on disk, and changed by INSERT, UPDATE and DELETE. Everything in Lectures 3–5 is about these.</li>
+  <li><strong>Views.</strong> Relations defined by a query (<code>CREATE VIEW … AS SELECT …</code>). A view is not stored; its rows are computed from the stored tables when the view is used. See <a href="../i05/05-beyond-the-slides.html">Lec 05 Chapter 5</a>.</li>
+  <li><strong>Temporary tables.</strong> Intermediate relations that the SQL processor builds while it executes a query (for example, the rows that survive WHERE before SELECT is applied, or a sorted run in an external sort). They are thrown away afterwards and are never declared by the user.</li>
+</ol>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+<h3>SQL exercises</h3>
+<div id="c1"></div><div id="c2"></div><div id="c3"></div><div id="c4"></div><div id="c5"></div>
+
+<h3>Exam questions</h3>
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2012–13 · 5 marks</div>
+  <div class="exam-q"><p>What are the three types of relations in SQL?</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>SQL distinguishes three kinds of relations (Garcia-Molina, Ullman and Widom, §2.3.1):</p>
+    <ol>
+      <li><strong>Stored relations, called tables.</strong> They exist in the database, are declared with <code>CREATE TABLE</code>, are kept on disk, and can be both queried and modified by changing their tuples (INSERT, UPDATE, DELETE). Example: <code>CREATE TABLE Movie (title VARCHAR2(50), year INTEGER, PRIMARY KEY (title, year));</code></li>
+      <li><strong>Views.</strong> Relations defined by a computation (a query). They are not stored; they are constructed, in whole or in part, when needed. Example: <code>CREATE VIEW OldMovie AS SELECT title, year FROM Movie WHERE year &lt; 1950;</code></li>
+      <li><strong>Temporary tables.</strong> Relations constructed by the SQL language processor while it executes queries and data modifications (for example, the intermediate result after the WHERE clause). They are thrown away when the statement finishes, are not stored, and are never declared by the user.</li>
+    </ol>
+    <p>Note: the question bank calls the third kind "temporary/derived relations" and includes CTEs and <code>CREATE TEMPORARY TABLE</code>. Oracle does have declared global temporary tables (<code>CREATE GLOBAL TEMPORARY TABLE</code>), but in the textbook's classification those are still declared tables; the textbook's "temporary tables" are the undeclared intermediate results. Give the textbook's three: tables, views, temporary tables.</p>
+  </div></details>
+</div>
+
+<div class="key"><p><strong>Summary:</strong> a relation (table) has a name, attributes (columns) and tuples (rows). Its schema is the name plus attributes; the database schema is the set of all relation schemas; the instance is the current set of tuples. Tables are unordered (use ORDER BY for order) and may hold duplicate rows unless a key forbids it. Every attribute has a domain of atomic values. CREATE TABLE lists "name type" pairs separated by commas, the reverse of C's "type name". SQL has three kinds of relations: stored tables, views, and temporary tables.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/sqlplay.js"></script>
+<script src="../i03/lecture.js"></script>
+<script>
+(() => {
+  const H = ['PName', 'Price', 'Category', 'Manufacturer'], R = [['Gizmo', '$19.99', 'Gadgets', 'GizmoWorks'], ['Powergizmo', '$29.99', 'Gadgets', 'GizmoWorks'], ['SingleTouch', '$149.99', 'Photography', 'Canon'], ['MultiTouch', '$203.99', 'Household', 'Hitachi']];
+  const xs = [150, 250, 330, 440], ws = [100, 80, 110, 110], y0 = 80, rh = 28;
+  let s = '';
+  H.forEach((h, j) => s += `<rect x="${xs[j]}" y="${y0}" width="${ws[j]}" height="${rh}" class="cell-hl"/><text x="${xs[j] + ws[j] / 2}" y="${y0 + 19}" text-anchor="middle" class="acc" style="font-size:13px">${h}</text>`);
+  R.forEach((r, i) => r.forEach((c, j) => s += `<rect x="${xs[j]}" y="${y0 + rh * (i + 1)}" width="${ws[j]}" height="${rh}" class="${i === 2 ? 'cell-new' : 'cell'}"/><text x="${xs[j] + ws[j] / 2}" y="${y0 + rh * (i + 1) + 19}" text-anchor="middle" style="font-size:13px">${c}</text>`));
+  s += `<text x="150" y="68" class="acc big">Product</text>`;
+  s += `<text x="20" y="30" class="big">relation name</text><path d="M70 36 L150 60" class="s-acc" marker-end="url(#m-acc)"/>`;
+  s += `<text x="430" y="30" class="big">attribute names (columns)</text><path d="M500 36 L495 76" class="s-acc" marker-end="url(#m-acc)"/><path d="M470 36 L300 76" class="s-acc" marker-end="url(#m-acc)"/>`;
+  s += `<text x="20" y="${y0 + rh * 3 + 18}" class="big">a tuple (row)</text><path d="M120 ${y0 + rh * 3 + 14} L146 ${y0 + rh * 3 + 14}" class="s-grn" marker-end="url(#m-grn)"/>`;
+  s += `<path d="M560 ${y0 + rh} L570 ${y0 + rh} L570 ${y0 + rh * 5} L560 ${y0 + rh * 5}" class="s-fg"/><text x="578" y="${y0 + rh * 3 + 4}" class="lbl">instance:</text><text x="578" y="${y0 + rh * 3 + 18}" class="lbl">4 tuples</text>`;
+  s += `<text x="150" y="${y0 + rh * 5 + 26}" class="lbl">schema: Product(PName, Price, Category, Manufacturer)</text>`;
+  document.querySelector('#ptab').innerHTML = s;
+})();
+sqlPlay('#p1', { setup: UNI, query: "SELECT * FROM Movie WHERE title = 'King Kong';", note: 'Rows are found by value. There are two King Kong films, so the title alone does not identify a row; Chapter 6 returns to this.' });
+sqlPlay('#p2', { setup: '', query: 'CREATE TABLE Student (\n    name     CHAR(50),\n    id       NUMBER(10),\n    gender   CHAR(1),\n    address  CHAR(100),\n    gpa      FLOAT\n);\nSELECT * FROM Student;', note: 'The playground starts with an empty database here. The SELECT returns no rows: the table exists but its instance is empty. Add a row with <code>INSERT INTO Student VALUES (\'Rahim\', 1905001, \'M\', \'Dhaka\', 3.6);</code>' });
+flashcards('#cards', [
+  { f: 'Relation', b: 'Codd\'s name for a table.' },
+  { f: 'Attribute', b: 'A named column.' },
+  { f: 'Tuple', b: 'A row: one value per attribute.' },
+  { f: 'Relation schema', b: 'Name + attributes (+ types, keys), e.g. Product(PName, Price, Category, Manufacturer).' },
+  { f: 'Database schema', b: 'The set of all relation schemas in the database.' },
+  { f: 'Instance', b: 'The set of tuples a relation holds right now.' },
+  { f: 'Domain', b: 'The set of allowed values of an attribute (its type).' },
+  { f: 'Atomic', b: 'Elementary, not split into parts: no lists or nested tables in a cell.' },
+  { f: 'Three kinds of relations', b: 'Stored tables, views, temporary tables (§2.3.1).' },
+]);
+quiz('#quiz', [
+  { q: 'Which is a relation schema?', opts: ['(SingleTouch, 149.99, Photography, Canon)', 'Product(PName, Price, Category, Manufacturer)', 'The four rows of Product', 'SELECT * FROM Product'], a: 1, why: 'The schema is the name plus attributes. The first option is a tuple, the third is an instance.' },
+  { q: 'Which statement about SQL tables is true?', opts: ['Rows are numbered and can be fetched by position', 'SELECT always returns rows in insertion order', 'Row order is not defined unless you use ORDER BY', 'Tables can never contain two identical rows'], a: 2, why: 'Tables are unordered. Without a key, duplicates are allowed (tables are bags).' },
+  { q: 'In CREATE TABLE, which order is correct?', opts: ['type then attribute name', 'attribute name then type', 'either order', 'type only'], a: 1, why: '<code>gpa FLOAT</code>, the reverse of C\'s <code>float gpa;</code>' },
+  { q: 'A cell holding the list {01711000000, 01811000000} violates…', opts: ['the key rule', 'atomicity of domains', 'the CHAR length', 'nothing'], a: 1, why: 'Attribute values must be atomic.' },
+  { q: 'What is wrong with: <code>CREATE TABLE T (a NUMBER, b CHAR(2),);</code>', opts: ['Nothing', 'The comma after the last attribute', 'NUMBER needs a size', 'CHAR must be VARCHAR2'], a: 1, why: 'No comma after the last item; Oracle reports ORA-00904: invalid identifier.' },
+  { q: 'Which kind of relation is built by the DBMS during execution and never declared?', opts: ['Table', 'View', 'Temporary table', 'Index'], a: 2, why: 'Textbook §2.3.1.' },
+]);
+ask('#try1', { q: 'The Product table on slide 10 has how many tuples and how many attributes? Type them as "tuples,attributes".', a: ['4,4'], why: '4 rows (Gizmo, Powergizmo, SingleTouch, MultiTouch), 4 columns.' });
+const P4 = "CREATE TABLE Product (\n  pname        VARCHAR2(20),\n  price        NUMBER(7,2),\n  category     VARCHAR2(20),\n  manufacturer VARCHAR2(20)\n);\nINSERT INTO Product VALUES ('Gizmo', 19.99, 'Gadgets', 'GizmoWorks');\nINSERT INTO Product VALUES ('Powergizmo', 29.99, 'Gadgets', 'GizmoWorks');\nINSERT INTO Product VALUES ('SingleTouch', 149.99, 'Photography', 'Canon');\nINSERT INTO Product VALUES ('MultiTouch', 203.99, 'Household', 'Hitachi');";
+chk('#c1', '', '<b>Easy.</b> The database is empty. Create a table <code>Dept</code> with attributes <code>dept_id</code> (a number of up to 4 digits) and <code>dept_name</code> (a string of up to 30 characters), then insert the department (10, \'CSE\').', "CREATE TABLE Dept (dept_id NUMBER(4), dept_name VARCHAR2(30));\nINSERT INTO Dept VALUES (10, 'CSE');", { check: 'state', table: 'Dept' });
+chk('#c2', '', '<b>Slide 10.</b> The database is empty. Create the <code>Product</code> table of slide 10 with columns <code>pname, price, category, manufacturer</code> (choose suitable types; store prices without the $ sign) and insert its four rows.', P4, { check: 'state', table: 'Product', hint: 'One CREATE TABLE and four INSERT statements, each ending with a semicolon.' });
+chk('#c3', '', '<b>From C to SQL.</b> Translate <code>struct Book { char isbn[13]; char title[100]; int year; float price; };</code> into a table <code>Book</code> (same attribute names, SQL types), then insert (\'9780131873254\', \'Database Systems\', 2008, 89.5).', "CREATE TABLE Book (\n  isbn  CHAR(13),\n  title VARCHAR2(100),\n  year  NUMBER(4),\n  price FLOAT\n);\nINSERT INTO Book VALUES ('9780131873254', 'Database Systems', 2008, 89.5);", { check: 'state', table: 'Book', hint: 'Name first, type second: <code>isbn CHAR(13)</code>.' });
+chk('#c4', UNI, '<b>Instance.</b> Show the current instance of the <code>MovieStar</code> relation (all rows, all columns).', 'SELECT * FROM MovieStar;');
+chk('#c5', UNI, '<b>Order is not stored.</b> Show all movies sorted by year, oldest first. Form: <code>SELECT * FROM Movie ORDER BY year;</code>', 'SELECT * FROM Movie ORDER BY year;', { ordered: true });
+</script>
+</body>
+</html>

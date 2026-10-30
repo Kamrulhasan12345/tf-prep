@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Heaps, Clustered and Non-clustered Indexes · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 07 (Sukarna) · Chapter 2 · Slides 13–18</div>
+<h1>How Tables Are Stored: Heaps, Clustered and Non-clustered Indexes</h1>
+<p class="lede">Before we can say what a scan costs, we need to know how a table sits on disk. This chapter covers heap tables, clustered indexes (where the index <em>is</em> the table), B+ tree and hash indexes, and non-clustered indexes, and answers the slide's question: if a hash index finds a key in O(1), why do databases use B+ trees?</p>
+
+<h2>1. Heap tables (slides 13–14)</h2>
+
+<dl class="def">
+<dt>Heap (heap-organized table)</dt>
+<dd>A table whose rows are stored in <b>no particular key order</b>. Blocks (pages) are allocated to the table only when they are needed, and a new row may go into <em>any</em> page that has enough free space.</dd>
+<dt>RID (row identifier)</dt>
+<dd>The pair (page number, slot number) that locates a row in a heap. Because rows are found through a page's <b>slot array</b> (the slotted-page layout of Lec 14), the RID stays valid even if the row moves inside its page.</dd>
+</dl>
+
+<p>The DBMS must remember which blocks belong to a heap, since they need not be contiguous. It keeps this in metadata. The slide gives two real systems:</p>
+<ul>
+  <li><b>SQL Server:</b> Table/Index → Allocation Unit → Extent → Pages (blocks).</li>
+  <li><b>Oracle:</b> Segment → Extent → Blocks. For example, the EMPLOYEE table might be segment #123 with extent 1 = blocks 1000–1063, extent 2 = blocks 2000–2063, extent 3 = blocks 3000–3127.</li>
+</ul>
+<p>An <b>extent</b> is a run of consecutive blocks allocated in one go, so that a scan can read many neighbouring blocks cheaply even though the table as a whole is scattered.</p>
+
+<p>Slide 14's figure shows a heap of three pages. Each page has a header (free space and so on), a slot array, and the row records (eid, dept_id). The eids are in no order: page 1 holds 105, 101, 109. A separate index on eid stores <i>key → RID</i> pairs such as 102 → (page 2, slot 0). Step through an insertion:</p>
+
+<figure>
+<span class="anim-tag">Animation</span>
+<div id="heap"></div>
+</figure>
+
+<h2>2. Clustered index (slide 15)</h2>
+
+<dl class="def">
+<dt>Clustered index</dt>
+<dd>An index organization in which the table's rows are stored <b>physically in sorted order of the index column</b>. Usually the leaf nodes of the B+ tree contain the table rows themselves, not pointers to them. There is no separate storage for the table: <b>the index is the table</b>.</dd>
+</dl>
+
+<p>Three consequences follow directly from the definition:</p>
+<ol>
+  <li><b>Only one clustered index per table</b>, because the rows can be physically ordered in only one way.</li>
+  <li>It is <b>usually built on the primary key</b> (the last line of slide 15).</li>
+  <li>It is <b>efficient for range queries and ordered scans</b>: rows with keys 110 to 125 sit next to each other in consecutive leaf pages, and reading the leaves left to right returns the whole table in key order.</li>
+</ol>
+
+<figure class="wide">
+<svg viewBox="0 0 760 250" width="760" role="img" aria-label="clustered index">
+  <g style="font-size:11.5px">
+  <rect x="315" y="10" width="130" height="26" rx="4" class="cell"/><text x="380" y="28" text-anchor="middle">root: 110 | 121</text>
+  <rect x="140" y="70" width="100" height="26" rx="4" class="cell"/><text x="190" y="88" text-anchor="middle">110 | 115</text>
+  <rect x="520" y="70" width="100" height="26" rx="4" class="cell"/><text x="570" y="88" text-anchor="middle">121 | 125</text>
+  <path d="M355 36 L200 68" class="s-fg" marker-end="url(#m-fg)"/><path d="M405 36 L560 68" class="s-fg" marker-end="url(#m-fg)"/>
+  <path d="M170 96 L110 130" class="s-fg" marker-end="url(#m-fg)"/><path d="M215 96 L370 130" class="s-fg" marker-end="url(#m-fg)"/><path d="M570 96 L630 130" class="s-fg" marker-end="url(#m-fg)"/>
+  </g>
+  <g id="leaves"></g>
+  <text x="20" y="242" class="lbl">leaf level = data pages: whole rows, sorted by EmployeeID, linked left to right</text>
+</svg>
+<figcaption><b>Figure 1.</b> Slide 15's clustered index on EmployeeID. The leaf pages <em>are</em> the table (orange). The slide's internal keys are approximate: a correct B+ tree would separate the pages by their first keys 110 and 121, as the root does.</figcaption>
+</figure>
+
+<h2>3. B+ tree index (slide 16)</h2>
+
+<p>Lec 15 covered B+ trees in detail. The slide's summary: a <b>balanced</b> tree with several levels; internal nodes hold key ranges and pointers to children; <b>leaf nodes hold the indexed values with pointers to the table rows</b> (R1, R2, …), and the leaves are linked in a list. Two properties matter for query execution:</p>
+<ul>
+  <li><b>Efficient for range search.</b> Find the first key of the range by going root to leaf, then follow the leaf links.</li>
+  <li><b>Preserves the order of tuples</b> when all tuples are retrieved through the index: reading the leaves left to right gives the keys in sorted order.</li>
+</ul>
+<p>The slide's picture has leaves [3, 8, 12], [17, 21, 29], [35, 40, 48], [52, 61, 70] under internal nodes [8, 29] and [40, 61]; those internal keys do not separate the leaves correctly (for example, 8 and 12 sit left of the key 8). A consistent tree for the same leaves is drawn in the animation in Section 6.</p>
+
+<h2>4. Hash index (slide 17)</h2>
+
+<dl class="def">
+<dt>Hash index</dt>
+<dd>An array of <b>buckets</b> (a hash table on disk). A hash function h maps each search key to a bucket, and each bucket holds (key, row pointer) entries. When a bucket fills, extra entries go to an <b>overflow bucket</b> chained to it (a <em>collision</em>).</dd>
+</dl>
+<p>In the slide's picture, keys 205 and 530 hash to bucket 0, which is full, so 412 (also hashed to bucket 0) goes to an overflow bucket; 101 is in bucket 1 and 317 in bucket 2. A hash index is <b>efficient for equality search</b> (compute h(key), read one bucket) but <b>does not preserve order</b>: neighbouring keys land in unrelated buckets, so reading the buckets in turn returns tuples in a scrambled order.</p>
+
+<h2>5. Non-clustered index (slide 18)</h2>
+
+<dl class="def">
+<dt>Non-clustered index</dt>
+<dd>Any index other than the clustered one. A table may be organized by a clustered index on one attribute and have one or more indexes on <em>other</em> columns; all of those are non-clustered. Their leaves hold the key plus a <b>row locator</b>, and the rows themselves are stored elsewhere, in a different order.</dd>
+</dl>
+<p>In slide 18's figure the table is clustered on CustomerID, and a non-clustered B+ tree on LastName has leaf entries such as Ahmed → 105 and Baker → 110. When the table has a clustered index, the non-clustered index typically stores the <b>clustered key</b> (here the CustomerID) as the row locator. To fetch a row by last name, the DBMS looks up LastName in the non-clustered index, gets CustomerID 105, then searches the clustered index for 105. In a heap table the locator is the RID instead.</p>
+
+<h2>6. Why use a B+ tree when hashing is O(1)? (slide 18)</h2>
+
+<div class="q">
+<h4>Slide question (worked answer): "If hash index gives O(1) search, why is B+ tree used?"</h4>
+<p>Because <b>many searches are range queries</b>, such as <code>deptid &gt; 10</code> or <code>deptid BETWEEN 10 AND 20</code>, and <b>hashing is bad at range search</b>.</p>
+<ul>
+  <li>A hash function deliberately scatters keys, so the keys 10, 11, …, 20 are spread over unrelated buckets. To answer a range query from a hash index you would have to hash every possible value in the range (impossible for real-valued or string keys) or read every bucket, which is a full scan.</li>
+  <li>A B+ tree keeps keys sorted. The DBMS descends once to the first key ≥ 10 (a few block reads, the tree height), then walks the linked leaves until it passes 20. The cost is the height plus the number of leaf blocks that actually hold matching keys.</li>
+  <li>The B+ tree also returns tuples in key order, which helps ORDER BY and the sort-based algorithms of Lecture 08. For equality search alone a B+ tree costs only a few more reads than hashing (height 3 or 4 with the root cached), so it is the better general-purpose choice.</li>
+</ul>
+<figure>
+<span class="anim-tag">Animation</span>
+<div id="range"></div>
+</figure>
+</div>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+
+<h3>Exam questions</h3>
+<p>No question in either question bank tests this chapter on its own. These ideas (heap versus clustered storage, index versus table blocks) are used in the scan-cost questions of Chapters 3 and 4.</p>
+
+<div class="key"><p><strong>Summary:</strong> a heap stores rows in no order, in pages allocated on demand and tracked by metadata; rows are located by RID = (page, slot). A clustered index stores the rows themselves in its leaves, sorted by the key: one per table, usually on the primary key, ideal for ranges. Other indexes are non-clustered and point to rows by RID or by clustered key. Hash indexes are fastest for equality but useless for ranges and scramble order, which is why B+ trees are the default.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="lecture.js"></script>
+<script>
+// clustered index leaves
+(() => {
+  const pages = [[['101', 'Alice', 'HR'], ['104', 'Bob', 'HR'], ['108', 'Chen', 'IT']],
+                 [['110', 'Dina', 'IT'], ['115', 'Emon', 'Sales'], ['118', 'Farah', 'Sales']],
+                 [['121', 'Gita', 'Finance'], ['125', 'Hasan', 'Finance'], ['128', 'Imran', 'Admin']]];
+  let s = '';
+  pages.forEach((p, i) => {
+    const x = 20 + i * 250;
+    s += `<rect x="${x}" y="132" width="220" height="92" rx="4" class="cell-hl"/><text x="${x + 8}" y="147" class="lbl">leaf / data page ${i + 1}</text>`;
+    p.forEach((r, j) => { s += `<text x="${x + 10}" y="${168 + j * 19}" style="font-size:12px">${r[0]}  ${r[1].padEnd(6)} ${r[2]}</text>`; });
+    if (i < 2) s += `<path d="M${x + 220} 178 H${x + 248}" class="s-acc" marker-end="url(#m-acc)"/>`;
+  });
+  document.querySelector('#leaves').innerHTML = s;
+})();
+
+// heap insertion animation
+const page = (n, rows, hl) => `<span class="qe-grp"><small>page ${n}</small><span>${rows.map((r, i) => `<span class="qe-blk ${r ? (hl === i ? 'new' : '') : 'free'}"><span>slot ${i}</span><span>${r ? r.join(' / ') : 'free'}</span></span>`).join('<br>')}</span></span>`;
+const P1 = [['105', '102'], ['101', '103'], ['109', '101']], P3 = [['104', '103'], ['103', '102'], ['110', '101']];
+const idx = e => `<span class="qe-grp"><small>index on eid (key → RID)</small><span>${e.map(([k, r, h]) => `<span class="qe-blk ${h ? 'new' : ''}"><span>${k}</span><span>${r}</span></span>`).join('<br>')}</span></span>`;
+const heapFrame = (p2, ix, hl) => `<div class="figrow">${page(1, P1)}${page(2, p2, hl)}${page(3, P3)}${idx(ix)}</div>`;
+stepper('#heap', [
+  { html: heapFrame([['102', '102'], null, ['108', '104']], [['101', '(1, 1)'], ['102', '(2, 0)'], ['103', '(3, 1)']]),
+    cap: 'A heap of three pages (rows shown as eid / dept_id). The eids are in no order. Page 2, slot 1 is free. The index on eid is separate and maps each key to a RID (page, slot).' },
+  { html: heapFrame([['102', '102'], ['107', '105'], ['108', '104']], [['101', '(1, 1)'], ['102', '(2, 0)'], ['103', '(3, 1)']], 1),
+    cap: 'INSERT eid 107. Since a heap keeps no order, the DBMS puts the row in <b>any page with enough free space</b>: here page 2, slot 1.' },
+  { html: heapFrame([['102', '102'], ['107', '105'], ['108', '104']], [['101', '(1, 1)'], ['102', '(2, 0)'], ['103', '(3, 1)'], ['107', '(2, 1)', 1]], 1),
+    cap: 'The index gets the entry 107 → (2, 1). The index is kept in key order even though the heap is not.' },
+]);
+
+// range query: hash vs B+ tree
+const keys = [3, 8, 12, 17, 21, 29, 35, 40, 48, 52, 61, 70];
+const bucket = k => k % 4;
+const hashView = (look) => `<div class="qe-row"><span class="qe-lab">hash index, h(k) = k mod 4</span>${[0, 1, 2, 3].map(b => `<span class="qe-grp"><small>bucket ${b}</small><span class="qe-blk ${look.includes(b) ? 'hl' : ''}">${keys.filter(k => bucket(k) === b).map(k => `<span class="${k >= 10 && k <= 40 && look.includes(b) ? 'pick' : ''}">${k}</span>`).join('')}</span></span>`).join('')}</div>`;
+const leaves = [[3, 8, 12], [17, 21, 29], [35, 40, 48], [52, 61, 70]];
+const bpView = (path, lv) => `<div class="qe-row"><span class="qe-lab">B+ tree</span><span class="qe-grp"><small>root</small><span class="qe-blk ${path.includes('root') ? 'hl' : ''}"><span>35</span></span></span>
+  <span class="qe-grp"><small>internal</small><span><span class="qe-blk ${path.includes('L') ? 'hl' : ''}"><span>17</span></span> <span class="qe-blk"><span>52</span></span></span></span></div>
+  <div class="qe-row"><span class="qe-lab">linked leaves</span>${leaves.map((l, i) => `<span class="qe-blk ${lv.includes(i) ? 'hl' : lv.length && i < Math.max(...lv) ? '' : ''}">${l.map(k => `<span class="${lv.includes(i) && k >= 10 && k <= 40 ? 'pick' : ''}">${k}</span>`).join('')}</span>`).join(' → ')}</div>`;
+stepper('#range', [
+  { html: hashView([]) + bpView([], []), cap: 'Query: <code>key BETWEEN 10 AND 40</code>. The same 12 keys are stored in a hash index (top) and a B+ tree (bottom; this is a consistent tree for the slide\'s leaves).' },
+  { html: hashView([0, 1, 2, 3]) + bpView([], []), cap: 'Hash index: the keys 10–40 are scattered over <b>all four buckets</b> (12 → 0, 17 → 1, 21 → 1, 29 → 1, 35 → 3, 40 → 0). Nothing tells us which buckets hold keys in the range, so every bucket must be read: a full scan of the index, and the results come out unsorted.' },
+  { html: hashView([]) + bpView(['root'], []), cap: 'B+ tree: start at the root. 10 &lt; 35, so go left.' },
+  { html: hashView([]) + bpView(['root', 'L'], [0]), cap: '10 &lt; 17, so go to the first leaf. Its keys ≥ 10 start the answer: 12.' },
+  { html: hashView([]) + bpView(['root', 'L'], [0, 1, 2]), cap: 'Follow the leaf links: 17, 21, 29, then 35, 40, and stop at 48 &gt; 40. Only the 3 leaves that hold the range are read, and the keys come out <b>in sorted order</b>.' },
+]);
+
+flashcards('#cards', [
+  { f: 'Heap table', b: 'Rows in no key order; pages allocated on demand; a new row goes into any page with free space.' },
+  { f: 'RID', b: 'Row identifier = (page number, slot number). Locates a row in a heap.' },
+  { f: 'Extent', b: 'A run of consecutive blocks allocated together (SQL Server, Oracle). Tracked in the table\'s metadata.' },
+  { f: 'Clustered index', b: 'Rows stored in index-key order inside the B+ tree leaves; the index is the table. One per table, usually on the primary key.' },
+  { f: 'Non-clustered index', b: 'Any other index. Leaves hold key + row locator (RID, or the clustered key).' },
+  { f: 'Hash index', b: 'Buckets addressed by h(key); great for equality, useless for ranges, does not preserve order. Overflow buckets handle collisions.' },
+  { f: 'Why B+ trees over hashing?', b: 'Range queries (BETWEEN, >, <) and sorted output; hashing scatters neighbouring keys.' },
+]);
+quiz('#quiz', [
+  { q: 'Why can a table have only one clustered index?', opts: ['The DBMS limits index count', 'Rows can be physically ordered in only one way', 'Clustered indexes use too much space', 'Hashing forbids it'], a: 1, why: 'A clustered index stores the rows themselves in key order; they cannot simultaneously be in two different orders.' },
+  { q: 'A new row is inserted into a heap table. Where does it go?', opts: ['At its key position', 'Always at the end of the last page', 'Into any page with enough free space', 'Into an overflow bucket'], a: 2, why: 'A heap keeps no order, so any page with room will do (slide 14: "new row may be placed on any page with sufficient free space").' },
+  { q: 'Which index best answers <code>WHERE price BETWEEN 100 AND 200</code>?', opts: ['Hash index on price', 'B+ tree on price', 'Hash index on id', 'None; always scan'], a: 1, why: 'B+ tree leaves are sorted and linked, so the range is read in one sweep.' },
+  { q: 'In a table clustered on CustomerID, what does a non-clustered index on LastName typically store as the row locator?', opts: ['The RID', 'The CustomerID', 'The whole row', 'A hash of LastName'], a: 1, why: 'Slide 18: the non-clustered index stores the clustered key, then the clustered index finds the row.' },
+  { q: 'Reading all entries of a hash index bucket by bucket returns the keys…', opts: ['sorted ascending', 'sorted descending', 'in no useful order', 'grouped by page'], a: 2, why: 'Hashing does not preserve order (slide 17).' },
+]);
+ask('#try1', { q: 'With h(k) = k mod 4, which bucket holds key 29?', a: 1, why: '29 = 7 × 4 + 1.' });
+</script>
+</body>
+</html>

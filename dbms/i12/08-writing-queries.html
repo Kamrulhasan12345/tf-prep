@@ -1,0 +1,323 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Writing Queries in Relational Algebra · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 12 (Ishrak) · Chapter 8 · Slides 45–49 · Book §2.4.12–2.4.14</div>
+<h1>Writing Queries in Relational Algebra</h1>
+<p class="lede">The slides' worked examples on the textbook's PC/Laptop/Printer database (one of which needs a correction), operator precedence, and the linear "assignment" notation. Then four exam questions in the same style, each answered and run on sample data.</p>
+
+<h2>1. A method for writing RA queries</h2>
+<ol>
+  <li><b>Find the relations</b> that hold the attributes the question mentions (in the conditions and in the output).</li>
+  <li><b>Connect them</b>: natural join when the linking attributes have the same name and no other names clash; theta/equi-join otherwise.</li>
+  <li><b>Select</b> with the question's conditions, as low in the tree as possible.</li>
+  <li><b>Project</b> onto what is asked.</li>
+  <li>Watch for the special patterns: "and also / both" across different tuples → ∩ of two queries; "but not / never / no" → −; "two or more / pairs / at least two different" → self-product with renaming; "the highest / largest" → remove everything that is smaller than something (− with a self-join), or γ (<a href="09-extended-ra.html">Chapter 9</a>); "every / all" → ÷ (<a href="05-set-operations.html">Chapter 5</a>).</li>
+</ol>
+
+<h2>2. The PC/Laptop/Printer examples (slides 45–48)</h2>
+<p>The schema is the textbook's (Exercise 2.4.1): Product(maker, model, type), PC(model, speed, ram, hd, price), Laptop(model, speed, ram, hd, screen, price), Printer(model, color, type, price). The sample data below is the book's (Figures 2.20–2.21), with Printer.color written 'T'/'F' as on slide 46. The slides write each answer as <code>Answer(…) := expression</code>, the book's linear notation (section 4).</p>
+
+<figure class="wide">
+<span class="anim-tag">Interactive tool</span>
+<div id="lab"></div>
+</figure>
+
+<div class="q"><h4>Slide 45: What PC models have a speed of at least 3.00? Which manufacturers make laptops with a hard disk of at least 100GB?</h4>
+<p class="ra-big">Answer(model) := π<sub>model</sub>(σ<sub>speed≥3.00</sub>(PC))</p>
+<p>On the data: <b>1005, 1006, 1013</b>.</p>
+<p class="ra-big">Answer(maker) := π<sub>maker</sub>(σ<sub>hd≥100</sub>(Product ⋈ Laptop))</p>
+<p>Product and Laptop share only model, so the natural join attaches each laptop's maker. Laptops with hd ≥ 100: 2001 (E), 2005 (A), 2007 (B), 2008 (F), 2010 (G), so the makers are <b>A, B, E, F, G</b>. Pushing the selection down, π<sub>maker</sub>(Product ⋈ σ<sub>hd≥100</sub>(Laptop)), is equivalent and cheaper.</p></div>
+
+<div class="q"><h4>Slide 46: Find the model numbers of all color laser printers. Find those manufacturers that sell laptops but not PCs.</h4>
+<p class="ra-big">π<sub>model</sub>(σ<sub>color='T' ∧ type='laser'</sub>(Printer))</p>
+<p>Both conditions are about the same printer, so ∧ in one selection is right: <b>3003, 3007</b>.</p>
+<p class="ra-big">π<sub>maker</sub>(σ<sub>type='laptop'</sub>(Product)) − π<sub>maker</sub>(σ<sub>type='pc'</sub>(Product))</p>
+<p>"but not" is a difference of two sets of makers. Laptop makers {A, B, E, F, G} minus PC makers {A, B, C, D, E} = <b>{F, G}</b>. A single selection σ<sub>type='laptop' ∧ type≠'pc'</sub> would be wrong: it tests one product tuple at a time, and every laptop tuple has type ≠ 'pc', so it would return all laptop makers.</p></div>
+
+<div class="q"><h4>Slide 47: Find those hard-disk sizes that occur in two or more PCs. Find pairs of PC models with both the same speed and RAM, each pair listed once.</h4>
+<p class="ra-big">π<sub>pc1.hd</sub>(σ<sub>pc1.model≠pc2.model ∧ pc1.hd=pc2.hd</sub>(ρ<sub>pc1</sub>(PC) × ρ<sub>pc2</sub>(PC)))</p>
+<p>"Two or more" means two <em>different</em> PCs with the same hd, so compare two renamed copies and require different models. Result: <b>250, 80, 160</b> (250 occurs in six PCs; 300, 320 and 200 occur once).</p>
+<p class="ra-big">π<sub>pc1.model, pc2.model</sub>(σ<sub>pc1.model&lt;pc2.model ∧ pc1.speed=pc2.speed ∧ pc1.ram=pc2.ram</sub>(ρ<sub>pc1</sub>(PC) × ρ<sub>pc2</sub>(PC)))</p>
+<p>Using &lt; instead of ≠ lists each pair once: (1004, 1012) passes, (1012, 1004) does not, and a PC is never paired with itself. Result: <b>(1004, 1012)</b>, both 2.80 GHz with 1024 MB.</p></div>
+
+<div class="q"><h4>Slide 48: Find the manufacturer(s) of the PC or laptop with the highest available speed.</h4>
+<p>The idea: collect all computers with their speeds; remove every computer that is slower than some other computer; what is left has the maximum speed; look up its maker. The slide writes:</p>
+<pre>R1(model, speed) := π<sub>model,speed</sub>(PC) ∪ π<sub>model,speed</sub>(Laptop)
+T(model, speed)  := R1 − σ<sub>R1.speed &lt; R2.speed</sub>(R1 × ρ<sub>R2</sub>(R1))
+Answer(maker)    := π<sub>maker</sub>(T ⋈ Product)</pre>
+<p><b>Correction.</b> The second line is not valid as written: R1 has two attributes, but R1 × ρ<sub>R2</sub>(R1) has four, so the difference is between relations that are not union-compatible. The selected pairs must be projected back onto the slower computer's attributes first:</p>
+<p class="ra-big">T(model, speed) := R1 − π<sub>R1.model, R1.speed</sub>(σ<sub>R1.speed &lt; R2.speed</sub>(R1 × ρ<sub>R2</sub>(R1)))</p>
+<p>(Load the "slide 48 as printed" example in the evaluator above to see the error.) On the data, the fastest computers are PCs 1005 and 1006 at 3.20 GHz, both made by <b>B</b>. If several makers tie at the top speed, all of them are returned.</p></div>
+
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="s48"></div>
+<figcaption><b>Figure 1.</b> Slide 48 (corrected) step by step. Watch the − step: of the 23 computers, only those that are not slower than any other survive.</figcaption>
+</figure>
+
+<h2>3. Precedence of the operators (slide 49)</h2>
+<p>To save parentheses, RA operators bind with this precedence, highest first:</p>
+<ol>
+  <li>σ, π, ρ (unary, highest)</li>
+  <li>×, ⋈ (and the other joins)</li>
+  <li>∩</li>
+  <li>∪, − (lowest)</li>
+</ol>
+<p>So R ∪ S ⋈ T means R ∪ (S ⋈ T), and R − S ∩ T means R − (S ∩ T). Operators of equal precedence group from the left: R − S ∪ T = (R − S) ∪ T. The evaluator follows these rules (it puts ÷ with × and ⋈). When in doubt, write parentheses; an examiner never deducts for them.</p>
+<figure><div class="figrow"><div><div class="figlabel">R ∪ S ⋈ T</div><div id="p1"></div></div><div><div class="figlabel">R − S ∩ T</div><div id="p2"></div></div><div><div class="figlabel">R − S ∪ T</div><div id="p3"></div></div></div>
+<figcaption><b>Figure 2.</b> How the precedence rules parse three unparenthesized expressions.</figcaption></figure>
+
+<h2>4. Linear notation: assignment</h2>
+<p>A long expression is easier to write and read as a sequence of named steps (textbook §2.4.13). <code>R(A1, …, An) := E</code> evaluates E and calls the result R, with attributes A1, …, An (the attribute list is optional). Later steps can use R as if it were a stored relation. Slide 48 uses it. In the evaluator, write each assignment on its own line: <code>T := …</code> or <code>T(a, b) := …</code>; the last line is the answer.</p>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+<h3>Write it yourself (textbook Exercise 2.4.1)</h3>
+<div id="ex1"></div>
+<div id="ex2"></div>
+<div id="ex3"></div>
+<div id="ex4"></div>
+<div id="ex5"></div>
+
+<h3>Exam questions</h3>
+<div class="exam">
+  <div class="exam-src">DB QB · 19-20 7a · 20 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-2 | 2019–20 · 15 marks</div>
+  <div class="exam-q"><p>Given the following schema of a university: classroom(building, room_number, capacity), department(dept_name, building, budget), course(course_id, title, dept_name, credits), instructor(ID, name, dept_name, salary), section(course_id, sec_id, semester, year, building, room_number, time_slot_id), teaches(ID, course_id, sec_id, semester, year), student(ID, name, dept_name, tot_cred), takes(ID, course_id, sec_id, semester, year, grade), advisor(s_ID, i_ID), timeslot(time_slot_id, day, start_time, end_time), prereq(course_id, prereq_id). Write the following queries in relational algebra:</p>
+  <p>i. Find the ID and name of each instructor in the Physics department.<br>ii. Find the ID and name of each instructor in a department located in the building 'Watson'.<br>iii. Find all the courses taught in the Fall 2022 semester but not in Spring 2022 semester.<br>iv. Find the ID and name of those instructors who earn more than the instructors in the Physics department.<br>v. Find the ID and name of each student who has not taken any course section in the year 2022.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><b>i.</b> π<sub>ID, name</sub>(σ<sub>dept_name='Physics'</sub>(instructor))</p>
+    <p><b>ii.</b> The building is in department; instructor and department share only dept_name:</p>
+    <p class="ra-big">π<sub>ID, name</sub>(instructor ⋈ σ<sub>building='Watson'</sub>(department))</p>
+    <p><b>iii.</b> "but not" is a difference. section records which course was offered in which semester:</p>
+    <p class="ra-big">π<sub>course_id</sub>(σ<sub>semester='Fall' ∧ year=2022</sub>(section)) − π<sub>course_id</sub>(σ<sub>semester='Spring' ∧ year=2022</sub>(section))</p>
+    <p><b>iv.</b> "More than the instructors in Physics" means more than <em>every</em> Physics instructor. Find the instructors who earn less than or equal to <em>some</em> Physics instructor, and remove them from all instructors:</p>
+    <pre>P   := σ<sub>dept_name='Physics'</sub>(instructor)
+NotMore := π<sub>I.ID, I.name</sub>(σ<sub>I.salary ≤ P.salary</sub>(ρ<sub>I</sub>(instructor) × ρ<sub>P</sub>(P)))
+Answer  := π<sub>ID, name</sub>(instructor) − NotMore</pre>
+    <p>(If the examiner meant "more than at least one Physics instructor", the answer is simply π<sub>I.ID, I.name</sub>(σ<sub>I.salary &gt; P.salary</sub>(ρ<sub>I</sub>(instructor) × ρ<sub>P</sub>(P))). State your reading.) Physics instructors never qualify under the first reading, because each earns ≤ his own salary.</p>
+    <p><b>v.</b> All students minus those who took a section in 2022. student and takes share only ID:</p>
+    <p class="ra-big">π<sub>ID, name</sub>(student) − π<sub>ID, name</sub>(student ⋈ σ<sub>year=2022</sub>(takes))</p>
+    <p>On the university sample data used in this lecture: (i) Einstein, Gold; (ii) Einstein, Gold, Crick (Physics and Biology are in Watson); (iii) CS-315, PHY-101; (iv) Brandt (98000 &gt; 95000, the top Physics salary); (v) 19991 Brandt and 44553 Peltier. Run them below.</p>
+    <div id="uniLab"></div>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2015–16 · 15 marks</div>
+  <div class="exam-q"><p>Consider the schema Route(FN, DC, AC, DI, SD, SA, PM), Flight(FN, DT, NP, AD, AA), Plane(PM, CA, TP) (FN = flight number, DC = departure city, AC = arrival city, DI = distance, SD = scheduled departure, SA = scheduled arrival, PM = plane model, DT = date, NP = number of passengers, AD = actual departure, AA = actual arrival, CA = capacity, TP = type), with the instance below. Translate the following queries into relational algebra:</p>
+  <p>(a) Which flights have at least 50 passengers on board and arrived more than 30 minutes late?<br>(b) What are the departure and arrival cities of all flights on October 10th that were completely full?<br>(c) What are the plane types that travel between BOSTON (BOS) and FRANCISCO (SFO)?<br>(d) Which flights departed late but arrived without any delay?</p>
+  <div id="flData"></div></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>Flight and Route share only FN; Route and Plane share only PM, so natural joins connect them. A "flight" in Flight is identified by (FN, DT), so the answers project both.</p>
+    <p><b>(a)</b> π<sub>FN, DT</sub>(σ<sub>NP≥50 ∧ AA−SA&gt;30</sub>(Flight ⋈ Route))</p>
+    <p>Here AA − SA means the difference in minutes. The times are stored as hhmm numbers, and plain subtraction of hhmm values is wrong across an hour boundary (1005 − 0950 = 55, but the real gap is 15 minutes), so the evaluator converts: minutes(t) = ⌊t/100⌋·60 + (t mod 100). Result: <b>(110, 2000-10-10)</b>, 35 minutes late with 403 passengers, and <b>(124, 2000-10-09)</b>, 40 minutes late with 150.</p>
+    <p><b>(b)</b> "Completely full" means the passengers equal the plane's capacity, which needs all three relations:</p>
+    <p class="ra-big">π<sub>DC, AC</sub>(σ<sub>DT='2000-10-10' ∧ NP=CA</sub>(Route ⋈ Flight ⋈ Plane))</p>
+    <p>On this instance the result is <b>empty</b>: no flight on October 10 was full (the fullest, flight 124, carried 414 of 440). The expression is still the answer; it would return cities for any full flight.</p>
+    <p><b>(c)</b> "Between" covers both directions:</p>
+    <p class="ra-big">π<sub>TP</sub>(σ<sub>(DC='BOS' ∧ AC='SFO') ∨ (DC='SFO' ∧ AC='BOS')</sub>(Route ⋈ Plane))</p>
+    <p>Only route 124 (SFO → BOS, an L1011) qualifies, so the result is <b>jet</b>.</p>
+    <p><b>(d)</b> Late departure: AD &gt; SD; no arrival delay: AA ≤ SA.</p>
+    <p class="ra-big">π<sub>FN, DT</sub>(σ<sub>AD&gt;SD ∧ AA≤SA</sub>(Flight ⋈ Route))</p>
+    <p>Result: <b>(1205, 2000-10-09), (110, 2000-10-11), (398, 2000-10-10), (124, 2000-10-10)</b>. (Comparisons of hhmm times on the same day are correct without conversion.)</p>
+    <div id="flLab"></div>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2011–12 · 10 marks</div>
+  <div class="exam-q"><p>Using the schema Emp(eno, ename, title, city), Proj(pno, pname, budget, city), Works(eno, pno, resp, dur), Pay(title, salary), express the following queries using relational algebra:</p>
+  <p>(a) Find names of employees whose salary is more than $1000.<br>(b) List all projects where at least one person with 'Programmer' title is working on it. (A project name may appear more than once.)</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><b>(a)</b> Salary depends on the title (Pay); Emp and Pay share only title:</p>
+    <p class="ra-big">π<sub>ename</sub>(σ<sub>salary&gt;1000</sub>(Emp ⋈ Pay))</p>
+    <p><b>(b)</b> The trap: Emp and Proj both have <code>city</code>. Emp ⋈ Works ⋈ Proj would also require Emp.city = Proj.city and silently lose programmers who live elsewhere. Project the clashing attribute away first:</p>
+    <p class="ra-big">π<sub>pno, pname</sub>(π<sub>pno, pname</sub>(Proj) ⋈ Works ⋈ π<sub>eno</sub>(σ<sub>title='Programmer'</sub>(Emp)))</p>
+    <p>The note "a project name may appear more than once" says pname is not a key: two different projects can share a name. That is why the answer keeps pno with pname; π<sub>pname</sub> alone would merge two such projects into one row. In the sample data below, Asha (Programmer, Dhaka) works on project P1 in Khulna: the correct expression lists P1, the naive three-way natural join (also loaded below) misses it.</p>
+    <div id="epLab"></div>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2010–11 · 8 marks</div>
+  <div class="exam-q"><p>Using the schema Product(pid, name, price, category, year, maker_cid), Purchase(buyer_ssn, seller_ssn, store, pid), Company(cid, name, stock_price, country), Person(ssn, name, phone_number, city), express the following queries using relational algebra:</p>
+  <p>(a) Find names of people who bought Indian products and live in Gulshan.<br>(b) Find people who bought stuff from Alam or bought products from a company whose stock price is more than BDT 2500.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>Person, Product and Company all have an attribute called <code>name</code>, and the links use different names (ssn/buyer_ssn, maker_cid/cid), so natural joins would be wrong here. Use equi-joins.</p>
+    <p><b>(a)</b></p>
+    <p class="ra-big">π<sub>Person.name</sub>(σ<sub>city='Gulshan'</sub>(Person) ⋈<sub>ssn=buyer_ssn</sub> Purchase ⋈<sub>Purchase.pid=Product.pid</sub> Product ⋈<sub>maker_cid=cid</sub> σ<sub>country='India'</sub>(Company))</p>
+    <p><b>(b)</b> "or" between two different ways of qualifying: compute the two sets of buyers and take the union, then attach the person's details.</p>
+    <pre>FromAlam  := π<sub>buyer_ssn</sub>(Purchase ⋈<sub>seller_ssn=ssn</sub> σ<sub>name='Alam'</sub>(Person))
+RichMaker := π<sub>buyer_ssn</sub>(Purchase ⋈<sub>Purchase.pid=Product.pid</sub> Product ⋈<sub>maker_cid=cid</sub> σ<sub>stock_price&gt;2500</sub>(Company))
+Answer    := π<sub>ssn, name</sub>(Person ⋈<sub>ssn=buyer_ssn</sub> (FromAlam ∪ RichMaker))</pre>
+    <p>Here "bought stuff from Alam" is read as "the seller is the person named Alam". If Alam is a store, replace the first line by π<sub>buyer_ssn</sub>(σ<sub>store='Alam'</sub>(Purchase)).</p>
+    <div id="ppLab"></div>
+  </div></details>
+</div>
+
+<div class="key"><p><strong>Summary:</strong> Find the relations, connect them with joins (natural only when the shared names are exactly the linking attributes), select, project. "but not" → −; "both … and … (different tuples)" → ∩; "two or more / pairs" → ρ and a self-product with ≠ or &lt;; "highest" → all minus those smaller than something; "every" → ÷. Precedence: σ π ρ, then × ⋈, then ∩, then ∪ −. Slide 48's T needs π<sub>R1.model,R1.speed</sub> before the difference.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/sqlplay.js"></script>
+<script src="lecture.js"></script>
+<script>
+const S48 = `R1 := project[model, speed](PC) union project[model, speed](Laptop)
+T := R1 - project[R1.model, R1.speed](select[R1.speed < R2.speed](R1 x rename[R2](R1)))
+project[maker](T join Product)`;
+raLab('#lab', { db: DB_PPLP, presets: [
+  { label: 'Slide 45: PC models with speed ≥ 3.00', ra: 'project[model](select[speed >= 3.00](PC))', sql: 'SELECT DISTINCT model\nFROM PC\nWHERE speed >= 3.00;' },
+  { label: 'Slide 45: makers of laptops with hd ≥ 100', ra: 'project[maker](select[hd >= 100](Product join Laptop))', sql: 'SELECT DISTINCT maker\nFROM Product NATURAL JOIN Laptop\nWHERE hd >= 100;' },
+  { label: 'Slide 46: color laser printers', ra: "project[model](select[color = 'T' and type = 'laser'](Printer))", sql: "SELECT DISTINCT model\nFROM Printer\nWHERE color = 'T' AND type = 'laser';" },
+  { label: 'Slide 46: makers of laptops but not PCs', ra: "project[maker](select[type = 'laptop'](Product)) - project[maker](select[type = 'pc'](Product))", sql: "SELECT maker FROM Product WHERE type = 'laptop'\nMINUS\nSELECT maker FROM Product WHERE type = 'pc';" },
+  { label: 'Slide 47: hd sizes in two or more PCs', ra: 'project[pc1.hd](select[pc1.model <> pc2.model and pc1.hd = pc2.hd](rename[pc1](PC) x rename[pc2](PC)))', sql: 'SELECT DISTINCT pc1.hd\nFROM PC pc1, PC pc2\nWHERE pc1.model <> pc2.model AND pc1.hd = pc2.hd;' },
+  { label: 'Slide 47: pairs with same speed and RAM', ra: 'project[pc1.model, pc2.model](select[pc1.model < pc2.model and pc1.speed = pc2.speed and pc1.ram = pc2.ram](rename[pc1](PC) x rename[pc2](PC)))', sql: 'SELECT pc1.model, pc2.model\nFROM PC pc1, PC pc2\nWHERE pc1.model < pc2.model AND pc1.speed = pc2.speed AND pc1.ram = pc2.ram;' },
+  { label: 'Slide 48 (corrected): maker of the fastest computer', ra: S48, sql: 'SELECT DISTINCT maker\nFROM Product\nWHERE model IN (\n  SELECT model FROM PC WHERE speed = (SELECT MAX(speed) FROM (SELECT speed FROM PC UNION SELECT speed FROM Laptop))\n  UNION\n  SELECT model FROM Laptop WHERE speed = (SELECT MAX(speed) FROM (SELECT speed FROM PC UNION SELECT speed FROM Laptop)));' },
+] });
+// "as printed" example, added after the self-tested presets
+(() => { const sel = document.querySelector('#lab select'); const o = document.createElement('option'); o.textContent = 'Slide 48 as printed (shows the union-compatibility error)'; o.value = 'p'; sel.insertBefore(o, sel.lastElementChild);
+  sel.addEventListener('change', () => { if (sel.value === 'p') { const ed = document.querySelector('#lab textarea'); ed.value = 'R1 := project[model, speed](PC) union project[model, speed](Laptop)\nT := R1 - select[R1.speed < R2.speed](R1 x rename[R2](R1))\nproject[maker](T join Product)'; document.querySelector('#lab [data-run]').click(); } }); })();
+raSteps('#s48', DB_PPLP, S48, { interval: 3000, max: 24 });
+raTree('#p1', 'R union S join T'); raTree('#p2', 'R - S intersect T'); raTree('#p3', 'R - S union T');
+
+// exam data
+const FL = raDB(`
+Route(FN, DC, AC, DI, SD, SA, PM)
+1384 | ROC | BOS | 325 | 650 | 810 | F101
+1205 | BOS | ROC | 325 | 1730 | 1900 | F101
+110 | BOS | LAX | 3250 | 900 | 1040 | L1011
+398 | LAX | SFO | 340 | 1120 | 1210 | 757
+124 | SFO | BOS | 3180 | 1400 | 2310 | L1011
+448 | BOS | DCA | 340 | 700 | 830 | 737
+540 | DCA | BOS | 340 | 1900 | 2030 | 737
+
+Flight(FN, DT, NP, AD, AA)
+1384 | 2000-10-09 | 40 | 650 | 800
+1384 | 2000-10-10 | 12 | 730 | 842
+1384 | 2000-10-11 | 30 | 700 | 815
+1205 | 2000-10-09 | 42 | 1735 | 1900
+1205 | 2000-10-10 | 8 | 1730 | 1855
+1205 | 2000-10-11 | 20 | 1810 | 1932
+110 | 2000-10-10 | 403 | 940 | 1115
+110 | 2000-10-11 | 385 | 905 | 1035
+398 | 2000-10-09 | 148 | 1150 | 1220
+398 | 2000-10-10 | 95 | 1125 | 1210
+124 | 2000-10-09 | 150 | 1500 | 2350
+124 | 2000-10-10 | 414 | 1410 | 2310
+
+Plane(PM, CA, TP)
+737 | 120 | jet
+747 | 460 | jet
+757 | 200 | jet
+L1011 | 440 | jet
+F101 | 45 | prop
+`);
+raShow('#flData', FL);
+const MIN = t => `(trunc(${t}/100)*60 + mod(${t},100))`;
+raLab('#flLab', { db: FL, presets: [
+  { label: '(a) ≥ 50 passengers, > 30 min late', ra: `project[FN, DT](select[NP >= 50 and ${MIN('AA')} - ${MIN('SA')} > 30](Flight join Route))`, sql: 'SELECT DISTINCT f.FN, f.DT\nFROM Flight f, Route r\nWHERE f.FN = r.FN AND f.NP >= 50\n  AND (FLOOR(f.AA/100)*60 + MOD(f.AA,100)) - (FLOOR(r.SA/100)*60 + MOD(r.SA,100)) > 30;' },
+  { label: '(b) full flights on Oct 10', ra: "project[DC, AC](select[DT = '2000-10-10' and NP = CA](Route join Flight join Plane))", sql: "SELECT DISTINCT r.DC, r.AC\nFROM Route r, Flight f, Plane p\nWHERE r.FN = f.FN AND r.PM = p.PM\n  AND f.DT = '2000-10-10' AND f.NP = p.CA;" },
+  { label: '(c) plane types between BOS and SFO', ra: "project[TP](select[(DC = 'BOS' and AC = 'SFO') or (DC = 'SFO' and AC = 'BOS')](Route join Plane))", sql: "SELECT DISTINCT p.TP\nFROM Route r, Plane p\nWHERE r.PM = p.PM\n  AND ((r.DC = 'BOS' AND r.AC = 'SFO') OR (r.DC = 'SFO' AND r.AC = 'BOS'));" },
+  { label: '(d) departed late, arrived on time', ra: 'project[FN, DT](select[AD > SD and AA <= SA](Flight join Route))', sql: 'SELECT DISTINCT f.FN, f.DT\nFROM Flight f, Route r\nWHERE f.FN = r.FN AND f.AD > r.SD AND f.AA <= r.SA;' },
+] });
+
+raLab('#uniLab', { db: DB_UNI, presets: [
+  { label: 'i. Physics instructors', ra: "project[ID, name](select[dept_name = 'Physics'](instructor))", sql: "SELECT DISTINCT ID, name\nFROM instructor\nWHERE dept_name = 'Physics';" },
+  { label: 'ii. instructors in Watson departments', ra: "project[ID, name](instructor join select[building = 'Watson'](department))", sql: "SELECT DISTINCT i.ID, i.name\nFROM instructor i, department d\nWHERE i.dept_name = d.dept_name AND d.building = 'Watson';" },
+  { label: 'iii. Fall 2022 but not Spring 2022', ra: "project[course_id](select[semester = 'Fall' and year = 2022](section)) - project[course_id](select[semester = 'Spring' and year = 2022](section))", sql: "SELECT course_id FROM section WHERE semester = 'Fall' AND year = 2022\nMINUS\nSELECT course_id FROM section WHERE semester = 'Spring' AND year = 2022;" },
+  { label: 'iv. earn more than every Physics instructor', ra: "P := select[dept_name = 'Physics'](instructor)\nNotMore := project[I.ID, I.name](select[I.salary <= P.salary](rename[I](instructor) x rename[P](P)))\nproject[ID, name](instructor) - NotMore", sql: "SELECT ID, name\nFROM instructor\nWHERE salary > (SELECT MAX(salary) FROM instructor WHERE dept_name = 'Physics');" },
+  { label: 'v. students with no section in 2022', ra: 'project[ID, name](student) - project[ID, name](student join select[year = 2022](takes))', sql: 'SELECT ID, name FROM student\nMINUS\nSELECT s.ID, s.name FROM student s, takes t WHERE s.ID = t.ID AND t.year = 2022;' },
+] });
+
+const EP = raDB(`
+Emp(eno, ename, title, city)
+E1 | Asha | Programmer | Dhaka
+E2 | Babu | Analyst | Khulna
+E3 | Chitra | Programmer | Khulna
+E4 | Dolon | Manager | Dhaka
+
+Proj(pno, pname, budget, city)
+P1 | Payroll | 50000 | Khulna
+P2 | Website | 30000 | Khulna
+P3 | Payroll | 80000 | Dhaka
+
+Works(eno, pno, resp, dur)
+E1 | P1 | coder | 12
+E2 | P1 | analyst | 6
+E3 | P2 | coder | 10
+E4 | P3 | manager | 24
+
+Pay(title, salary)
+Programmer | 1200
+Analyst | 1500
+Manager | 900
+`);
+raLab('#epLab', { db: EP, presets: [
+  { label: '(a) salary > 1000', ra: 'project[ename](select[salary > 1000](Emp join Pay))', sql: 'SELECT DISTINCT e.ename\nFROM Emp e, Pay p\nWHERE e.title = p.title AND p.salary > 1000;' },
+  { label: '(b) projects with a programmer (correct)', ra: "project[pno, pname](project[pno, pname](Proj) join Works join project[eno](select[title = 'Programmer'](Emp)))", sql: "SELECT DISTINCT p.pno, p.pname\nFROM Proj p, Works w, Emp e\nWHERE p.pno = w.pno AND w.eno = e.eno AND e.title = 'Programmer';" },
+  { label: '(b) naive: Emp ⋈ Works ⋈ Proj also matches city', ra: "project[pno, pname](select[title = 'Programmer'](Emp join Works join Proj))", sql: "SELECT DISTINCT p.pno, p.pname\nFROM Emp e, Works w, Proj p\nWHERE e.eno = w.eno AND w.pno = p.pno AND e.city = p.city AND e.title = 'Programmer';" },
+] });
+
+const PP = raDB(`
+Person(ssn, name, phone_number, city)
+101 | Alam | 0171 | Dhanmondi
+102 | Bithi | 0181 | Gulshan
+103 | Chayan | 0191 | Gulshan
+104 | Dina | 0161 | Mirpur
+
+Company(cid, name, stock_price, country)
+C1 | Tata | 3000 | India
+C2 | Walton | 1800 | Bangladesh
+C3 | Bajaj | 2200 | India
+
+Product(pid, name, price, category, year, maker_cid)
+1 | Nano | 500000 | car | 2020 | C1
+2 | Primo | 15000 | phone | 2021 | C2
+3 | Pulsar | 200000 | bike | 2019 | C3
+
+Purchase(buyer_ssn, seller_ssn, store, pid)
+102 | 101 | Bashundhara | 2
+103 | 104 | Jamuna | 3
+104 | 102 | Alam | 1
+102 | 104 | Jamuna | 1
+`);
+raLab('#ppLab', { db: PP, presets: [
+  { label: '(a) Indian products, living in Gulshan', ra: "project[Person.name](select[city = 'Gulshan'](Person) join[ssn = buyer_ssn] Purchase join[Purchase.pid = Product.pid] Product join[maker_cid = cid] select[country = 'India'](Company))", sql: "SELECT DISTINCT pe.name\nFROM Person pe, Purchase pu, Product pr, Company c\nWHERE pe.ssn = pu.buyer_ssn AND pu.pid = pr.pid AND pr.maker_cid = c.cid\n  AND pe.city = 'Gulshan' AND c.country = 'India';" },
+  { label: '(b) bought from Alam or from a rich maker', ra: "FromAlam := project[buyer_ssn](Purchase join[seller_ssn = ssn] select[name = 'Alam'](Person))\nRichMaker := project[buyer_ssn](Purchase join[Purchase.pid = Product.pid] Product join[maker_cid = cid] select[stock_price > 2500](Company))\nproject[ssn, name](Person join[ssn = buyer_ssn] (FromAlam union RichMaker))", sql: "SELECT ssn, name FROM Person\nWHERE ssn IN (SELECT pu.buyer_ssn FROM Purchase pu, Person s\n              WHERE pu.seller_ssn = s.ssn AND s.name = 'Alam'\n              UNION\n              SELECT pu.buyer_ssn FROM Purchase pu, Product pr, Company c\n              WHERE pu.pid = pr.pid AND pr.maker_cid = c.cid AND c.stock_price > 2500);" },
+] });
+
+flashcards('#cards', [
+  { f: '"but not"', b: 'Difference of two sets: π(…) − π(…).' },
+  { f: '"two or more" / "pairs"', b: 'Self-product of two renamed copies, with ≠ (two or more) or &lt; (each pair once).' },
+  { f: '"the highest"', b: 'All candidates minus those smaller than some other candidate (self-join), or γ max.' },
+  { f: 'Precedence', b: '1. σ π ρ  2. × ⋈  3. ∩  4. ∪ −. Equal levels group left to right.' },
+  { f: 'R(A1,…,An) := E', b: 'Linear notation: name the result of E (optionally renaming its attributes) and use it later.' },
+  { f: 'Natural join safety check', b: 'List the shared attribute names. Use ⋈ only if they are exactly the linking attributes.' },
+]);
+quiz('#quiz', [
+  { q: 'R ∪ S ⋈ T is parsed as…', opts: ['(R ∪ S) ⋈ T', 'R ∪ (S ⋈ T)', 'an error', '(R ⋈ T) ∪ (S ⋈ T)'], a: 1, why: '⋈ has higher precedence than ∪.' },
+  { q: 'Why is slide 48\'s T := R1 − σ<sub>R1.speed&lt;R2.speed</sub>(R1 × ρ<sub>R2</sub>(R1)) invalid?', opts: ['× cannot take a relation with itself', 'The two sides of − have 2 and 4 attributes', 'σ cannot compare speeds', 'R2 is not defined'], a: 1, why: 'Project back onto R1.model, R1.speed first.' },
+  { q: 'Which finds makers of laptops but not PCs?', opts: ['π<sub>maker</sub>(σ<sub>type=\'laptop\' ∧ type≠\'pc\'</sub>(Product))', 'π<sub>maker</sub>(σ<sub>type=\'laptop\'</sub>(Product)) − π<sub>maker</sub>(σ<sub>type=\'pc\'</sub>(Product))', 'π<sub>maker</sub>(σ<sub>type=\'laptop\'</sub>(Product)) ∩ π<sub>maker</sub>(σ<sub>type=\'pc\'</sub>(Product))', 'π<sub>maker</sub>(Product) − π<sub>maker</sub>(Laptop)'], a: 1, why: 'The condition is about other tuples of the same maker, so it needs a difference of sets.' },
+  { q: 'Why use pc1.model &lt; pc2.model rather than ≠ for "pairs listed once"?', opts: ['&lt; is faster', '≠ lists each pair twice, (a,b) and (b,a)', '≠ is not allowed in σ', 'They are the same'], a: 1, why: '&lt; keeps exactly one orientation.' },
+  { q: 'Person(ssn, name, …) and Company(cid, name, …) are joined through other tables. Why not use natural joins?', opts: ['Natural join would also equate Person.name with Company.name', 'Natural joins are slower', 'Company has no key', 'It is fine'], a: 0, why: 'Shared names that are not linking attributes break natural joins.' },
+]);
+ask('#try1', { q: 'How many laptops in the textbook data have hd ≥ 100?', a: 5, why: '2001 (240), 2005 (120), 2007 (120), 2008 (100), 2010 (160).' });
+
+raCheck('#ex1', { db: DB_PPLP, task: '1. (Easy) Find the model number and price of all products (of any type) made by manufacturer B.', solution: "project[model, price](select[maker = 'B'](Product) join (project[model, price](PC) union project[model, price](Laptop) union project[model, price](Printer)))", hint: 'Put the (model, price) pairs of the three tables together with ∪, then join with B\'s products.' });
+raCheck('#ex2', { db: DB_PPLP, task: '2. Find the manufacturers that sell PCs and also sell printers.', solution: "project[maker](select[type = 'pc'](Product)) intersect project[maker](select[type = 'printer'](Product))" });
+raCheck('#ex3', { db: DB_PPLP, task: '3. (Exam style) Find the manufacturers of at least two different computers (PCs or laptops) with speeds of at least 2.80.', solution: "F := project[model](select[speed >= 2.80](PC)) union project[model](select[speed >= 2.80](Laptop))\nM := Product join F\nproject[M1.maker](select[M1.maker = M2.maker and M1.model <> M2.model](rename[M1](M) x rename[M2](M)))", hint: 'Collect fast models, attach makers, then a self-product with equal maker and different model.' });
+sqlCheck('#ex4', { setup: raSetup(DB_PPLP), task: '4. Write slide 47\'s "hard-disk sizes that occur in two or more PCs" in SQL with a self-join.', solution: 'SELECT DISTINCT pc1.hd\nFROM PC pc1, PC pc2\nWHERE pc1.model <> pc2.model AND pc1.hd = pc2.hd;' });
+sqlCheck('#ex5', { setup: raSetup(DB_PPLP), task: '5. (Exam style) Write slide 46\'s "manufacturers that sell laptops but not PCs" in Oracle SQL.', solution: "SELECT maker FROM Product WHERE type = 'laptop'\nMINUS\nSELECT maker FROM Product WHERE type = 'pc';" });
+</script>
+</body>
+</html>

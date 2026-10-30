@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Inner and Outer Joins · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 09 (Ishrak) · Chapter 1 · Slides 1–6</div>
+<h1>Inner and Outer Joins</h1>
+<p class="lede">An ordinary join throws away every row that has no partner. Sometimes those rows are exactly what we want to see: departments without employees, makers without laptops. This chapter lists the six kinds of join on slide 2, defines dangling tuples, and animates the inner, left, right and full outer joins of slides 3–6 so you can see which rows survive and where the NULLs come from. It also covers Oracle's old (+) notation.</p>
+
+<h2>1. Six ways to combine two tables (slide 2)</h2>
+<p>Slide 2 lists the join types in order of how they treat rows. In Oracle each has its own ANSI syntax in the FROM clause:</p>
+<div class="tbl"><table>
+<tr><th>Join</th><th>Oracle syntax</th><th>Which rows</th></tr>
+<tr><td>CROSS product</td><td><code>FROM PC CROSS JOIN Laptop</code> (same as <code>FROM PC, Laptop</code>)</td><td>every pair, no condition</td></tr>
+<tr><td>NATURAL JOIN</td><td><code>FROM PC NATURAL JOIN Laptop</code></td><td>pairs equal on all same-named columns; one copy of each</td></tr>
+<tr><td>INNER JOIN</td><td><code>FROM PC INNER JOIN Laptop ON PC.maker = Laptop.maker</code></td><td>pairs satisfying the ON condition</td></tr>
+<tr><td>LEFT OUTER JOIN</td><td><code>FROM PC LEFT OUTER JOIN Laptop ON …</code></td><td>inner join + unmatched rows of the left table</td></tr>
+<tr><td>RIGHT OUTER JOIN</td><td><code>FROM PC RIGHT OUTER JOIN Laptop ON …</code></td><td>inner join + unmatched rows of the right table</td></tr>
+<tr><td>FULL OUTER JOIN</td><td><code>FROM PC FULL OUTER JOIN Laptop ON …</code></td><td>inner join + unmatched rows of both tables</td></tr>
+</table></div>
+<p>The words <code>INNER</code> and <code>OUTER</code> are optional: <code>JOIN</code> means INNER JOIN, and <code>LEFT JOIN</code> means LEFT OUTER JOIN. Chapters 2 and 3 of Lecture 08 covered the first three; this lecture is about the outer joins.</p>
+<p>Careful with NATURAL JOIN here: PC(model, maker) and Laptop(model, maker) share <em>both</em> column names, so <code>PC NATURAL JOIN Laptop</code> requires equal model <em>and</em> equal maker, and returns nothing (no model is both a PC and a laptop). This is why the slides write the condition explicitly with ON.</p>
+
+<h2>2. The running example and the inner join (slide 3)</h2>
+<p>Lecture 09 uses two small tables (a simplified version of the computer database, with the maker stored in each table):</p>
+<figure><div id="tabs"></div><figcaption><b>Figure 1.</b> PC(model, maker) and Laptop(model, maker) of slides 3–19.</figcaption></figure>
+<p>Slide 3: <code>PC INNER JOIN Laptop ON PC.maker = Laptop.maker</code> pairs each PC with each laptop of the same maker. A and B make both, so the result has two rows. C (only PCs) and D (only laptops) have no partner and disappear.</p>
+
+<dl class="def">
+<dt>Dangling tuple</dt>
+<dd>A row of one table that matches no row of the other table under the join condition. PC (1003, C) and Laptop (2003, D) are dangling. An inner join drops dangling tuples.</dd>
+<dt>Outer join</dt>
+<dd>A join that keeps dangling tuples too, padding the other table's columns with NULL. LEFT keeps the dangling tuples of the left table, RIGHT those of the right table, FULL those of both (slides 4–6: "common tuples plus dangling tuples from the left / right / both tables").</dd>
+</dl>
+
+<h2>3. Left, right and full outer joins (slides 4–6)</h2>
+<p>Pick a join type and step through it. In each frame one PC row (left) is compared with every laptop row (right). Green result rows come from matches; amber rows are dangling tuples, and the NULLs in them are the padding.</p>
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div class="bp-form" id="jt" role="group" aria-label="Join type"></div>
+<div id="jstep"></div>
+</figure>
+
+<p>Where do the NULLs come from? Not from the data: neither table contains a NULL. They are created by the outer join to fill the columns of a table that had no matching row. This is how to read the results:</p>
+<ul>
+<li><strong>LEFT</strong> (slide 4): rows A and B as in the inner join, plus <code>(1003, C, NULL, NULL)</code>: C makes a PC but no laptop.</li>
+<li><strong>RIGHT</strong> (slide 5): A and B, plus <code>(NULL, NULL, 2003, D)</code>: D makes a laptop but no PC.</li>
+<li><strong>FULL</strong> (slide 6): A and B, plus both dangling rows.</li>
+</ul>
+<p>Two facts follow and are worth memorising. (1) The number of rows: inner ≤ left, inner ≤ right, and full = left + right − inner (here 2 ≤ 3, 3 and 3 + 3 − 2 = 4). (2) <code>A LEFT JOIN B</code> is the same as <code>B RIGHT JOIN A</code> (with the columns in a different order), so RIGHT JOIN is never strictly needed; many people write only LEFT joins.</p>
+<div id="p-out"></div>
+
+<div class="q">
+<h4>Question (worked answer): does the playground run FULL OUTER JOIN?</h4>
+<p>Yes. Oracle has supported <code>FULL OUTER JOIN</code> since Oracle 9i, and the playground's SQLite engine (version 3.45) supports RIGHT and FULL OUTER JOIN natively, so every query on slides 3–19 runs as written. Some systems (MySQL, for example) have no FULL OUTER JOIN; there it is emulated by a left join plus the right join's dangling rows:</p>
+<pre>SELECT PC.model, PC.maker, Laptop.model, Laptop.maker
+FROM   PC LEFT JOIN Laptop ON PC.maker = Laptop.maker
+UNION ALL
+SELECT PC.model, PC.maker, Laptop.model, Laptop.maker
+FROM   PC RIGHT JOIN Laptop ON PC.maker = Laptop.maker
+WHERE  PC.maker IS NULL;          -- only the right-dangling rows</pre>
+<p>The second half adds only rows that the first half does not have, so UNION ALL is safe and no rows are lost or doubled.</p>
+</div>
+
+<h2>4. Oracle's old outer-join operator (+)</h2>
+<p>Before ANSI join syntax (Oracle 9i), Oracle wrote outer joins in the WHERE clause with the operator <code>(+)</code>. You will meet it in old exam answers and old code, so you should be able to read it. The playground does not understand it; the code below is Oracle-only.</p>
+<pre>-- LEFT OUTER JOIN: keep all PCs. (+) goes on the side that may be missing (Laptop)
+SELECT PC.model, PC.maker, Laptop.model, Laptop.maker
+FROM   PC, Laptop
+WHERE  PC.maker = Laptop.maker(+);
+
+-- RIGHT OUTER JOIN: keep all laptops. (+) on the PC side
+SELECT PC.model, PC.maker, Laptop.model, Laptop.maker
+FROM   PC, Laptop
+WHERE  PC.maker(+) = Laptop.maker;</pre>
+<p>Read <code>(+)</code> as "add NULL rows to this table when needed". It is placed on the <em>deficient</em> side, the table whose columns become NULL, which is the opposite of the LEFT/RIGHT words. The old syntax has limits that ANSI syntax does not: (+) cannot be put on both sides, so there is no full outer join (it must be written as the union of a left and a right join); it cannot be combined with OR or IN in the same condition; and every condition on the deficient table must also carry (+), or the outer join silently becomes an inner join. Oracle recommends the ANSI form, and the slides use it.</p>
+
+<h2>5. ON versus WHERE in an outer join</h2>
+<p>For an inner join it does not matter whether a condition is written in ON or in WHERE. For an outer join it matters a great deal, and it is a classic source of bugs. Using the HR schema: list every department with its employees earning more than 10000.</p>
+<pre>-- (a) condition in ON: decides which employees MATCH; every department survives
+SELECT d.DEPARTMENTNAME, e.LASTNAME
+FROM   DEPARTMENT d LEFT JOIN EMPLOYEE e
+       ON e.DEPARTMENTID = d.DEPARTMENTID AND e.SALARY > 10000;
+
+-- (b) condition in WHERE: applied AFTER the join; NULL-padded rows fail it and vanish
+SELECT d.DEPARTMENTNAME, e.LASTNAME
+FROM   DEPARTMENT d LEFT JOIN EMPLOYEE e
+       ON e.DEPARTMENTID = d.DEPARTMENTID
+WHERE  e.SALARY > 10000;</pre>
+<p>In (b), a department with no well-paid employee only has rows where e.SALARY is either ≤ 10000 or NULL, and <code>NULL &gt; 10000</code> is not true, so the department disappears: the left join has turned into an inner join. Query (a) keeps all 8 departments, with NULL for those without a match. Rule: conditions on the <em>optional</em> table of an outer join belong in ON (unless you are deliberately testing <code>IS NULL</code>, as in the next chapter).</p>
+<div id="p-onwhere"></div>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div><div id="try2"></div>
+<h3>Try it in SQL</h3>
+<p>Exercises 1–3 use PC(model, maker) and Laptop(model, maker); 4–6 use the HR schema (department 190 Contracting has no employees, and employee Grant has no department).</p>
+<div id="c1"></div><div id="c2"></div><div id="c3"></div><div id="c4"></div><div id="c5"></div><div id="c6"></div>
+
+<h3>Exam questions</h3>
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2016–17 · 15 marks</div>
+  <div class="exam-q"><p>Explain the application of left, right and full outer joins with examples.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>An <strong>outer join</strong> returns the rows of the inner join plus the <em>dangling tuples</em> (rows with no match) of one or both tables, padding the other table's columns with NULL. Example tables (HR schema, simplified): EMPLOYEE(id, name, deptid) with rows (1, Abel, 80), (2, Fay, 20), (3, Grant, NULL); DEPARTMENT(deptid, dname) with rows (20, Marketing), (80, Sales), (190, Contracting).</p>
+    <p><strong>Left outer join</strong>: all rows of the left table. <em>Application:</em> a report that must list every employee, including those not yet assigned a department.</p>
+<pre>SELECT e.name, d.dname
+FROM   EMPLOYEE e LEFT OUTER JOIN DEPARTMENT d ON e.deptid = d.deptid;
+-- Abel Sales | Fay Marketing | Grant NULL</pre>
+    <p><strong>Right outer join</strong>: all rows of the right table. <em>Application:</em> list every department with its employees, so that empty departments are visible (for example to find departments that need staff).</p>
+<pre>SELECT e.name, d.dname
+FROM   EMPLOYEE e RIGHT OUTER JOIN DEPARTMENT d ON e.deptid = d.deptid;
+-- Fay Marketing | Abel Sales | NULL Contracting</pre>
+    <p><strong>Full outer join</strong>: all rows of both. <em>Application:</em> reconciliation and auditing, finding in one query both employees without a department and departments without employees, or comparing two lists (e.g. makers of PCs vs makers of laptops, slide 17 of Lecture 09).</p>
+<pre>SELECT e.name, d.dname
+FROM   EMPLOYEE e FULL OUTER JOIN DEPARTMENT d ON e.deptid = d.deptid;
+-- Abel Sales | Fay Marketing | Grant NULL | NULL Contracting</pre>
+    <p>A further application of all three: <strong>finding unmatched rows</strong> ("anti-join"). Adding <code>WHERE d.deptid IS NULL</code> to the left join returns only employees without a department; Lecture 09 slides 10–15 use exactly this to find makers of PCs but not laptops. Counting with outer joins (<code>COUNT(e.id)</code> after a left join from DEPARTMENT) gives 0 for empty departments instead of omitting them. In old Oracle syntax the left join is written <code>WHERE e.deptid = d.deptid(+)</code>. The question bank's answer is correct.</p>
+  </div></details>
+</div>
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2011–12 · 10 marks</div>
+  <div class="exam-q"><p>Distinguish between 'cross join', 'natural join' and 'outer joins'. When (left or right) outer joins are useful? Give an example.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <div class="tbl"><table>
+      <tr><th></th><th>Cross join</th><th>Natural join</th><th>Outer join</th></tr>
+      <tr><td>Condition</td><td>none</td><td>equality of all same-named columns (implicit)</td><td>explicit ON condition</td></tr>
+      <tr><td>Columns</td><td>all columns of both tables</td><td>common columns once</td><td>all columns of both</td></tr>
+      <tr><td>Unmatched rows</td><td>no notion of matching</td><td>dropped</td><td>kept from one side (LEFT/RIGHT) or both (FULL), padded with NULL</td></tr>
+      <tr><td>Size (M, N rows)</td><td>exactly M · N</td><td>0 to M · N</td><td>LEFT ≥ M, RIGHT ≥ N, FULL ≥ max(M, N)</td></tr>
+    </table></div>
+    <p>With R(A, B) = {(1, x), (2, y)} and S(B, C) = {(x, 5), (y, 6), (z, 7)}: R CROSS JOIN S has 6 rows; R NATURAL JOIN S has (1, x, 5), (2, y, 6); R RIGHT OUTER JOIN S ON R.B = S.B adds (NULL, NULL, z, 7).</p>
+    <p><strong>When outer joins are useful:</strong> whenever the rows that have no match must still be reported or counted: every student with the number of courses taken (0 for none), every department with its manager even if the manager is not yet appointed, or every PC maker together with any laptop they make. Example: <code>SELECT d.DEPARTMENTNAME, COUNT(e.EMPLOYEEID) FROM DEPARTMENT d LEFT JOIN EMPLOYEE e ON e.DEPARTMENTID = d.DEPARTMENTID GROUP BY d.DEPARTMENTNAME</code> lists Contracting with 0, which an inner join would omit.</p>
+    <p>Note: the question bank's comparison table says a natural join has at most min(M, N) rows and an outer join at least max(M, N). Both are wrong. A natural join can have up to M · N rows when the join values repeat (every row of R matches every row of S if they all share one B value). A left outer join has at least M rows, which can be fewer than N (e.g. 1 employee left-joined with 3 departments gives 1 row).</p>
+  </div></details>
+</div>
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2010–11 · 7 marks</div>
+  <div class="exam-q"><p>Define natural joins and outer joins.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><strong>Natural join</strong> (R ⋈ S): the join of R and S on equality of <em>all</em> attributes with the same name in both schemas, with one copy of each common attribute kept. If R(A, B, C) and S(C, D), R ⋈ S has schema (A, B, C, D) and contains a tuple for every pair of an R-tuple and an S-tuple with equal C. Tuples with no partner are dropped. If R and S share no attribute names, the natural join is the cross product. SQL: <code>SELECT * FROM R NATURAL JOIN S</code>.</p>
+    <p><strong>Outer join</strong>: a join that also keeps the dangling tuples (tuples matching nothing) of one or both operands, padding the missing attributes with NULL. Left outer join (R ⟕ S) keeps all of R, right outer join (R ⟖ S) all of S, full outer join (R ⟗ S) both. Example with the PC/Laptop tables of Lecture 09: PC LEFT OUTER JOIN Laptop ON PC.maker = Laptop.maker contains (1003, C, NULL, NULL) because maker C has no laptop. The natural versions (NATURAL LEFT OUTER JOIN, …) also exist.</p>
+  </div></details>
+</div>
+
+<div class="key"><p><strong>Summary:</strong> an inner join keeps only matching pairs; rows with no partner (dangling tuples) are dropped. LEFT, RIGHT and FULL OUTER JOIN add the dangling tuples of the left, right or both tables, filling the other table's columns with NULL. Full = left + right − inner in row count. Oracle's old notation puts (+) on the deficient side in the WHERE clause and cannot express a full join. In an outer join, conditions on the optional table belong in ON; in WHERE they discard the NULL-padded rows and turn the join back into an inner join.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/sqlplay.js"></script>
+<script src="../i08/lecture.js"></script>
+<script>
+sqlTables('#tabs', JOINPC);
+const PCr = [[1001, 'A'], [1002, 'B'], [1003, 'C']], LPr = [[2001, 'A'], [2002, 'B'], [2003, 'D']];
+const draw = type => {
+  $('#jt').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', b.dataset.t === type));
+  $('#jstep').innerHTML = '<div></div>';
+  stepper($('#jstep').firstChild, joinSteps({ L: PCr, R: LPr, lname: 'PC', rname: 'Laptop', lhead: ['model', 'maker'], rhead: ['model', 'maker'], on: (p, l) => p[1] === l[1], cond: 'PC.maker = Laptop.maker', type }));
+};
+$('#jt').innerHTML = ['inner', 'left', 'right', 'full'].map(t => `<button type="button" data-t="${t}">${t === 'inner' ? 'INNER JOIN' : t.toUpperCase() + ' OUTER JOIN'}</button>`).join('');
+$('#jt').addEventListener('click', e => { const b = e.target.closest('button'); if (b) draw(b.dataset.t); });
+draw(new URLSearchParams(location.search).get('join') || 'left');
+sqlPlay('#p-out', { setup: JOINPC, query: 'SELECT *\nFROM   PC LEFT OUTER JOIN Laptop\n       ON PC.maker = Laptop.maker;', note: 'Slide 4. Change LEFT to RIGHT (slide 5), FULL (slide 6) or INNER (slide 3).' });
+sqlPlay('#p-onwhere', { setup: HR, query: '-- (a) condition in ON: all 8 departments\nSELECT d.DEPARTMENTNAME, e.LASTNAME\nFROM   DEPARTMENT d LEFT JOIN EMPLOYEE e\n       ON e.DEPARTMENTID = d.DEPARTMENTID AND e.SALARY > 10000\nORDER BY d.DEPARTMENTNAME;', note: 'Then move "AND e.SALARY > 10000" into a WHERE clause: only departments with a well-paid employee remain.' });
+flashcards('#cards', [
+  { f: 'Dangling tuple', b: 'A row that matches no row of the other table under the join condition.' },
+  { f: 'LEFT OUTER JOIN', b: 'Inner join + dangling rows of the left table, right columns NULL.' },
+  { f: 'RIGHT OUTER JOIN', b: 'Inner join + dangling rows of the right table, left columns NULL.' },
+  { f: 'FULL OUTER JOIN', b: 'Inner join + dangling rows of both tables.' },
+  { f: 'Oracle (+)', b: 'Old outer-join syntax in WHERE; (+) marks the deficient side. a.x = b.x(+) is a LEFT join keeping a. No full join.' },
+  { f: 'ON vs WHERE in an outer join', b: 'ON decides matches (all preserved rows stay); WHERE filters afterwards and drops NULL-padded rows.' },
+  { f: 'Row counts', b: 'inner ≤ left, right ≤ full; full = left + right − inner.' },
+]);
+quiz('#quiz', [
+  { q: 'PC LEFT OUTER JOIN Laptop ON PC.maker = Laptop.maker on the slide data has how many rows?', opts: ['2', '3', '4', '9'], a: 1, why: 'A, B matched + C dangling.' },
+  { q: 'Where do the NULLs in an outer join\'s result come from?', opts: ['From NULLs stored in the tables', 'They pad the columns of the table that had no matching row', 'From the ON condition being NULL', 'From DISTINCT'], a: 1, why: 'Neither table on the slides contains NULLs.' },
+  { q: 'In old Oracle syntax, WHERE PC.maker = Laptop.maker(+) is…', opts: ['a right outer join', 'a left outer join keeping all PCs', 'a full outer join', 'an inner join'], a: 1, why: '(+) is on Laptop, the side that may be missing; all PCs are kept.' },
+  { q: 'Which statement is true?', opts: ['A LEFT JOIN B = B LEFT JOIN A', 'A LEFT JOIN B = B RIGHT JOIN A (up to column order)', 'RIGHT JOIN cannot be rewritten', 'FULL JOIN = LEFT JOIN ∩ RIGHT JOIN'], a: 1, why: 'Swapping the tables swaps LEFT and RIGHT.' },
+  { q: 'PC NATURAL JOIN Laptop (both have columns model, maker) returns…', opts: ['the inner join on maker', 'no rows', 'the cross product', 'an error'], a: 1, why: 'It needs equal model AND maker; no model is both.' },
+  { q: 'A left join with WHERE right_table.col > 5 behaves like…', opts: ['a full join', 'an inner join (NULL-padded rows fail the test)', 'a cross join', 'a right join'], a: 1, why: 'NULL > 5 is unknown, so dangling rows vanish.' },
+]);
+ask('#try1', { q: 'Inner join has 7 rows, the left table has 2 dangling rows and the right table has 3. How many rows does the FULL OUTER JOIN have?', a: 12, why: '7 + 2 + 3 = 12.' });
+ask('#try2', { q: 'A LEFT JOIN B returns 10 rows and the inner join returns 8. How many rows of A are dangling?', a: 2, why: 'Each dangling A row adds exactly one NULL-padded row.' });
+sqlCheck('#c1', { setup: JOINPC, task: '1. (Easy) Write the RIGHT OUTER JOIN of PC and Laptop on maker (all columns).', solution: 'SELECT * FROM PC RIGHT OUTER JOIN Laptop ON PC.maker = Laptop.maker;' });
+sqlCheck('#c2', { setup: JOINPC, task: '2. Write the FULL OUTER JOIN of PC and Laptop on maker, returning PC.model and Laptop.model only.', solution: 'SELECT PC.model, Laptop.model FROM PC FULL OUTER JOIN Laptop ON PC.maker = Laptop.maker;' });
+sqlCheck('#c3', { setup: JOINPC, task: '3. Write the same result as PC LEFT OUTER JOIN Laptop ON PC.maker = Laptop.maker, but using RIGHT OUTER JOIN (columns: PC.model, PC.maker, Laptop.model, Laptop.maker).', solution: 'SELECT PC.model, PC.maker, Laptop.model, Laptop.maker FROM Laptop RIGHT OUTER JOIN PC ON PC.maker = Laptop.maker;', hint: 'Swap the two tables.' });
+sqlCheck('#c4', { setup: HR, task: '4. List the last name of every employee with the name of his or her department; employees without a department must appear too (with NULL).', solution: 'SELECT e.LASTNAME, d.DEPARTMENTNAME FROM EMPLOYEE e LEFT JOIN DEPARTMENT d ON e.DEPARTMENTID = d.DEPARTMENTID;' });
+sqlCheck('#c5', { setup: HR, task: '5. List every department name with the last name of its manager (NULL if it has no manager).', solution: 'SELECT d.DEPARTMENTNAME, m.LASTNAME FROM DEPARTMENT d LEFT JOIN EMPLOYEE m ON d.MANAGERID = m.EMPLOYEEID;' });
+sqlCheck('#c6', { setup: HR, task: '6. (Exam style) List all employees and all departments together: each employee with his or her department name, plus departments that have no employees and employees that have no department.', solution: 'SELECT e.LASTNAME, d.DEPARTMENTNAME FROM EMPLOYEE e FULL OUTER JOIN DEPARTMENT d ON e.DEPARTMENTID = d.DEPARTMENTID;' });
+</script>
+</body>
+</html>

@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Selection and Projection · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 12 (Ishrak) · Chapter 2 · Slides 6–11 · Book §2.4.5–2.4.6</div>
+<h1>Selection (σ) and Projection (π)</h1>
+<p class="lede">The two unary operators: σ picks rows, π picks columns. This chapter works through the slides' examples (one of which has a wrong output), shows how σ and π map to WHERE and SELECT DISTINCT, and answers the slides' two "are these equivalent?" questions.</p>
+
+<h2>1. Selection σ (slides 6–7)</h2>
+
+<dl class="def">
+  <dt>Selection σ<sub>c</sub>(R)</dt>
+  <dd>Returns the tuples of R that satisfy the condition c. The result has the <b>same schema</b> as R and at most as many tuples. The condition is checked on one tuple at a time.</dd>
+  <dt>Condition (predicate)</dt>
+  <dd>A Boolean expression built from attributes of R and constants with the comparisons =, &lt;, ≤, &gt;, ≥, &lt;&gt; (slide 6), combined with AND (∧), OR (∨) and NOT (¬).</dd>
+</dl>
+
+<p>Slide 6 writes the SQL and the RA side by side for the schema Students(sid, sname, gpa):</p>
+<div class="figrow">
+<pre>SELECT *
+FROM Students
+WHERE gpa &gt; 3.5;</pre>
+<p class="ra-big">σ<sub>gpa&gt;3.5</sub>(Students)</p>
+</div>
+<p>The <code>WHERE</code> clause becomes the subscript of σ, and <code>SELECT *</code> means no column is removed, so there is no π. Two more examples from the slide: σ<sub>Salary&gt;40000</sub>(Employee) keeps the employees earning more than 40000, and σ<sub>name='Smith'</sub>(Employee) keeps the employees named Smith. Text constants go in single quotes, numbers do not.</p>
+
+<h3>Slide 7's example, step by step</h3>
+<p>Slide 7 applies σ<sub>Salary&gt;40000</sub> to a three-row Employee relation and shows a two-row result containing only Smith and Fred. That output is <b>wrong</b>: John earns 200000, and 200000 &gt; 40000, so John also passes. The correct result contains all three employees. (The slide's output would be right for the condition Salary &gt; 400000, which is probably what was meant.) Step through both:</p>
+
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="s7a"></div>
+<figcaption><b>Figure 1.</b> σ<sub>Salary&gt;40000</sub>(Employee) as written on slide 7. Every row passes.</figcaption>
+</figure>
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="s7b"></div>
+<figcaption><b>Figure 2.</b> σ<sub>Salary&gt;400000</sub>(Employee): this gives the two-row output printed on the slide.</figcaption>
+</figure>
+
+<h3>Compound conditions</h3>
+<p>A selection condition may combine tests: σ<sub>dept_name='Physics' ∧ salary&gt;90000</sub>(instructor) keeps Physics instructors who earn more than 90000. Two laws follow directly from the definition (textbook §16.2.3), and the optimizer uses them all the time:</p>
+<ul>
+  <li>σ<sub>c1 ∧ c2</sub>(R) = σ<sub>c1</sub>(σ<sub>c2</sub>(R)) = σ<sub>c2</sub>(σ<sub>c1</sub>(R)). A conjunction can be split into a cascade of selections in either order (slide 34 shows the "either order" part as a tree).</li>
+  <li>σ<sub>c1 ∨ c2</sub>(R) = σ<sub>c1</sub>(R) ∪ σ<sub>c2</sub>(R). A disjunction is the union of the two selections.</li>
+</ul>
+
+<h2>2. Projection π (slides 8–9)</h2>
+
+<dl class="def">
+  <dt>Projection π<sub>A1,…,An</sub>(R)</dt>
+  <dd>Keeps only the attributes A1, …, An of every tuple of R, then <b>removes duplicate tuples</b> (slide 8: "eliminates columns, then removes duplicates"). The output schema is (A1, …, An).</dd>
+</dl>
+
+<p>The slide's examples: π<sub>SSN,Name</sub>(Employee) has output schema Answer(SSN, Name); for Students, π<sub>sname,gpa</sub>(Students) corresponds to</p>
+<pre>SELECT DISTINCT sname, gpa
+FROM Students;</pre>
+<p>The word <code>DISTINCT</code> matters. Without it SQL keeps duplicate rows (SQL works with bags), while π never does (RA works with sets, <a href="01-relational-algebra.html">Chapter 1</a>).</p>
+
+<h3>Slide 9's example: duplicates disappear</h3>
+<p>Slide 9's Employee has three employees, all named John, two of whom earn 200000. After keeping only Name and Salary, two tuples are identical, so π keeps one of them: the result has 2 tuples, not 3.</p>
+
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="s9"></div>
+<figcaption><b>Figure 3.</b> π<sub>Name,Salary</sub>(Employee) on slide 9's data (here called Employee2). Three tuples go in, two come out.</figcaption>
+</figure>
+
+<p>So a projection can only shrink a relation: if R is non-empty, 1 ≤ |π<sub>L</sub>(R)| ≤ |R|. If L contains a key of R, no two tuples can collide and |π<sub>L</sub>(R)| = |R| exactly. That is why projecting onto SSN (a key) never loses rows, while projecting onto Name can.</p>
+
+<h2>3. Operators compose (slides 10–11)</h2>
+
+<p>Because σ and π both return relations, they can be nested. Slide 10 asks how to write this query in RA:</p>
+<pre>SELECT DISTINCT sname, gpa
+FROM Students
+WHERE gpa &gt; 3.5;</pre>
+
+<div class="q"><h4>Slide 10: how do we represent this query in RA? Are the two expressions logically equivalent?</h4>
+<p>The standard translation reads the SQL from the inside out: <code>FROM</code> gives the relation, <code>WHERE</code> becomes σ, <code>SELECT DISTINCT</code> becomes π on top:</p>
+<p class="ra-big">π<sub>sname,gpa</sub>(σ<sub>gpa&gt;3.5</sub>(Students))</p>
+<p>The slide's second expression is σ<sub>gpa&gt;3.5</sub>(π<sub>sname,gpa</sub>(Students)). <b>Yes, the two are equivalent.</b> The projection keeps gpa, so the selection can still test it, and a row passes the test before the projection exactly when its projected copy passes it after. In general:</p>
+<p class="formula">σ<sub>c</sub>(π<sub>L</sub>(R)) = π<sub>L</sub>(σ<sub>c</sub>(R)) whenever every attribute used in c is in L.</p>
+</div>
+
+<div class="q"><h4>Slide 11: the same question for SELECT DISTINCT sid, sname … WHERE gpa &gt; 3.5</h4>
+<p>The translation is π<sub>sid,sname</sub>(σ<sub>gpa&gt;3.5</sub>(Students)). The slide's alternative σ<sub>gpa&gt;3.5</sub>(π<sub>sid,sname</sub>(Students)) is <b>not equivalent</b>; in fact it is not even a valid expression. The inner projection throws gpa away, so the outer selection refers to an attribute that no longer exists. (The slide crosses out the ⇕ arrow for this reason.) Type <code>select[gpa &gt; 3.5](project[sid, sname](Students))</code> into the evaluator below to see it rejected.</p>
+<p>The lesson: you may move σ above π only if π keeps every attribute σ needs. The safe order, and the one a translator produces, is σ first, π last.</p>
+</div>
+
+<figure class="wide">
+<span class="anim-tag">Interactive tool</span>
+<div id="lab"></div>
+</figure>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+<div id="try2"></div>
+<h3>Write it yourself</h3>
+<p>These use a small university database: <code>instructor(ID, name, dept_name, salary)</code>, <code>department(dept_name, building, budget)</code> and others. Press <b>Show relations</b> to see the data.</p>
+<div id="ex1"></div>
+<div id="ex2"></div>
+<div id="ex3"></div>
+<div id="ex4"></div>
+<div id="ex5"></div>
+
+<h3>Exam questions</h3>
+<p>The question bank's selection/projection questions always combine σ and π with joins. The first one, "compute the output of Π<sub>name</sub>(σ<sub>salary&lt;900000</sub>(Instructor)) …", is worked in <a href="06-theta-outer-joins.html">Chapter 6</a>.</p>
+
+<div class="key"><p><strong>Summary:</strong> σ<sub>c</sub>(R) keeps the tuples satisfying c (WHERE); π<sub>L</sub>(R) keeps the attributes L and removes duplicates (SELECT DISTINCT). A SQL block translates to π<sub>select-list</sub>(σ<sub>where</sub>(from-relations)). σ and π commute only when π keeps the attributes σ tests. Slide 7's printed output is wrong: John (200000) also satisfies Salary &gt; 40000.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/sqlplay.js"></script>
+<script src="lecture.js"></script>
+<script>
+const DB2 = { ...DB_SLIDES, ...DB_EMP, ...raDB(`
+Employee2(SSN, Name, Salary)
+1234545 | John | 200000
+5423341 | John | 600000
+4352342 | John | 200000
+`) };
+raSteps('#s7a', DB_EMP, 'select[Salary > 40000](Employee)', { sql: 'SELECT * FROM Employee WHERE Salary > 40000;' });
+raSteps('#s7b', DB_EMP, 'select[Salary > 400000](Employee)', { sql: 'SELECT * FROM Employee WHERE Salary > 400000;' });
+raSteps('#s9', DB2, 'project[Name, Salary](Employee2)', { sql: 'SELECT DISTINCT Name, Salary FROM Employee2;' });
+raLab('#lab', { db: DB2, presets: [
+  { label: 'Slide 10: π_sname,gpa(σ_gpa>3.5(Students))', ra: 'project[sname, gpa](select[gpa > 3.5](Students))', sql: 'SELECT DISTINCT sname, gpa\nFROM Students\nWHERE gpa > 3.5;' },
+  { label: 'Slide 10: σ_gpa>3.5(π_sname,gpa(Students)), same result', ra: 'select[gpa > 3.5](project[sname, gpa](Students))', sql: 'SELECT DISTINCT sname, gpa\nFROM Students\nWHERE gpa > 3.5;' },
+  { label: 'Slide 11: π_sid,sname(σ_gpa>3.5(Students))', ra: 'project[sid, sname](select[gpa > 3.5](Students))', sql: 'SELECT DISTINCT sid, sname\nFROM Students\nWHERE gpa > 3.5;' },
+  { label: 'Slide 6: σ_name=\'Smith\'(Employee)', ra: "select[Name = 'Smith'](Employee)", sql: "SELECT *\nFROM Employee\nWHERE Name = 'Smith';" },
+  { label: 'Compound condition', ra: "select[gpa > 3 and not (sname = 'Rina')](Students)", sql: "SELECT *\nFROM Students\nWHERE gpa > 3 AND NOT (sname = 'Rina');" },
+] });
+
+flashcards('#cards', [
+  { f: 'σ<sub>c</sub>(R)', b: 'Selection: the tuples of R satisfying c. Same schema as R. SQL: WHERE c.' },
+  { f: 'π<sub>L</sub>(R)', b: 'Projection: keep attributes L, then remove duplicate tuples. SQL: SELECT DISTINCT L.' },
+  { f: 'Size of σ<sub>c</sub>(R)', b: 'Between 0 and |R| tuples.' },
+  { f: 'Size of π<sub>L</sub>(R)', b: 'Between 1 and |R| for non-empty R; exactly |R| if L contains a key.' },
+  { f: 'σ<sub>c1∧c2</sub>(R)', b: '= σ<sub>c1</sub>(σ<sub>c2</sub>(R)), in either order.' },
+  { f: 'σ<sub>c1∨c2</sub>(R)', b: '= σ<sub>c1</sub>(R) ∪ σ<sub>c2</sub>(R).' },
+  { f: 'When do σ and π commute?', b: 'σ<sub>c</sub>(π<sub>L</sub>(R)) = π<sub>L</sub>(σ<sub>c</sub>(R)) when all attributes of c are in L. Otherwise the left side is not even valid.' },
+]);
+quiz('#quiz', [
+  { q: 'Employee = {(John, 200000), (Smith, 600000), (Fred, 500000)}. How many tuples does σ<sub>Salary&gt;40000</sub>(Employee) have?', opts: ['1', '2 (as on slide 7)', '3', '0'], a: 2, why: 'All three salaries exceed 40000. Slide 7 shows 2 rows, which is a slip in the slide.' },
+  { q: 'Which SQL is equivalent to π<sub>Name</sub>(Employee)?', opts: ['SELECT Name FROM Employee', 'SELECT DISTINCT Name FROM Employee', 'SELECT * FROM Employee', 'SELECT Name FROM Employee GROUP BY Salary'], a: 1, why: 'π removes duplicates; plain SELECT keeps them.' },
+  { q: 'Is σ<sub>gpa&gt;3.5</sub>(π<sub>sid,sname</sub>(Students)) valid?', opts: ['Yes, it equals π<sub>sid,sname</sub>(σ<sub>gpa&gt;3.5</sub>(Students))', 'No, gpa has been projected away before σ needs it', 'Yes, but it returns no rows', 'Only in SQL'], a: 1, why: 'Slide 11: the inner π drops gpa.' },
+  { q: 'R has 100 tuples and key K. How many tuples does π<sub>K</sub>(R) have?', opts: ['Exactly 100', 'At most 100, possibly fewer', 'Exactly 1', 'Cannot be determined'], a: 0, why: 'Key values are unique, so no two projected tuples coincide.' },
+  { q: 'σ<sub>A=1 ∨ B=2</sub>(R) equals…', opts: ['σ<sub>A=1</sub>(σ<sub>B=2</sub>(R))', 'σ<sub>A=1</sub>(R) ∩ σ<sub>B=2</sub>(R)', 'σ<sub>A=1</sub>(R) ∪ σ<sub>B=2</sub>(R)', 'σ<sub>A=1</sub>(R) − σ<sub>B=2</sub>(R)'], a: 2, why: 'OR becomes union; AND becomes a cascade (or intersection).' },
+  { q: 'What is the schema of π<sub>sname,gpa</sub>(σ<sub>gpa&gt;3.5</sub>(Students))?', opts: ['(sid, sname, gpa)', '(sname, gpa)', '(gpa)', '(sname)'], a: 1, why: 'σ keeps the schema; π then keeps sname and gpa.' },
+]);
+ask('#try1', { q: 'Slide 9: how many tuples does π<sub>Name</sub>(Employee2) have (all three employees are called John)?', a: 1, why: 'All three tuples project to (John), and a set keeps it once.' });
+ask('#try2', { q: 'Students has gpas 3.4, 1.3, 3.8, 3.6. How many tuples does σ<sub>gpa&gt;3.5 ∧ gpa&lt;3.7</sub>(Students) have?', a: 1, why: 'Only 3.6 is in the open interval (3.5, 3.7): Tanvir.' });
+
+raCheck('#ex1', { db: DB_UNI, task: '1. (Easy) All instructors of the Physics department, with all their attributes.', solution: "select[dept_name = 'Physics'](instructor)", hint: "Text constants go in quotes: dept_name = 'Physics'." });
+raCheck('#ex2', { db: DB_UNI, task: '2. The names of instructors who earn more than 80000.', solution: 'project[name](select[salary > 80000](instructor))', hint: 'σ on salary first, then π on name.' });
+raCheck('#ex3', { db: DB_UNI, task: '3. Translate to RA: <code>SELECT DISTINCT building FROM department WHERE budget &gt;= 70000;</code>', solution: 'project[building](select[budget >= 70000](department))', hint: 'FROM → relation, WHERE → σ, SELECT DISTINCT → π.' });
+sqlCheck('#ex4', { setup: raSetup(DB_UNI), task: '4. Translate to Oracle SQL: π<sub>name,salary</sub>(σ<sub>dept_name=\'Comp. Sci.\' ∧ salary&gt;70000</sub>(instructor)).', solution: "SELECT DISTINCT name, salary\nFROM instructor\nWHERE dept_name = 'Comp. Sci.' AND salary > 70000;", hint: 'π → SELECT DISTINCT, σ → WHERE, ∧ → AND.' });
+sqlCheck('#ex5', { setup: raSetup(DB_UNI), task: '5. (Exam style) Translate to SQL: π<sub>ID</sub>(σ<sub>(semester=\'Fall\' ∧ year=2022) ∨ grade=\'A\'</sub>(takes)).', solution: "SELECT DISTINCT ID\nFROM takes\nWHERE (semester = 'Fall' AND year = 2022) OR grade = 'A';", hint: 'Keep the parentheses: AND binds tighter than OR, but writing them makes the meaning obvious.' });
+</script>
+</body>
+</html>

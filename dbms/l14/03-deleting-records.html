@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Deleting Fixed-Length Records · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 14 · Chapter 3 · Slides 6–10</div>
+<h1>Deleting Fixed-Length Records</h1>
+<p class="lede">Deleting a row leaves a hole in the file. The slides give three ways to deal with that hole: shift everything up, move the last record in, or keep a list of holes to reuse later.</p>
+
+<h2>1. Why deletion is a problem</h2>
+
+<p>Chapter 2 relied on one fact: record <i>i</i> is always at byte <i>n</i>(<i>i</i>−1), with records packed back to back. Deleting a record breaks that. If you just erase record 3, the file now has an empty 100-byte gap in the middle. A scan would read garbage there, and the space is wasted. Something has to be done with the hole. The slides list three <b class="term">alternatives</b> for deleting record <i>i</i> from a file of <i>n</i> records:</p>
+
+<ol type="a">
+  <li>Move records <i>i</i>+1, …, <i>n</i> to positions <i>i</i>, …, <i>n</i>−1 (shift everything after the hole up by one).</li>
+  <li>Move record <i>n</i> (the last one) to position <i>i</i> (fill the hole with the last record).</li>
+  <li>Do not move records at all. Instead, link all free slots together on a <b class="term">free list</b>.</li>
+</ol>
+
+<p>All three examples use the same query from the slides:</p>
+<pre>DELETE FROM instructor WHERE id = 22222;</pre>
+<p>22222 is Einstein, record 3.</p>
+
+<h2>2. Alternative a: shift every later record up</h2>
+
+<p>Record 3 is removed, then record 4 is copied into slot 3, record 5 into slot 4, and so on until record 11 is copied into slot 10. The file is one record shorter and has no gap. The order of the remaining records is unchanged.</p>
+
+<figure>
+<span class="anim-tag">Animation</span>
+<div id="a-anim"></div>
+<figcaption><b>Figure 1.</b> Alternative a. Einstein (record 3) is deleted. The 8 records after it (orange) each move up one slot. The slide's picture shows the same thing: “record 2” is followed directly by “record 4” (El Said), which now sits in slot 3.</figcaption>
+</figure>
+
+<p><strong>Cost:</strong> deleting one record moved 8 others. Deleting near the start of a large file means rewriting almost the whole file, which is far too expensive for a busy database.</p>
+
+<h2>3. Alternative b: move the last record into the hole</h2>
+
+<p>Only one record moves: the last record in the file (record 11, Kim) is copied into the empty slot 3, and the file shrinks by one record.</p>
+
+<figure>
+<span class="anim-tag">Animation</span>
+<div id="b-anim"></div>
+<figcaption><b>Figure 2.</b> Alternative b. Kim (record 11) is moved into the hole left by Einstein. Every other record stays where it was.</figcaption>
+</figure>
+
+<p><strong>Cost:</strong> one record move, however large the file is. <strong>Downside:</strong> the records are no longer in their original order. If the file was sorted (for example by ID), that order is now broken. Kim, ID 98345, now sits between 15151 and 32343.</p>
+
+<h2>4. Alternative c: the free list</h2>
+
+<p>The third option moves nothing. The deleted slot is left where it is and marked as free. The free slots are linked together so the next insert can find one quickly. This chain of free slots is the <b class="term">free list</b>, and it works like this:</p>
+
+<ul>
+  <li>A small <b class="term">file header</b> is added at the start of the file. It stores the address of the first free slot.</li>
+  <li>Each free slot uses its own (now unused) bytes to store the address of the <em>next</em> free slot. The last one stores “null”, meaning “end of the list”.</li>
+</ul>
+
+<p>A <b class="term">pointer</b> here is simply a stored address: “the next free slot is record 4”. Because a deleted slot holds no real data any more, its space can be reused to store that pointer at no extra cost.</p>
+
+<p>The slide deletes three records: id = 12121 (record 1), id = 32343 (record 4) and id = 45565 (record 6).</p>
+
+<figure>
+<span class="anim-tag">Animation</span>
+<div id="c-anim"></div>
+<figcaption><b>Figure 3.</b> Alternative c after the three deletions. The header points to record 1, record 1 points to record 4, record 4 points to record 6, and record 6 ends the list. No record moved.</figcaption>
+</figure>
+
+<h3>Inserting with a free list</h3>
+<p>When a new instructor is inserted, the database looks at the header. If it points to a free slot, the new record goes into that slot, and the header is updated to point to whatever that slot pointed to next. With the list above, the first insert fills record 1 and the header then points to record 4. Only when the list is empty does a new record go at the end of the file. This is the main advantage of the free list: holes are always reused, so space is not wasted.</p>
+
+<div class="tbl"><table>
+<tr><th>Alternative</th><th>Records moved per delete</th><th>Keeps record order?</th><th>Space reuse</th></tr>
+<tr><td>a. Shift up</td><td class="bad">All later records (8 here)</td><td class="good">Yes</td><td class="good">Immediate, file shrinks</td></tr>
+<tr><td>b. Move last</td><td class="good">1</td><td class="bad">No</td><td class="good">Immediate, file shrinks</td></tr>
+<tr><td>c. Free list</td><td class="good">0</td><td class="good">Yes (the gaps stay as gaps)</td><td class="mid">On the next insert</td></tr>
+</table></div>
+
+<p>There is one more reason real systems prefer not to move records. Other structures, such as indexes, store the position of a record. If records move (alternatives a and b), every one of those stored positions has to be updated as well. With a free list, a record's position never changes.</p>
+
+<h2>5. Discussion: implementing a fixed-length record file</h2>
+
+<p>The last slide asks how you would implement this as a small program, with classes and methods, and how a relation would be stored using them. One reasonable design uses two classes: a record that knows how to turn itself into a fixed number of bytes, and a file that manages slots and the free list.</p>
+
+<pre>RECORD_SIZE = 53   # 5 + 20 + 20 + 8 bytes
+
+class InstructorRecord:
+    def __init__(self, id, name, dept, salary): ...
+    def to_bytes(self):        # pad every field to its fixed width
+        return (self.id.ljust(5) + self.name.ljust(20) +
+                self.dept.ljust(20) + str(self.salary).rjust(8)).encode()
+    @staticmethod
+    def from_bytes(b): ...     # slice b[0:5], b[5:25], b[25:45], b[45:53]
+
+class FixedLengthFile:
+    # header: address of the first free slot (or -1 if none)
+    def read(self, i):         # seek to HEADER + i * RECORD_SIZE, read RECORD_SIZE bytes
+    def insert(self, rec):     # take the slot the header points to, else append at the end
+    def delete(self, i):       # write the old header value into slot i, set header = i
+    def scan(self):            # yield every slot that is not on the free list</pre>
+
+<p>Storing the instructor relation means creating one <code>FixedLengthFile</code> for it and calling <code>insert</code> once per row. <code>read(i)</code> uses exactly the formula from Chapter 2, and <code>delete</code> is alternative c.</p>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+<div id="try2"></div>
+
+<h3>Exam questions</h3>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 21-22 5c · 10 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-2 | 2021–22 · 10 marks</div>
+  <div class="exam-q"><p>Consider a relational database table containing a few records shown in the following figure which is stored in a database file using fixed length records and a free list.</p>
+  <div id="q154f"></div>
+  <p>i) Show the structure of the file after deleting Record 2 (Mohammad Naim) and inserting a new row (Tamim Iqbal, Batter, 34).<br>ii) Discuss how the table would be stored in a slotted page structure with high-level block diagram showing only the records. You do not have to show the attributes of the records.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+<p><strong>Reading the figure.</strong> Records 1, 4 and 6 are empty. The arrows form the free list: header → record 1 → record 4 → record 6 → null.</p>
+<p><strong>(i) Delete record 2.</strong> Nothing moves. Record 2's slot becomes free and is added to the free list. The usual way is to push it at the front, because that needs only two pointer writes: record 2 stores the old header value (record 1), and the header now points to record 2. Free list: <strong>header → 2 → 1 → 4 → 6</strong>.</p>
+<p><strong>Insert (Tamim Iqbal, Batter, 34).</strong> The header points to record 2, so the new row is written into slot 2, and the header takes record 2's “next” value. Free list: <strong>header → 1 → 4 → 6</strong>. The result:</p>
+<figure><div id="q154a"></div></figure>
+<p>If deleted slots were added at the <em>end</em> of the list instead (header → 1 → 4 → 6 → 2), the insert would take slot 1, giving header → 4 → 6 → 2 and Tamim in record 1. Both are valid free-list implementations; state which one you use.</p>
+<p><strong>(ii) Slotted page.</strong> The six live records (0, 2, 3, 5, 7, 8) are packed together at the end of the block. The header keeps one slot per record number. Slots 1, 4 and 6 are marked empty, so no record space is wasted on them and no free list is needed: the free space is one contiguous gap between the header and the records. Assuming 50-byte records in a 4096-byte block:</p>
+<figure><div id="q154s"></div>
+<figcaption>R<i>k</i> is the record in slot <i>k</i>. Slots 1, 4 and 6 are empty (white, marked −). Records are packed: 4096 − 6 × 50 = 3796 is the end of free space. A later insert can reuse an empty slot number and takes its bytes from the free space.</figcaption></figure>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2015–16 · 15 marks</div>
+  <div class="exam-q"><p>Figure shows a fixed-length record file structure for a Customer relation. Show the file structure after deletion of records with customer IDs C0004 and C0007 for different file deletion methods. Compare the advantages and disadvantages among the different deletion methods.</p><div id="q24f"></div></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+<p>C0004 is record 3 and C0007 is record 6. Delete them in that order with each of the three methods of this chapter.</p>
+<div class="figrow">
+<div><div class="figlabel">(a) shift later records up</div><div id="q24a"></div></div>
+<div><div class="figlabel">(b) move the last record into the hole</div><div id="q24b"></div></div>
+<div><div class="figlabel">(c) free list</div><div id="q24c"></div></div>
+</div>
+<p><strong>(a) Shift.</strong> Deleting record 3 moves records 4–9 up one slot (6 moves). C0007 is now in slot 5, and deleting it moves the 3 records after it (3 moves). Total 9 record moves; the file has 8 records, still sorted.</p>
+<p><strong>(b) Move last.</strong> Deleting record 3 moves C0010 (record 9) into slot 3. The file now ends at record 8 (C0009). Deleting C0007 (record 6) moves C0009 into slot 6. Total 2 moves, but the order is broken: C0010 now sits between C0003 and C0005.</p>
+<p><strong>(c) Free list.</strong> No record moves. After deleting record 3, header → 3 → null. Deleting record 6 pushes it at the front: header → 6 → 3 → null. (If new free slots are added at the end, the list is header → 3 → 6.) The file still has 10 slots, two of them free.</p>
+<div class="tbl"><table>
+<tr><th>Method</th><th>Advantages</th><th>Disadvantages</th></tr>
+<tr><td>a. Shift</td><td>Keeps sorted order; no gaps; file shrinks.</td><td>Moves every later record (9 moves here); far too slow for large files; positions stored in indexes all change.</td></tr>
+<tr><td>b. Move last</td><td>One move per delete; no gaps; file shrinks.</td><td>Breaks the sort order; the moved record's position changes, so indexes must be updated.</td></tr>
+<tr><td>c. Free list</td><td>No moves; records never change position; holes reused by later inserts.</td><td>Holes waste space until reused; needs a header and pointer bookkeeping; a scan must skip free slots.</td></tr>
+</table></div>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2014–15 · 15 marks</div>
+  <div class="exam-q"><p>A file containing fixed-length records of a student relation (attributes: student_id, name, department_code, level, term) is given. Show the file structures after deletion of record 3 for the following cases and give comparative advantages/disadvantages:<br>(a) Move record 4 to the space occupied by record 3, record 5 to record 4, and so on.<br>(b) Move record 8 to the space occupied by record 3.<br>(c) Mark record 3 as deleted and move no records. Use a header and record pointer.</p><div id="q26f"></div></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+<p>The figure is not printed with this question in the bank. The same exam's next question (multitable clustering, Chapter 7) gives this student file with records 0–8, which matches “move record 8”, so it is used here. Record 3 is (1205010, N14).</p>
+<div class="figrow">
+<div><div class="figlabel">(a) shift up: 5 moves</div><div id="q26a"></div></div>
+<div><div class="figlabel">(b) record 8 into slot 3: 1 move</div><div id="q26b"></div></div>
+<div><div class="figlabel">(c) marked deleted, free list</div><div id="q26c"></div></div>
+</div>
+<p><strong>(a)</strong> Records 4–8 each move up one slot, so 1205013 is now record 3 and the file has records 0–7, still in the original order. <strong>(b)</strong> Only record 8 (1204003) moves into slot 3; the file has records 0–7, but an EEE student now sits among the CSE students, so the grouping by department is lost. <strong>(c)</strong> Nothing moves. The header points to record 3, and record 3's space holds the next-free pointer (null, since it is the only free slot). The next insert goes into slot 3.</p>
+<p>Comparison: (a) keeps order but costs a move per later record; (b) costs one move but breaks order; (c) costs no moves and keeps every record's position (so indexes stay valid) but leaves a hole until the next insert. The same table as in the previous question applies.</p>
+<p>Note: the question bank's answer invents its own 8-record file numbered 1–8 (S101 … S108). Its three results are correct for that invented data.</p>
+  </div></details>
+</div>
+
+<div class="key">
+<p><strong>Summary:</strong> a deleted record leaves a hole. Shifting everything up (a) keeps order but is slow. Moving the last record in (b) is fast but breaks order. A free list (c) moves nothing and reuses holes on later inserts, which is why it is the usual choice.</p>
+</div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="lecture.js"></script>
+<script>
+// ---- practice ----
+flashcards('#cards', [
+  { f: 'Alternative a (shift up)', b: 'Move records i+1 … n to i … n−1. Keeps order, but moves every later record.' },
+  { f: 'Alternative b (move last)', b: 'Move record n into the hole. One move, but the file is no longer in order.' },
+  { f: 'Alternative c (free list)', b: 'Move nothing. Link the free slots in a list starting at the file header; inserts reuse them.' },
+  { f: 'File header', b: 'A small area at the start of the file storing the address of the first free slot.' },
+  { f: 'Free list', b: 'A linked list of deleted (free) slots. Each free slot stores the address of the next one; the last stores null.' },
+  { f: 'Why avoid moving records?', b: 'Indexes and other structures store record positions. A moved record makes every such pointer wrong.' },
+]);
+quiz('#quiz', [
+  { q: 'A file has 12 records (0–11). With alternative a, how many records move when record 3 is deleted?', opts: ['1', '3', '8', '11'], a: 2,
+    why: 'Records 4 to 11 each move up one slot: 11 − 4 + 1 = 8 moves.' },
+  { q: 'Which alternative can break the sorted order of the file?', opts: ['a. shift up', 'b. move the last record', 'c. free list', 'None of them'], a: 1,
+    why: 'The last record (largest key in a sorted file) is dropped into the middle.' },
+  { q: 'Header → 1 → 4 → 6. A new record is inserted. Where does it go, and what does the header point to afterwards?', opts: ['End of the file; header → 1', 'Slot 6; header → 1', 'Slot 4; header → 1 → 6', 'Slot 1; header → 4'], a: 3,
+    why: 'Insertion takes the slot the header points to (1) and the header takes that slot’s next pointer (4).' },
+  { q: 'Where is the “next free” pointer of a deleted record stored?', opts: ['In a separate index file', 'Inside the deleted record’s own (now unused) bytes', 'In the next record', 'In the data dictionary'], a: 1,
+    why: 'The free slot holds no data any more, so its bytes can store the pointer at no extra space cost.' },
+  { q: 'Which alternative never changes the position of a live record?', opts: ['a', 'b', 'c', 'a and b'], a: 2,
+    why: 'Only the free list leaves every remaining record where it was.' },
+]);
+ask('#try1', { q: 'A file has records 0–9. Using alternative b, record 2 and then record 5 are deleted. Which original record ends up in slot 5?', a: ['8', 'record 8'],
+  hint: 'After the first deletion the last record is record 8.', why: 'Record 9 fills slot 2. Now the last record is 8, and it fills slot 5.' });
+ask('#try2', { q: 'Header → 3 → null. Record 7 is deleted and pushed at the front of the free list. Write the list (e.g. 7,3).', a: ['7,3', '7 3', '7→3', 'header→7→3'],
+  hint: 'Pushing at the front: the new slot points to the old first slot.', why: 'Record 7 stores “next = 3” and the header points to 7: header → 7 → 3 → null.' });
+
+// ---- exam figures ----
+const PL = [['Shakib Al Hasan', 'Allrounder', '36'], null, ['Mohammad Naim', 'Batter', '24'], ['Taskin Ahmed', 'Bowler', '28'], null,
+  ['Mushfiqur Rahim', 'Batter', '36'], null, ['Litton Das', 'Batter', '28'], ['Mustafizur Rahman', 'Bowler', '28']];
+const redT = t => `<span style="color:var(--red)">${t}</span>`;
+const plFile = (rows, head, next, mark = {}) => recTable(null, [{ lab: 'header', cells: null, cls: 'hl', side: redT('first free → ' + head) },
+  ...rows.map((r, i) => ({ lab: `record ${i}`, cells: r, cls: mark[i], side: next[i] !== undefined ? redT('next free → ' + next[i]) : '' }))], ['Player Name', 'Role', 'Age']);
+document.querySelector('#q154f').innerHTML = plFile(PL, 'record 1', { 1: 'record 4', 4: 'record 6', 6: 'null' });
+const PL2 = PL.slice(); PL2[2] = ['Tamim Iqbal', 'Batter', '34'];
+document.querySelector('#q154a').innerHTML = plFile(PL2, 'record 1', { 1: 'record 4', 4: 'record 6', 6: 'null' }, { 2: 'new' });
+{
+  const names = ['R0', null, 'R2', 'R3', null, 'R5', null, 'R7', 'R8'];
+  let end = 4096; const entries = [], records = [];
+  names.forEach(n => { if (!n) { entries.push(null); return; } entries.push([50, end]); records.push({ start: end - 50, end, text: n }); end -= 50; });
+  document.querySelector('#q154s').innerHTML = slotPage({ block: 4096, entries, freeEnd: end, records });
+}
+const CU = [...Array(10).keys()].map(i => [`C${String(i + 1).padStart(4, '0')}`, `N${i + 1}`, i < 5 ? 'North' : 'South', 'Dhaka', String((i + 1) * 1000)]);
+const cuHead = ['CustID', 'Name', 'Street', 'City', 'Balance'];
+recTable('#q24f', CU.map((c, i) => ({ lab: `record ${i}`, cells: c })), cuHead);
+const cuShort = (ids, extra = {}) => recTable(null, ids.map((k, i) => k === null ? { lab: `${i}`, cells: null, side: extra[i] } : { lab: `${i}`, cells: [CU[k][0], CU[k][4]], cls: extra.cls?.[i] }), ['CustID', 'Balance']);
+document.querySelector('#q24a').innerHTML = cuShort([0, 1, 2, 4, 5, 7, 8, 9], { cls: { 3: 'hl', 4: 'hl', 5: 'hl', 6: 'hl', 7: 'hl' } });
+document.querySelector('#q24b').innerHTML = cuShort([0, 1, 2, 9, 4, 5, 8, 7], { cls: { 3: 'new', 6: 'new' } });
+document.querySelector('#q24c').innerHTML = recTable(null, [{ lab: 'hdr', cells: null, cls: 'hl', side: redT('→ 6') },
+  ...CU.map((c, i) => i === 3 ? { lab: '3', cells: null, side: redT('→ null') } : i === 6 ? { lab: '6', cells: null, side: redT('→ 3') } : { lab: `${i}`, cells: [c[0], c[4]] })], ['CustID', 'Balance']);
+const ST = [['1205001', 'N11'], ['1205004', 'N12'], ['1205007', 'N13'], ['1205010', 'N14'], ['1205013', 'N15'], ['1205016', 'N16'], ['1204001', 'N21'], ['1204002', 'N22'], ['1204003', 'N23']]
+  .map(([id, n]) => [id, n, id.startsWith('1205') ? 'CSE' : 'EEE', '3', '1']);
+const stHead = ['student_id', 'name', 'dept', 'level', 'term'];
+recTable('#q26f', ST.map((c, i) => ({ lab: `record ${i}`, cells: c, cls: i === 3 ? 'del' : '' })), stHead);
+const stShort = (rows, cls = {}) => recTable(null, rows.map((k, i) => ({ lab: `${i}`, cells: [ST[k][0], ST[k][2]], cls: cls[i] })), ['student_id', 'dept']);
+document.querySelector('#q26a').innerHTML = stShort([0, 1, 2, 4, 5, 6, 7, 8], { 3: 'hl', 4: 'hl', 5: 'hl', 6: 'hl', 7: 'hl' });
+document.querySelector('#q26b').innerHTML = stShort([0, 1, 2, 8, 4, 5, 6, 7], { 3: 'new' });
+document.querySelector('#q26c').innerHTML = recTable(null, [{ lab: 'hdr', cells: null, cls: 'hl', side: redT('→ 3') },
+  ...ST.map((c, i) => i === 3 ? { lab: '3', cells: null, side: redT('→ null') } : { lab: `${i}`, cells: [c[0], c[2]] })], ['student_id', 'dept']);
+</script>
+<script>
+// alternative a: shift every later record up, one move per step
+const R = (i, cls) => ({ lab: `record ${i}`, cells: INSTR[i], cls });
+const aSteps = [{ html: recTable(null, instrRows()), cap: 'Before. We will delete id 22222 (Einstein, record 3).' },
+  { html: recTable(null, instrRows({ 3: 'del' })), cap: 'Einstein\'s record is removed, leaving a hole in slot 3.' }];
+for (let k = 0; k < 8; k++) {
+  const rows = [];
+  for (let slot = 0; slot < 12; slot++) {
+    if (slot < 3) rows.push(R(slot));
+    else if (slot < 3 + k) rows.push({ lab: `record ${slot}`, cells: INSTR[slot + 1], cls: 'hl' });
+    else if (slot === 3 + k) rows.push({ lab: `record ${slot}`, cells: INSTR[slot + 1], cls: 'new', side: '↑ moved up' });
+    else if (slot === 4 + k) rows.push({ lab: `record ${slot}`, cells: null, side: 'now empty' });
+    else rows.push(R(slot));
+  }
+  aSteps.push({ html: recTable(null, rows), cap: `Move ${INSTR[4 + k][1]} (old record ${4 + k}) up into slot ${3 + k}. <b>Records moved: ${k + 1}</b>.` });
+}
+aSteps.push({ html: recTable(null, INSTR.filter((_, i) => i !== 3).map((c, i) => ({ lab: `record ${i}`, cells: c, cls: i >= 3 ? 'hl' : '' }))),
+  cap: 'Done. The file is one record shorter and still in order, but deleting one record cost <b>8 moves</b>.' });
+stepper('#a-anim', aSteps, { interval: 1100 });
+
+// alternative b: move the last record into the hole
+stepper('#b-anim', [
+  { html: recTable(null, instrRows()), cap: 'Before. We will delete id 22222 (Einstein, record 3).' },
+  { html: recTable(null, instrRows({ 3: 'del', 11: 'hl' })), cap: 'Einstein\'s record is removed, leaving a hole in slot 3. The last record in the file is Kim (record 11).' },
+  { html: recTable(null, INSTR.map((c, i) => i === 3 ? { lab: 'record 3', cells: INSTR[11], cls: 'new', side: '← Kim moved here' } : i === 11 ? { lab: 'record 11', cells: null, side: 'now empty' } : R(i))),
+    cap: 'Copy Kim into slot 3. <b>One move</b>, however big the file is.' },
+  { html: recTable(null, INSTR.slice(0, 11).map((c, i) => ({ lab: `record ${i}`, cells: i === 3 ? INSTR[11] : c, cls: i === 3 ? 'new' : '' }))),
+    cap: 'The file shrinks by one record. Note that it is no longer sorted by ID: 98345 now sits between 15151 and 32343.' },
+]);
+
+// alternative c: free list
+const red = t => `<span style="color:var(--red)">${t}</span>`;
+const fl = (free, header, extra = {}) => recTable(null, [{ lab: 'header', cells: null, cls: 'hl', side: red(`first free → ${header}`) },
+  ...INSTR.map((c, i) => free[i] !== undefined ? { lab: `record ${i}`, cells: null, side: red(`next free → ${free[i]}`) }
+    : extra[i] ? { lab: `record ${i}`, cells: extra[i], cls: 'new', side: 'new record' } : { lab: `record ${i}`, cells: c })]);
+stepper('#c-anim', [
+  { html: fl({}, 'null'), cap: 'Start: a file header is added. No slots are free, so it points to null.' },
+  { html: fl({ 1: 'null' }, 'record 1'), cap: 'Delete <b>12121</b> (record 1). Nothing moves. The slot is marked free, and the header now points to it.' },
+  { html: fl({ 1: 'record 4', 4: 'null' }, 'record 1'), cap: 'Delete <b>32343</b> (record 4). Its slot is linked onto the list: record 1 now points to record 4.' },
+  { html: fl({ 1: 'record 4', 4: 'record 6', 6: 'null (end)' }, 'record 1'), cap: 'Delete <b>45565</b> (record 6). Record 4 now points to record 6, which ends the list. This matches the slide: header → 1 → 4 → 6. (Many systems add new free slots at the front of the list instead; either order works.)' },
+  { html: fl({ 4: 'record 6', 6: 'null (end)' }, 'record 4', { 1: ['22225', 'David', 'History', '70000'] }), cap: 'Insert a new instructor (22225, David). The header says slot 1 is free, so David goes there, and the header moves on to record 4. Holes are reused, nothing was moved.' },
+]);
+</script>
+</body>
+</html>

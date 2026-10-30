@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Query Trees and Logical Optimization · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 12 (Ishrak) · Chapter 7 · Slides 28–44 · Book §16.2–16.3</div>
+<h1>Query Trees and Logical Optimization</h1>
+<p class="lede">An RA expression can be drawn as a tree and evaluated bottom-up. Many different trees give the same answer; logical optimization picks one in which selections and projections happen as early as possible, so that every later operator handles fewer and narrower tuples. This chapter follows slides 28–44 and measures the gain on sample data.</p>
+
+<h2>1. Logically equivalent plans (slides 28–30)</h2>
+<dl class="def">
+  <dt>Logically equivalent expressions</dt>
+  <dd>Two RA expressions are equivalent if they produce the same relation on <em>every</em> possible database instance, not just on one sample.</dd>
+  <dt>Logical optimization</dt>
+  <dd>Rewriting an RA expression into an equivalent one that is expected to be cheaper, using algebraic laws. It works on the expression only; choosing algorithms (hash join, index scan…) is physical optimization, Sukarna sir's Lec 07–08.</dd>
+</dl>
+
+<div class="q"><h4>Slide 29: for R(A, B) and S(B, C), do σ and π commute?</h4>
+<p><b>σ<sub>A=5</sub>(π<sub>A</sub>(R)) = π<sub>A</sub>(σ<sub>A=5</sub>(R))</b>: yes. The projection keeps A, the only attribute the selection tests, so filtering before or after projecting gives the same set of A values (<a href="02-selection-projection.html">Chapter 2</a>).</p>
+<p><b>σ<sub>A=5</sub>(π<sub>B</sub>(R)) ?= π<sub>B</sub>(σ<sub>A=5</sub>(R))</b>: no. On the left, π<sub>B</sub> has already removed A, so σ<sub>A=5</sub> has nothing to test; the left side is not a valid expression. The right side is fine: "the B values of the tuples with A = 5". Rule: a selection can move below a projection, never above one that removes its attributes.</p>
+</div>
+
+<h2>2. Plans as trees (slides 31–32)</h2>
+<p>Slide 31 draws π<sub>B</sub>(R(A,B) ⋈ S(B,C)) as a <b class="term">query tree</b> (expression tree): leaves are relations, inner nodes are operators, and each node's children are its inputs. "Bottom-up tree traversal = order of operation execution": a node can run once its children have produced their results, so execution starts at the leaves and ends at the root.</p>
+<figure><div id="t31"></div><figcaption><b>Figure 1.</b> Slide 31's plan π<sub>B</sub>(R ⋈ S) as a tree.</figcaption></figure>
+
+<div class="q"><h4>Slide 32: what SQL query does this correspond to? Are there logically equivalent RA expressions?</h4>
+<p>The join pairs R and S tuples with equal B, and the projection keeps B without duplicates:</p>
+<pre>SELECT DISTINCT R.B
+FROM R, S
+WHERE R.B = S.B;</pre>
+<p>Equivalent expressions (all return "the B values that occur in both R and S"):</p>
+<ul>
+  <li>π<sub>B</sub>(R) ⋈ π<sub>B</sub>(S), the plan of slide 33;</li>
+  <li>π<sub>B</sub>(R) ∩ π<sub>B</sub>(S), because a natural join of two relations with the same single attribute is their intersection (<a href="04-natural-join.html">Chapter 4</a>);</li>
+  <li>π<sub>B</sub>(R ⋈ π<sub>B</sub>(S)) and π<sub>B</sub>(S ⋈ R) (joins commute).</li>
+</ul>
+<p>All of them are in the evaluator below; on the sample data they all return the same B values.</p>
+</div>
+
+<h2>3. Pushing down projections and selections (slides 33–37)</h2>
+
+<div class="q"><h4>Slide 33: why might we prefer π<sub>B</sub>(R) ⋈ π<sub>B</sub>(S)?</h4>
+<p>Because the join then works on narrower and fewer tuples. Projecting R and S onto B first (1) drops the attributes A and C that the query never outputs, so each tuple is smaller and more of them fit in a block, and (2) merges duplicate B values, so the join has fewer tuples to match. The join's output is also tiny: just the common B values, with no A or C. On the sample data below, the original join outputs 13 tuples of 3 attributes (39 values) only to throw A and C away; in the pushed-down plan the join receives 6 and 7 one-attribute tuples and outputs 6 values. With realistic tables, where tuples are wide and many share a B value, the difference is far larger.</p>
+</div>
+
+<p>Slide 34: "It is always possible to change the order of selections": σ<sub>A=10</sub>(σ<sub>B&gt;0</sub>(R)) = σ<sub>B&gt;0</sub>(σ<sub>A=10</sub>(R)). Both keep exactly the tuples with A = 10 and B &gt; 0. Slide 35: a projection can be pushed through a join, provided the join attributes are kept: π<sub>A,C</sub>(R(A,B,D) ⋈ S(B,C)) = π<sub>A,C</sub>(π<sub>A,B</sub>(R) ⋈ S). D is not needed anywhere, so it is projected out before the join; B must stay because the join needs it.</p>
+
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="moves"></div>
+<figcaption><b>Figure 2.</b> Slides 34 and 35 as tree rewrites.</figcaption>
+</figure>
+
+<p>Slide 36's takeaways: this process is called <b>logical optimization</b>; the optimizer generates many equivalent plans and searches them for a good one; relational algebra is the abstraction that makes this possible. Slide 37 lists the basic moves ("commutators"). With the conditions under which each is valid:</p>
+<div class="tbl"><table>
+<tr><th>#</th><th>Move</th><th>Law</th><th>Valid when</th></tr>
+<tr><td>1</td><td>projection through selection</td><td>π<sub>L</sub>(σ<sub>c</sub>(R)) = π<sub>L</sub>(σ<sub>c</sub>(π<sub>L ∪ attr(c)</sub>(R)))</td><td>always (keep c's attributes below σ)</td></tr>
+<tr><td>2</td><td>projection through join</td><td>π<sub>L</sub>(R ⋈ S) = π<sub>L</sub>(π<sub>L<sub>R</sub>∪J</sub>(R) ⋈ π<sub>L<sub>S</sub>∪J</sub>(S))</td><td>always, if the join attributes J are kept on both sides</td></tr>
+<tr><td>3</td><td>selection through selection</td><td>σ<sub>c1</sub>(σ<sub>c2</sub>(R)) = σ<sub>c2</sub>(σ<sub>c1</sub>(R)) = σ<sub>c1∧c2</sub>(R)</td><td>always</td></tr>
+<tr><td>4</td><td>selection through projection</td><td>σ<sub>c</sub>(π<sub>L</sub>(R)) = π<sub>L</sub>(σ<sub>c</sub>(R))</td><td>attr(c) ⊆ L</td></tr>
+<tr><td>5</td><td>selection through join</td><td>σ<sub>c</sub>(R ⋈ S) = σ<sub>c</sub>(R) ⋈ S</td><td>c uses only attributes of R</td></tr>
+<tr><td>+</td><td>join reordering</td><td>R ⋈ S = S ⋈ R; (R ⋈ S) ⋈ T = R ⋈ (S ⋈ T)</td><td>always</td></tr>
+</table></div>
+<p>Moves 3 and 5 are also why a condition such as R.B = S.B ∧ R.A &lt; 10 can be split: the first conjunct becomes the join, the second goes down to R. The textbook lists these laws with proofs in §16.2 (Sukarna sir's <a href="../s08/07-beyond-the-slides.html">Lec 08 chapter</a> applies them to exam questions).</p>
+
+<h2>4. Optimizing an SFW plan (slides 38–44)</h2>
+<p>Slide 39 translates this query over R(A,B), S(B,C), T(C,D):</p>
+<pre>SELECT R.A, T.D
+FROM R, S, T
+WHERE R.B = S.B AND S.C = T.C AND R.A &lt; 10;</pre>
+<p>The two equalities equate shared attributes, so they become natural joins; R.A &lt; 10 becomes a selection, and the SELECT list a projection: π<sub>A,D</sub>(σ<sub>A&lt;10</sub>(T ⋈ (R ⋈ S))). Slide 40 states the heuristic: <em>selections and projections should happen as early as possible</em>, because then "we will have fewer tuples in a plan". Slides 41–44 apply it in two moves. Step through them; each frame shows the plan and, measured on the sample data, the number of tuples every operator outputs.</p>
+
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="opt"></div>
+<figcaption><b>Figure 3.</b> Slides 39–44: the same query, three plans. "Work" adds up tuples × attributes over every operator's output, a rough measure of how much data the plan moves.</figcaption>
+</figure>
+
+<div class="q"><h4>Slide 44: in general, when is an attribute not needed?</h4>
+<p>An attribute is not needed above some point of the tree when <b>no operator above that point uses it</b>: it is not in the final projection list, and it does not appear in any selection condition or join condition that is still to be evaluated higher up. In slide 44's plan, B is used only by the join R ⋈ S. Once that join is done, B is dead, so π<sub>A,C</sub> drops it immediately; A is kept for the output and C for the join with T. (Slide 44 writes the subscript as "A,c"; it means A, C.)</p>
+</div>
+
+<p>Selection pushing usually gives the biggest gain, because it reduces the number of tuples; projection pushing reduces their width. Real optimizers combine these heuristics with cost estimates (sizes, available indexes) to choose the join order and algorithms, which is the topic of Lec 07–08 and the textbook's §16.4–16.6.</p>
+
+<h3>Test an equivalence yourself</h3>
+<p>Type two expressions over R(A,B), S(B,C), T(C,D). The tool evaluates both on the sample data. If the results differ, the expressions are certainly <b>not</b> equivalent and the data is a counterexample. If they agree, they <em>may</em> be equivalent; a proof needs a law from the table above, because one instance cannot prove equivalence.</p>
+<div class="ask" id="eqtool">
+  <div class="ask-q"><b>Equivalence tester</b></div>
+  <form class="ask-f" id="eqf" style="display:grid;gap:8px">
+    <input id="eq1" value="project[A, D](select[A < 10](T join (R join S)))" aria-label="first expression" style="max-width:none">
+    <input id="eq2" value="project[A, D](T join project[A, C](select[A < 10](R) join S))" aria-label="second expression" style="max-width:none">
+    <div><button type="submit">Compare</button></div>
+  </form>
+  <div id="eqout"></div>
+</div>
+
+<figure class="wide">
+<span class="anim-tag">Interactive tool</span>
+<div id="lab"></div>
+</figure>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+<h3>Write it yourself</h3>
+<div id="ex1"></div>
+<div id="ex2"></div>
+<div id="ex3"></div>
+<div id="ex4"></div>
+<div id="ex5"></div>
+
+<h3>Exam questions</h3>
+<p>The question bank's optimization questions (push selections and projections down for a given SQL query or expression; true/false laws such as δ(π<sub>L</sub>(R)) = π<sub>L</sub>(δ(R)) and π<sub>a</sub>(R ∩ S) ≠ π<sub>a</sub>(R) ∩ π<sub>a</sub>(S); query trees with subqueries; join-size estimation) are fully worked, with trees, in <a href="../s08/07-beyond-the-slides.html">Sukarna sir's Lec 08 "Exam topics beyond the slides"</a>. They use exactly the moves of this chapter: DB QB 20-21 8b is slide 39's query with T.D &gt; 20 instead of R.A &lt; 10. The expression-tree question with materialization and pipelining (DB QB 19-20 3b) is in <a href="../s07/05-iterators-pipelining.html">Lec 07 Iterators and pipelining</a>.</p>
+
+<div class="key"><p><strong>Summary:</strong> A query tree has relations at the leaves and operators inside; it is evaluated bottom-up. Equivalent expressions give the same result on every instance. Logical optimization rewrites the tree with laws: selections commute with each other, move below projections that keep their attributes and below joins onto the side whose attributes they use; projections move below selections and joins as long as condition and join attributes are kept. Heuristic: push selections and projections as far down as possible. An attribute can be dropped as soon as no operator above uses it.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/sqlplay.js"></script>
+<script src="lecture.js"></script>
+<script>
+const DBO = raDB(`
+R(A, B)
+3 | 1
+15 | 2
+7 | 3
+22 | 1
+9 | 4
+30 | 2
+5 | 5
+18 | 3
+2 | 2
+11 | 6
+
+S(B, C)
+1 | x
+2 | y
+3 | x
+4 | z
+5 | y
+6 | w
+2 | z
+7 | x
+
+T(C, D)
+x | 10
+y | 20
+z | 30
+w | 40
+v | 50
+`);
+const DBS = raDB(`
+R(A, B, D)
+1 | 10 | p
+2 | 10 | q
+3 | 20 | p
+4 | 30 | r
+
+S(B, C)
+10 | c1
+20 | c2
+20 | c3
+40 | c4
+`);
+raTree('#t31', 'project[B](R join S)');
+
+// tree rewrite frames with measured work
+const work = (db, e) => { const r = raRun(db, e); return { r, tuples: r.steps.reduce((s, x) => s + x.out.rows.length, 0), vals: r.steps.reduce((s, x) => s + x.out.rows.length * x.out.cols.length, 0) }; };
+const frame = (db, e, cap, title) => {
+  const w = work(db, e), st = raParse(e)[0].e;
+  const nm = n => { const l = raLabel(n), me = l.sym + (l.sub ? `<sub>${l.sub}</sub>` : ''), sh = k => k.op === 'rel' ? k.name : '…'; return n.kids.length === 2 ? `${sh(n.kids[0])} ${me} ${sh(n.kids[1])}` : `${me}(${sh(n.kids[0])})`; };
+  const sizes = w.r.steps.map(x => `<tr><td>${nm(x.n)}</td><td>${x.out.rows.length}</td><td>${x.out.cols.length}</td></tr>`).join('');
+  return { html: `<div class="ra-frame"><div class="ra-tree">${treeSVG(st, { top: title })}</div><div class="ra-io"><table class="ra-t"><tr><th>operator (bottom-up)</th><th>tuples out</th><th>attributes</th></tr>${sizes}<tr><td><b>work</b> (tuples × attributes, summed)</td><td colspan="2"><b>${w.vals}</b> values</td></tr></table>${relHTML(w.r.result, { title: 'result' })}</div></div>`, cap };
+};
+stepper('#moves', [
+  frame(DBO, 'select[A = 7](select[B > 0](R))', 'Slide 34, left: σ<sub>A=10</sub>(σ<sub>B&gt;0</sub>(R)) on our data (with A = 7 so the result is not empty). σ<sub>B&gt;0</sub> runs first and passes all 10 tuples.', 'σ over σ'),
+  frame(DBO, 'select[B > 0](select[A = 7](R))', 'Slide 34, right: the selections swapped. Same result; now the more selective test runs first, so the second σ sees 1 tuple instead of 10.', 'swapped'),
+  frame(DBS, 'project[A, C](R join S)', 'Slide 35, left: π<sub>A,C</sub>(R(A,B,D) ⋈ S(B,C)). The join carries D although the query never uses it.', 'before'),
+  frame(DBS, 'project[A, C](project[A, B](R) join S)', 'Slide 35, right: D is projected out before the join; B stays because the join needs it. Same result, narrower intermediate tuples.', 'D projected out early'),
+], { interval: 3200 });
+stepper('#opt', [
+  frame(DBO, 'project[A, D](select[A < 10](T join (R join S)))', 'Slide 39: the direct translation. Both joins run on all tuples, and A &lt; 10 is tested only at the end.', 'slide 39'),
+  frame(DBO, 'project[A, D](T join (select[A < 10](R) join S))', 'Slides 41–42: σ<sub>A&lt;10</sub> uses only R\'s attribute A, so it is pushed below both joins (move 5, twice). R shrinks from 10 to 5 tuples before any join, both joins output 6 tuples instead of 13, and the work drops from 127 to 64 values.', 'selection pushed down'),
+  frame(DBO, 'project[A, D](T join project[A, C](select[A < 10](R) join S))', 'Slides 43–44: after R ⋈ S, B is never used again, so π<sub>A,C</sub> drops it (move 2). The second join\'s input shrinks from 6 × 3 to 6 × 2 values and its output from 6 × 4 to 6 × 3. On this tiny table the extra π costs about what it saves (70 vs 64 values); in a real system the projection is applied on the fly as the join emits tuples (pipelining), so it costs no extra pass, and the saving grows with wide attributes such as long strings.', 'projection pushed down'),
+], { interval: 3600 });
+
+document.querySelector('#eqf').addEventListener('submit', e => {
+  e.preventDefault();
+  const out = document.querySelector('#eqout'), a = document.querySelector('#eq1').value, b = document.querySelector('#eq2').value;
+  try {
+    const ra = raRun(DBO, a).result, rb = raRun(DBO, b).result, same = raSame(ra, rb);
+    out.innerHTML = `<p class="sq-msg ${same ? 'ok' : 'err'}"><b>${same ? 'Same result on this data' : 'Different results: not equivalent'}.</b> ${same ? 'They may be equivalent; justify it with a law.' : 'This data is a counterexample.'}</p><div class="ra-io">${relHTML(ra, { title: 'first' })}${relHTML(rb, { title: 'second' })}</div>`;
+  } catch (er) { out.innerHTML = `<p class="sq-msg err"><b>Cannot evaluate:</b> ${er.message.replace(/</g, '&lt;')}</p>`; }
+});
+
+raLab('#lab', { db: DBO, presets: [
+  { label: 'Slide 31/32: π_B(R ⋈ S)', ra: 'project[B](R join S)', sql: 'SELECT DISTINCT R.B\nFROM R, S\nWHERE R.B = S.B;' },
+  { label: 'Slide 33: π_B(R) ⋈ π_B(S)', ra: 'project[B](R) join project[B](S)', sql: 'SELECT DISTINCT R.B\nFROM R, S\nWHERE R.B = S.B;' },
+  { label: 'Equivalent: π_B(R) ∩ π_B(S)', ra: 'project[B](R) intersect project[B](S)', sql: 'SELECT B FROM R\nINTERSECT\nSELECT B FROM S;' },
+  { label: 'Slide 39: unoptimized', ra: 'project[A, D](select[A < 10](T join (R join S)))', sql: 'SELECT DISTINCT R.A, T.D\nFROM R, S, T\nWHERE R.B = S.B AND S.C = T.C AND R.A < 10;' },
+  { label: 'Slide 44: optimized', ra: 'project[A, D](T join project[A, C](select[A < 10](R) join S))', sql: 'SELECT DISTINCT R.A, T.D\nFROM R, S, T\nWHERE R.B = S.B AND S.C = T.C AND R.A < 10;' },
+] });
+
+flashcards('#cards', [
+  { f: 'Query tree', b: 'Leaves = relations, inner nodes = operators, children = inputs. Evaluated bottom-up.' },
+  { f: 'Logically equivalent', b: 'Same result on every database instance.' },
+  { f: 'Logical optimization', b: 'Rewriting an RA plan into an equivalent, cheaper one using algebraic laws.' },
+  { f: 'Push selections down', b: 'Apply σ as early as possible: below joins (to the side whose attributes it uses) and below projections that keep its attributes.' },
+  { f: 'Push projections down', b: 'Drop attributes as soon as nothing above uses them; keep join and condition attributes.' },
+  { f: 'σ<sub>c</sub>(R ⋈ S) = σ<sub>c</sub>(R) ⋈ S', b: 'Valid when c mentions only R\'s attributes.' },
+  { f: 'When is an attribute not needed?', b: 'When it is not in the output and no selection or join condition above uses it.' },
+]);
+quiz('#quiz', [
+  { q: 'Is σ<sub>A=5</sub>(π<sub>B</sub>(R(A,B))) equal to π<sub>B</sub>(σ<sub>A=5</sub>(R))?', opts: ['Yes, always', 'No: the left side is invalid because A is gone', 'Only if A is a key', 'Only for sets'], a: 1, why: 'Slide 29.' },
+  { q: 'For R(A,B), S(B,C): which is a valid rewrite of σ<sub>C=3</sub>(R ⋈ S)?', opts: ['σ<sub>C=3</sub>(R) ⋈ S', 'R ⋈ σ<sub>C=3</sub>(S)', 'σ<sub>C=3</sub>(R) ⋈ σ<sub>C=3</sub>(S)', 'π<sub>C</sub>(R ⋈ S)'], a: 1, why: 'C is S\'s attribute, so the selection goes to S.' },
+  { q: 'Pushing π<sub>A,C</sub> below R(A,B,D) ⋈ S(B,C) on the R side gives…', opts: ['π<sub>A</sub>(R)', 'π<sub>A,B</sub>(R)', 'π<sub>A,D</sub>(R)', 'π<sub>B,D</sub>(R)'], a: 1, why: 'Keep A for the output and B for the join; drop D.' },
+  { q: 'Why does pushing selections down help?', opts: ['It changes the result', 'Later operators, especially joins, process fewer tuples', 'It removes the need for indexes', 'It sorts the data'], a: 1, why: 'Slide 40: fewer tuples in the plan.' },
+  { q: 'Two expressions give the same result on one sample database. This proves…', opts: ['they are equivalent', 'nothing about equivalence; only a law (or proof) can', 'they are not equivalent', 'one is optimized'], a: 1, why: 'Equivalence must hold on every instance. A difference on one instance, however, does disprove it.' },
+]);
+ask('#try1', { q: 'In Figure 3, how many tuples does σ<sub>A&lt;10</sub>(R) output on the sample data?', a: 5, why: 'A values 3, 7, 9, 5, 2 are below 10.' });
+
+raCheck('#ex1', { db: DBO, task: '1. (Easy) Translate slide 39\'s SQL literally into RA (any correct form is accepted).', solution: 'project[A, D](select[A < 10](T join (R join S)))' });
+raCheck('#ex2', { db: DBO, task: '2. Write an equivalent plan for <code>SELECT DISTINCT R.A FROM R, S WHERE R.B = S.B AND S.C = \'x\'</code> in which the selection is applied directly to S. (The checker compares results; check your tree shape yourself.)', solution: "project[A](R join select[C = 'x'](S))", hint: 'C belongs to S, so σ<sub>C=\'x\'</sub>(S) goes below the join.' });
+raCheck('#ex3', { db: DBO, task: '3. (Exam style) For <code>SELECT DISTINCT T.D FROM R, S, T WHERE R.B = S.B AND S.C = T.C AND T.D &gt; 20</code>, write the fully optimized plan: selection on T pushed down, and only the needed attributes kept above each join.', solution: 'project[D](project[C](R join S) join select[D > 20](T))', hint: 'After R ⋈ S only C is needed; σ<sub>D&gt;20</sub> goes on T.' });
+sqlCheck('#ex4', { setup: raSetup(DBO), task: '4. Write slide 33\'s plan π<sub>B</sub>(R) ⋈ π<sub>B</sub>(S) in SQL using two subqueries in FROM.', solution: 'SELECT DISTINCT r.B\nFROM (SELECT DISTINCT B FROM R) r, (SELECT DISTINCT B FROM S) s\nWHERE r.B = s.B;' });
+sqlCheck('#ex5', { setup: raSetup(DBO), task: '5. Write the result of exercise 3 in SQL.', solution: 'SELECT DISTINCT T.D\nFROM R, S, T\nWHERE R.B = S.B AND S.C = T.C AND T.D > 20;' });
+</script>
+</body>
+</html>

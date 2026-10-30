@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sorting with ORDER BY · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="../i03/lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 04 (Ishrak) · Chapter 6 · Slides 41–43 · Book §6.1.8</div>
+<h1>Sorting the Result with ORDER BY</h1>
+<p class="lede">How ORDER BY sorts the output, ascending by default or descending with DESC, how a second and third sort key break ties, how each key gets its own direction, and where NULLs go (with a correction to slide 43 for Oracle's DESC order).</p>
+
+<h2>1. ORDER BY (slide 41)</h2>
+<dl class="def">
+  <dt>ORDER BY</dt>
+  <dd>The last clause of a query. It lists one or more <b class="term">sort keys</b> (columns or expressions), each optionally followed by <code>ASC</code> (ascending, the default) or <code>DESC</code> (descending). It is evaluated last, after SELECT and DISTINCT, and only reorders the output rows: it never adds or removes rows.</dd>
+</dl>
+<pre>SELECT   pname, price, category, manufacturer
+FROM     Product
+WHERE    price &gt; 50
+ORDER BY pname;          -- MultiTouch, SingleTouch</pre>
+<p>The two products above $50 are sorted by name: M comes before S. Without ORDER BY the order is not defined (Lec 03, Chapter 2), so ORDER BY is the only way to get a guaranteed order.</p>
+
+<h2>2. Several sort keys: breaking ties (slide 42)</h2>
+<pre>SELECT   pname, price, manufacturer
+FROM     Product
+WHERE    category = 'Gadgets' AND price &gt; 10
+ORDER BY price, pname;</pre>
+<p>The rows are sorted by the first key, <code>price</code>. Only rows that are <em>equal</em> on price (a <b class="term">tie</b>) are then put in order by the second key, <code>pname</code>; rows still tied are ordered by the third key, and so on. The second key never overrides the first. On the slide data the two gadgets have different prices (19.99, 29.99), so the second key has no effect there.</p>
+<p>Ties are easier to see on a bigger table. The animation sorts cheap PCs by speed (fastest first), then by price, then by model:</p>
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="a1"></div>
+</figure>
+
+<h2>3. A direction for each key (slide 43)</h2>
+<pre>SELECT   pname, price, manufacturer
+FROM     Product
+WHERE    category = 'Gadgets' AND price &gt; 10
+ORDER BY price ASC, pname DESC;</pre>
+<p>ASC or DESC applies only to the key it follows. Here price is ascending and, among equal prices, names are descending. Writing <code>ORDER BY price, pname DESC</code> means the same thing: price is ASC by default.</p>
+
+<h2>4. Where do NULLs go? (slide 43)</h2>
+<p>Slide 43 says "NULL values always come last". In Oracle that is true for <strong>ascending</strong> keys only. Oracle sorts NULL as if it were larger than every value, so:</p>
+<ul>
+  <li><code>ORDER BY x</code> or <code>ORDER BY x ASC</code>: NULLs come <strong>last</strong> (default <code>NULLS LAST</code>);</li>
+  <li><code>ORDER BY x DESC</code>: NULLs come <strong>first</strong> (default <code>NULLS FIRST</code>).</li>
+</ul>
+<p>Either default can be overridden per key, as the slide shows: <code>ORDER BY price ASC NULLS FIRST</code> or <code>ORDER BY price DESC NULLS LAST</code>.</p>
+<figure>
+<div class="figrow"><div id="n1"></div><div id="n2"></div><div id="n3"></div></div>
+<figcaption><b>Figure 1.</b> Sales staff sorted by <code>commission_pct</code> in Oracle. NULL counts as the largest value: last in ASC, first in DESC, unless NULLS FIRST/LAST says otherwise.</figcaption>
+</figure>
+<p>Other systems differ: SQLite and MySQL treat NULL as the <em>smallest</em> value (first in ASC). The playground runs on SQLite, so in the boxes below write <code>NULLS LAST</code> / <code>NULLS FIRST</code> explicitly to get Oracle's order.</p>
+<div id="p1"></div>
+
+<h2>5. Two more facts worth knowing</h2>
+<ul>
+  <li><strong>You may sort by a column you do not select:</strong> <code>SELECT pname FROM Product ORDER BY price</code> is legal, since ORDER BY can see the rows' other columns. The exception is SELECT DISTINCT: after duplicate removal there is no single price for a row, so Oracle then requires the sort keys to be in the SELECT list (ORA-01791).</li>
+  <li><strong>You may sort by position or by alias:</strong> <code>ORDER BY 2</code> sorts by the second selected column; <code>SELECT price * 1.15 AS with_vat … ORDER BY with_vat</code> uses an alias (aliases: Lec 05, Chapter 4).</li>
+</ul>
+<div id="p2"></div>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+<h3>SQL exercises</h3>
+<p>Ordered exercises are checked row by row, so the order must match too.</p>
+<div id="c1"></div><div id="c2"></div><div id="c3"></div><div id="c4"></div><div id="c5"></div>
+
+<div class="key"><p><strong>Summary:</strong> ORDER BY is evaluated last and only reorders rows. Each key is ASC by default or DESC; the second key only orders rows tied on the first, and so on. In Oracle NULL sorts as the largest value: last for ASC, first for DESC (slide 43's "always last" holds only for ASC); NULLS FIRST / NULLS LAST override this per key. Without ORDER BY, row order is not guaranteed.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/sqlplay.js"></script>
+<script src="../i03/lecture.js"></script>
+<script>
+(() => {
+  const H = ['model', 'speed', 'price'];
+  const R = [[1003, 1.42, 478], [1004, 2.80, 649], [1005, 3.20, 630], [1007, 2.20, 510], [1008, 2.20, 770], [1009, 2.00, 650], [1010, 2.80, 770], [1012, 2.80, 649], [1013, 3.06, 529]];
+  const L = [['select', 'SELECT   model, speed, price'], ['from', 'FROM     PC'], ['where', 'WHERE    price < 800'], ['order', 'ORDER BY speed DESC, price, model;']];
+  const sortBy = keys => [...R].sort((a, b) => { for (const [j, d] of keys) { const c = oraCmp(a[j], b[j]) * (d ? -1 : 1); if (c) return c; } return 0; });
+  // mark rows tied on given keys
+  const ties = (rows, keys) => rows.map((r, i) => { const k = x => keys.map(j => x[j]).join('|'); const same = rows.filter(x => k(x) === k(r)).length > 1; return { c: r, cls: same ? 'hl' : '', side: same ? 'tie' : '' }; });
+  const s1 = sortBy([[1, 1]]), s2 = sortBy([[1, 1], [2, 0]]), s3 = sortBy([[1, 1], [2, 0], [0, 0]]);
+  stepper('#a1', [
+    { html: frameHTML(Q(L, ['from', 'where', 'select']), T(H, R, { name: 'PCs under $800 (unsorted)' })), cap: 'FROM, WHERE and SELECT have produced 9 rows in no particular order.' },
+    { html: frameHTML(Q(L, 'order'), T(H, ties(s1, [1]), { name: 'by speed DESC', hl: [1] })), cap: '<b>First key: speed DESC.</b> Fastest first. Rows with equal speed (highlighted) are ties: three PCs at 2.80 and two at 2.20. Their order is not yet decided.' },
+    { html: frameHTML(Q(L, 'order'), T(H, ties(s2, [1, 2]), { name: 'then price ASC', hl: [1, 2] })), cap: '<b>Second key: price ASC</b>, used <i>only inside each tie group</i>. Among the 2.80 PCs, 649 comes before 770; the 2.20 PCs become 510, 770. But 1004 and 1012 are still tied: same speed and same price.' },
+    { html: frameHTML(Q(L, 'order'), T(H, s3, { name: 'then model ASC (final)', hl: [1, 2, 0] })), cap: '<b>Third key: model.</b> 1004 before 1012. Now no two rows are tied, so the order is completely determined. Without the third key, Oracle could return 1004 and 1012 in either order.' },
+  ], { interval: 2600 });
+})();
+(() => {
+  const R = [['Zlotkey', 0.2], ['Abel', 0.3], ['Taylor', 0.2], ['Grant', 0.15], ['Kochhar', null]];
+  const srt = (desc, nullsFirst) => [...R].sort((a, b) => { if (a[1] == null || b[1] == null) { if (a[1] == b[1]) return 0; return (a[1] == null) === nullsFirst ? -1 : 1; } return (a[1] - b[1]) * (desc ? -1 : 1) || (a[0] < b[0] ? -1 : 1); });
+  document.querySelector('#n1').innerHTML = T(['last_name', 'commission_pct'], srt(false, false), { name: 'ORDER BY commission_pct' });
+  document.querySelector('#n2').innerHTML = T(['last_name', 'commission_pct'], srt(true, true), { name: 'ORDER BY commission_pct DESC' });
+  document.querySelector('#n3').innerHTML = T(['last_name', 'commission_pct'], srt(false, true), { name: '… ASC NULLS FIRST' });
+})();
+sqlPlay('#p1', { setup: HR, query: "SELECT last_name, commission_pct\nFROM Employees\nWHERE job_id LIKE 'SA%' OR last_name = 'Kochhar'\nORDER BY commission_pct DESC NULLS FIRST, last_name;", note: 'Oracle would give the same order with just <code>ORDER BY commission_pct DESC, last_name</code>. Try removing NULLS FIRST: SQLite then puts the NULL last, the opposite of Oracle.' });
+sqlPlay('#p2', { setup: GIZ, query: 'SELECT pname\nFROM Product\nORDER BY price DESC;', note: 'Sorting by a column that is not selected. Then add DISTINCT after SELECT: Oracle rejects it (SQLite happens to allow it).' });
+flashcards('#cards', [
+  { f: 'Default direction', b: 'ASC (ascending).' },
+  { f: 'Second sort key', b: 'Orders only rows tied on the first key.' },
+  { f: 'ORDER BY a, b DESC', b: 'a ascending, then b descending within equal a.' },
+  { f: 'Oracle NULLs, ASC', b: 'Last (NULL counts as the largest value).' },
+  { f: 'Oracle NULLs, DESC', b: 'First.' },
+  { f: 'NULLS FIRST / NULLS LAST', b: 'Override where NULLs go, per key.' },
+  { f: 'ORDER BY 2', b: 'Sort by the second column of the SELECT list.' },
+]);
+quiz('#quiz', [
+  { q: '<code>ORDER BY price, pname DESC</code>: which key is descending?', opts: ['Both', 'Only pname', 'Only price', 'Neither'], a: 1, why: 'DESC applies to the key it follows; price is ASC by default.' },
+  { q: 'In Oracle, <code>ORDER BY commission_pct DESC</code> puts NULL commissions…', opts: ['first', 'last', 'in the middle', 'it removes them'], a: 0, why: 'NULL is treated as the largest value, so it leads in descending order. Slide 43\'s "always last" is only true for ASC.' },
+  { q: 'Can ORDER BY change the number of rows returned?', opts: ['Yes', 'No', 'Only with DESC', 'Only with NULLS FIRST'], a: 1, why: 'It only reorders the output.' },
+  { q: 'Two rows tie on every ORDER BY key. Their relative order is…', opts: ['by primary key', 'by insertion time', 'not defined', 'alphabetical'], a: 2, why: 'Add another key if you need a fixed order.' },
+  { q: 'Is <code>SELECT DISTINCT category FROM Product ORDER BY price</code> legal in Oracle?', opts: ['Yes', 'No: with DISTINCT, ORDER BY keys must be selected', 'Only with ASC', 'Only if price is unique'], a: 1, why: 'ORA-01791: not a SELECTed expression.' },
+]);
+ask('#try1', { q: 'Run <code>SELECT model, ram, price FROM PC ORDER BY ram DESC, price, model;</code> in your head. Which model comes first?', a: 1008, hint: 'Largest RAM is 2048 (models 1008, 1010, 1011). Then cheapest. Then smallest model number.', why: '1008 and 1010 both have 2048 MB and cost 770; the third key, model, puts 1008 first.' });
+chk('#c1', GIZ, '<b>Easy (slide 41).</b> Show all columns of products costing more than $50, sorted by name.', 'SELECT pname, price, category, manufacturer FROM Product WHERE price > 50 ORDER BY pname;', { ordered: true });
+chk('#c2', GIZ, '<b>Slide 43.</b> Show name, price and manufacturer of gadgets costing more than $10, sorted by price ascending and, within a price, by name descending.', "SELECT pname, price, manufacturer FROM Product\nWHERE category = 'Gadgets' AND price > 10\nORDER BY price ASC, pname DESC;", { ordered: true });
+chk('#c3', PCS, '<b>Descending.</b> Show model and price of all laptops, most expensive first.', 'SELECT model, price FROM Laptop ORDER BY price DESC;', { ordered: true });
+chk('#c4', PCS, '<b>Tie-breaking.</b> Show model, speed and price of all PCs, sorted by speed (fastest first), then by price (cheapest first), then by model.', 'SELECT model, speed, price FROM PC ORDER BY speed DESC, price, model;', { ordered: true });
+chk('#c5', HR, '<b>Exam style: Oracle NULL order.</b> Show <code>last_name</code>, <code>department_id</code> and <code>salary</code> of all employees, sorted by department in ascending order with employees who have no department <em>last</em> (as Oracle does by default), then by salary highest first, then by last name.', 'SELECT last_name, department_id, salary\nFROM Employees\nORDER BY department_id ASC NULLS LAST, salary DESC, last_name;', { ordered: true, hint: 'The playground is SQLite, so write NULLS LAST explicitly to get Oracle\'s default.' });
+</script>
+</body>
+</html>

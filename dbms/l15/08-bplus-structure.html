@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>B+ Tree Structure · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 15 · Chapter 8 · Slides 26–30</div>
+<h1>B+ Tree Structure</h1>
+<p class="lede">The anatomy of a B+ tree: its nodes, what the keys and pointers in each node mean, the rules for leaves and non-leaves, and how full each node is allowed to be (with the answer for n = 99).</p>
+
+<h2>1. The big picture (slide 26)</h2>
+
+<p>A B+ tree is an index organised as a <b class="term">tree</b> of <b class="term">nodes</b>. Each node is one disk block. The slides' example indexes the instructor relation on <code>name</code>:</p>
+
+<figure class="wide">
+<div id="tree"></div>
+<figcaption><b>Figure 1.</b> The B+ tree from slides 26–31, with n = 4 (each node has room for 3 keys and 4 pointers). Black arrows go from a pointer slot to a child node. Blue arrows link each leaf to the next one.</figcaption>
+</figure>
+
+<dl class="def">
+  <dt>Root node</dt><dd>The single node at the top, [Mozart]. Every search starts here.</dd>
+  <dt>Internal (non-leaf) nodes</dt><dd>Nodes between the root and the leaves, here [Einstein, Gold] and [Srinivasan]. They contain only keys and pointers to other nodes, which guide the search downward.</dd>
+  <dt>Leaf nodes</dt><dd>The bottom level. Together the leaves contain <em>every</em> search-key value in the file, in sorted order, each with a pointer to its record. (Lines from the leaves to the records are left out of Figure 1 to keep it readable; Section 3 shows them for one leaf.)</dd>
+</dl>
+
+<h3>All paths from root to leaf are the same length</h3>
+<p>This property is what the “B” stands for: <b class="term">balanced</b>. Every leaf is at the same depth, so every search reads the same number of nodes. A tree can never become lopsided, with some keys hidden at the end of a long chain, which is exactly the overflow-chain problem from Chapter 7. Step through all five paths:</p>
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="paths"></div>
+</figure>
+
+<h2>2. Inside a node (slide 28)</h2>
+
+<figure>
+<svg viewBox="0 0 640 70" width="640" role="img" aria-label="Typical node P1 K1 P2 ... Pn-1 Kn-1 Pn">
+  <g id="node"></g>
+</svg>
+<figcaption><b>Figure 2.</b> A typical node. Pointers (P) and keys (K) alternate. A node holds up to n pointers and n − 1 keys.</figcaption>
+</figure>
+
+<ul>
+  <li>The <b class="term">K<sub>i</sub></b> are search-key values. Inside a node they are kept sorted: K₁ &lt; K₂ &lt; K₃ &lt; … &lt; K<sub>n−1</sub>.</li>
+  <li>The <b class="term">P<sub>i</sub></b> are pointers. In a <em>non-leaf</em> node they point to child nodes. In a <em>leaf</em> they point to records (or to buckets of records, if the key is not unique).</li>
+  <li><b class="term">n</b> is the maximum number of pointers in a node, called the <b class="term">fan-out</b>. It is chosen so that one node fills one disk block. The figures here use n = 4 to stay small. Real B+ trees have n around 100 or more (Chapter 9).</li>
+</ul>
+
+<h2>3. Leaf nodes (slide 29)</h2>
+
+<p>The slide lists three properties of a leaf node:</p>
+<ol>
+  <li>For i = 1, 2, …, n−1, <strong>pointer P<sub>i</sub> points to a file record with search-key value K<sub>i</sub></strong>.</li>
+  <li><strong>Leaves are in order:</strong> if L<sub>i</sub> and L<sub>j</sub> are leaves and i &lt; j (L<sub>i</sub> is to the left), every key in L<sub>i</sub> is ≤ every key in L<sub>j</sub>.</li>
+  <li><strong>P<sub>n</sub> points to the next leaf</strong> in search-key order. This last pointer slot is not used for a record.</li>
+</ol>
+
+<figure>
+<svg id="leaf" viewBox="0 0 620 330" width="620" role="img" aria-label="A leaf node pointing to its records and to the next leaf"></svg>
+<figcaption><b>Figure 3.</b> The leaf [Brandt, Califieri, Crick] (slide 29). P₁, P₂ and P₃ point to the records for those names, wherever they are in the file (which is sorted on id, not name). P₄ points to the next leaf.</figcaption>
+</figure>
+
+<p>The next-leaf pointers chain all the leaves into one sorted list. That makes range queries efficient: for <code>WHERE name BETWEEN 'Crick' AND 'Katz'</code>, search down to Crick once, then walk right along the leaves (Crick, Einstein, El Said, Gold, Katz) without going back up the tree.</p>
+
+<h2>4. Non-leaf nodes (slide 30)</h2>
+
+<p>For a non-leaf node with <i>m</i> pointers, the keys split the key space into ranges, one per pointer:</p>
+<ul>
+  <li>All search keys in the subtree that <strong>P₁</strong> points to are <strong>less than K₁</strong>.</li>
+  <li>For 2 ≤ i ≤ m − 1, all search keys in the subtree that <strong>P<sub>i</sub></strong> points to are <strong>≥ K<sub>i−1</sub> and &lt; K<sub>i</sub></strong>.</li>
+  <li>All search keys in the subtree that <strong>P<sub>m</sub></strong> points to are <strong>≥ K<sub>m−1</sub></strong>.</li>
+</ul>
+<p>The slide writes the middle rule as “for 2 ≤ i ≤ n − 1” and the last one with P<sub>n</sub> and K<sub>n−1</sub>, which describes a <em>full</em> node. For a node that uses only m of its n pointers, read n as m, as in the list above.</p>
+<p>In short: the pointer to the <em>left</em> of a key leads to smaller values, and the pointer to its <em>right</em> leads to values greater than or equal to it.</p>
+
+<figure class="wide">
+<div id="ranges"></div>
+<figcaption><b>Figure 4.</b> The same tree with each pointer labelled by the range of keys it leads to. For example, [Einstein, Gold] sends names &lt; Einstein left, names from Einstein up to (not including) Gold to the middle, and names ≥ Gold right.</figcaption>
+</figure>
+
+<h3>Non-leaf nodes form a multilevel sparse index on the leaf nodes. Explain!</h3>
+<p>Look at the internal node [Einstein, Gold] and its three leaves. Its keys Einstein and Gold are exactly the <em>first keys</em> of its second and third leaves. That is a sparse index (Chapter 2): one entry per block (leaf), holding the block's smallest key. The first leaf needs no key, since everything smaller than Einstein goes there. The root [Mozart] does the same one level up: Mozart is the smallest key under its right child. So the non-leaf levels are a sparse index on the leaves, plus a sparse index on that sparse index, which is precisely the multilevel index from Chapter 4. The difference is that B+ tree nodes may be partly empty and are split or merged locally, so the structure never needs reorganizing.</p>
+
+<h2>5. How full must a node be?</h2>
+
+<p>To keep the tree shallow, nodes may not become too empty. Each node (except the root) must be at least about half full. With fan-out n:</p>
+<div class="tbl"><table>
+<tr><th>Node type</th><th>Pointers (children)</th><th>Search keys</th></tr>
+<tr><td>Root, when it is not a leaf</td><td>2 to n</td><td>1 to n − 1</td></tr>
+<tr><td>Root, when it is the only node (a leaf)</td><td>—</td><td>0 to n − 1</td></tr>
+<tr><td>Internal (non-leaf, non-root)</td><td>⌈n/2⌉ to n</td><td>⌈n/2⌉ − 1 to n − 1</td></tr>
+<tr><td>Leaf</td><td>—</td><td>⌈(n−1)/2⌉ to n − 1</td></tr>
+</table></div>
+<p>Check against Figure 1 (n = 4): leaves hold 2 or 3 keys (⌈3/2⌉ = 2 to 3), internal nodes have 2 to 4 children ([Srinivasan] has 2, [Einstein, Gold] has 3), and the root has 2 children.</p>
+
+<div class="q">
+<h4>Question (worked answer): minimum and maximum keys for n = 99</h4>
+<p><em>Find the minimum and maximum number of search keys in the root, leaf and non-leaf nodes of a B+ tree with n = 99.</em></p>
+<p>A node holds at most n = 99 pointers, so at most <strong>n − 1 = 98 keys</strong>, whatever its type. The minimums differ:</p>
+<div class="tbl"><table>
+<tr><th>Node</th><th>Minimum keys</th><th>Maximum keys</th><th>Why</th></tr>
+<tr><td>Root (non-leaf)</td><td class="num"><strong>1</strong></td><td class="num"><strong>98</strong></td><td>A non-leaf root needs at least 2 children, so at least 1 key to separate them.</td></tr>
+<tr><td>Root (if it is the only node)</td><td class="num">0</td><td class="num">98</td><td>An empty tree is allowed.</td></tr>
+<tr><td>Non-leaf (internal)</td><td class="num"><strong>49</strong></td><td class="num"><strong>98</strong></td><td>At least ⌈99/2⌉ = 50 children, and 50 children need 49 keys.</td></tr>
+<tr><td>Leaf</td><td class="num"><strong>49</strong></td><td class="num"><strong>98</strong></td><td>At least ⌈(99−1)/2⌉ = ⌈49⌉ = 49 keys.</td></tr>
+</table></div>
+</div>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+<div id="try2"></div>
+
+<h3>Exam questions</h3>
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2017–18, 2016–17, 2011–12 · 8 marks</div>
+  <div class="exam-q"><p>Write down the key properties of a B+ tree.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>For a B+ tree with fan-out n (at most n pointers per node):</p>
+    <ol>
+      <li><strong>Balanced:</strong> every path from the root to a leaf has the same length.</li>
+      <li><strong>Node format:</strong> a node holds up to n pointers P₁…P<sub>n</sub> and n − 1 keys K₁ &lt; K₂ &lt; … &lt; K<sub>n−1</sub>, kept sorted. A node normally fills one disk block.</li>
+      <li><strong>Leaves hold all keys:</strong> every search-key value of the file appears in some leaf, with P<sub>i</sub> pointing to the record (or bucket) for K<sub>i</sub>.</li>
+      <li><strong>Leaves are ordered and chained:</strong> all keys in a leaf to the left are ≤ all keys in a leaf to the right, and P<sub>n</sub> of each leaf points to the next leaf, which makes range scans cheap.</li>
+      <li><strong>Non-leaf nodes route the search:</strong> with m pointers, the subtree of P₁ has keys &lt; K₁, the subtree of P<sub>i</sub> has keys ≥ K<sub>i−1</sub> and &lt; K<sub>i</sub>, and the subtree of P<sub>m</sub> has keys ≥ K<sub>m−1</sub>. The non-leaf levels form a multilevel sparse index on the leaves.</li>
+      <li><strong>Occupancy:</strong> a non-leaf node other than the root has between ⌈n/2⌉ and n children; a leaf has between ⌈(n−1)/2⌉ and n − 1 keys; a non-leaf root has at least 2 children; a root that is a leaf may hold 0 to n − 1 keys.</li>
+      <li><strong>Height:</strong> with K keys the height is at most ⌈log<sub>⌈n/2⌉</sub>(K)⌉, so a lookup reads very few nodes.</li>
+      <li><strong>Self-maintaining:</strong> inserts split full nodes and deletes merge or redistribute underfull ones, locally, so the file never needs a full reorganization (Chapter 7).</li>
+    </ol>
+    <p>Note: the question bank gives the leaf minimum as ⌈m/2⌉ − 1 keys. That equals the textbook's ⌈(n−1)/2⌉ only when n is odd; for n = 4 the correct minimum is ⌈3/2⌉ = 2, not 1.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2014–15 · 10 marks</div>
+  <div class="exam-q"><p>Discuss the basic principles of B+ tree index structure.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><strong>What it is.</strong> A B+ tree is a balanced, multilevel ordered index whose nodes are disk blocks. Its leaves contain every search key with a pointer to the record, linked left to right in key order. The levels above form a sparse index on the leaves (Section 4).</p>
+    <p><strong>Principle 1, large fan-out.</strong> A node holds about n ≈ 100 or more pointers, so each level multiplies the reach by at least ⌈n/2⌉. A million keys need at most 4 levels (Chapter 9), so a lookup costs about 4 block reads.</p>
+    <p><strong>Principle 2, balance.</strong> All leaves are at the same depth, so every lookup costs the same: the height of the tree.</p>
+    <p><strong>Principle 3, routing by key ranges.</strong> In a non-leaf node, the pointer left of K<sub>i</sub> leads to keys &lt; K<sub>i</sub> and the pointer right of it to keys ≥ K<sub>i</sub>. The search follows one pointer per level (<code>find(v)</code>, Chapter 9).</p>
+    <p><strong>Principle 4, nodes stay at least half full.</strong> Every node except the root keeps between about n/2 and n pointers. This guarantees the height bound and limits wasted space to at most half a node.</p>
+    <p><strong>Principle 5, local reorganization.</strong> Insertion puts the key in its leaf; a full leaf splits into two half-full leaves and one new key goes into the parent, which may split in turn, and a root split adds a level. Deletion removes the key; an underfull node borrows from a sibling or merges with it, and a root left with one child is removed. Only nodes on one root-to-leaf path change, so the tree never needs the periodic full reorganization an indexed-sequential file needs. (Insertion and deletion are taught in detail in <a href="10-bplus-insertion.html">B+ tree insertion</a> and <a href="11-bplus-deletion.html">B+ tree deletion</a>.)</p>
+    <p><strong>Principle 6, sequential access.</strong> The leaf chain gives the keys in sorted order, so a range query does one descent and then walks along the leaves.</p>
+    <figure><div id="pr11"></div><figcaption>The slides' B+ tree (n = 4): routing levels above, all keys in the chained leaves.</figcaption></figure>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2011–12 · 12 marks (similar: CSE 215 | L-3/T-1 | 2012–13)</div>
+  <div class="exam-q"><p>Suppose in a B+ tree, pointers are 4 bytes long and keys are 12 bytes long. How many keys and pointers will a block of 16,384 bytes have? For a one million record table, what would be the expected length of the index?</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><strong>Keys and pointers per block.</strong> A node with n pointers has n − 1 keys and must fit in the block:</p>
+    <p class="formula">4n + 12(n − 1) ≤ 16,384 ⇒ 16n ≤ 16,396 ⇒ n ≤ 1024.75</p>
+    <p>So a node holds <strong>n = 1024 pointers and 1023 keys</strong> (1024 × 4 + 1023 × 12 = 16,372 bytes). A leaf uses the same layout: 1023 (key, record-pointer) pairs plus the next-leaf pointer.</p>
+    <p><strong>Length of the index</strong> for 1,000,000 keys. “Length” is read here as the number of levels (the length of a root-to-leaf path); the total size in blocks follows from the same count.</p>
+    <div class="tbl"><table>
+      <tr><th>Assumption</th><th>Keys per leaf</th><th>Leaves</th><th>Levels above</th><th>Levels</th><th>Blocks</th></tr>
+      <tr><td>Completely full nodes (best case)</td><td class="num">1023</td><td class="num">⌈10⁶/1023⌉ = 978</td><td class="num">978 ≤ 1024 → 1 root</td><td class="num"><strong>2</strong></td><td class="num">979 (≈ 16.0 MB)</td></tr>
+      <tr><td>Typical fill, about 69% (706 keys and 706 children per node)</td><td class="num">706</td><td class="num">⌈10⁶/706⌉ = 1417</td><td class="num">⌈1417/706⌉ = 3, then 1 root</td><td class="num"><strong>3</strong></td><td class="num">1421 (≈ 23.3 MB)</td></tr>
+      <tr><td>Half-full nodes (worst case)</td><td class="num">512</td><td class="num">⌈10⁶/512⌉ = 1954</td><td class="num">⌈1954/512⌉ = 4, then 1 root</td><td class="num"><strong>3</strong></td><td class="num">1959 (≈ 32.1 MB)</td></tr>
+    </table></div>
+    <p>So the index has <strong>3 levels</strong> in the expected case (2 if every node is packed full), and the slide formula agrees: ⌈log<sub>⌈1024/2⌉</sub>(10⁶)⌉ = ⌈log₅₁₂ 10⁶⌉ = ⌈2.21⌉ = 3. In bytes, the expected index is about 1421 × 16,384 = 23,281,664 bytes ≈ 23.3 MB. A lookup reads 3 nodes plus the data block.</p>
+  </div></details>
+</div>
+
+<div class="key">
+<p><strong>Summary:</strong> a B+ tree is a balanced tree of block-sized nodes: a root, internal nodes and leaves, with every root-to-leaf path the same length. Each node holds up to n pointers and n − 1 sorted keys. Leaves hold every key with a pointer to its record, plus a pointer to the next leaf. Non-leaf nodes route the search by key ranges and act as a multilevel sparse index on the leaves. Every node except the root stays at least half full.</p>
+</div>
+</main>
+<script src="../assets/book.js"></script>
+<script>
+const T = () => ({ k: ['Mozart'], c: [
+  { k: ['Einstein', 'Gold'], c: [{ k: ['Brandt', 'Califieri', 'Crick'] }, { k: ['Einstein', 'El Said'] }, { k: ['Gold', 'Katz', 'Kim'] }] },
+  { k: ['Srinivasan'], c: [{ k: ['Mozart', 'Singh'] }, { k: ['Srinivasan', 'Wu'] }] }] });
+const t1 = T();
+document.querySelector('#tree').innerHTML = bpSVG(t1);
+const t2 = T(); bpLayout(t2);
+const leaves = [t2.c[0].c[0], t2.c[0].c[1], t2.c[0].c[2], t2.c[1].c[0], t2.c[1].c[1]];
+stepper('#paths', leaves.map((l, i) => {
+  const path = new Set([t2.id, l.parent.id, l.id]);
+  return { html: bpSVG(t2, { path, cur: l, edge: { node: l.parent, j: l.parent.c.indexOf(l) } }),
+    cap: `Path ${i + 1} of 5: root [Mozart] → [${l.parent.k.join(', ')}] → leaf [${l.k.join(', ')}]. <b>3 nodes.</b>` };
+}), { interval: 1400 });
+const t3 = T();
+document.querySelector('#ranges').innerHTML = bpSVG(t3, { edgeLabels: true });
+
+// node structure
+(() => {
+  const cells = ['P₁', 'K₁', 'P₂', 'K₂', '…', 'Pₙ₋₁', 'Kₙ₋₁', 'Pₙ'];
+  document.querySelector('#node').innerHTML = cells.map((c, i) =>
+    `<rect class="${c.startsWith('K') ? 'cell' : 'cell-plain'}" x="${10 + i * 77}" y="14" width="77" height="40"/><text x="${48 + i * 77}" y="40" text-anchor="middle" class="big" style="font-size:15px">${c}</text>`).join('');
+})();
+
+// leaf → records
+(() => {
+  const KW = 70, PW = 12, x0 = 10, y0 = 20;
+  let s = '';
+  const keys = ['Brandt', 'Califieri', 'Crick'];
+  for (let k = 0; k < 4; k++) {
+    const px = x0 + k * (KW + PW);
+    s += `<rect class="cell-plain" x="${px}" y="${y0}" width="${PW}" height="28"/>`;
+    if (k < 3) s += `<rect class="cell" x="${px + PW}" y="${y0}" width="${KW}" height="28"/><text x="${px + PW + 8}" y="${y0 + 19}" style="font-size:12px">${keys[k]}</text>`;
+  }
+  s += `<text x="${x0}" y="${y0 - 6}" class="lbl">leaf node</text>`;
+  const nx = x0 + 3 * (KW + PW) + PW / 2;
+  s += `<path d="M${nx} ${y0 + 14} H${nx + 80}" class="s-acc" marker-end="url(#m-acc)"/><text x="${nx + 86}" y="${y0 + 18}" class="lbl" style="fill:var(--accent)">P₄ → next leaf [Einstein, El Said]</text>`;
+  const fx = 300, fy = 80, rh = 20, colW = [50, 76, 76, 50];
+  INSTR.forEach((r, i) => {
+    let cx = fx; const hot = keys.includes(r[1]);
+    r.forEach((v, c) => { s += `<rect class="${hot ? 'cell-hl' : 'cell'}" x="${cx}" y="${fy + i * rh}" width="${colW[c]}" height="${rh}"/><text x="${cx + 5}" y="${fy + i * rh + 14}" style="font-size:11px">${v}</text>`; cx += colW[c]; });
+  });
+  s += `<text x="${fx}" y="${fy - 8}" class="lbl">instructor file (sorted on id)</text>`;
+  keys.forEach((k, j) => {
+    const r = INSTR.findIndex(x => x[1] === k), sx = x0 + j * (KW + PW) + PW / 2;
+    s += `<path d="M${sx} ${y0 + 28} V${fy + r * rh + rh / 2} H${fx - 2}" class="s-red" marker-end="url(#m-red)"/>`;
+    s += `<text x="${sx + 4}" y="${y0 + 44 + j * 14}" class="lbl red">P${'₁₂₃'[j]}</text>`;
+  });
+  document.querySelector('#leaf').innerHTML = s;
+})();
+document.querySelector('#pr11').innerHTML = bpSVG(T());
+flashcards('#cards', [
+  { f: 'Fan-out n', b: 'The maximum number of pointers in a node; a node holds at most n − 1 keys.' },
+  { f: 'Leaf node', b: 'Holds keys with pointers to their records; P<sub>n</sub> points to the next leaf.' },
+  { f: 'Non-leaf node', b: 'Holds keys and child pointers that route the search by key range.' },
+  { f: 'Balanced', b: 'All root-to-leaf paths have the same length.' },
+  { f: 'Min children, internal node', b: '⌈n/2⌉ (root: 2).' },
+  { f: 'Min keys, leaf', b: '⌈(n − 1)/2⌉.' },
+  { f: 'Pointer left / right of K<sub>i</sub>', b: 'Left: keys &lt; K<sub>i</sub>. Right: keys ≥ K<sub>i</sub>.' },
+]);
+quiz('#quiz', [
+  { q: 'n = 4. What is the minimum number of keys in a (non-root) leaf?', opts: ['1', '2', '3', '4'], a: 1, why: '⌈(4 − 1)/2⌉ = ⌈1.5⌉ = 2.' },
+  { q: 'n = 4. Minimum number of children of an internal (non-root) node?', opts: ['1', '2', '3', '4'], a: 1, why: '⌈4/2⌉ = 2.' },
+  { q: 'In the slides\' tree, which keys live in the subtree to the right of “Gold” in [Einstein, Gold]?', opts: ['Names &lt; Gold', 'Names ≥ Gold (and &lt; Mozart)', 'Only Gold', 'Names ≥ Einstein'], a: 1, why: 'The pointer right of K<sub>i</sub> leads to keys ≥ K<sub>i</sub>; the root bounds them by Mozart.' },
+  { q: 'What does P<sub>n</sub> of a leaf point to?', opts: ['A record', 'The parent', 'The next leaf in key order', 'Nothing'], a: 2, why: 'The leaf chain makes range scans cheap.' },
+  { q: 'Why are the non-leaf levels called a multilevel sparse index?', opts: ['They store every key', 'Each separator is the first key of a leaf (block), one entry per block, repeated per level', 'They are hashed', 'They point to records'], a: 1, why: 'One entry per child node, holding its smallest key: the sparse-index idea applied level by level.' },
+  { q: 'n = 99: maximum keys in any node?', opts: ['49', '50', '98', '99'], a: 2, why: 'n − 1 = 98.' },
+]);
+ask('#try1', { q: 'Keys are 8 bytes, pointers 8 bytes, block 4,096 bytes. What is the fan-out n?', a: 256, hint: '8n + 8(n − 1) ≤ 4096', why: '16n ≤ 4104 ⇒ n = 256 (255 keys).' });
+ask('#try2', { q: 'With n = 256, what is the minimum number of keys in a non-root leaf?', a: 128, why: '⌈255/2⌉ = 128.' });
+
+</script>
+</body>
+</html>

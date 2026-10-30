@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Slotted Page Structure · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 14 · Chapter 5 · Slides 14–16</div>
+<h1>Slotted Page Structure</h1>
+<p class="lede">Chapter 4 showed how to lay out one variable-length record. This chapter shows how to fit many of them into one block, so they can be found, grown, shrunk and deleted. Includes the step-by-step example and Question w2-3.</p>
+
+<h2>1. The problem</h2>
+
+<p>With fixed-length records, slot <i>i</i> of a block was always at the same place. With variable-length records that no longer works. Records have different sizes, so you cannot compute where the 3rd record starts. A deleted record leaves a hole of some odd size that the next record may not fit into. And a record that grows (a longer name after an <code>UPDATE</code>) may no longer fit where it was.</p>
+
+<p>The standard solution is the <b class="term">slotted page structure</b>. A <b class="term">page</b> is the same thing as a block: the unit that is read from disk in one go.</p>
+
+<h2>2. How a slotted page is organised</h2>
+
+<p>The block is divided into three regions:</p>
+<ol>
+  <li>A <b class="term">block header</b> at the start of the block.</li>
+  <li>The <b class="term">records</b>, packed together at the <em>end</em> of the block.</li>
+  <li><b class="term">Free space</b> in the middle.</li>
+</ol>
+<p>The header grows forward (left to right) as entries are added, and the records grow backward (right to left) as records are added. The free space shrinks from both sides. The block is full when the two meet.</p>
+
+<p>The slide lists what the header contains:</p>
+<dl class="def">
+  <dt>Number of record entries</dt><dd>How many slots the header currently has.</dd>
+  <dt>End of free space</dt><dd>The address where the free space stops and the records begin. A new record is placed just before this address.</dd>
+  <dt>Location and size of each record</dt><dd>One entry (a <b class="term">slot</b>) per record, saying where the record is in the block and how many bytes it uses.</dd>
+</dl>
+
+<p>Two more rules from the slide make this work:</p>
+<ul>
+  <li><strong>Records can be moved around within the page to keep them contiguous</strong> (packed together with no empty space between them). When a record moves, only its header entry has to be updated.</li>
+  <li><strong>Pointers should not point directly to a record. They should point to the record's entry in the header.</strong> An index, for example, stores “block 7, slot 2” instead of “block 7, byte 3596”. Then records can move freely inside the block without breaking anything outside it. Only the slot entry changes.</li>
+</ul>
+
+<p>That second rule is the key idea. It is the same trick as a building directory: people remember “Room 2”, and if Room 2 moves to another floor, only the directory sign changes.</p>
+
+<h2>3. Worked example (slides 15–16)</h2>
+
+<p>Three relations are given:</p>
+<pre>Student (id, NID, name, f-name, f-NID, m-name, m-NID, DOB, cgpa, tot-cred, uni-id,
+         uni-name, uni-street, uni-city, house-no, street, city, d-no, d-name, building)
+Takes   (id, course-no, semester, year, grade)
+Course  (course-no, title, credit, pre-req)</pre>
+<p>A student record is 400 bytes, a takes record 100 bytes and a course record 80 bytes. The block is 4&nbsp;KB. The task: show the slotted page after inserting one record of each, in the order student, takes, course.</p>
+
+<p><strong>Two details about the slide's numbers.</strong> The slide text says “4000 byte” but its pictures use 4096 (4&nbsp;KB = 4 × 1024 = 4096 bytes), so this page uses 4096. Also, in the slide's pictures the location stored for each record is the address where that record <em>ends</em> (just after its last byte), and the record occupies the <i>size</i> bytes before that. This chapter follows the same convention so that the numbers match the slides.</p>
+
+<h3>Step 1: insert the student record (400 bytes)</h3>
+<p>The block is empty, so free space ends at 4096. The record is placed in the last 400 bytes: 4096 − 400 = 3696, so it occupies bytes 3696–4095. The header is updated: 1 entry, end of free space = 3696, and entry 1 = (size 400, location 4096).</p>
+<figure>
+<svg id="s1" role="img" aria-label="Slotted page after inserting the student record"></svg>
+<figcaption><b>Figure 1.</b> After step 1. The first header cell (orange) holds the number of entries (top) and the end of free space (bottom). Each other header cell is one slot: size on top, location below. Blue arrows go from slots to their records. The red dashed arrow marks the end of free space.</figcaption>
+</figure>
+
+<h3>Step 2: insert the takes record (100 bytes)</h3>
+<p>The new record goes right before the current end of free space: 3696 − 100 = 3596, so it occupies bytes 3596–3695. The header now has 2 entries, end of free space = 3596, and entry 2 = (100, 3696).</p>
+<figure>
+<svg id="s2" role="img" aria-label="Slotted page after inserting the takes record"></svg>
+<figcaption><b>Figure 2.</b> After step 2. This matches the slide's picture: header cells (2 / 3596), (400 / 4096), (100 / 3696).</figcaption>
+</figure>
+
+<div class="q">
+<h4>Question w2-3 (worked answer)</h4>
+<p><strong>(a) Insert the course record (80 bytes).</strong> Free space ends at 3596, so the record goes at 3596 − 80 = 3516 and occupies bytes 3516–3595. The header becomes: <strong>3 entries, end of free space = 3516</strong>, entries (400, 4096), (100, 3696), (80, 3596).</p>
+<figure>
+<svg id="s3" role="img" aria-label="Slotted page after inserting the course record"></svg>
+<figcaption><b>Figure 3.</b> After inserting the course record (green).</figcaption>
+</figure>
+
+<p><strong>(b) Deleting a record, three cases.</strong> In every case the deleted record's slot is marked as empty (for example its size is set to −1) instead of being removed, because something outside the block may still refer to the slot numbers of the <em>other</em> records. Then the records are kept contiguous:</p>
+
+<p><strong>Case 1: delete the last record</strong> (course, the record nearest the free space). Nothing has to move. Its bytes 3516–3595 simply become free space, slot 3 is marked empty, and the end of free space moves back to <strong>3596</strong>.</p>
+<figure>
+<svg id="d-last" role="img" aria-label="After deleting the course record"></svg>
+</figure>
+
+<p><strong>Case 2: delete the first record</strong> (student, bytes 3696–4095). This leaves a 400-byte hole at the very end of the block, with takes and course in front of it. To close the hole, every record between the free space and the hole is shifted 400 bytes toward the end: takes moves to 3996–4095 and course to 3916–3995. Their slot locations become 4096 and 3996. Slot 1 is marked empty, and the end of free space becomes <strong>3916</strong>.</p>
+<figure>
+<span class="anim-tag">Animation</span>
+<div id="d-first-anim"></div>
+</figure>
+
+<p><strong>Case 3: delete a record in between</strong> (takes, bytes 3596–3695). Only the records between the free space and the hole move, here just course. It shifts 100 bytes toward the end, to 3616–3695, and its slot location becomes 3696. Student does not move. Slot 2 is marked empty, and the end of free space becomes <strong>3616</strong>.</p>
+<figure>
+<svg id="d-mid" role="img" aria-label="After deleting the takes record"></svg>
+</figure>
+
+<p>The general rule: <em>when a record of size s is deleted, every record stored between the free space and the hole moves s bytes toward the end of the block, their slot entries are updated, and the end of free space increases by s.</em> Anything outside the block keeps pointing at slot numbers, which have not changed, so nothing outside needs updating.</p>
+</div>
+
+<h2>4. Try it yourself: slotted page simulator</h2>
+
+<p>Exams ask for this procedure in many variations: different block sizes, different record sizes, different deletion orders. Type a block size and a list of operations, press <b>Run</b>, and step through the result. Write <code>insert NAME SIZE</code> to add a record and <code>delete K</code> to delete the record in slot K, separated by commas. Like the slides, the simulator ignores the bytes the header itself uses, stores each record's <em>end</em> address as its location, and reuses an empty slot for the next insert.</p>
+
+<figure class="wide">
+<span class="anim-tag">Interactive</span>
+<div id="sim"></div>
+<figcaption><b>Figure 4.</b> Slotted page simulator. Try the exam questions below: <code>4096</code> with <code>insert r2 500, insert r3 1500, insert r1 1000</code>, or <code>8000</code> with two students, two takes and one course.</figcaption>
+</figure>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+<div id="try2"></div>
+
+<h3>Exam questions</h3>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 22-23 8c · 10 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-1 | 2022–23 · 10 marks</div>
+  <div class="exam-q">
+<p>The following table stores information about courses offered by BUET.</p>
+<pre>create table course (
+    course_code     char(10) primary key,
+    course_title    varchar(255) not null,
+    credit_hours    numeric not null,
+    old_course_code char(10) references course (course_code)
+);</pre>
+<p>Here, varchar is variable-length and all other data-types are fixed length, size of numeric is 8 bytes, and size of char(n) is n bytes. Draw the structure of the records, and the structure of the page when the records of this table are stored using Slotted Page Structure.</p>
+  </div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+<p><strong>Record structure.</strong> Use the variable-length record layout from Chapter 4: the fixed-length part first, attributes in their declared order, with the one variable-length attribute (course_title) replaced by a 4-byte (offset, length) pair; then a null bitmap; then the actual title characters.</p>
+<div class="tbl"><table>
+<tr><th>Bytes</th><th>Field</th><th>Size</th></tr>
+<tr><td class="num">0–9</td><td>course_code, char(10), stored directly</td><td>10</td></tr>
+<tr><td class="num">10–13</td><td>course_title as (offset, length); offset is always 33</td><td>4</td></tr>
+<tr><td class="num">14–21</td><td>credit_hours, numeric</td><td>8</td></tr>
+<tr><td class="num">22–31</td><td>old_course_code, char(10)</td><td>10</td></tr>
+<tr><td class="num">32</td><td>null bitmap (4 bits used, one per attribute)</td><td>1</td></tr>
+<tr><td class="num">33 …</td><td>course_title characters</td><td>0–255</td></tr>
+</table></div>
+<p>The fixed part is 33 bytes, so a record is 33 + (title length) bytes, between 33 and 288 bytes. Only old_course_code may be null (the others are a primary key or <code>not null</code>), so in practice only the 4th bit of the bitmap can be 1. Three sample records:</p>
+<figure><svg id="q153a" role="img" aria-label="record layout for CSE 215"></svg>
+<svg id="q153b" role="img" aria-label="record layout for CSE 101 with null old code"></svg>
+<figcaption>(CSE 215, Database Management Systems, 3.00, CSE 303) is 33 + 27 = <b>60 bytes</b>. (CSE 216, Database Management Systems Sessional, 1.50, CSE 304) is 33 + 37 = <b>70 bytes</b>. (CSE 101, Structured Programming Language, 3.00, null) is 33 + 31 = <b>64 bytes</b>: its old_course_code bytes are unused and the bitmap is <code>0001</code>. char(10) values are padded with spaces to 10 bytes.</figcaption></figure>
+<p><strong>Page structure.</strong> Records have different lengths, so they go into a slotted page. Taking a 4&nbsp;KB (4096-byte) block and inserting the three records in order: 4096 − 60 = 4036, 4036 − 70 = 3966, 3966 − 64 = 3902.</p>
+<figure><div id="q153p"></div>
+<figcaption>Header: 3 entries, end of free space 3902, slots (60, 4096), (70, 4036), (64, 3966). Each slot points to its record. An index on course_code, and the <code>references</code> pointer from old_course_code, refer to (block, slot), never to a byte address, so records can be moved inside the block.</figcaption></figure>
+<p>The bank's answer draws the same idea with a slot directory of (offset, size) pairs where the offset is the record's <em>start</em> byte. That is an equally valid convention: slot 1 would then hold (4036, 60) instead of (60, 4096).</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 20-21 1b · 15 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-2 | 2020–21 · 15 marks</div>
+  <div class="exam-q"><p>Show and explain the slotted-page structure by inserting two variable length records with size S1 and S2. The block size is 4000 bytes. Show the structure after deletion of the record of size S1.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+<p><strong>Structure.</strong> The block header holds the number of entries, the end of free space, and one (size, location) slot per record. Records are stored from the end of the block toward the front, and free space sits in between (Section 2).</p>
+<p><strong>Insert S1.</strong> Free space ends at 4000, so record 1 occupies [4000 − S1, 4000). Header: 1 entry, end of free space = 4000 − S1, slot 1 = (S1, 4000).</p>
+<p><strong>Insert S2.</strong> Record 2 occupies [4000 − S1 − S2, 4000 − S1). Header: 2 entries, end of free space = 4000 − S1 − S2, slot 2 = (S2, 4000 − S1).</p>
+<p><strong>Delete S1.</strong> Slot 1 is marked empty (size −1) and kept, because pointers to slot 2 must keep working. Record 1 was the first record, so its removal leaves a hole of S1 bytes at the end of the block. Record 2 is moved S1 bytes toward the end, to [4000 − S2, 4000), and slot 2 becomes (S2, 4000). End of free space = 4000 − S2.</p>
+<div class="tbl"><table>
+<tr><th>State</th><th>Entries</th><th>End of free space</th><th>Slot 1</th><th>Slot 2</th></tr>
+<tr><td>After S1</td><td>1</td><td>4000 − S1</td><td>(S1, 4000)</td><td></td></tr>
+<tr><td>After S2</td><td>2</td><td>4000 − S1 − S2</td><td>(S1, 4000)</td><td>(S2, 4000 − S1)</td></tr>
+<tr><td>After deleting S1</td><td>2</td><td>4000 − S2</td><td>empty</td><td>(S2, 4000)</td></tr>
+</table></div>
+<p>With concrete sizes S1 = 300 and S2 = 200 (step through it):</p>
+<figure><span class="anim-tag">Animation</span><div id="q157"></div></figure>
+<p>The bank's answer gives the same result with start offsets: slot 2 = (offset 4000 − S2, length S2) after compaction.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">DB QB · Jan 20 4b · 15 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-2 | 2018–19 · 15 marks</div>
+  <div class="exam-q"><p>Given the relational schema as follows:<br>Student (id, name, DOB, cgpa, tot-cred, house-no, street, city, remarks, NID)<br>Takes (id, course-no, semester, year, grade)<br>Course (course-no, title, credit, pre-req)<br>The tuple size for Student, Takes and Course are 400, 100 and 80 bytes respectively. The block size is 8 KB (8000 Byte). Show the organization of slotted page structure after insertion of i. two tuples of Student, ii. two tuples of Takes, and iii. one tuple of Course.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+<p>Each new record goes immediately before the current end of free space, starting from 8000:</p>
+<div class="tbl"><table>
+<tr><th>Insert</th><th>Bytes</th><th>Slot (size, location)</th><th>End of free space after</th></tr>
+<tr><td>student 1</td><td>7600–7999</td><td>(400, 8000)</td><td>7600</td></tr>
+<tr><td>student 2</td><td>7200–7599</td><td>(400, 7600)</td><td>7200</td></tr>
+<tr><td>takes 1</td><td>7100–7199</td><td>(100, 7200)</td><td>7100</td></tr>
+<tr><td>takes 2</td><td>7000–7099</td><td>(100, 7100)</td><td>7000</td></tr>
+<tr><td>course 1</td><td>6920–6999</td><td>(80, 7000)</td><td>6920</td></tr>
+</table></div>
+<figure><span class="anim-tag">Animation</span><div id="q160"></div>
+<figcaption>Final header: <b>5 entries, end of free space = 6920</b>, slots (400, 8000), (400, 7600), (100, 7200), (100, 7100), (80, 7000). The three relations share one block, so each record must also carry (or its slot must record) which relation it belongs to.</figcaption></figure>
+<p>The bank's answer is correct; it writes each slot as (start offset, size), for example slot 5 = [6920, 80].</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 18 CT3 3 · 6 marks</div>
+  <div class="exam-q"><p>The sizes of tuples of relations r1, r2 and r3 are 1000, 500 and 1500 respectively. The three insert statements: insert into r2 values (…), insert into r3 values (…) and insert into r1 values (…) are executed consecutively. The block size is 4KB (4096 Byte). Show the slotted page block structures after every insertion.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+<p>The order of insertion is r2, r3, r1.</p>
+<ol>
+<li><strong>Insert r2 (500 B):</strong> 4096 − 500 = 3596, bytes 3596–4095. Header: 1 entry, end of free space 3596, slot 1 = (500, 4096).</li>
+<li><strong>Insert r3 (1500 B):</strong> 3596 − 1500 = 2096, bytes 2096–3595. Header: 2 entries, end of free space 2096, slot 2 = (1500, 3596).</li>
+<li><strong>Insert r1 (1000 B):</strong> 2096 − 1000 = 1096, bytes 1096–2095. Header: 3 entries, end of free space 1096, slot 3 = (1000, 2096).</li>
+</ol>
+<figure><span class="anim-tag">Animation</span><div id="q164"></div>
+<figcaption>After the three inserts, 1096 bytes (minus the header itself) remain free between the header and r1.</figcaption></figure>
+  </div></details>
+</div>
+
+<div class="key">
+<p><strong>Summary:</strong> a slotted page has a header (number of entries, end of free space, and one (size, location) slot per record) at the front, records packed at the back, and free space in between. Records can move inside the block to stay contiguous. Only their slot entries change, because outside pointers refer to slots, not to byte addresses.</p>
+</div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="lecture.js"></script>
+<script>
+slotSim('#sim', 4096, 'insert student 400, insert takes 100, insert course 80, delete 1');
+const simFrames = (b, t) => slotRun(b, slotParse(t)).map(st => ({ html: slotPage({ ...st, block: b }), cap: st.cap }));
+stepper('#q157', simFrames(4000, 'insert S1 300, insert S2 200, delete 1'));
+stepper('#q160', simFrames(8000, 'insert student1 400, insert student2 400, insert takes1 100, insert takes2 100, insert course1 80'));
+stepper('#q164', simFrames(4096, 'insert r2 500, insert r3 1500, insert r1 1000'));
+document.querySelector('#q153p').innerHTML = slotPage({ block: 4096, entries: [[60, 4096], [70, 4036], [64, 3966]], freeEnd: 3902,
+  records: [{ start: 4036, end: 4096, text: 'CSE 215' }, { start: 3966, end: 4036, text: 'CSE 216' }, { start: 3902, end: 3966, text: 'CSE 101' }] });
+const fx = (code, title, old, n) => [
+  { from: 0, to: 10, text: code, over: 'code' }, { from: 10, to: 14, text: `33,${n}`, over: 'title' },
+  { from: 14, to: 22, text: '3.00', over: 'credit' }, { from: 22, to: 32, text: old, over: 'old code', cls: old ? 'cell' : 'cell-plain' },
+  { from: 32, to: 33, text: '', cls: 'cell-hl' }, { from: 33, to: 33 + n, text: title, cls: 'cell-new' }];
+byteStrip('#q153a', fx('CSE 215', 'Database Management Systems', 'CSE 303', 27), [0, 10, 14, 22, 33, 60], { scale: 12, note: 'orange byte 32 = null bitmap 0000' });
+byteStrip('#q153b', fx('CSE 101', 'Structured Programming Language', '', 31), [0, 10, 14, 22, 33, 64], { scale: 12, note: 'orange byte 32 = null bitmap 0001 (old_course_code is null)' });
+flashcards('#cards', [
+  { f: 'Slotted page', b: 'A block layout for variable-length records: a header with one slot per record at the front, records packed at the back, free space in the middle.' },
+  { f: 'Block header contents', b: 'Number of record entries, end of free space, and the (size, location) of each record.' },
+  { f: 'End of free space', b: 'The address where free space stops and the records begin. A new record of size s is placed at end − s.' },
+  { f: 'Why point to slots, not bytes?', b: 'Records can move inside the block (to stay contiguous). Only the slot entry changes, so outside pointers stay valid.' },
+  { f: 'Deleting a record', b: 'Mark its slot empty, move every record between the free space and the hole by s bytes toward the end, add s to the end of free space.' },
+  { f: 'Page', b: 'Another word for block: the unit read from or written to disk in one operation.' },
+]);
+quiz('#quiz', [
+  { q: 'A 4096-byte slotted page holds records of 400 and 100 bytes (inserted in that order). Where does a new 80-byte record start?', opts: ['3596', '3516', '80', '4016'], a: 1,
+    why: 'End of free space is 4096 − 400 − 100 = 3596, so the record occupies 3596 − 80 = 3516 up to 3595.' },
+  { q: 'Why is a deleted record’s slot marked empty instead of removed from the header?', opts: ['The header cannot shrink', 'To save time', 'Removing it would renumber later slots and break outside pointers', 'The slot holds the free-list pointer'], a: 2,
+    why: 'Outside structures (indexes) store (block, slot number). Removing slot 1 would make slot 2 become slot 1, so every pointer to it would be wrong.' },
+  { q: 'Which deletion moves no records at all?', opts: ['Deleting the first record inserted', 'Deleting the record nearest the free space (the most recently placed one)', 'Deleting any middle record', 'None, every deletion moves records'], a: 1,
+    why: 'Only records between the free space and the hole move. If the hole is right next to the free space, there are none.' },
+  { q: 'In the slides, a header entry (100, 3696) means:', opts: ['A 100-byte record starting at byte 3696', 'Slot 100 at byte 3696', 'A record of 3696 bytes', 'A 100-byte record occupying bytes 3596–3695'], a: 3,
+    why: 'The slides store the end address (the byte just after the record). The record starts at 3696 − 100 = 3596.' },
+  { q: 'Where is the free space in a slotted page?', opts: ['At the end of the block', 'After each record', 'Between the end of the header and the first record', 'In a separate block'], a: 2,
+    why: 'The header grows forward from the start, the records grow backward from the end, and the free space is the gap between them.' },
+]);
+ask('#try1', { q: 'A 4096-byte block receives records of 1000, 500 and 1500 bytes, in that order. What is the end of free space afterwards?', a: 1096, hint: 'Subtract every record size from 4096.', why: '4096 − 1000 − 500 − 1500 = 1096.' });
+ask('#try2', { q: 'In a 4096-byte page with student (400 B, bytes 3696–4095), takes (100 B) and course (80 B), you delete takes. What is the new location (end address) stored in course’s slot?', a: 3696,
+  hint: 'Course moves 100 bytes toward the end of the block.', why: 'Course was at 3516–3595 with location 3596. It moves 100 bytes, so its location becomes 3696.' });
+</script>
+<script>
+const S = { start: 3696, end: 4096, text: 'student' }, T = { start: 3596, end: 3696, text: 'takes' }, C = { start: 3516, end: 3596, text: 'course', cls: 'cell-new' };
+slotted('#s1', { entries: [[400, 4096]], freeEnd: 3696, records: [S] });
+slotted('#s2', { entries: [[400, 4096], [100, 3696]], freeEnd: 3596, records: [S, T] });
+slotted('#s3', { entries: [[400, 4096], [100, 3696], [80, 3596]], freeEnd: 3516, records: [S, T, C] });
+slotted('#d-last', { entries: [[400, 4096], [100, 3696], null], freeEnd: 3596, records: [S, T], note: 'CASE 1: course deleted, nothing moves' });
+const hole = (a, b) => ({ start: a, end: b, text: 'hole', cls: 'cell-plain' });
+stepper('#d-first-anim', [
+  { html: slotted(null, { entries: [[400, 4096], [100, 3696], [80, 3596]], freeEnd: 3516, records: [{ ...S, cls: 'cell-del' }, T, C] }),
+    cap: 'Start: three records. We delete <b>student</b>, the first record inserted, at bytes 3696–4095.' },
+  { html: slotted(null, { entries: [null, [100, 3696], [80, 3596]], freeEnd: 3516, records: [hole(3696, 4096), T, C] }),
+    cap: 'Student is removed and slot 1 is marked empty. This leaves a <b>400-byte hole</b> at the end of the block, with takes and course still in front of it.' },
+  { html: slotted(null, { entries: [null, [100, 4096], [80, 3596]], freeEnd: 3516, records: [{ start: 3996, end: 4096, text: 'takes', cls: 'cell-hl' }, hole(3596, 3996), C] }),
+    cap: '<b>takes</b> slides 400 bytes to the end of the block (3996–4095). Its slot entry is updated to location 4096.' },
+  { html: slotted(null, { entries: [null, [100, 4096], [80, 3996]], freeEnd: 3516, records: [{ start: 3996, end: 4096, text: 'takes' }, { start: 3916, end: 3996, text: 'course', cls: 'cell-hl' }, hole(3516, 3916)] }),
+    cap: '<b>course</b> slides 400 bytes too (3916–3995). Its slot entry becomes 3996. The hole is now next to the free space.' },
+  { html: slotted(null, { entries: [null, [100, 4096], [80, 3996]], freeEnd: 3916, records: [{ start: 3996, end: 4096, text: 'takes' }, { start: 3916, end: 3996, text: 'course' }] }),
+    cap: 'The hole merges with the free space: <b>end of free space = 3916</b>. Records are contiguous again. Slot numbers 2 and 3 did not change, so pointers from outside the block are still correct.' },
+]);
+slotted('#d-mid', { entries: [[400, 4096], null, [80, 3696]], freeEnd: 3616,
+  records: [S, { start: 3616, end: 3696, text: 'course', cls: 'cell-hl' }],
+  note: 'CASE 3: takes deleted, course shifts 100 bytes right (orange)' });
+</script>
+</body>
+</html>

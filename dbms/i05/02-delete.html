@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Deleting Rows · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="../i03/lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 05 (Ishrak) · Chapter 2 · Slides 7–11 · Book §6.5.2</div>
+<h1>Deleting Rows with DELETE</h1>
+<p class="lede">The DELETE statement, with and without a WHERE clause; deleting rows chosen through another table with <code>IN (SELECT …)</code> and <code>NOT IN (SELECT …)</code>; and why, when a fact is stored in two tables, the order of the two DELETE statements matters. Ends with a fully worked exam question that combines a bulk insert and a delete.</p>
+
+<h2>1. The DELETE statement (slide 7)</h2>
+<pre>DELETE FROM &lt;table_name&gt;;                     -- unconditional
+DELETE FROM &lt;table_name&gt; WHERE &lt;condition&gt;;   -- conditional</pre>
+<dl class="def">
+  <dt>DELETE</dt>
+  <dd>Removes from one table every row for which the WHERE condition is TRUE. Without a WHERE clause it removes <em>all</em> rows; the table itself (its schema) remains, empty. DELETE removes whole rows: there is no "delete one column of a row" (set it to NULL with UPDATE instead).</dd>
+</dl>
+<pre>DELETE FROM Student;                  -- every student is removed
+DELETE FROM Student WHERE id = '121';  -- only the student with id 121</pre>
+<p>The WHERE clause works exactly as in a query: the condition is tested on each row, and rows where it is FALSE or UNKNOWN stay. A good habit before any DELETE is to run the same WHERE in a SELECT first, to see which rows will go. (In Oracle, a DELETE can be undone with ROLLBACK until it is committed.)</p>
+
+<h2>2. Delete all PCs with less than 100 GB hard disk (slides 8–9)</h2>
+<p>A PC's facts live in two tables: its specifications in <code>PC</code>, its maker and type in <code>Product</code>. Deleting "the PC" means deleting from both, so the slide uses two statements:</p>
+<pre>DELETE FROM Product
+WHERE  model IN (SELECT model
+                 FROM   PC
+                 WHERE  hd &lt; 100);
+
+DELETE FROM PC
+WHERE  hd &lt; 100;</pre>
+<dl class="def">
+  <dt>x IN (SELECT …)</dt>
+  <dd>The IN test of Lec 04, Chapter 7, with the list produced by a query (a <b class="term">subquery</b>). The inner query runs first and returns a column of values; the condition is TRUE for rows whose x is one of them. Subqueries are taught fully in Lecture 11; here they are only used as lists.</dd>
+</dl>
+<p>The subquery returns the models with small disks, 1003 and 1013 (both 80 GB). The first statement removes those two rows from Product; the second removes the same two from PC.</p>
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="a1"></div>
+</figure>
+<div class="q">
+<h4>Why the order of the two statements matters (worked answer)</h4>
+<p>Product has no hd column, so the first statement must find the models through PC. If PC were cleaned first, the subquery <code>SELECT model FROM PC WHERE hd &lt; 100</code> would then return nothing, and the Product rows for 1003 and 1013 would never be deleted. So: <strong>delete from the table that is used to find the rows last.</strong></p>
+<p>If PC.model were declared a foreign key referencing Product.model (Lecture 6), the slide's order would fail instead: Oracle refuses to delete a Product row while a PC row still refers to it (ORA-02292). Then you must delete from PC first and find the Product rows another way, for example <code>DELETE FROM Product WHERE type = 'pc' AND model NOT IN (SELECT model FROM PC);</code>, or declare the key <code>ON DELETE CASCADE</code>.</p>
+</div>
+<div id="p1"></div>
+
+<h2>3. Delete all laptops made by a manufacturer that does not make printers (slides 10–11)</h2>
+<pre>DELETE FROM Product
+WHERE  type = 'laptop'
+AND    maker NOT IN (SELECT maker
+                     FROM   Product
+                     WHERE  type = 'printer');
+
+DELETE FROM Laptop
+WHERE  model NOT IN (SELECT model
+                     FROM   Product
+                     WHERE  type = 'laptop');</pre>
+<p>Read the first statement inside out. The subquery lists the makers of printers: D, E and H. A laptop row is deleted if its maker is not in that list. The laptop makers are A, B, E, F and G, so the laptops of A, B, F and G go (models 2004–2010, seven rows) and E's laptops (2001–2003) stay.</p>
+<p>The second statement then cleans Laptop: after the first statement, Product lists only 2001, 2002 and 2003 as laptops, so every Laptop row whose model is not among them is deleted. Again the order matters: it relies on Product already being cleaned.</p>
+<p>The subquery in the first statement reads the same table, Product, that is being deleted from. As with INSERT … SELECT, SQL evaluates the condition for every row against the table <em>as it was before the statement</em> (textbook §6.5.2), then deletes; the result does not depend on the order in which rows are visited.</p>
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="a2"></div>
+</figure>
+<div id="p2"></div>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div><div id="try2"></div>
+<h3>SQL exercises</h3>
+<div id="c1"></div><div id="c2"></div><div id="c3"></div><div id="c4"></div><div id="c5"></div><div id="c6"></div>
+
+<h3>Exam questions</h3>
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 215 | L-2/T-2 | 2021–22 · 10 marks</div>
+  <div class="exam-q"><p>Consider the following relational database schema:</p>
+  <p>Product(maker, model, type), PC(model, speed, ram, hd, price), Laptop(model, speed, ram, hd, screen, price)</p>
+  <p>Write SQL DML queries to reflect the following:<br>
+  (a) Insert the fact that for every PC there is a laptop with the same manufacturer, speed, ram, and hard disk, a 17-inch screen, a model number 1100 greater and a price $400 more.<br>
+  (b) Delete all laptops made by a manufacturer that does not make PCs.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><strong>(a)</strong> The laptop's specifications go into Laptop and the (maker, model, type) fact into Product, because the manufacturer is stored only in Product. Two bulk inserts:</p>
+    <pre>INSERT INTO Product (maker, model, type)
+SELECT maker, model + 1100, 'laptop'
+FROM   Product
+WHERE  type = 'pc';
+
+INSERT INTO Laptop (model, speed, ram, hd, screen, price)
+SELECT model + 1100, speed, ram, hd, 17, price + 400
+FROM   PC;</pre>
+    <p>Each SELECT produces one row per PC; its columns line up with the listed target columns. Inserting into Product first is required if Laptop.model is a foreign key referencing Product.model (the parent row must exist before the child row). On the textbook data, 13 rows are added to each table (models 2101–2113).</p>
+    <p><strong>(b)</strong> "Makers that make PCs" = <code>SELECT maker FROM Product WHERE type = 'pc'</code>. A laptop is deleted if its maker is not in that set. Delete from Laptop first (while Product still says which models are laptops of which maker), then from Product:</p>
+    <pre>DELETE FROM Laptop
+WHERE  model IN (SELECT model
+                 FROM   Product
+                 WHERE  type = 'laptop'
+                 AND    maker NOT IN (SELECT maker
+                                      FROM   Product
+                                      WHERE  type = 'pc'));
+
+DELETE FROM Product
+WHERE  type = 'laptop'
+AND    maker NOT IN (SELECT maker
+                     FROM   Product
+                     WHERE  type = 'pc');</pre>
+    <p>On the textbook data the PC makers are A, B, C, D and E; the laptop makers F and G make no PCs, so laptops 2008, 2009 and 2010 are deleted from both tables (if (a) has been run first, its new laptops belong to PC makers and all stay).</p>
+    <p>Note: the question bank's answer for (b) deletes only from Laptop and leaves the three Product rows behind (it mentions this as optional). Since "the laptop" is described by both tables, delete from both, as slides 10–11 do. Its inner query also omits <code>type = 'laptop'</code>; that is harmless only because Laptop contains only laptop models.</p>
+  </div></details>
+</div>
+
+<div class="key"><p><strong>Summary:</strong> <code>DELETE FROM T WHERE cond</code> removes the rows where cond is TRUE; without WHERE it empties the table but keeps it. Rows to delete can be chosen through another table with <code>col IN (SELECT …)</code> or <code>NOT IN (SELECT …)</code>. When a fact is spread over two tables, delete from both, and delete last from the table the other statement uses to find its rows (or, with foreign keys, children first).</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/sqlplay.js"></script>
+<script src="../i03/lecture.js"></script>
+<script>
+const PROD = [['A', 1001, 'pc'], ['A', 1002, 'pc'], ['A', 1003, 'pc'], ['A', 2004, 'laptop'], ['A', 2005, 'laptop'], ['A', 2006, 'laptop'], ['B', 1004, 'pc'], ['B', 1005, 'pc'], ['B', 1006, 'pc'], ['B', 2007, 'laptop'], ['C', 1007, 'pc'], ['D', 1008, 'pc'], ['D', 1009, 'pc'], ['D', 1010, 'pc'], ['D', 3004, 'printer'], ['D', 3005, 'printer'], ['E', 1011, 'pc'], ['E', 1012, 'pc'], ['E', 1013, 'pc'], ['E', 2001, 'laptop'], ['E', 2002, 'laptop'], ['E', 2003, 'laptop'], ['E', 3001, 'printer'], ['E', 3002, 'printer'], ['E', 3003, 'printer'], ['F', 2008, 'laptop'], ['F', 2009, 'laptop'], ['G', 2010, 'laptop'], ['H', 3006, 'printer'], ['H', 3007, 'printer']];
+const PCR = [[1001, 2.66, 1024, 250, 2114], [1002, 2.10, 512, 250, 995], [1003, 1.42, 512, 80, 478], [1004, 2.80, 1024, 250, 649], [1005, 3.20, 512, 250, 630], [1006, 3.20, 1024, 320, 1049], [1007, 2.20, 1024, 200, 510], [1008, 2.20, 2048, 250, 770], [1009, 2.00, 1024, 250, 650], [1010, 2.80, 2048, 300, 770], [1011, 1.86, 2048, 160, 959], [1012, 2.80, 1024, 160, 649], [1013, 3.06, 512, 80, 529]];
+const LR = [[2001, 2.00, 2048, 240, 20.1, 3673], [2002, 1.73, 1024, 80, 17.0, 949], [2003, 1.80, 512, 60, 15.4, 549], [2004, 2.00, 512, 60, 13.3, 1150], [2005, 2.16, 1024, 120, 17.0, 2500], [2006, 2.00, 2048, 80, 15.4, 1700], [2007, 1.83, 1024, 120, 13.3, 1429], [2008, 1.60, 1024, 100, 15.4, 900], [2009, 1.60, 512, 80, 14.1, 680], [2010, 2.00, 2048, 160, 15.4, 2300]];
+const PH = ['maker', 'model', 'type'], PCH = ['model', 'speed', 'ram', 'hd', 'price'], LH = ['model', 'speed', 'ram', 'hd', 'screen', 'price'];
+// slide 9 animation (Product shown for makers A–E only, rows with pc)
+(() => {
+  const small = [1003, 1013];
+  const pPC = PROD.filter(r => r[2] === 'pc');
+  const L = [['d1', 'DELETE FROM Product'], ['d1', 'WHERE model IN (SELECT model FROM PC'], ['d1', '                WHERE hd < 100);'], ['d2', 'DELETE FROM PC WHERE hd < 100;']];
+  const pRows = (mark, gone) => pPC.filter(r => !(gone && small.includes(r[1]))).map(r => ({ c: r, cls: mark && small.includes(r[1]) ? 'del' : '' }));
+  const cRows = (mark, gone, hl) => PCR.filter(r => !(gone && small.includes(r[0]))).map(r => ({ c: r, cls: mark && small.includes(r[0]) ? 'del' : hl && r[3] < 100 ? 'hl' : '', side: hl && r[3] < 100 ? 'hd < 100' : '' }));
+  stepper('#a1', [
+    { html: dmlFrame(L, null, [T(PH, pRows(), { name: 'Product (pc rows only)' }), T(PCH, cRows(), { name: 'PC' })]), cap: '<b>Before.</b> 13 PCs, each described by a Product row and a PC row. (Product\'s laptop and printer rows are not shown; they are not affected.)' },
+    { html: dmlFrame(L, 'd1', [T(PH, pRows(), { name: 'Product (pc rows only)' }), T(PCH, cRows(false, false, true), { name: 'PC' })]), cap: 'Statement 1. The subquery runs on PC: <code>SELECT model FROM PC WHERE hd &lt; 100</code> returns <b>{1003, 1013}</b>.' },
+    { html: dmlFrame(L, 'd1', [T(PH, pRows(true), { name: 'Product (pc rows only)' }), T(PCH, cRows(false, false, true), { name: 'PC' })]), cap: 'Product rows whose model is IN {1003, 1013} are deleted: "2 rows deleted."' },
+    { html: dmlFrame(L, 'd2', [T(PH, pRows(false, true), { name: 'Product (pc rows only)' }), T(PCH, cRows(true), { name: 'PC' })]), cap: 'Statement 2 deletes the same two models from PC, using hd directly.' },
+    { html: dmlFrame(L, null, [T(PH, pRows(false, true), { name: 'Product after' }), T(PCH, cRows(false, true), { name: 'PC after' })]), cap: '<b>After.</b> 11 PCs remain, consistently in both tables. Had statement 2 run first, statement 1\'s subquery would have found no models and Product would still list 1003 and 1013.' },
+  ], { interval: 2600 });
+})();
+// slide 11 animation
+(() => {
+  const L = [['d1', "DELETE FROM Product WHERE type = 'laptop'"], ['d1', 'AND maker NOT IN (SELECT maker FROM Product'], ['d1', "                  WHERE type = 'printer');"], ['d2', 'DELETE FROM Laptop WHERE model NOT IN'], ['d2', "  (SELECT model FROM Product WHERE type = 'laptop');"]];
+  const printerMakers = ['D', 'E', 'H'];
+  const goneModels = PROD.filter(r => r[2] === 'laptop' && !printerMakers.includes(r[0])).map(r => r[1]);
+  const pl = PROD.filter(r => r[2] !== 'pc');
+  const pRows = (step) => pl.filter(r => !(step >= 3 && goneModels.includes(r[1]))).map(r => ({ c: r, cls: step === 1 && r[2] === 'printer' ? 'hl' : step === 2 && goneModels.includes(r[1]) ? 'del' : '', side: step === 1 && r[2] === 'printer' ? 'printer maker' : '' }));
+  const lRows = (step) => LR.filter(r => !(step >= 5 && goneModels.includes(r[0]))).map(r => ({ c: r, cls: step === 4 && goneModels.includes(r[0]) ? 'del' : '' }));
+  stepper('#a2', [
+    { html: dmlFrame(L, null, [T(PH, pRows(0), { name: 'Product (laptops and printers)' }), T(LH, lRows(0), { name: 'Laptop' })]), cap: '<b>Before.</b> Laptop makers: A, B, E, F, G. (Product\'s pc rows are not shown.)' },
+    { html: dmlFrame(L, 'd1', [T(PH, pRows(1), { name: 'Product' }), T(LH, lRows(0), { name: 'Laptop' })]), cap: 'Statement 1, subquery: the makers of printers are <b>{D, E, H}</b>.' },
+    { html: dmlFrame(L, 'd1', [T(PH, pRows(2), { name: 'Product' }), T(LH, lRows(0), { name: 'Laptop' })]), cap: 'A laptop row is deleted when its maker is NOT IN {D, E, H}: the laptops of A, B, F and G, <b>7 rows</b>. E makes printers, so its laptops stay.' },
+    { html: dmlFrame(L, 'd2', [T(PH, pRows(3), { name: 'Product' }), T(LH, lRows(4), { name: 'Laptop' })]), cap: 'Statement 2: Product now lists only 2001, 2002, 2003 as laptops. Every Laptop row whose model is NOT IN that list is deleted.' },
+    { html: dmlFrame(L, null, [T(PH, pRows(3), { name: 'Product after' }), T(LH, lRows(5), { name: 'Laptop after' })]), cap: '<b>After.</b> Only E\'s three laptops remain, in both tables.' },
+  ], { interval: 2600 });
+})();
+sqlPlay('#p1', { setup: PCS, query: 'DELETE FROM Product\nWHERE  model IN (SELECT model\n                 FROM   PC\n                 WHERE  hd < 100);\n\nDELETE FROM PC\nWHERE  hd < 100;\n\nSELECT * FROM PC;', note: 'Reset, then swap the two DELETE statements and check Product with Show tables: 1003 and 1013 are still there.' });
+sqlPlay('#p2', { setup: PCS, query: "DELETE FROM Product\nWHERE  type = 'laptop'\nAND    maker NOT IN (SELECT maker\n                     FROM   Product\n                     WHERE  type = 'printer');\n\nDELETE FROM Laptop\nWHERE  model NOT IN (SELECT model\n                     FROM   Product\n                     WHERE  type = 'laptop');\n\nSELECT * FROM Laptop;" });
+flashcards('#cards', [
+  { f: 'DELETE FROM T', b: 'Removes all rows; the table remains, empty.' },
+  { f: 'DELETE FROM T WHERE c', b: 'Removes rows where c is TRUE (FALSE/UNKNOWN rows stay).' },
+  { f: 'Subquery as a list', b: 'col IN (SELECT …) / col NOT IN (SELECT …): the inner query runs first.' },
+  { f: 'Fact stored in two tables', b: 'Delete from both; the table used to find the rows goes last.' },
+  { f: 'With a foreign key (no cascade)', b: 'Delete child rows (PC) before the parent row (Product).' },
+  { f: 'Safety habit', b: 'Run the WHERE as a SELECT first to see what will be deleted.' },
+]);
+quiz('#quiz', [
+  { q: 'What does <code>DELETE FROM Student;</code> do?', opts: ['Drops the table', 'Removes all rows, keeps the table', 'Removes the first row', 'Error: WHERE is required'], a: 1, why: 'Unconditional delete (slide 7). DROP TABLE removes the table itself.' },
+  { q: 'Slide 9 with the two statements swapped (PC first). What happens to Product?', opts: ['Same result', 'Rows 1003 and 1013 remain', 'All PCs are deleted from Product', 'Error'], a: 1, why: 'The subquery on PC finds nothing once PC is cleaned.' },
+  { q: 'Which makers\' laptops does slide 11 delete?', opts: ['D, E, H', 'A, B, F, G', 'E only', 'F, G'], a: 1, why: 'Printer makers are D, E, H; all other laptop makers lose their laptops.' },
+  { q: 'How many rows does <code>DELETE FROM PC WHERE price &lt; 600</code> remove?', opts: ['2', '3', '4', '5'], a: 1, why: '1003 (478), 1007 (510), 1013 (529).' },
+  { q: 'In <code>DELETE FROM Product WHERE … maker NOT IN (SELECT maker FROM Product …)</code>, the subquery sees…', opts: ['the table as it was before the DELETE', 'the table with some rows already deleted', 'only deleted rows', 'nothing'], a: 0, why: 'The condition is evaluated against the old table, then rows are deleted.' },
+]);
+ask('#try1', { q: 'Exam (b) on the textbook data: how many Laptop rows are deleted for "laptops made by a manufacturer that does not make PCs"?', a: 3, why: 'F (2008, 2009) and G (2010).' });
+ask('#try2', { q: 'How many rows does <code>DELETE FROM Printer WHERE color = \'T\' AND type = \'ink-jet\'</code> remove?', a: 3, why: '3001, 3004, 3006.' });
+chk('#c1', PCS, '<b>Easy.</b> Delete all printers cheaper than $110 from the Printer table.', 'DELETE FROM Printer WHERE price < 110;', { check: 'state', table: 'Printer' });
+chk('#c2', PCS, '<b>Slide 9, statement 1.</b> Delete from Product the PCs that have less than 100 GB of hard disk (use a subquery on PC).', 'DELETE FROM Product\nWHERE model IN (SELECT model FROM PC WHERE hd < 100);', { check: 'state', table: 'Product' });
+chk('#c3', PCS, '<b>Slide 9, statement 2.</b> Delete the same PCs from PC.', 'DELETE FROM PC WHERE hd < 100;', { check: 'state', table: 'PC' });
+chk('#c4', PCS, '<b>Slide 11.</b> Delete from Product all laptops made by a manufacturer that does not make printers.', "DELETE FROM Product\nWHERE type = 'laptop'\nAND maker NOT IN (SELECT maker FROM Product WHERE type = 'printer');", { check: 'state', table: 'Product' });
+chk('#c5', PCS, "<b>Both tables, right order.</b> Delete all laptops with a screen smaller than 15 inches from both Laptop and Product. (The checker looks at Product.)", "DELETE FROM Product\nWHERE model IN (SELECT model FROM Laptop WHERE screen < 15);\nDELETE FROM Laptop WHERE screen < 15;", { check: 'state', table: 'Product', hint: 'Product has no screen column: find the models through Laptop, so clean Product first.' });
+chk('#c6', PCS, '<b>Exam (b).</b> Delete from Laptop all laptops made by a manufacturer that does not make PCs. (The checker looks at Laptop; also delete them from Product, after Laptop, to keep the tables consistent.)', "DELETE FROM Laptop\nWHERE model IN (SELECT model FROM Product\n                WHERE type = 'laptop'\n                AND maker NOT IN (SELECT maker FROM Product WHERE type = 'pc'));\nDELETE FROM Product\nWHERE type = 'laptop'\nAND maker NOT IN (SELECT maker FROM Product WHERE type = 'pc');", { check: 'state', table: 'Laptop' });
+</script>
+</body>
+</html>

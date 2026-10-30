@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Referential Actions · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 06 (Ishrak) · Chapter 4 · Slides 22–23 · Textbook §7.1.2</div>
+<h1>Referential Actions: CASCADE and SET NULL</h1>
+<p class="lede">Instead of rejecting a parent update or delete, a foreign key can be told to repair the children: copy the new key into them (CASCADE), delete them too (CASCADE), or set their reference to NULL (SET NULL). This chapter animates each action on the slides' tables, shows what Oracle supports (ON DELETE only), and answers the exam questions on choosing a policy.</p>
+
+<h2>1. Three policies (slides 22–23)</h2>
+<p>When a parent row's key is updated or the row is deleted while children still refer to it, the SQL standard lets the designer choose one of these <b class="term">referential actions</b> for each foreign key, separately for UPDATE and DELETE:</p>
+<dl class="def">
+  <dt>Default policy (NO ACTION / RESTRICT)</dt>
+  <dd>Reject the statement. This is what you get when nothing is declared, and it is what Chapter 3 showed. (The standard distinguishes NO ACTION, checked at the end of the statement, from RESTRICT, checked immediately; for the cases in this course they behave the same. Oracle has only the default, under no keyword.)</dd>
+  <dt>CASCADE</dt>
+  <dd>Make the same change in the children. ON UPDATE CASCADE copies the new key value into every referencing row. ON DELETE CASCADE deletes every referencing row along with the parent.</dd>
+  <dt>SET NULL</dt>
+  <dd>Keep the children, but set their foreign-key column(s) to NULL. Only possible if those columns allow NULL.</dd>
+</dl>
+<p>Slide 22 picks one action for each operation, for the Department/Employee example:</p>
+<ul>
+  <li><strong>"If the ID of a departmental head is changed, it needs to be updated in both tables"</strong> → <code>ON UPDATE CASCADE</code>.</li>
+  <li><strong>"If the departmental head retires temporarily, it needs to be set null in the foreign table"</strong> → <code>ON DELETE SET NULL</code>.</li>
+</ul>
+<p>Slide 23 says to "do it while creating the foreign table":</p>
+<pre>CREATE TABLE Department (
+  name CHAR(3),
+  head INT REFERENCES Employee(id)
+           ON DELETE SET NULL
+           ON UPDATE CASCADE
+);</pre>
+<p><strong>Oracle warning.</strong> This is standard SQL, and it runs in the playground (SQLite follows the standard here). Oracle supports only two actions, both for DELETE: <code>ON DELETE CASCADE</code> and <code>ON DELETE SET NULL</code>. Oracle has no ON UPDATE clause at all, so the statement above fails in Oracle with <code>ORA-00907: missing right parenthesis</code> (the parser does not expect ON UPDATE). In Oracle the slide's table is written</p>
+<pre>CREATE TABLE Department (
+  name CHAR(3),
+  head INT REFERENCES Employee(id) ON DELETE SET NULL
+);</pre>
+<p>and a primary-key change must be propagated by hand (the three steps of Chapter 3's exercise 4), by a trigger (Lec 12), or with a deferrable constraint (<a href="08-beyond-the-slides.html">Chapter 8</a>). Oracle's designers argue that a primary key should never change in the first place; if ids can change, they were a poor choice of key.</p>
+
+<h2>2. ON DELETE SET NULL</h2>
+<p>D (id 4) retires. With ON DELETE SET NULL, <code>DELETE FROM Employee WHERE id = 4</code> succeeds, and EEE stays in Department with head NULL.</p>
+<figure class="wide"><span class="anim-tag">Animation</span><div id="a1"></div></figure>
+<div id="p1"></div>
+<p>If the foreign-key column is also declared <code>NOT NULL</code>, SET NULL cannot do its job, and the delete fails anyway (Oracle: <code>ORA-01407: cannot update (…"HEAD") to NULL</code>). SET NULL only makes sense for an <em>optional</em> reference.</p>
+
+<h2>3. ON UPDATE CASCADE (standard SQL)</h2>
+<p>D's id changes from 4 to 9. With ON UPDATE CASCADE, EEE's head follows: it becomes 9. The link is preserved, which is what slide 22 asks for.</p>
+<figure class="wide"><span class="anim-tag">Animation</span><div id="a2"></div></figure>
+<div id="p2"></div>
+
+<h2>4. ON DELETE CASCADE</h2>
+<p>The third combination: deleting the parent deletes the children. For departments this would be a strange rule (EEE disappears because its head retired), which is why the slide does not use it. It is the right rule when a child cannot exist without its parent: an order's line items, a building's rooms, a student's enrolment records. Then deleting the parent should clean up everything that belongs to it.</p>
+<figure class="wide"><span class="anim-tag">Animation</span><div id="a3"></div></figure>
+<p>Cascades can chain. Suppose Course(code, dept) references Department(name) ON DELETE CASCADE, and Department(head) references Employee(id) ON DELETE CASCADE. One delete of an employee can then remove a department and all of its courses:</p>
+<figure class="wide"><span class="anim-tag">Animation</span><div id="a4"></div></figure>
+<div id="p3"></div>
+<p>This power is also the danger of CASCADE: a single mistaken DELETE can silently remove many rows in several tables. Use it only where the children really have no meaning without the parent.</p>
+
+<h2>5. Which action where?</h2>
+<div class="tbl"><table>
+<tr><th>Situation</th><th>ON DELETE</th><th>ON UPDATE (standard SQL)</th></tr>
+<tr><td>Child is part of the parent (order → order lines, weak entity)</td><td>CASCADE</td><td>CASCADE</td></tr>
+<tr><td>Link is optional; child lives on (department → its head; employee → manager)</td><td>SET NULL</td><td>CASCADE</td></tr>
+<tr><td>Child is important history and must not lose its parent (sale → customer)</td><td>default (reject)</td><td>CASCADE or default</td></tr>
+</table></div>
+<p>For UPDATE, CASCADE is almost always the right choice: the parent still exists, only its key value changed, so the children should follow it. SET NULL on update would throw away a link that is still true. For DELETE the parent is really gone, so it depends on whether the child can exist without it.</p>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+<h3>Write it yourself</h3>
+<p>Exercises 1 and 2 check the foreign key you declare, including its ON DELETE and ON UPDATE actions.</p>
+<div id="c1"></div><div id="c2"></div><div id="c3"></div><div id="c4"></div><div id="c5"></div>
+
+<h3>Exam questions</h3>
+<div class="exam">
+  <div class="exam-src">DB QB · 19-20 8a · 10 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-2 | 2019–20, 2015–16 · 10 marks</div>
+  <div class="exam-q"><p>What is the difference between referential integrity constraint and foreign key constraint? What are the three different policies for UPDATE and DELETE that can be mentioned for maintaining referential integrity? Among these, which one is more suitable for UPDATE, and which one is more suitable for DELETE? Why?</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+  <p><strong>Referential integrity vs foreign key.</strong> A <em>referential integrity constraint</em> is the general requirement that a value appearing in one place must also appear in another place: every reference must point at something that exists (no dangling references). A <em>foreign key constraint</em> is the specific SQL declaration that enforces one common kind of referential integrity: the values of some column(s) of a child table must match the PRIMARY KEY or UNIQUE key of a row of a parent table, or be NULL. Every foreign key is a referential integrity constraint, but not the other way round. Example: "the model of a Product must be the model of some PC, Laptop or Printer" (slide 29) is a referential integrity constraint, but no single FOREIGN KEY can express it, because it refers to the union of three tables; it needs a CHECK with a subquery or an assertion (Chapters 5–6).</p>
+  <p><strong>The three policies</strong> (what to do when a referenced parent row is updated or deleted):</p>
+  <ol>
+    <li><strong>Default (reject, NO ACTION/RESTRICT):</strong> the statement on the parent fails if any child refers to the old key. Example: <code>DELETE FROM Employee WHERE id = 4</code> is rejected because EEE's head is 4.</li>
+    <li><strong>CASCADE:</strong> the change is repeated in the children. On update the children get the new key (EEE's head becomes 9 when 4 becomes 9); on delete the children are deleted too (EEE is deleted with employee 4).</li>
+    <li><strong>SET NULL:</strong> the children's foreign key becomes NULL (EEE's head becomes NULL when employee 4 is deleted or re-keyed).</li>
+  </ol>
+<pre>CREATE TABLE Department (
+  name CHAR(3),
+  head INT REFERENCES Employee(id)
+           ON DELETE SET NULL
+           ON UPDATE CASCADE      -- standard SQL; Oracle supports only the ON DELETE actions
+);</pre>
+  <p><strong>Most suitable for UPDATE: CASCADE.</strong> When a parent's key changes, the parent row still exists and is still the same real-world thing; only its identifier changed. The children still refer to it, so the correct repair is to give them the new identifier. Rejecting forces a manual three-step workaround, and SET NULL would destroy a relationship that is still true.</p>
+  <p><strong>Most suitable for DELETE: SET NULL</strong> (this is the slides' choice). When a parent is deleted, the relationship really ends, but in general the child still exists: a department whose head retires is still a department. SET NULL keeps the child and records "no parent for now". CASCADE would delete children that have their own existence (losing data by accident), and rejecting would block a legitimate delete. CASCADE on delete is the right choice only when the child cannot exist without the parent (weak entities, such as an order's line items).</p>
+  <p>Note: the CSE 215 bank's answer recommends RESTRICT for DELETE. That is a defensible safety-first choice, but the question asks to pick among the policies for maintaining integrity <em>automatically</em>, and the slides (and the textbook's example, <code>ON DELETE SET NULL ON UPDATE CASCADE</code>) choose SET NULL. Mention both reasons in an exam: SET NULL when the child can exist alone, CASCADE when it cannot.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2012–13 · 10 marks</div>
+  <div class="exam-q"><p>What are the different policies of maintaining referential integrity? Discuss them with examples.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+  <p>Referential integrity requires every foreign-key value to match an existing parent key. It can be broken from the child side (inserting or updating a reference to a key that does not exist) and from the parent side (deleting or re-keying a parent that is still referenced). Child-side violations are always rejected. For the parent side, SQL lets the designer choose a policy per foreign key, separately for DELETE and UPDATE. Example tables: Employee(id PK, name, …) and Department(name, head → Employee.id) with rows (CSE, 2), (EEE, 4), (ME, 1).</p>
+  <ol>
+    <li><strong>Default / reject (NO ACTION or RESTRICT).</strong> The parent statement fails if a child refers to the affected key. <code>DELETE FROM Employee WHERE id = 4</code> → error (Oracle ORA-02292, child record found); both tables unchanged. This is the policy when nothing is declared.</li>
+    <li><strong>CASCADE.</strong> The change propagates. With <code>ON DELETE CASCADE</code>, deleting employee 4 also deletes (EEE, 4). With <code>ON UPDATE CASCADE</code>, <code>UPDATE Employee SET id = 9 WHERE id = 4</code> also changes EEE's head to 9. Typical use: existence-dependent children (order lines of an order).</li>
+    <li><strong>SET NULL.</strong> The children's foreign key is set to NULL. Deleting employee 4 leaves (EEE, NULL): the department remains, without a head. Requires the column to allow NULL. Typical use: optional relationships.</li>
+    <li><strong>SET DEFAULT</strong> (standard SQL). The children's foreign key is set to the column's DEFAULT value, which must itself be a valid parent key (e.g. a placeholder employee 0 "acting head"). Oracle does not support SET DEFAULT.</li>
+  </ol>
+<pre>-- Oracle
+CREATE TABLE Department (
+  name CHAR(3) PRIMARY KEY,
+  head INT CONSTRAINT dept_head_fk REFERENCES Employee(id) ON DELETE SET NULL
+);
+CREATE TABLE Course (
+  code VARCHAR2(7) PRIMARY KEY,
+  dept CHAR(3) REFERENCES Department(name) ON DELETE CASCADE
+);</pre>
+  <p>In Oracle only the default, ON DELETE CASCADE and ON DELETE SET NULL exist; updates of a referenced key are always rejected (no ON UPDATE clause). The CSE 215 bank's answer says RESTRICT is "the default policy in most relational databases": the default is formally NO ACTION, which for a single statement behaves the same.</p>
+  </div></details>
+</div>
+
+<div class="key"><p><strong>Summary:</strong> A referential action tells the DBMS how to repair the children when a referenced parent is deleted or re-keyed: reject (default), CASCADE (follow the parent: update or delete the children) or SET NULL (cut the link). Slide 23's <code>ON DELETE SET NULL ON UPDATE CASCADE</code> is the textbook choice. Oracle supports only ON DELETE CASCADE and ON DELETE SET NULL; there is no ON UPDATE clause. Cascades can chain through several tables.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/sqlplay.js"></script>
+<script src="lecture.js"></script>
+<script>
+stepper('#a1', fkSteps({ t: 'delEmp', id: 4 }, { del: 'SET NULL', upd: 'NO ACTION' }), { interval: 2600 });
+stepper('#a2', fkSteps({ t: 'updEmp', from: 4, to: 9 }, { del: 'NO ACTION', upd: 'CASCADE' }), { interval: 2600 });
+stepper('#a3', fkSteps({ t: 'delEmp', id: 2 }, { del: 'CASCADE', upd: 'NO ACTION' }), { interval: 2600 });
+// chained cascade: Employee ← Department ← Course
+(() => {
+  const C0 = [['CSE215', 'CSE'], ['CSE216', 'CSE'], ['EEE101', 'EEE'], ['EEE102', 'EEE'], ['ME141', 'ME']];
+  const fig = (emp, dept, crs, ec = {}, dc = {}, cc = {}) => `<pre style="margin:0 0 10px">DELETE FROM Employee WHERE id = 4;</pre><div class="figrow">` +
+    `<div><div class="figlabel">Course · dept → Department(name) ON DELETE CASCADE</div>${recTable(null, crs.map((r, i) => ({ cells: r, cls: cc[i] })), ['code', 'dept'])}</div>` +
+    `<div><div class="figlabel">Department · head → Employee(id) ON DELETE CASCADE</div>${recTable(null, dept.map((r, i) => ({ cells: r.map(String), cls: dc[i] })), ['name', 'head'])}</div>` +
+    `<div><div class="figlabel">Employee</div>${recTable(null, emp.map((r, i) => ({ cells: r.map(String), cls: ec[i] })), ['id', 'name', 'address', 'gender'])}</div></div>`;
+  const e1 = EMP0.filter(r => r[0] !== 4), d1 = DEPT0.filter(r => r[1] !== 4), c1 = C0.filter(r => r[1] !== 'EEE');
+  stepper('#a4', [
+    { html: fig(EMP0, DEPT0, C0, { 3: 'del' }), cap: 'Employee 4 is to be deleted. Who references it?' },
+    { html: fig(EMP0, DEPT0, C0, { 3: 'del' }, { 1: 'del' }), cap: 'Department EEE has head = 4, and that foreign key says ON DELETE CASCADE: EEE is deleted too.' },
+    { html: fig(EMP0, DEPT0, C0, { 3: 'del' }, { 1: 'del' }, { 2: 'del', 3: 'del' }), cap: 'Deleting EEE is itself a parent delete for Course. EEE101 and EEE102 reference EEE with ON DELETE CASCADE, so they are deleted as well.' },
+    { html: fig(e1, d1, c1), cap: 'One statement removed 1 employee, 1 department and 2 courses. If any foreign key on the way had the default policy, the whole statement would have been rejected instead.' },
+  ], { interval: 2600 });
+})();
+sqlPlay('#p1', { setup: ED_SETNULL, query: 'DELETE FROM Employee WHERE id = 4;\nSELECT * FROM Department;' });
+sqlPlay('#p2', { setup: edSetup('ON DELETE SET NULL\n           ON UPDATE CASCADE'), query: 'UPDATE Employee SET id = 9 WHERE id = 4;\nSELECT * FROM Department;',
+  note: 'This is slide 23\'s table, which SQLite accepts. Oracle would refuse to create it (no ON UPDATE). Try also <code>DELETE FROM Employee WHERE id = 2;</code> to see the SET NULL half.' });
+sqlPlay('#p3', { setup: EMP_SQL + "CREATE TABLE Department (name CHAR(3) PRIMARY KEY, head INT REFERENCES Employee(id) ON DELETE CASCADE);\n" + DEPT_ROWS +
+  "CREATE TABLE Course (code VARCHAR2(7) PRIMARY KEY, dept CHAR(3) REFERENCES Department(name) ON DELETE CASCADE);\nINSERT INTO Course VALUES ('CSE215', 'CSE');\nINSERT INTO Course VALUES ('CSE216', 'CSE');\nINSERT INTO Course VALUES ('EEE101', 'EEE');\nINSERT INTO Course VALUES ('EEE102', 'EEE');\nINSERT INTO Course VALUES ('ME141', 'ME');",
+  query: 'DELETE FROM Employee WHERE id = 4;\nSELECT * FROM Course;', note: 'The chained cascade of the animation. Use Show tables to see all three tables afterwards.' });
+
+flashcards('#cards', [
+  { f: 'Referential action', b: 'What the DBMS does to child rows when their parent is deleted or its key updated.' },
+  { f: 'ON DELETE CASCADE', b: 'Deleting a parent deletes all rows that reference it (and so on, down the chain).' },
+  { f: 'ON DELETE SET NULL', b: 'Deleting a parent sets the children\'s foreign key to NULL; the children stay.' },
+  { f: 'ON UPDATE CASCADE', b: 'Changing a parent\'s key copies the new key into the children. Standard SQL; not in Oracle.' },
+  { f: 'NO ACTION / RESTRICT', b: 'The default: reject the parent statement if children exist.' },
+  { f: 'SET DEFAULT', b: 'Standard SQL: children get the column default. Not supported by Oracle.' },
+  { f: 'Oracle\'s actions', b: 'Only ON DELETE CASCADE and ON DELETE SET NULL (plus the default). No ON UPDATE clause.' },
+]);
+quiz('#quiz', [
+  { q: 'Department.head REFERENCES Employee(id) ON DELETE SET NULL. After <code>DELETE FROM Employee WHERE id = 1</code>, Department holds…', opts: ['(CSE,2), (EEE,4)', '(CSE,2), (EEE,4), (ME,NULL)', 'the statement is rejected', '(CSE,2), (EEE,4), (ME,1)'], a: 1, why: 'ME referenced employee 1; SET NULL keeps ME with head NULL.' },
+  { q: 'Same table, but ON DELETE CASCADE. <code>DELETE FROM Employee WHERE id = 3</code> deletes how many Department rows?', opts: ['0', '1', '3', 'it is rejected'], a: 0, why: 'Nobody references employee 3, so nothing cascades.' },
+  { q: 'Which clause does Oracle reject?', opts: ['ON DELETE CASCADE', 'ON DELETE SET NULL', 'ON UPDATE CASCADE', 'REFERENCES Employee(id) with no ON clause'], a: 2, why: 'Oracle has no ON UPDATE actions; the parser fails with ORA-00907.' },
+  { q: 'Why is CASCADE usually best for UPDATE?', opts: ['It is faster', 'The parent still exists with a new identifier, so the children should follow it', 'Oracle requires it', 'It deletes outdated children'], a: 1, why: 'The relationship is still true; only the key value changed.' },
+  { q: 'head is declared <code>INT NOT NULL REFERENCES Employee(id) ON DELETE SET NULL</code>. Deleting a referenced employee…', opts: ['sets head to NULL anyway', 'fails, because head cannot become NULL', 'deletes the department', 'sets head to 0'], a: 1, why: 'SET NULL tries to write NULL into a NOT NULL column; Oracle raises ORA-01407.' },
+  { q: 'Orders(id) ← OrderLine(order_id ON DELETE CASCADE). What does <code>DELETE FROM Orders WHERE id = 7</code> do?', opts: ['Deletes order 7 only', 'Deletes order 7 and all its order lines', 'Rejected while lines exist', 'Sets the lines\' order_id to NULL'], a: 1, why: 'Order lines are existence-dependent on the order: the classic CASCADE case.' },
+]);
+ask('#try1', { q: 'In the chained-cascade database (Employee ← Department ← Course, all ON DELETE CASCADE, courses CSE215, CSE216 in CSE, EEE101, EEE102 in EEE, ME141 in ME), how many rows in total (all three tables) does <code>DELETE FROM Employee WHERE id = 2</code> remove?', a: 4, why: 'Employee 2, department CSE (head 2), and courses CSE215 and CSE216: 4 rows.' });
+
+sqlCheck('#c1', { setup: EMP_SQL, check: 'state', table: FKS('Department'),
+  task: 'Easy. Create the Oracle version of slide 23\'s table: Department(name CHAR(3), head INT) with head referencing Employee(id), and SET NULL when the employee is deleted. (Only ON DELETE, since Oracle has no ON UPDATE.)',
+  solution: 'CREATE TABLE Department (\n  name CHAR(3),\n  head INT REFERENCES Employee(id) ON DELETE SET NULL\n);' });
+sqlCheck('#c2', { setup: "CREATE TABLE Orders (id NUMBER(8) PRIMARY KEY, customer VARCHAR2(40));", check: 'state', table: FKS('OrderLine'),
+  task: 'Orders(id, customer) exists. Create OrderLine(order_id NUMBER(8), line_no NUMBER(3), item VARCHAR2(40), qty NUMBER(4)) with primary key (order_id, line_no), where order_id references Orders(id) and deleting an order deletes its lines.',
+  solution: 'CREATE TABLE OrderLine (\n  order_id NUMBER(8) REFERENCES Orders(id) ON DELETE CASCADE,\n  line_no  NUMBER(3),\n  item     VARCHAR2(40),\n  qty      NUMBER(4),\n  PRIMARY KEY (order_id, line_no)\n);' });
+sqlCheck('#c3', { setup: ED_SETNULL, check: 'state', table: 'Department',
+  task: 'The foreign key has ON DELETE SET NULL. With a single statement, make CSE headless (head NULL) while also removing its head from the university.',
+  solution: 'DELETE FROM Employee WHERE id = 2;' });
+sqlCheck('#c4', { setup: ED_CASCADE + "INSERT INTO Department VALUES ('CE', 4);", check: 'state', table: "(SELECT 'Employee' AS t, id AS a, name AS b FROM Employee UNION ALL SELECT 'Department', name, head FROM Department)",
+  task: 'The foreign key has ON DELETE CASCADE, and D (id 4) heads EEE and CE. D leaves, but EEE must survive with A (id 1) as its head. CE should disappear. Write the statements.',
+  hint: 'Repoint EEE first; then the delete cascades only to CE.',
+  solution: "UPDATE Department SET head = 1 WHERE name = 'EEE';\nDELETE FROM Employee WHERE id = 4;" });
+sqlCheck('#c5', { setup: edSetup('ON DELETE SET NULL\n           ON UPDATE CASCADE') + "INSERT INTO Department VALUES ('CE', 4);", check: 'state', table: "(SELECT 'Employee' AS t, id AS a, name AS b FROM Employee UNION ALL SELECT 'Department', name, head FROM Department)",
+  task: 'Exam level, slide 23\'s table (standard SQL, runs here). In one statement each: renumber employee 4 to 40, then let employee 1 retire. Predict the final Department table before you check.',
+  solution: 'UPDATE Employee SET id = 40 WHERE id = 4;\nDELETE FROM Employee WHERE id = 1;' });
+</script>
+</body>
+</html>

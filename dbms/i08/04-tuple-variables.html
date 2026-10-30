@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tuple Variables and Self-Joins · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 08 (Ishrak) · Chapter 4 · Slides 20–22</div>
+<h1>Tuple Variables and Self-Joins</h1>
+<p class="lede">When two joined tables have a column with the same name, or when a table must be joined with itself, we need names for the rows we are talking about. These names are tuple variables (aliases). This chapter answers slide 21's "which address?", explains slide 21's Oracle note "no AS", and animates slide 22's self-join, including the trap of listing each pair twice.</p>
+
+<h2>1. Which address? (slides 20–21)</h2>
+<p>The schema now is</p>
+<pre>Person  (<u>pname</u>, address, worksfor)
+Company (<u>cname</u>, address)</pre>
+<p>Both tables have a column called <code>address</code>. The task on slide 20: <em>find those persons whose address is the same as the company address</em> (the company they work for). Slide 21's first attempt,</p>
+<pre>SELECT pname, address
+FROM   Person, Company
+WHERE  worksfor = cname;</pre>
+<p>does not run. With two tables in FROM, <code>address</code> could mean Person.address or Company.address, and Oracle refuses with <code>ORA-00918: column ambiguously defined</code>. The fix is to qualify it with the table name, which also lets us state the real condition (person's address = company's address):</p>
+<pre>SELECT Person.pname, Company.address
+FROM   Person, Company
+WHERE  Person.worksfor = Company.cname
+AND    Person.address = Company.address;</pre>
+<p>Slide 21 stops at the join condition and only shows how to qualify columns; the extra line <code>AND Person.address = Company.address</code> is what the task of slide 20 actually asks for.</p>
+<div id="p21"></div>
+
+<h2>2. Tuple variables (aliases)</h2>
+<p>Writing the full table name before every column is tiring. SQL lets us give each table in FROM a short name:</p>
+<dl class="def">
+<dt>Tuple variable (table alias, correlation name)</dt>
+<dd>A name declared after a table in the FROM clause. In the nested-loop meaning of a query (Chapter 2), it is the loop variable that ranges over that table's rows: <code>x</code> stands for "the current Person row".</dd>
+</dl>
+<pre>SELECT x.pname, y.address
+FROM   Person x, Company y            -- Oracle: no AS here
+WHERE  x.worksfor = y.cname
+AND    x.address = y.address;</pre>
+<p>The slide writes <code>Person AS x, Company AS y</code> and marks it with the bubble <em>"No 'AS' in Oracle"</em>. That is correct and worth remembering for exams: standard SQL (and PostgreSQL, MySQL, SQLite) allows <code>AS</code> before a table alias, but Oracle gives <code>ORA-00933: SQL command not properly ended</code>. Oracle does allow <code>AS</code> before a <em>column</em> alias (<code>SELECT price*quantity AS sales</code>). (The playground runs on SQLite, which accepts both forms, so it will not catch this mistake for you.)</p>
+<div id="p21b"></div>
+
+<h2>3. Joining a table with itself (slide 22)</h2>
+<p><em>Find those pairs of persons who have the same addresses.</em></p>
+<p>Now both rows we compare come from Person. One loop variable cannot hold two rows at once, so we name Person twice with two tuple variables. Each acts as an independent copy of the table:</p>
+<pre>SELECT x.pname, y.pname, x.address
+FROM   Person x, Person y
+WHERE  x.pname &lt;&gt; y.pname
+AND    x.address = y.address;</pre>
+<dl class="def">
+<dt>Self-join</dt><dd>A join of a table with itself, using two tuple variables. It compares rows of the same table with each other: pairs of persons, an employee and his manager, two PCs with the same speed.</dd>
+</dl>
+<p>Two remarks on slide 22. First, the slide prints the not-equal operator as <code>&lt; &gt;</code> with a space; that is a typesetting slip, and in SQL it must be written <code>&lt;&gt;</code> (or <code>!=</code>) with no space. Second, the condition <code>x.pname &lt;&gt; y.pname</code> stops a person from being paired with himself, but it still lets each pair appear <strong>twice</strong>, once in each order. Watch the animation with our sample data (invented addresses): Karim, Nabila and Mitu share "45 Dhanmondi".</p>
+
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="self"></div>
+</figure>
+
+<div class="q">
+<h4>Question (worked answer): how do we list each pair only once?</h4>
+<p>Replace <code>&lt;&gt;</code> by <code>&lt;</code>. Of the two orderings (Karim, Nabila) and (Nabila, Karim), exactly one has the first name alphabetically smaller, so exactly one survives; and x.pname &lt; y.pname is false when x and y are the same row, so self-pairs are still excluded.</p>
+<pre>SELECT x.pname, y.pname, x.address
+FROM   Person x, Person y
+WHERE  x.pname &lt; y.pname
+AND    x.address = y.address;</pre>
+<p>With three people at one address there are 3 · 2 = 6 ordered pairs but only 3 unordered pairs: (Karim, Mitu), (Karim, Nabila), (Mitu, Nabila). The same trick answers the classic exam question "find pairs of PC models with the same speed and RAM; list each pair once" (<code>p1.model &lt; p2.model</code>).</p>
+</div>
+<div id="p22"></div>
+
+<h3>Self-join on a foreign key: employees and their managers</h3>
+<p>The most common self-join in exams uses a foreign key that points to its <em>own</em> table. In the question bank's HR schema, EMPLOYEE has a column MANAGERID that holds the EMPLOYEEID of the employee's manager. To print each employee next to the manager's name, give EMPLOYEE two roles:</p>
+<pre>SELECT e.LASTNAME AS employee, m.LASTNAME AS manager
+FROM   EMPLOYEE e, EMPLOYEE m          -- e = the employee, m = the manager
+WHERE  e.MANAGERID = m.EMPLOYEEID;</pre>
+<p>Read the join condition as "e's manager is m". Mixing up the roles (writing <code>e.EMPLOYEEID = m.MANAGERID</code> but printing the wrong side) is exactly the bug in a question-bank "find the fault" question, worked in <a href="../i10/03-group-by-having.html">Lecture 10, Chapter 3</a>. King has no manager (MANAGERID is NULL), so he does not appear: NULL = anything is never true. Lecture 09's outer joins can keep him.</p>
+<div id="p-mgr"></div>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+<h3>Try it in SQL</h3>
+<p>Exercises 1–3 use Person/Company (invented addresses), 4 uses the PC table of the textbook's computer database, 5–6 use the HR schema (EMPLOYEE, DEPARTMENT, JOB, JOB_HISTORY).</p>
+<div id="c1"></div><div id="c2"></div><div id="c3"></div><div id="c4"></div><div id="c5"></div><div id="c6"></div>
+
+<div class="key"><p><strong>Summary:</strong> when two FROM tables share a column name, qualify it (Person.address). A tuple variable (alias) is a short name for a table in FROM and is the loop variable of the nested-loop meaning; Oracle forbids AS before a table alias. A self-join names one table twice with two aliases to compare its rows with each other. Use &lt;&gt; to exclude self-pairs and &lt; to list each unordered pair once. A foreign key to the same table (MANAGERID → EMPLOYEEID) is joined the same way, with one alias per role.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/sqlplay.js"></script>
+<script src="../i08/lecture.js"></script>
+<script>
+const PP = [['Rahim', '12 Kawran Bazar', 'GizmoWorks'], ['Karim', '45 Dhanmondi', 'GizmoWorks'], ['Salma', '3 Gulshan Ave', 'Canon'], ['Nabila', '45 Dhanmondi', 'Hitachi'], ['Tanvir', '7 Agrabad', 'Canon'], ['Mitu', '45 Dhanmondi', 'Canon']];
+const H = ['pname', 'address', 'worksfor'];
+const st = [{ html: row2(rel('Person x', H, PP), rel('Person y', H, PP), rel('result', ['x.pname', 'y.pname', 'x.address'], [])), cap: 'Two tuple variables, x and y, both range over Person. For each x, every y is tested: x.pname &lt;&gt; y.pname AND x.address = y.address.' }];
+const out = [];
+PP.forEach((x, i) => {
+  const hit = PP.map((y, j) => (i !== j && x[1] === y[1]) ? j : -1).filter(j => j >= 0), fresh = [];
+  hit.forEach(j => { fresh.push(out.length); out.push([x[0], PP[j][0], x[1]]); });
+  st.push({ html: row2(rel('Person x', H, PP, { cls: { [i]: 'hl' }, side: { [i]: '◀ x' } }), rel('Person y', H, PP, { cls: Object.fromEntries(PP.map((y, j) => [j, j === i ? 'del' : hit.includes(j) ? 'new' : ''])) }),
+    rel(`result (${out.length})`, ['x.pname', 'y.pname', 'x.address'], out, { cls: Object.fromEntries(fresh.map(k => [k, 'new'])) })),
+    cap: `x = ${x[0]} (${x[1]}). ${hit.length ? `Same address as ${hit.map(j => PP[j][0]).join(' and ')}: ${hit.length} row(s) added.` : 'Nobody else lives there.'} The y row equal to x itself is struck out by x.pname &lt;&gt; y.pname.` });
+});
+st.push({ html: row2(rel('result with <>', ['x.pname', 'y.pname', 'x.address'], out, { cls: Object.fromEntries(out.map((r, k) => [k, r[0] < r[1] ? 'new' : 'del'])) })),
+  cap: 'All 6 rows describe only 3 pairs: (Karim, Nabila) and (Nabila, Karim) are the same pair. With <b>x.pname &lt; y.pname</b> only the green rows survive.' });
+stepper('#self', st);
+sqlPlay('#p21', { setup: PERSONCO, query: 'SELECT Person.pname, Company.address\nFROM   Person, Company\nWHERE  Person.worksfor = Company.cname\nAND    Person.address = Company.address;', note: 'Change the SELECT list to plain "pname, address" to see the ambiguity error.' });
+sqlPlay('#p21b', { setup: PERSONCO, query: 'SELECT x.pname, y.address\nFROM   Person x, Company y\nWHERE  x.worksfor = y.cname\nAND    x.address = y.address;', note: 'Rahim lives at GizmoWorks\' address and Salma at Canon\'s. Tanvir lives at Hitachi\'s address but works for Canon, so he is not listed.' });
+sqlPlay('#p22', { setup: PERSONCO, query: 'SELECT x.pname, y.pname, x.address\nFROM   Person x, Person y\nWHERE  x.pname <> y.pname\nAND    x.address = y.address;', note: 'Slide 22: 6 rows. Change <> to < for the 3 distinct pairs.' });
+sqlPlay('#p-mgr', { setup: HR, query: 'SELECT e.LASTNAME AS employee, m.LASTNAME AS manager\nFROM   EMPLOYEE e, EMPLOYEE m\nWHERE  e.MANAGERID = m.EMPLOYEEID\nORDER BY m.LASTNAME, e.LASTNAME;', note: '19 rows: every employee except King, who has no manager.' });
+flashcards('#cards', [
+  { f: 'Ambiguous column', b: 'A column name that exists in more than one FROM table; Oracle error ORA-00918 unless qualified.' },
+  { f: 'Tuple variable', b: 'An alias for a table in FROM; the loop variable that ranges over its rows.' },
+  { f: 'AS before a table alias in Oracle?', b: 'Not allowed (FROM Person x, not FROM Person AS x). AS is fine for column aliases.' },
+  { f: 'Self-join', b: 'A table joined with itself through two aliases, to compare its rows with each other.' },
+  { f: 'x.pname <> y.pname', b: 'Excludes pairing a row with itself, but lists every pair twice.' },
+  { f: 'x.pname < y.pname', b: 'Lists each unordered pair exactly once.' },
+]);
+quiz('#quiz', [
+  { q: 'Which FROM clause is valid in Oracle?', opts: ['FROM Person AS x, Company AS y', 'FROM Person x, Company y', 'FROM x = Person, y = Company', 'FROM Person(x), Company(y)'], a: 1, why: 'Oracle does not accept AS before a table alias.' },
+  { q: 'Four people share one address. How many rows does slide 22\'s query (with <>) return for them?', opts: ['4', '6', '12', '16'], a: 2, why: 'Ordered pairs of distinct people: 4 · 3 = 12.' },
+  { q: '…and with < instead of <>?', opts: ['4', '6', '12', '3'], a: 1, why: 'Unordered pairs: 4 · 3 / 2 = 6.' },
+  { q: 'In "FROM EMPLOYEE e, EMPLOYEE m WHERE e.MANAGERID = m.EMPLOYEEID", which alias is the manager?', opts: ['e', 'm', 'both', 'neither'], a: 1, why: 'm\'s EMPLOYEEID is the value stored in e\'s MANAGERID column.' },
+  { q: 'Why does King not appear in the employee–manager self-join?', opts: ['He is the president', 'His MANAGERID is NULL, and NULL = value is never true', 'He has no department', 'Self-joins skip the first row'], a: 1, why: 'Comparisons with NULL are unknown, so the row fails the WHERE condition.' },
+]);
+ask('#try1', { q: 'Person has 6 rows. How many rows does the cross product Person x, Person y have before the WHERE clause?', a: 36, why: '6 · 6.' });
+sqlCheck('#c1', { setup: PERSONCO, task: '1. (Easy) Using tuple variables, list every person\'s name with the address of the company they work for.', solution: 'SELECT p.pname, c.address FROM Person p, Company c WHERE p.worksfor = c.cname;' });
+sqlCheck('#c2', { setup: PERSONCO, task: '2. List the persons who do NOT live at the address of the company they work for.', solution: 'SELECT p.pname FROM Person p, Company c WHERE p.worksfor = c.cname AND p.address <> c.address;' });
+sqlCheck('#c3', { setup: PERSONCO, task: '3. List each pair of persons who work for the same company, each pair once (first name alphabetically smaller), with the company name.', solution: 'SELECT x.pname, y.pname, x.worksfor FROM Person x, Person y WHERE x.worksfor = y.worksfor AND x.pname < y.pname;', hint: 'Self-join Person with itself on worksfor, and use < between the names.' });
+sqlCheck('#c4', { setup: PCDB, task: '4. (Exam: BUET QBank, CSE 303 2015–16) Find the pairs of PC models that have both the same speed and RAM. List each pair once, smaller model first.', solution: 'SELECT p1.model, p2.model FROM PC p1, PC p2 WHERE p1.speed = p2.speed AND p1.ram = p2.ram AND p1.model < p2.model;', hint: 'Self-join PC; p1.model < p2.model.' });
+sqlCheck('#c5', { setup: HR, task: '5. List the last names of employees who earn more than their own manager, with the manager\'s last name.', solution: 'SELECT e.LASTNAME, m.LASTNAME FROM EMPLOYEE e, EMPLOYEE m WHERE e.MANAGERID = m.EMPLOYEEID AND e.SALARY > m.SALARY;', hint: 'Self-join employee e with manager m and compare salaries.' });
+sqlCheck('#c6', { setup: HR, task: '6. (Exam style) List the last names of employees who were hired <em>before</em> their manager, together with the manager\'s last name and both hire dates.', solution: 'SELECT e.LASTNAME, m.LASTNAME, e.HIREDATE, m.HIREDATE FROM EMPLOYEE e, EMPLOYEE m WHERE e.MANAGERID = m.EMPLOYEEID AND e.HIREDATE < m.HIREDATE;' });
+</script>
+</body>
+</html>

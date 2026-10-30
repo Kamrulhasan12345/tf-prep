@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NULL and Three-Valued Logic · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="../i03/lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 04 (Ishrak) · Chapter 8 · Beyond the slides · Book §6.1.6–6.1.7</div>
+<h1>NULL in Conditions: Three-Valued Logic</h1>
+<p class="lede">Lecture 3 introduced NULL as a missing value. This chapter, which follows the textbook, explains what happens when a WHERE condition meets a NULL: comparisons give a third truth value, UNKNOWN; AND, OR and NOT follow three-valued truth tables; and WHERE keeps only rows whose condition is TRUE. It ends with IS NULL, NVL, and the surprising query that does not return every row.</p>
+
+<h2>1. Arithmetic and comparisons with NULL (textbook §6.1.6)</h2>
+<p>NULL means "no value is known here". The textbook draws two rules from that:</p>
+<ol>
+  <li><strong>Arithmetic:</strong> if either operand of <code>+ − × /</code> is NULL, the result is NULL. If commission is unknown, so is <code>salary * commission_pct</code>.</li>
+  <li><strong>Comparison:</strong> if either side of <code>= &lt;&gt; &lt; &gt; &lt;= &gt;=</code> is NULL, the result is the truth value <b class="term">UNKNOWN</b>. The unknown value might make the comparison true or false; SQL does not guess.</li>
+</ol>
+<p>So <code>NULL = NULL</code> is UNKNOWN, not TRUE (two unknown values need not be equal), and <code>commission_pct &gt; 0.2</code> is UNKNOWN for an employee without a commission. NULL itself is not a value, so writing <code>WHERE commission_pct = NULL</code> is never TRUE for any row.</p>
+<dl class="def">
+  <dt>IS NULL / IS NOT NULL</dt>
+  <dd>The only correct tests for NULL. <code>x IS NULL</code> is TRUE when x is NULL and FALSE otherwise; it never gives UNKNOWN.</dd>
+</dl>
+
+<h2>2. The three truth values (textbook §6.1.7)</h2>
+<p>With UNKNOWN in play, AND, OR and NOT need extended truth tables. A simple way to remember them, from the textbook: think of TRUE as 1, FALSE as 0 and UNKNOWN as ½. Then</p>
+<div class="formula">A AND B = min(A, B) &nbsp;&nbsp;&nbsp; A OR B = max(A, B) &nbsp;&nbsp;&nbsp; NOT A = 1 − A</div>
+<figure>
+<div id="tt"></div>
+<figcaption><b>Figure 1.</b> Three-valued truth tables. FALSE AND anything is FALSE; TRUE OR anything is TRUE; every other combination with UNKNOWN gives UNKNOWN. NOT UNKNOWN is UNKNOWN.</figcaption>
+</figure>
+<p>Pick two values and see the rule at work:</p>
+<div id="tool"></div>
+<p><strong>The WHERE rule:</strong> a row is returned only when its whole condition is <b class="good">TRUE</b>. Rows whose condition is FALSE <em>or UNKNOWN</em> are dropped. (UNKNOWN is not FALSE, but WHERE treats both as "not proven true".)</p>
+
+<h2>3. Watching a WHERE clause with NULLs</h2>
+<p>The query below looks for sales staff with a high commission or a high salary, on a slice of the Employees table that includes people with no commission. The animation evaluates each row with three-valued logic.</p>
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="a1"></div>
+</figure>
+<p>King has no commission, but <code>salary &gt;= 13000</code> is TRUE, and <code>UNKNOWN OR TRUE</code> is TRUE, so he is returned. Hunold's commission test is UNKNOWN and his salary test FALSE, and <code>UNKNOWN OR FALSE</code> is UNKNOWN, so he is not returned.</p>
+
+<h2>4. The query that does not return every row</h2>
+<p>The textbook's best illustration (its Example 6.10) is a condition that looks like it is always true:</p>
+<pre>SELECT last_name
+FROM   Employees
+WHERE  commission_pct &lt;= 0.2 OR commission_pct &gt; 0.2;</pre>
+<p>For any real number, one of the two comparisons is true. But for the 13 employees whose commission is NULL, both comparisons are UNKNOWN, and <code>UNKNOWN OR UNKNOWN</code> is UNKNOWN. The query returns only the 4 employees who have a commission. To include everyone, say so: <code>… OR commission_pct IS NULL</code>.</p>
+<div id="p1"></div>
+
+<h2>5. Replacing NULL: NVL</h2>
+<dl class="def">
+  <dt>NVL(x, y)</dt>
+  <dd>Oracle function that returns x if x is not NULL, and y otherwise. <code>NVL(commission_pct, 0)</code> treats a missing commission as 0. (NVL2(x, y, z) returns y if x is not NULL and z if it is.)</dd>
+</dl>
+<pre>SELECT last_name, salary * (1 + NVL(commission_pct, 0)) AS total_pay
+FROM   Employees;</pre>
+<p>Without NVL, <code>salary * (1 + commission_pct)</code> would be NULL for 13 of the 17 employees. Use NVL only when the replacement makes sense: a missing commission really is "no commission", so 0 is right; a missing date of birth is not 1 January 1900.</p>
+
+<h2>6. Where NULLs show up in this lecture</h2>
+<div class="tbl"><table>
+<tr><th>Feature</th><th>Behaviour with NULL</th></tr>
+<tr><td><code>=</code>, <code>&lt;</code>, BETWEEN, LIKE</td><td>UNKNOWN, so the row is not returned (and not returned by the NOT version either)</td></tr>
+<tr><td><code>IN (…)</code></td><td>a NULL x is never IN; a NULL in the list does not stop other matches</td></tr>
+<tr><td><code>NOT IN (…)</code></td><td>a NULL in the list makes it never TRUE (Chapter 7)</td></tr>
+<tr><td><code>DISTINCT</code></td><td>treats all NULLs as equal: one NULL row remains</td></tr>
+<tr><td><code>ORDER BY</code></td><td>Oracle sorts NULL as the largest value (Chapter 6)</td></tr>
+<tr><td>UNIQUE constraint</td><td>several NULLs allowed (Lec 03, Chapter 6)</td></tr>
+<tr><td>Oracle <code>''</code></td><td>the empty string is NULL</td></tr>
+</table></div>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div><div id="try2"></div>
+<h3>SQL exercises</h3>
+<div id="c1"></div><div id="c2"></div><div id="c3"></div><div id="c4"></div><div id="c5"></div>
+
+<div class="key"><p><strong>Summary:</strong> arithmetic with NULL gives NULL; comparisons with NULL give UNKNOWN. With TRUE = 1, UNKNOWN = ½, FALSE = 0: AND = min, OR = max, NOT = 1 − x. WHERE returns only TRUE rows, so UNKNOWN rows disappear, even from conditions like <code>x &lt;= 0.2 OR x &gt; 0.2</code>. Test NULL with IS NULL / IS NOT NULL, and substitute a value with NVL.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/sqlplay.js"></script>
+<script src="../i03/lecture.js"></script>
+<script>
+truthTables('#tt');
+tvlTool('#tool');
+(() => {
+  const H = ['last_name', 'salary', 'commission_pct'];
+  const R = [['King', 24000, null], ['Hunold', 9000, null], ['Zlotkey', 10500, 0.2], ['Abel', 11000, 0.3], ['Grant', 7000, 0.15], ['Hartstein', 13000, null]];
+  const c1 = r => r[2] == null ? null : r[2] >= 0.25, c2 = r => r[1] >= 13000;
+  const nm = x => x === true ? 'TRUE' : x === false ? 'FALSE' : 'UNKNOWN';
+  selectAnim('#a1', { name: 'Employees (slice)', head: H, rows: R, perRow: true, cols: [0],
+    where: { test: r => or3(c1(r), c2(r)), why: r => `${r[2] == null ? 'NULL' : r[2]} &gt;= 0.25 is ${nm(c1(r))}; ${r[1]} &gt;= 13000 is ${nm(c2(r))}; ${nm(c1(r))} OR ${nm(c2(r))}` },
+    sql: [['select', 'SELECT last_name'], ['from', 'FROM   Employees'], ['where', 'WHERE  commission_pct >= 0.25'], ['where', '   OR  salary >= 13000;']] });
+})();
+sqlPlay('#p1', { setup: HR, query: 'SELECT last_name, commission_pct\nFROM   Employees\nWHERE  commission_pct <= 0.2 OR commission_pct > 0.2;', note: 'Only 4 rows. Add <code>OR commission_pct IS NULL</code> and all 17 appear.' });
+flashcards('#cards', [
+  { f: 'NULL + 5', b: 'NULL' },
+  { f: 'NULL = NULL', b: 'UNKNOWN' },
+  { f: 'TRUE AND UNKNOWN', b: 'UNKNOWN (min(1, ½))' },
+  { f: 'FALSE AND UNKNOWN', b: 'FALSE (min(0, ½))' },
+  { f: 'TRUE OR UNKNOWN', b: 'TRUE (max(1, ½))' },
+  { f: 'NOT UNKNOWN', b: 'UNKNOWN (1 − ½)' },
+  { f: 'WHERE keeps…', b: 'only rows whose condition is TRUE.' },
+  { f: 'NVL(x, y)', b: 'x if x is not NULL, else y.' },
+]);
+quiz('#quiz', [
+  { q: 'For a row with commission_pct NULL, <code>commission_pct &gt; 0.1 AND salary &gt; 5000</code> (salary 6000) is…', opts: ['TRUE', 'FALSE', 'UNKNOWN', 'NULL'], a: 2, why: 'UNKNOWN AND TRUE = min(½, 1) = ½.' },
+  { q: 'Same row: <code>commission_pct &gt; 0.1 AND salary &gt; 9000</code> is…', opts: ['TRUE', 'FALSE', 'UNKNOWN', 'error'], a: 1, why: 'UNKNOWN AND FALSE = FALSE.' },
+  { q: 'Same row: <code>NOT (commission_pct &gt; 0.1)</code> is…', opts: ['TRUE', 'FALSE', 'UNKNOWN', 'NULL'], a: 2, why: 'NOT UNKNOWN is UNKNOWN, so the row is excluded both by the condition and by its negation.' },
+  { q: 'Which correctly finds employees without a manager?', opts: ['manager_id = NULL', 'manager_id IS NULL', "manager_id = ''", 'NOT manager_id'], a: 1, why: 'Only IS NULL tests for NULL.' },
+  { q: '<code>SELECT DISTINCT commission_pct FROM Employees</code> returns how many rows?', opts: ['4', '5', '17', '3'], a: 0, why: '0.2, 0.3, 0.15 and one NULL row (DISTINCT treats NULLs as equal).' },
+  { q: '<code>NVL(commission_pct, 0) * 100</code> for an employee with no commission is…', opts: ['NULL', '0', '100', 'UNKNOWN'], a: 1, why: 'NVL replaces the NULL with 0 first.' },
+]);
+ask('#try1', { q: 'How many Employees rows satisfy <code>commission_pct &lt;&gt; 0.2</code>?', a: 2, hint: 'Only rows with a known commission can be TRUE.', why: 'Abel (0.3) and Grant (0.15). The 13 NULLs give UNKNOWN; Zlotkey and Taylor (0.2) give FALSE.' });
+ask('#try2', { q: 'How many rows does <code>WHERE manager_id = manager_id</code> return on Employees?', a: 16, why: 'King\'s manager_id is NULL, and NULL = NULL is UNKNOWN, so he is dropped.' });
+chk('#c1', HR, '<b>Easy.</b> Show the last names of employees who have no commission.', 'SELECT last_name FROM Employees WHERE commission_pct IS NULL;');
+chk('#c2', HR, '<b>IS NOT NULL.</b> Show <code>last_name</code> and <code>manager_id</code> of every employee who has a manager.', 'SELECT last_name, manager_id FROM Employees WHERE manager_id IS NOT NULL;');
+chk('#c3', HR, '<b>NVL.</b> Show each employee\'s <code>last_name</code> and commission, with a missing commission shown as 0.', 'SELECT last_name, NVL(commission_pct, 0) FROM Employees;');
+chk('#c4', HR, '<b>Fix the textbook query.</b> Write a WHERE clause on <code>commission_pct</code> that returns the last names of <em>all</em> 17 employees: those with commission at most 0.2, above 0.2, or missing.', 'SELECT last_name FROM Employees\nWHERE commission_pct <= 0.2 OR commission_pct > 0.2 OR commission_pct IS NULL;');
+chk('#c5', HR, '<b>Exam style.</b> Show <code>last_name</code> and <code>department_id</code> of employees who are not in department 80, including employees with no department, sorted by last name.', 'SELECT last_name, department_id FROM Employees\nWHERE department_id <> 80 OR department_id IS NULL\nORDER BY last_name;', { ordered: true, hint: '<code>department_id &lt;&gt; 80</code> is UNKNOWN for Grant, whose department is NULL.' });
+</script>
+</body>
+</html>

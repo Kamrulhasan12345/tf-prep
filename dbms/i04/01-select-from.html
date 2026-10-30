@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SELECT and FROM · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="../i03/lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 04 (Ishrak) · Chapter 1 · Slides 1–11 · Book §6.1.1</div>
+<h1>SELECT and FROM: Reading a Table</h1>
+<p class="lede">The simplest SQL queries: all columns with <code>SELECT *</code>, chosen columns with a SELECT list, and duplicate removal with DISTINCT. Along the way: what "selection" and "projection" mean, and how a query turns an input schema into an output schema.</p>
+
+<h2>1. Where we are (slides 1–3)</h2>
+<p>Lecture 3 used the <b class="term">DDL</b> to create tables. Lecture 4 starts the <b class="term">DML</b>: first <em>querying</em> one table, then (Lecture 5) inserting, deleting and modifying rows. All examples use slide 3's <code>Product</code> table:</p>
+<div id="giz"></div>
+<p>The slides print prices with a dollar sign, but the column holds plain numbers (<code>NUMBER(7,2)</code>): 19.99, not "$19.99". The $ is only how the slide displays them.</p>
+
+<h2>2. The basic form (slide 4)</h2>
+<pre>SELECT &lt;attributes&gt;
+FROM   &lt;one or more relations&gt;</pre>
+<dl class="def">
+  <dt>SELECT clause</dt>
+  <dd>The list of attributes (columns) the answer should contain, separated by commas, or <code>*</code> meaning "all attributes, in their declared order".</dd>
+  <dt>FROM clause</dt>
+  <dd>The table (or tables) the rows come from. In Lectures 4 and 5 it is always one table; Lecture 8 uses several.</dd>
+</dl>
+<p>"Plus many many more bells and whistles": WHERE, DISTINCT, ORDER BY and the rest are optional additions to this core, introduced one at a time in this lecture.</p>
+
+<h2>3. The simplest query: SELECT * (slides 5–6)</h2>
+<p><em>Show all entries from the product table.</em></p>
+<pre>SELECT *
+FROM   Product;</pre>
+<p>The result is the whole table: every row, every column. The slide labels this "selection". In relational algebra, <b class="term">selection</b> (written σ) is the operation that picks <em>rows</em>; a query with no condition selects every row, so it is a selection with the condition "always true".</p>
+<div id="p1"></div>
+
+<h2>4. Choosing columns: projection (slide 7)</h2>
+<p><em>Show all product categories.</em></p>
+<pre>SELECT category
+FROM   Product;</pre>
+<dl class="def">
+  <dt>Projection (π)</dt>
+  <dd>The operation that keeps only some <em>columns</em> of a relation. In SQL, the SELECT list performs projection.</dd>
+  <dt>Selection (σ)</dt>
+  <dd>The operation that keeps only some <em>rows</em>. In SQL, the WHERE clause (Chapter 2) performs selection.</dd>
+</dl>
+<p>This query selects all rows and projects onto one column, hence the slide's label "selection and projection". Beware of the names: SQL's keyword <code>SELECT</code> does <em>projection</em>, while relational algebra's <em>selection</em> is SQL's <code>WHERE</code>.</p>
+<p>Look closely at the result: <strong>Gadgets appears twice</strong>. Gizmo and Powergizmo are both gadgets, and SQL keeps one output row per input row. Removing columns can make rows that were different become identical.</p>
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="a1"></div>
+</figure>
+
+<h2>5. Removing duplicates: DISTINCT (slides 8–9)</h2>
+<p><em>Show all product categories</em>, each once:</p>
+<pre>SELECT DISTINCT category
+FROM   Product;</pre>
+<dl class="def">
+  <dt>DISTINCT</dt>
+  <dd>A keyword placed right after SELECT that removes duplicate rows from the answer: two output rows are duplicates if they are equal in every selected column. Without it SQL uses <code>ALL</code> (the default), keeping every row.</dd>
+</dl>
+<div class="figrow">
+<div><div class="figlabel">SELECT DISTINCT category</div><div id="t1"></div></div>
+<div><div class="figlabel">SELECT category</div><div id="t2"></div></div>
+</div>
+<p>Why is ALL the default, when the relational model says relations are sets? Removing duplicates costs time: the DBMS must sort or hash the whole answer to find equal rows. SQL lets you pay that cost only when you ask for it. Duplicates also carry information sometimes (for example, to count how many products are gadgets).</p>
+<div id="p2"></div>
+
+<h2>6. Several columns (slide 10)</h2>
+<p><em>List all products along with their price and manufacturers.</em></p>
+<pre>SELECT pname, price, manufacturer
+FROM   Product;</pre>
+<p>The columns appear in the order of the SELECT list, which need not be the table's order: <code>SELECT manufacturer, pname</code> puts manufacturer first. Column names are case-insensitive, so <code>pname</code>, <code>PName</code> and <code>PNAME</code> all work.</p>
+<div id="p3"></div>
+
+<h2>7. Input schema and output schema (slide 11)</h2>
+<p>Every query takes relations in and produces a new relation, which has its own schema. Slide 11 shows the query of slide 10 as a function between schemas:</p>
+<figure>
+<svg viewBox="0 0 640 170" width="640" role="img" aria-label="Input schema Product(PName, Price, Category, Manufacturer) maps to output schema Answer(PName, Price, Manufacturer)">
+  <rect x="20" y="20" width="600" height="34" rx="6" class="cell"/>
+  <text x="34" y="42" style="font-size:14px">Input schema:  Product(<tspan class="acc">PName</tspan>, <tspan class="acc">Price</tspan>, <tspan class="dimt">Category</tspan>, <tspan class="acc">Manufacturer</tspan>)</text>
+  <path d="M320 56 L320 84" class="s-fg" marker-end="url(#m-fg)"/>
+  <text x="330" y="76" class="lbl">SELECT pname, price, manufacturer FROM Product</text>
+  <rect x="20" y="90" width="600" height="34" rx="6" class="cell-new"/>
+  <text x="34" y="112" style="font-size:14px">Output schema: Answer(<tspan class="acc">PName</tspan>, <tspan class="acc">Price</tspan>, <tspan class="acc">Manufacturer</tspan>)</text>
+  <text x="20" y="150" class="lbl">The output is itself a relation, so it can be stored (Lec 05: CREATE TABLE … AS SELECT) or used inside another query.</text>
+</svg>
+<figcaption><b>Figure 1.</b> A query maps an input schema to an output schema. Category is projected away. (The slide spells Manufacturer as "Manfacturer".)</figcaption>
+</figure>
+<p>This closure property, that the result of a query is a relation, is what lets queries be nested and stored. "Answer" is just a name for the unnamed result.</p>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+<h3>SQL exercises</h3>
+<p>Exercises 1–3 use the slides' <code>Product</code> and <code>CDCollection</code> tables; 4–5 use the <code>Employees</code> table (modelled on Oracle's HR sample schema). Press <b>Show tables</b> to see the data.</p>
+<div id="c1"></div><div id="c2"></div><div id="c3"></div><div id="c4"></div><div id="c5"></div>
+
+<div class="key"><p><strong>Summary:</strong> <code>SELECT list FROM table</code> returns one output row per input row, with the listed columns (<code>*</code> = all). Picking columns is projection (π, done by SELECT); picking rows is selection (σ, done by WHERE). Projection can create duplicate rows; SQL keeps them unless you write DISTINCT, which removes rows equal in every selected column. A query maps an input schema to an output schema, and its result is again a relation.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/sqlplay.js"></script>
+<script src="../i03/lecture.js"></script>
+<script>
+document.querySelector('#giz').innerHTML = `<figure>${T(GIZ_HEAD, GIZ_ROWS, { name: 'Product' })}<figcaption><b>Product</b>(pname, price, category, manufacturer): the slides' running example.</figcaption></figure>`;
+document.querySelector('#t1').innerHTML = T(['category'], [['Gadgets'], ['Photography'], ['Household']]);
+document.querySelector('#t2').innerHTML = T(['category'], [['Gadgets'], ['Gadgets'], ['Photography'], ['Household']]);
+selectAnim('#a1', { name: 'Product', head: GIZ_HEAD, rows: GIZ_ROWS, cols: [2], distinct: true,
+  sql: [['select', 'SELECT DISTINCT category'], ['from', 'FROM   Product;']] });
+sqlPlay('#p1', { setup: GIZ, query: 'SELECT *\nFROM   Product;' });
+sqlPlay('#p2', { setup: GIZ, query: 'SELECT DISTINCT category\nFROM   Product;', note: 'Delete DISTINCT and run again to see the duplicate Gadgets row.' });
+sqlPlay('#p3', { setup: GIZ, query: 'SELECT pname, price, manufacturer\nFROM   Product;', note: 'Try <code>SELECT manufacturer, pname FROM Product;</code>: the column order follows the SELECT list.' });
+flashcards('#cards', [
+  { f: 'SELECT *', b: 'All columns, in declared order.' },
+  { f: 'Projection (π)', b: 'Keep some columns. Done by the SELECT list.' },
+  { f: 'Selection (σ)', b: 'Keep some rows. Done by WHERE.' },
+  { f: 'DISTINCT', b: 'Remove output rows that are equal in every selected column.' },
+  { f: 'Default without DISTINCT', b: 'ALL: duplicates are kept (bag semantics).' },
+  { f: 'Why not always DISTINCT?', b: 'It costs a sort or hash of the whole answer; duplicates can also be meaningful.' },
+  { f: 'Output schema', b: 'The schema of the query\'s answer, e.g. Answer(PName, Price, Manufacturer).' },
+]);
+quiz('#quiz', [
+  { q: 'How many rows does <code>SELECT manufacturer FROM Product</code> return on the slide data?', opts: ['2', '3', '4', '1'], a: 2, why: 'One row per product: GizmoWorks appears twice.' },
+  { q: 'And <code>SELECT DISTINCT manufacturer FROM Product</code>?', opts: ['2', '3', '4', '1'], a: 1, why: 'GizmoWorks, Canon, Hitachi.' },
+  { q: 'Which SQL clause performs relational-algebra selection (σ)?', opts: ['SELECT', 'FROM', 'WHERE', 'DISTINCT'], a: 2, why: 'WHERE chooses rows. The SELECT keyword performs projection.' },
+  { q: '<code>SELECT DISTINCT category, manufacturer FROM Product</code> returns how many rows?', opts: ['2', '3', '4', '6'], a: 1, why: '(Gadgets, GizmoWorks) twice becomes once; plus (Photography, Canon), (Household, Hitachi).' },
+  { q: 'What is the output schema of <code>SELECT price, pname FROM Product</code>?', opts: ['Answer(PName, Price)', 'Answer(Price, PName)', 'Product(PName, Price, Category, Manufacturer)', 'Answer(Price)'], a: 1, why: 'Columns follow the SELECT list order.' },
+]);
+ask('#try1', { q: 'On the Employees table (17 rows), how many rows does <code>SELECT department_id FROM Employees</code> return?', a: 17, why: 'Without DISTINCT, one output row per input row.' });
+chk('#c1', GIZ, '<b>Easy.</b> Show the whole <code>CDCollection</code> table.', 'SELECT * FROM CDCollection;');
+chk('#c2', GIZ, '<b>Projection.</b> Show the name and price of every product.', 'SELECT pname, price FROM Product;');
+chk('#c3', GIZ, '<b>DISTINCT.</b> Show each manufacturer once.', 'SELECT DISTINCT manufacturer FROM Product;');
+chk('#c4', HR, '<b>DISTINCT on real data.</b> Show the different job IDs that occur in <code>Employees</code>, each once.', 'SELECT DISTINCT job_id FROM Employees;');
+chk('#c5', HR, '<b>Exam style.</b> Show every different combination of department and job in <code>Employees</code> (columns <code>department_id, job_id</code>), each once. How many rows do you get, and why is one of them NULL?', 'SELECT DISTINCT department_id, job_id FROM Employees;', { hint: 'DISTINCT applies to the whole row of selected columns. Kimberely Grant has no department.' });
+</script>
+</body>
+</html>

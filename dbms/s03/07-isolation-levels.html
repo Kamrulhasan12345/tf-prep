@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Transaction Isolation Levels · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="../s02/lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 03 (Sukarna) · Chapter 7 · Slides 35–37 · Book §6.6.5</div>
+<h1>Transaction Isolation Levels</h1>
+<p class="lede">Serializability is the strongest guarantee, and the most expensive. SQL lets a transaction ask for weaker isolation: read uncommitted, read committed, or repeatable read. This chapter defines each level with the slides' ticket-booking example, animates what the reading transaction sees, and compares the anomalies each level permits.</p>
+
+<h2>1. Why weaker levels exist</h2>
+<p>Everything so far aimed at serializable schedules. Enforcing that costs waiting (locks) or aborts (timestamps). Many applications can tolerate small anomalies in exchange for speed, so SQL lets each transaction choose its <b class="term">isolation level</b>: how much it may see of other, concurrent transactions' work.</p>
+<pre>SET TRANSACTION ISOLATION LEVEL READ COMMITTED;     -- SQL syntax (textbook §6.6)</pre>
+<p>The level is a property of the transaction that <em>reads</em>: it controls what that transaction may observe. The anomalies involved:</p>
+<dl class="def">
+  <dt>Dirty read</dt><dd>Reading a value written by a transaction that has not committed (and may abort).</dd>
+  <dt>Non-repeatable (unrepeatable) read</dt><dd>Reading the same element twice in one transaction and getting different values, because another transaction committed a change in between.</dd>
+  <dt>Phantom</dt><dd>Running the same query twice and getting different <em>sets</em> of rows, because another transaction inserted (or deleted) rows that satisfy the condition (textbook §18.6.3).</dd>
+</dl>
+
+<h2>2. The four levels (slides 35–37)</h2>
+<p>The slides' scenario: a ticket portal. One seat is left: availability = 1. T₁ books it, changing availability from 1 to 0, but has not yet committed. T₂ is checking availability for another customer.</p>
+
+<h3>Serializable</h3>
+<p>The strongest level: the execution must be equivalent to some serial order of the transactions. T₂ sees either the state before T₁ or the state after T₁ commits, never anything in between, and the same in every read. This is what 2PL or timestamp ordering (Chapters 1–6) provide.</p>
+
+<h3>Read uncommitted</h3>
+<p><strong>Dirty reads are allowed.</strong> T₂ reads availability = 0 written by the uncommitted T₁, and tells a customer “no seats available”. Then T₁ aborts and availability returns to 1: the customer was turned away because of a value that never officially existed.</p>
+
+<h3>Read committed</h3>
+<p><strong>Dirty reads are not allowed.</strong> While T₁ is uncommitted, T₂ sees availability = 1, the last <em>committed</em> value (the slide says it comes from the UNDO data: the system keeps the old value for possible rollback and shows it to readers, which is a multiversion read). After T₁ commits, a second read by T₂ sees 0, the new committed value. So the same item read twice gave 1 and then 0: <strong>non-repeatable reads are possible</strong>.</p>
+
+<h3>Repeatable read</h3>
+<p><strong>Dirty reads are not allowed, and a value once read stays the same.</strong> T₂ sees 1 before T₁ commits and still sees 1 after T₁ commits, because it keeps reading the value that was committed when it first read the item. (In SQL's definition, repeatable read still allows <em>phantoms</em>: newly inserted rows may appear in a repeated query; the textbook describes it as locking or fixing the tuples already read, but not new ones.)</p>
+
+<figure class="wide">
+<span class="anim-tag">Interactive animation</span>
+<div class="cc-form"><label class="sm">Isolation level of T₂
+<select id="lvl"><option value="ru">read uncommitted</option><option value="rc" selected>read committed</option><option value="rr">repeatable read</option><option value="ser">serializable</option></select></label>
+<label class="sm">T₁ finally <select id="end"><option value="c">commits</option><option value="a">aborts</option></select></label></div>
+<div id="iso"></div>
+<figcaption><b>Figure 1.</b> What T₂ sees at each isolation level. “Committed” is the value other transactions would read after T₁ commits; “uncommitted” is T₁'s tentative value.</figcaption>
+</figure>
+
+<h2>3. Comparison</h2>
+<div class="tbl"><table>
+<tr><th>level</th><th>dirty read</th><th>non-repeatable read</th><th>phantom</th><th>slide example: T₂'s two reads</th></tr>
+<tr><td>read uncommitted</td><td class="bad">possible</td><td class="bad">possible</td><td class="bad">possible</td><td>0 (dirty), then 1 after T₁ aborts</td></tr>
+<tr><td>read committed</td><td class="good">no</td><td class="bad">possible</td><td class="bad">possible</td><td>1, then 0 after T₁ commits</td></tr>
+<tr><td>repeatable read</td><td class="good">no</td><td class="good">no</td><td class="bad">possible</td><td>1, then still 1</td></tr>
+<tr><td>serializable</td><td class="good">no</td><td class="good">no</td><td class="good">no</td><td>as in some serial order</td></tr>
+</table></div>
+<p>Each weaker level trades correctness for concurrency: fewer locks are held (or held for shorter times), so transactions wait less. In a lock-based system, roughly: read uncommitted takes no read locks; read committed takes short read locks (released right after each read), or reads the last committed version; repeatable read keeps read locks on the rows read until commit; serializable also prevents phantoms (e.g. by locking ranges or whole relations).</p>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+
+<h3>Exam questions</h3>
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 215 | L-2/T-2 | 2021–22 · 15 marks</div>
+  <div class="exam-q"><p>The SQL standard defines three weak isolation levels: dirty reads, read committed, and repeatable reads. Compare these three levels with illustrative examples.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+  <p>(“Dirty reads” is the level SQL calls READ UNCOMMITTED.) All three are weaker than SERIALIZABLE; they differ in which anomalies a reading transaction may observe. Scenario: one ticket left, availability = 1; T₁ books it (writes 0); T₂ checks availability.</p>
+  <ol>
+    <li><b>Read uncommitted (dirty reads allowed).</b> T₁ writes 0 and has not committed; T₂ reads 0 and answers “sold out”. T₁ then aborts; availability is 1 again. T₂ acted on data that never existed. Allows dirty reads, non-repeatable reads and phantoms. Fastest: no read locks.</li>
+    <li><b>Read committed.</b> T₂ can read only committed values. While T₁ is uncommitted, T₂ reads 1 (the old committed value, or it waits for T₁'s lock). After T₁ commits, T₂ reads again and gets 0. No dirty reads, but <b>non-repeatable reads</b> are possible: two reads of the same item in T₂ returned 1 and 0. Typical implementation: short-duration read locks, or reading the last committed version.</li>
+    <li><b>Repeatable read.</b> No dirty reads, and any item T₂ has read keeps the value T₂ first saw: T₂ reads 1 before and after T₁'s commit (T₁'s write may even be blocked until T₂ finishes, in a lock-based system). <b>Phantoms</b> are still possible: if T₂ runs SELECT COUNT(*) FROM seats WHERE free = 1 twice while another transaction inserts a new free seat, the second count is larger.</li>
+  </ol>
+  <div class="tbl"><table><tr><th></th><th>dirty read</th><th>non-repeatable read</th><th>phantom</th></tr>
+  <tr><td>read uncommitted</td><td>yes</td><td>yes</td><td>yes</td></tr>
+  <tr><td>read committed</td><td>no</td><td>yes</td><td>yes</td></tr>
+  <tr><td>repeatable read</td><td>no</td><td>no</td><td>yes</td></tr></table></div>
+  <p>Going down the list, isolation increases and concurrency decreases; SERIALIZABLE removes phantoms too.</p>
+  </div></details>
+</div>
+
+<div class="key"><p><strong>Summary:</strong> SQL offers four isolation levels. Serializable gives the effect of a serial order. Read uncommitted allows dirty reads. Read committed forbids dirty reads but a repeated read may see a newly committed value. Repeatable read also keeps every value read stable, but new rows (phantoms) may appear. Weaker levels mean less waiting and more anomalies.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../s02/lecture.js"></script>
+<script>
+function isoSteps(lvl, end) {
+  // value seen by T2 at each of its two reads
+  const first = lvl === 'ru' ? 0 : 1;
+  const committedAfter = end === 'c' ? 0 : 1;
+  const second = lvl === 'ru' ? committedAfter : lvl === 'rc' ? committedAfter : lvl === 'rr' ? 1 : (end === 'c' ? 0 : 1);
+  const rows = [
+    { t: 1, html: 'write avail := 0', ex: ['1', '0', ''], cap: 'T₁ books the last seat: it writes availability = 0 but has <b>not committed</b>. The committed value is still 1.' },
+    { t: 2, html: 'read avail', ex: ['1', '0', String(lvl === 'ser' ? '(waits)' : first)], cap: lvl === 'ru' ? 'Read uncommitted: T₂ sees T₁\'s tentative value <b>0</b> (a dirty read) and tells a customer the show is sold out.' : lvl === 'ser' ? 'Serializable with locking: T₂ must wait until T₁ finishes (T₁ holds an exclusive lock), so T₂ will behave as if it ran entirely after T₁. (With multiversion reads, T₂ would instead read 1 and behave as if it ran before T₁.)' : `${lvl === 'rc' ? 'Read committed' : 'Repeatable read'}: no dirty reads, so T₂ sees the last committed value, <b>1</b> (taken from the undo data / old version).` },
+    { t: 1, html: end === 'c' ? 'commit' : 'abort', ex: [end === 'c' ? '0' : '1', '', ''], cap: end === 'c' ? 'T₁ commits: availability = 0 is now the committed value.' : 'T₁ aborts: its write is undone, availability is 1 again.' },
+    { t: 2, html: 'read avail', ex: [end === 'c' ? '0' : '1', '', String(lvl === 'ser' ? (end === 'c' ? 0 : 1) : second)], cap:
+      lvl === 'ru' ? (end === 'c' ? 'T₂ reads 0 again. This time it happens to be right, but its first read was dirty: it relied on an uncommitted value.' : 'T₂ now reads <b>1</b>: its first read was a dirty value that never officially existed, and the customer was wrongly turned away.')
+      : lvl === 'rc' ? (end === 'c' ? 'Read committed: T₂ now sees the new committed value <b>0</b>. Its two reads gave 1 and 0: a <b>non-repeatable read</b>.' : 'T₂ reads the committed value 1 again.')
+      : lvl === 'rr' ? 'Repeatable read: T₂ sees <b>1</b> again, the same value as its first read, even though T₁ has committed 0. Its reads are repeatable.'
+      : `Serializable: T₂ reads ${end === 'c' ? '0' : '1'}, consistent with the serial order (T₁, T₂). Both of its reads would return the same value.` },
+  ];
+  if (lvl === 'ser') rows[3].cap += ' (T₂\'s first read actually happens only now, after the wait.)';
+  return CC.growSteps([1, 2], rows, { extra: ['committed', 'uncommitted', 'T₂ sees'], init: { t: 0, html: '', ex: ['1', '', ''] }, startCap: 'One seat left: availability = 1 (committed).' });
+}
+const draw = () => stepper('#iso', isoSteps(document.querySelector('#lvl').value, document.querySelector('#end').value), { interval: 2300 });
+document.querySelectorAll('#lvl, #end').forEach(s => s.addEventListener('change', draw));
+draw();
+flashcards('#cards', [
+  { f: 'Read uncommitted', b: 'Dirty reads allowed.' },
+  { f: 'Read committed', b: 'Only committed values are read; a repeated read may see a newer committed value.' },
+  { f: 'Repeatable read', b: 'Committed values only, and an item read keeps its value; phantoms possible.' },
+  { f: 'Serializable', b: 'Equivalent to some serial order; no dirty, non-repeatable reads or phantoms.' },
+  { f: 'Phantom', b: 'A repeated query returns new rows inserted by another transaction.' },
+]);
+quiz('#quiz', [
+  { q: 'T₂ reads 1, T₁ commits 0, T₂ reads 0. Which is the weakest level that forbids this?', opts: ['read uncommitted', 'read committed', 'repeatable read', 'none'], a: 2, why: 'This is a non-repeatable read; repeatable read forbids it.' },
+  { q: 'Which level allows T₂ to see T₁\'s uncommitted 0?', opts: ['read uncommitted', 'read committed', 'repeatable read', 'serializable'], a: 0, why: 'Only read uncommitted allows dirty reads.' },
+  { q: 'Repeatable read still allows…', opts: ['dirty reads', 'non-repeatable reads', 'phantoms', 'lost updates of committed data'], a: 2, why: 'New rows may appear in a repeated query.' },
+]);
+ask('#try1', { q: 'Read committed, slide example, T₁ commits. What does T₂\'s second read return?', a: 0, why: 'The newly committed value.' });
+</script>
+</body>
+</html>

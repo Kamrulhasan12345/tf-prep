@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cross Product and Join · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 08 (Ishrak) · Chapter 2 · Slides 7–12</div>
+<h1>Cross Product and Join</h1>
+<p class="lede">What does SQL do when the FROM clause names two tables? This chapter builds the answer from the slides' tiny tables R and S: first every pairing of rows (the cross product), then keeping only the pairs that match (the join), then the natural join shorthand, and finally the nested-loop "meaning" of any SELECT–FROM–WHERE query.</p>
+
+<h2>1. The cross product (slide 7)</h2>
+
+<p>Slide 7 lists two tables after FROM and has no WHERE clause:</p>
+<pre>SELECT A, R.B, S.B, C
+FROM   R, S;</pre>
+<p>R has columns A and B, and S has columns B and C. Both tables have a column called B, so inside this query a bare <code>B</code> would be ambiguous. We write <code>R.B</code> and <code>S.B</code> to say which one we mean. A and C exist in only one table, so they need no prefix.</p>
+
+<dl class="def">
+<dt>Cross product (Cartesian product), R × S</dt>
+<dd>The table that pairs <em>every</em> row of R with <em>every</em> row of S. Each result row is a row of R followed by a row of S. If R has <i>m</i> rows and S has <i>n</i> rows, R × S has <i>m</i> · <i>n</i> rows, and its columns are all of R's columns followed by all of S's.</dd>
+<dt>Qualified column name</dt>
+<dd><code>table.column</code>, such as <code>R.B</code>. Needed whenever two tables in the FROM clause share a column name.</dd>
+</dl>
+
+<p>Here R has 2 rows and S has 3, so R × S has 2 · 3 = <strong>6 rows</strong> and 2 + 2 = 4 columns. The arrows on the slide show row (1, x) of R being paired with x, y and z of S, then row (2, y) being paired with the same three. The animation builds the six rows one pairing at a time.</p>
+
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="cross"></div>
+</figure>
+
+<p>Most of these six rows are nonsense. Row (1, x, y, 6) glues R's "x" row to S's "y" row, although nothing connects them. The cross product is rarely the answer we want; it is the raw material that a WHERE condition then filters.</p>
+<div id="p-cross"></div>
+
+<h2>2. Join = cross product, then filter (slides 8–9)</h2>
+
+<p>Slide 8 adds a WHERE clause that keeps only the pairs whose B values agree:</p>
+<pre>SELECT *
+FROM   R, S
+WHERE  R.B = S.B;</pre>
+<p>Conceptually, SQL forms all 6 pairs and tests <code>R.B = S.B</code> on each. The slide circles the two pairs that pass: (1, x, x, 5) and (2, y, y, 6). Slide 9 shows the final result with just those two rows. That is a <b class="term">join</b>.</p>
+
+<dl class="def">
+<dt>Join (theta join), R ⋈<sub>C</sub> S</dt>
+<dd>The rows of R × S that satisfy a condition C. In relational algebra, R ⋈<sub>C</sub> S = σ<sub>C</sub>(R × S): a selection σ applied to a cross product.</dd>
+<dt>Equijoin</dt>
+<dd>A join whose condition is an equality between columns, such as R.B = S.B. Almost every join you write is an equijoin on a foreign key.</dd>
+</dl>
+
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="filter"></div>
+</figure>
+
+<p>Row S(z, 7) has no partner in R, so it does not appear in the join at all. Remember this: an ordinary join silently drops rows that match nothing. Lecture 09's <a href="../i09/01-join-types.html">outer joins</a> exist to keep such rows.</p>
+<div id="p-join"></div>
+
+<div class="q">
+<h4>Question (worked answer): does the DBMS really build the whole cross product?</h4>
+<p>No. "Cross product, then filter" defines <em>what</em> the answer is, and it is the right way to reason about a query. A real DBMS computes the same answer far more cheaply: it uses an index on S.B, sorts both tables, or hashes them (the join algorithms of <a href="../s08/01-nested-loop-joins.html">Lecture 08 of the query-execution part</a>). The query optimizer is free to choose any method, because they all produce exactly the rows of σ<sub>C</sub>(R × S).</p>
+</div>
+
+<h2>3. Natural join (slide 10)</h2>
+
+<p>Joining on columns that have the same name is so common that SQL has a shorthand. Slide 10 compares the two forms:</p>
+<div class="figrow">
+<pre>SELECT A, R.B, C
+FROM   R, S
+WHERE  R.B = S.B;</pre>
+<pre>SELECT A, B, C
+FROM   R NATURAL JOIN S;</pre>
+</div>
+
+<dl class="def">
+<dt>Natural join, R ⋈ S</dt>
+<dd>A join that (1) matches rows on <em>equality of every pair of columns with the same name</em>, and (2) keeps only <em>one copy</em> of each such column. Here the only shared name is B, so the natural join is the equijoin on R.B = S.B with one B column: (1, x, 5) and (2, y, 6).</dd>
+</dl>
+
+<p>Because the two B columns are merged into one, the natural-join query writes plain <code>B</code>. In Oracle you are in fact <em>not allowed</em> to qualify it: <code>SELECT R.B FROM R NATURAL JOIN S</code> raises <code>ORA-25155: column used in NATURAL join cannot have qualifier</code>.</p>
+<div id="p-nat"></div>
+
+<p>Natural join is convenient but fragile: it joins on <em>whatever</em> names happen to match. If someone later adds a column <code>last_updated</code> to both tables, the natural join silently starts requiring equal timestamps too. Oracle also accepts two explicit ANSI forms that you will meet in Lecture 09:</p>
+<pre>SELECT A, R.B, C FROM R JOIN S ON R.B = S.B;   -- condition written out (also: INNER JOIN)
+SELECT A, B, C   FROM R JOIN S USING (B);      -- name the shared column(s) yourself</pre>
+<p>All three return the same two rows here. <code>FROM R, S WHERE …</code> (the slides' style) and <code>FROM R JOIN S ON …</code> are interchangeable for inner joins; use whichever your teacher writes, and be consistent.</p>
+
+<h2>4. The meaning of any SELECT–FROM–WHERE (slides 11–12)</h2>
+
+<p>Slide 11 generalises the idea to <i>n</i> tables. The meaning (the <b class="term">semantics</b>) of</p>
+<pre>SELECT a1, a2, …, ak
+FROM   R1, R2, …, Rn
+WHERE  Conditions</pre>
+<p>is defined by nested loops, one loop per table in FROM:</p>
+<pre>Answer = {}
+for x1 in R1 do
+    for x2 in R2 do
+        …
+            for xn in Rn do
+                if Conditions(x1, …, xn)
+                    then Answer = Answer + {(a1, …, ak)}
+return Answer</pre>
+<p>Each combination (x1, …, xn) is one row of R1 × … × Rn; the <code>if</code> is the WHERE filter; and the tuple added is the SELECT list (a projection, π in relational algebra). So the whole query is π<sub>a1…ak</sub>(σ<sub>Conditions</sub>(R1 × … × Rn)).</p>
+
+<p>Note the <code>+</code> on slide 11. It means "append", so a row that is produced twice appears twice: SQL tables are <b class="term">bags</b> (multisets), and a plain SELECT keeps duplicates. Slide 12 changes the query to <code>SELECT DISTINCT</code> and the <code>+</code> to <code>∪</code>, set union, which adds a row only if it is not already there. DISTINCT turns the bag into a set.</p>
+
+<dl class="def">
+<dt>Bag (multiset)</dt><dd>A collection in which the same element can occur several times; order does not matter. SQL query results are bags.</dd>
+<dt>DISTINCT</dt><dd>Removes duplicate rows from the result, turning the bag into a set.</dd>
+</dl>
+
+<div class="q">
+<h4>Question (worked answer): trace the nested loops for SELECT B FROM R, S WHERE R.B = S.B with and without DISTINCT</h4>
+<p>x1 runs over R's rows, x2 over S's rows; the condition is x1.B = x2.B and the output is x1.B.</p>
+<div class="tbl"><table>
+<tr><th>x1 (R)</th><th>x2 (S)</th><th>R.B = S.B?</th><th>Answer (bag, slide 11)</th><th>Answer (set, slide 12)</th></tr>
+<tr><td>(1, x)</td><td>(x, 5)</td><td class="good">true</td><td>{x}</td><td>{x}</td></tr>
+<tr><td>(1, x)</td><td>(y, 6)</td><td class="bad">false</td><td>{x}</td><td>{x}</td></tr>
+<tr><td>(1, x)</td><td>(z, 7)</td><td class="bad">false</td><td>{x}</td><td>{x}</td></tr>
+<tr><td>(2, y)</td><td>(x, 5)</td><td class="bad">false</td><td>{x}</td><td>{x}</td></tr>
+<tr><td>(2, y)</td><td>(y, 6)</td><td class="good">true</td><td>{x, y}</td><td>{x, y}</td></tr>
+<tr><td>(2, y)</td><td>(z, 7)</td><td class="bad">false</td><td>{x, y}</td><td>{x, y}</td></tr>
+</table></div>
+<p>Here both answers are {x, y}, because no value was produced twice. Duplicates appear as soon as two different pairs produce the same output, which is exactly the "subtlety" of <a href="03-join-queries.html">the next chapter</a> (slides 17–19).</p>
+</div>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+<div id="try2"></div>
+<h3>Try it in SQL</h3>
+<p>Exercises 1–3 use R and S; 4–6 use Product and Company (slide data plus a few invented rows).</p>
+<div id="c1"></div><div id="c2"></div><div id="c3"></div><div id="c4"></div><div id="c5"></div><div id="c6"></div>
+
+<div class="key"><p><strong>Summary:</strong> listing several tables in FROM forms their cross product: every row of one paired with every row of the other (m · n rows). A WHERE condition that compares columns of the two tables keeps only the matching pairs: that is a join, σ<sub>C</sub>(R × S). Shared column names must be qualified (R.B). NATURAL JOIN joins on all same-named columns and keeps one copy of each. Any SELECT–FROM–WHERE means "nested loops over the FROM tables, test WHERE, output the SELECT list", producing a bag; DISTINCT makes it a set.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/sqlplay.js"></script>
+<script src="../i08/lecture.js"></script>
+<script>
+const R = [[1, 'x'], [2, 'y']], S = [['x', 5], ['y', 6], ['z', 7]];
+const XH = ['A', 'R.B', 'S.B', 'C'];
+const pairs = R.flatMap(r => S.map(s => [...r, ...s]));
+// cross product, one pair per frame
+const cs = [{ html: row2(rel('R', ['A', 'B'], R), rel('S', ['B', 'C'], S), rel('R × S (0 rows)', XH, [])), cap: 'R has 2 rows, S has 3. R × S will pair each R row with each S row: 2 · 3 = 6 rows.' }];
+pairs.forEach((p, k) => {
+  const i = Math.floor(k / 3), j = k % 3;
+  cs.push({ html: row2(rel('R', ['A', 'B'], R, { cls: { [i]: 'hl' }, side: { [i]: '◀ x1' } }), rel('S', ['B', 'C'], S, { cls: { [j]: 'hl' }, side: { [j]: '◀ x2' } }),
+    rel(`R × S (${k + 1} rows)`, XH, pairs.slice(0, k + 1), { cls: { [k]: 'new' } })),
+    cap: `Pair R row (${R[i].join(', ')}) with S row (${S[j].join(', ')}): output row (${p.join(', ')}).${j === 2 && i === 0 ? ' R\'s first row is done; move to the second.' : ''}${k === 5 ? ' All 6 pairs formed.' : ''}` });
+});
+stepper('#cross', cs, { interval: 1500 });
+// filter
+const ok = p => p[1] === p[2];
+const fs = [{ html: row2(rel('R × S', XH, pairs)), cap: 'Start from the cross product: 6 rows.' }];
+pairs.forEach((p, k) => fs.push({ html: row2(rel('testing WHERE R.B = S.B', XH, pairs, { cls: Object.fromEntries(pairs.slice(0, k + 1).map((q, m) => [m, ok(q) ? 'new' : 'del'])), side: { [k]: ok(p) ? `${p[1]} = ${p[2]} ✓` : `${p[1]} ≠ ${p[2]} ✗` } })),
+  cap: `Row ${k + 1}: R.B = ${p[1]}, S.B = ${p[2]}. ${ok(p) ? '<b>Equal: the row is kept.</b>' : 'Different: the row is discarded.'}` }));
+fs.push({ html: row2(rel('R ⋈ S (2 rows)', XH, pairs.filter(ok), { cls: { 0: 'new', 1: 'new' } })), cap: 'Result (slide 9): the two rows whose B values agree. S\'s row (z, 7) matched no R row and is gone.' });
+stepper('#filter', fs, { interval: 1500 });
+
+sqlPlay('#p-cross', { setup: RS, query: 'SELECT A, R.B, S.B, C\nFROM   R, S;', note: 'Slide 7. Try removing the R. and S. prefixes: Oracle (and the playground) reports that column B is ambiguous.' });
+sqlPlay('#p-join', { setup: RS, query: 'SELECT *\nFROM   R, S\nWHERE  R.B = S.B;', note: 'Slides 8–9.' });
+sqlPlay('#p-nat', { setup: RS, query: 'SELECT A, B, C\nFROM   R NATURAL JOIN S;', note: 'Slide 10. Compare with SELECT A, R.B, C FROM R, S WHERE R.B = S.B.' });
+
+flashcards('#cards', [
+  { f: 'R × S', b: 'Cross product: every row of R paired with every row of S; |R| · |S| rows.' },
+  { f: 'Join', b: 'σ<sub>C</sub>(R × S): the pairs of the cross product that satisfy condition C.' },
+  { f: 'Equijoin', b: 'A join whose condition is equality of columns, e.g. R.B = S.B.' },
+  { f: 'Natural join', b: 'Equijoin on all same-named columns, keeping one copy of each.' },
+  { f: 'Qualified name', b: 'table.column, needed when the column name appears in more than one FROM table.' },
+  { f: 'Bag', b: 'Multiset: duplicates allowed. Plain SELECT returns a bag.' },
+  { f: 'SELECT DISTINCT', b: 'Removes duplicate rows, so the answer is a set (slide 12\'s ∪).' },
+]);
+quiz('#quiz', [
+  { q: 'R has 5 rows and S has 4. How many rows does SELECT * FROM R, S return?', opts: ['9', '20', '5', '4'], a: 1, why: 'No WHERE clause, so it is the cross product: 5 · 4 = 20.' },
+  { q: 'Why must slide 7 write R.B and S.B?', opts: ['Oracle requires prefixes on every column', 'B is a column of both tables, so plain B is ambiguous', 'B is a key', 'To sort the result'], a: 1, why: 'A and C are unique to one table and need no prefix.' },
+  { q: 'Which row of S is missing from R ⋈ S on slide 9?', opts: ['(x, 5)', '(y, 6)', '(z, 7)', 'none'], a: 2, why: 'No R row has B = z.' },
+  { q: 'R(A, B) NATURAL JOIN S(B, C) has which columns?', opts: ['A, R.B, S.B, C', 'A, B, C', 'B only', 'A, C'], a: 1, why: 'The shared column B appears once.' },
+  { q: 'In the nested-loop semantics, what does the if-test correspond to?', opts: ['SELECT list', 'FROM list', 'WHERE clause', 'DISTINCT'], a: 2, why: 'The loops enumerate FROM, the if is WHERE, the appended tuple is SELECT.' },
+  { q: 'Slide 12 replaces "+" with "∪". Which keyword causes that?', opts: ['ALL', 'DISTINCT', 'UNION', 'NATURAL'], a: 1, why: 'DISTINCT makes the answer a set.' },
+]);
+ask('#try1', { q: 'Three tables in FROM with 10, 20 and 5 rows and no WHERE clause. How many rows?', a: 1000, hint: 'Cross product of all three.', why: '10 · 20 · 5 = 1000.' });
+ask('#try2', { q: 'R(A, B) has 2 columns and S(B, C, D) has 3. How many columns does SELECT * FROM R NATURAL JOIN S have?', a: 4, hint: 'Count the shared column once.', why: 'A, B, C, D: 2 + 3 − 1 shared = 4.' });
+const T = PRODCO_X;
+sqlCheck('#c1', { setup: RS, task: '1. (Easy) Return the full cross product of R and S.', solution: 'SELECT * FROM R, S;' });
+sqlCheck('#c2', { setup: RS, task: '2. Return A and C for the pairs of R and S rows whose B values match.', solution: 'SELECT A, C FROM R, S WHERE R.B = S.B;' });
+sqlCheck('#c3', { setup: RS, task: '3. Return the pairs (A, C) from R × S where the B values are <em>different</em>.', solution: 'SELECT A, C FROM R, S WHERE R.B <> S.B;', hint: 'In Oracle "not equal" is &lt;&gt; (or !=).' });
+sqlCheck('#c4', { setup: T, task: '4. For each product, list its name and the stock price of its manufacturer.', solution: 'SELECT pname, stockPrice FROM Product, Company WHERE manufacturer = cname;' });
+sqlCheck('#c5', { setup: T, task: '5. How many rows does the cross product of Product and Company have? Write a query that returns that number (one row, one column).', solution: 'SELECT COUNT(*) FROM Product, Company;', hint: 'COUNT(*) counts rows; aggregation is taught in Lecture 10, but COUNT(*) is all you need here.' });
+sqlCheck('#c6', { setup: T, task: '6. (Exam style) List the names of products whose manufacturer\'s stock price is greater than the product\'s own price divided by 4.', solution: 'SELECT pname FROM Product, Company WHERE manufacturer = cname AND stockPrice > price / 4;', hint: 'Join condition AND a second condition that uses columns from both tables.' });
+</script>
+</body>
+</html>

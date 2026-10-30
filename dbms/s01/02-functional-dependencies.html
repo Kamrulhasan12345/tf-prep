@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Functional Dependencies · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 01 (Sukarna) · Chapter 2 · Slides 6–14 · Book §3.1.1</div>
+<h1>Functional Dependencies</h1>
+<p class="lede">A functional dependency says “if two rows agree here, they must agree there”. This chapter defines it, reads the FDs of the slides' Movies1 relation, explains why one table instance can refute an FD but never prove it, and answers slide 14's “Why?”.</p>
+
+<h2>1. FDs are constraints (slide 6)</h2>
+<p>Design theory needs a precise way to say how attributes relate. The <b class="term">functional dependency</b> (FD) is that tool. It lets us analyze a relation schema and improve it. FDs come from the real-world rules the data must obey, so they are <em>database constraints</em>. For the slides' running relation</p>
+<p class="formula">Movies1(title, year, length, genre, studioName, starName)</p>
+<p>the rules are:</p>
+<ul>
+  <li>Two movies with the same title are not produced in the same year (so title and year together identify a movie).</li>
+  <li>A movie has one genre.</li>
+  <li>A movie is made by only one studio.</li>
+  <li>A movie can have multiple stars.</li>
+</ul>
+<p>Each rule except the last becomes an FD. The last rule is the <em>absence</em> of an FD, and it matters just as much.</p>
+
+<h2>2. Definition (slide 7)</h2>
+<dl class="def">
+  <dt>Functional dependency A₁A₂…Aₙ → B₁B₂…Bₘ</dt>
+  <dd>A statement about relation R: <em>if two tuples of R agree on all of the attributes A₁, A₂, …, Aₙ (have the same values for them), then they must also agree on all of B₁, B₂, …, Bₘ.</em> It is read “A₁A₂…Aₙ functionally determine B₁B₂…Bₘ”. The A's are the <b>left side</b> (determinant), the B's the <b>right side</b>.</dd>
+</dl>
+<p>Notation: the slides write <code>A₁A₂…Aₙ → B₁B₂…Bₘ</code> with the attributes run together, or with braces and commas, <code>{A₁, A₂, …, Aₙ} → {B₁, …, Bₘ}</code>. Both mean the same. With single-letter attributes, <code>AB → C</code> means {A, B} → {C}.</p>
+<figure>
+<svg viewBox="0 0 560 190" width="560" role="img" aria-label="two tuples t and u agreeing on the A's must agree on the B's">
+  <text x="150" y="22" text-anchor="middle" class="big">A's</text><text x="290" y="22" text-anchor="middle" class="big">B's</text>
+  <path d="M90 30 V180 M210 30 V180 M370 30 V180" class="s-fg dash"/>
+  <path d="M96 28 H204 M216 28 H364" class="s-acc" marker-end="url(#m-acc)"/>
+  <text x="62" y="70" class="big">t</text><rect x="80" y="52" width="440" height="30" class="cell"/>
+  <rect x="90" y="52" width="120" height="30" class="cell-hl"/><rect x="210" y="52" width="160" height="30" class="cell-new"/>
+  <text x="62" y="150" class="big">u</text><rect x="80" y="132" width="440" height="30" class="cell"/>
+  <rect x="90" y="132" width="120" height="30" class="cell-hl"/><rect x="210" y="132" width="160" height="30" class="cell-new"/>
+  <text x="150" y="112" text-anchor="middle" class="lbl">if t and u agree here…</text>
+  <text x="290" y="112" text-anchor="middle" class="lbl">…they must agree here</text>
+  <text x="445" y="112" text-anchor="middle" class="lbl">other attributes: free</text>
+</svg>
+<figcaption><b>Figure 1.</b> The meaning of A → B (slide 7). For <em>any</em> two tuples t and u: equal on the orange columns forces equal on the green columns. The remaining columns may differ.</figcaption>
+</figure>
+
+<h2>3. When does a relation satisfy an FD? (slide 8)</h2>
+<dl class="def">
+  <dt>R satisfies f</dt><dd>Relation schema R satisfies FD f if <em>every</em> instance of R that can legally occur obeys f. An FD is a constraint on the schema, not an observation about one table.</dd>
+</dl>
+<p>The direction of an FD matters. The slide's example:</p>
+<ul>
+  <li><code>StudentID → PhoneNumber</code>: a student has only one phone number. Two students may share a number (siblings at home).</li>
+  <li><code>PhoneNumber → StudentID</code>: a phone number belongs to only one student. A student may have several numbers.</li>
+</ul>
+<p>These are different rules about the world, and a designer must decide which is true.</p>
+
+<h3>Why “functional”?</h3>
+<p>A → B behaves like a mathematical function from A-values to B-values: give it the A-value and it returns one B-value. It is not usually a function you can compute by a formula (no formula turns a title and year into a length); it is a function in the sense that the database can store only one answer. If the FD did not hold, one A-value could map to several B-values, and that is not a function.</p>
+
+<h2>4. FDs of Movies1 (slides 9–12)</h2>
+<figure>
+<div id="m1"></div>
+<figcaption><b>Figure 2.</b> An instance of Movies1 (slide 9). Star Wars appears three times, once per star.</figcaption>
+</figure>
+<p><strong>Is this a good design? (slide 10)</strong> Seemingly not. It holds information about three kinds of thing (movies, studios, stars) in one relation, and the year, length and genre of Star Wars are stored three times. To judge a design properly we need to know its FDs. Turning the rules into FDs (slide 11):</p>
+<div class="tbl"><table>
+<tr><th>Rule</th><th>FD</th></tr>
+<tr><td>Two movies with the same title are not produced in the same year</td><td class="fd">title year → length</td></tr>
+<tr><td>A movie has one genre</td><td class="fd">title year → genre</td></tr>
+<tr><td>A movie is made by only one studio</td><td class="fd">title year → studioName</td></tr>
+</table></div>
+<p>All three have the same left side because “a movie” means “a (title, year) pair”: the first rule says (title, year) identifies a movie. With commas: <code>title, year → length</code>, and so on.</p>
+<p><strong>The combined FD (slide 12).</strong> The slides claim <code>title year → length genre studioName</code>. Check it against the definition: if two tuples agree on title and year, they are about the same movie, and one movie has one length, one genre and one studio. So they agree on all three. The claim is true, and it says exactly what the three separate FDs say together (Chapter 4 calls this the combining rule).</p>
+
+<h2>5. An FD that does not hold (slide 13)</h2>
+<p>Does <code>title year → starName</code> hold? Take the first two tuples: both are (Star Wars, 1977), but one has Carrie Fisher and the other Mark Hamill. They agree on the left side and disagree on the right, so the FD is <strong>false</strong>. A movie has many stars.</p>
+<div class="q">
+<h4>Slide 13: “What if your existing instance does not violate the FD?”</h4>
+<p>Suppose the table held only one tuple per movie, so no two tuples share a title and year. Then no pair of tuples violates <code>title year → starName</code> in that instance. It is <em>still not an FD of Movies1</em>: tomorrow someone may insert a second star for a movie, and that is a perfectly legal tuple. An FD is a rule about every legal instance. One instance can <strong>disprove</strong> an FD (one violating pair is enough) but can never <strong>prove</strong> it. FDs come from the meaning of the data.</p>
+</div>
+
+<h2>6. Testing FDs on an instance (slide 14)</h2>
+<p>Slide 14 gives a relation R(A, B, C, D) and asks which FDs the instance obeys. The method: group the rows by their left-side values, and check that each group has a single right-side value.</p>
+<figure>
+<span class="anim-tag">Animation</span>
+<div id="abcd"></div>
+</figure>
+<div class="q">
+<h4>Slide 14: “Does A → C hold? Yes. Why?”</h4>
+<p>Group the rows by A. The two a₁ rows both have C = c₁. The two a₂ rows both have C = c₂. The single a₃ row cannot conflict with anything. No two rows agree on A and differ on C, so <strong>this instance satisfies A → C</strong>. In contrast, A → B fails (the a₁ rows have b₁ and b₂) and C → A fails (the c₂ rows have a₂ and a₃). Following section 5, “A → C holds” here means “is not contradicted by this instance”; whether it is a real FD of R depends on what A and C mean.</p>
+</div>
+
+<h3>Try it: check any FD against this instance</h3>
+<div id="chk"></div>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+<div id="try2"></div>
+
+<div class="key"><p><strong>Summary:</strong> X → Y means any two tuples that agree on X agree on Y. FDs are constraints that come from the meaning of the data and must hold in every legal instance. For Movies1, <code>title year → length genre studioName</code> holds, while <code>title year → starName</code> does not because a movie has many stars. A single instance can refute an FD (one pair of rows that agree on X and differ on Y) but cannot prove one.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="lecture.js"></script>
+<script>
+$('#m1').innerHTML = inst(MOVIES1_H, MOVIES1, { cap: 'Movies1' });
+
+const H = ['A', 'B', 'C', 'D'];
+const R = [['a₁', 'b₁', 'c₁', 'd₁'], ['a₁', 'b₂', 'c₁', 'd₂'], ['a₂', 'b₂', 'c₂', 'd₂'], ['a₂', 'b₃', 'c₂', 'd₃'], ['a₃', 'b₃', 'c₂', 'd₄']];
+// colour the left and right columns of an FD test; bad = rows in a violating group
+function test(lc, rc) {
+  const groups = new Map();
+  R.forEach((r, i) => { const k = lc.map(c => r[c]).join('|'); if (!groups.has(k)) groups.set(k, []); groups.get(k).push(i); });
+  const cell = {}, bad = [];
+  for (const [, rows] of groups) {
+    const vals = new Set(rows.map(i => rc.map(c => R[i][c]).join('|')));
+    const viol = vals.size > 1;
+    rows.forEach(i => { lc.forEach(c => { cell[i + ',' + c] = 'hl'; }); rc.forEach(c => { cell[i + ',' + c] = viol ? 'bad' : (rows.length > 1 ? 'good' : ''); }); });
+    if (viol) bad.push(rows);
+  }
+  return { cell, bad };
+}
+const fr = (lc, rc, name) => { const t = test(lc, rc); return { html: inst(H, R, { cell: t.cell }), t }; };
+const a = fr([0], [1]), b = fr([0], [2]), c = fr([2], [0]);
+stepper('#abcd', [
+  { html: inst(H, R), cap: 'The instance from slide 14: five tuples over A, B, C, D.' },
+  { html: a.html, cap: '<b>A → B?</b> Group by A (orange). The two a₁ rows have B = b₁ and b₂ (red): they agree on A but differ on B. <b>Does not hold.</b>' },
+  { html: b.html, cap: '<b>A → C?</b> a₁ rows: C = c₁, c₁. a₂ rows: c₂, c₂ (green, consistent). a₃: one row. No violating pair: <b>holds on this instance.</b>' },
+  { html: c.html, cap: '<b>C → A?</b> Group by C. The c₂ rows have A = a₂, a₂, a₃ (red). Rows 3 and 5 agree on C and differ on A. <b>Does not hold.</b>' },
+]);
+
+// interactive checker
+const host = $('#chk');
+host.innerHTML = `<div class="fdtool"><form class="fdt-form"><label><span>FD to test on the instance above (attributes A, B, C, D)</span><input value="B -> D" spellcheck="false"></label><div class="fdt-btns"><button>Test</button></div></form><div class="fdt-msg" hidden></div><div class="out" style="margin-top:10px"></div></div>`;
+const S4 = FD.parseAttrs('A B C D');
+const run = () => {
+  const m = host.querySelector('.fdt-msg');
+  try {
+    const f = FD.parseFDs(S4, host.querySelector('input').value)[0];
+    if (!f) throw new Error('Type an FD such as <code>B -> D</code>.');
+    const lc = [0, 1, 2, 3].filter(i => f.l >> i & 1), rc = [0, 1, 2, 3].filter(i => f.r >> i & 1);
+    const t = test(lc, rc); m.hidden = true;
+    host.querySelector('.out').innerHTML = inst(H, R, { cell: t.cell }) + `<p class="fdt-res">${t.bad.length ? `<span class="bad">Violated.</span> Rows ${t.bad.map(g => g.map(i => i + 1).join(' and ')).join('; rows ')} agree on ${FD.fmtSet(S4, f.l)} but differ on ${FD.fmtSet(S4, f.r)}.` : `<span class="good">Not violated by this instance.</span> Every group of rows with equal ${FD.fmtSet(S4, f.l)} has one value of ${FD.fmtSet(S4, f.r)}.`}</p>`;
+  } catch (e) { m.innerHTML = '<b>Check your input.</b> ' + e.message; m.hidden = false; }
+};
+host.querySelector('form').addEventListener('submit', e => { e.preventDefault(); run(); });
+run();
+
+flashcards('#cards', [
+  { f: 'Functional dependency X → Y', b: 'Any two tuples that agree on all attributes of X also agree on all attributes of Y.' },
+  { f: 'Left side / determinant', b: 'The attributes X in X → Y.' },
+  { f: 'R satisfies an FD', b: 'Every legal instance of R obeys it. It is a constraint on the schema.' },
+  { f: 'Why “functional”?', b: 'Each X-value maps to exactly one Y-value, like a function.' },
+  { f: 'What one instance can show', b: 'It can refute an FD (one violating pair) but never prove it.' },
+  { f: 'Movies1 FD', b: 'title year → length genre studioName. Not title year → starName.' },
+]);
+quiz('#quiz', [
+  { q: '<code>StudentID → PhoneNumber</code> says…', opts: ['A phone number belongs to one student', 'A student has only one phone number', 'Every student has a phone', 'Phone numbers are unique'], a: 1, why: 'Fix the StudentID and the phone number is fixed. Two students may still share a number.' },
+  { q: 'In Movies1, which FD does NOT hold?', opts: ['title year → genre', 'title year → studioName', 'title year → starName', 'title year → length'], a: 2, why: 'Star Wars 1977 has three different stars.' },
+  { q: 'An instance has no two rows with the same title and year. What can we conclude about title year → starName?', opts: ['It holds for Movies1', 'Nothing: an instance cannot prove an FD', 'It is a key', 'It is trivial'], a: 1, why: 'Future legal instances may violate it. FDs come from the meaning of the data.' },
+  { q: 'On slide 14\'s instance, does B → C hold?', opts: ['Yes', 'No'], a: 1, why: 'Rows 2 and 3 both have b₂ but C = c₁ and c₂.' },
+  { q: 'How many tuples does it take to show an FD is violated?', opts: ['1', '2', 'All of them', 'It can never be shown'], a: 1, why: 'One pair that agrees on the left side and disagrees on the right is enough.' },
+]);
+ask('#try1', { q: 'On slide 14\'s instance, which two rows violate <code>B → D</code>? Give the row numbers (1–5), e.g. <code>1, 2</code>.', a: v => { const n = (v.match(/\d/g) || []).sort().join(''); return n === '45'; }, show: 'rows 4 and 5', hint: 'Group the rows by B. Which group has two different D-values?', why: 'Rows 4 and 5 both have b₃ but D = d₃ and d₄. (The two b₂ rows both have d₂, which is fine.)' });
+ask('#try2', { q: 'Does C D → B hold on slide 14\'s instance? Answer yes or no.', a: ['yes'], hint: 'Are there two rows that agree on both C and D?', why: 'The (C, D) pairs (c₁,d₁), (c₁,d₂), (c₂,d₂), (c₂,d₃), (c₂,d₄) are all different, so no pair of rows can violate it.' });
+</script>
+</body>
+</html>

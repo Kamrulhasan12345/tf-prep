@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dirty Data and Cascading Rollback · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 04 (Sukarna) · Chapter 1 · Slides 1–5 · Book §19.1.1–19.1.2</div>
+<h1>Dirty Data and Cascading Rollback</h1>
+<p class="lede">A scheduler can keep a schedule serializable and still let one transaction read a value that another transaction later takes back. This chapter explains that "dirty data" problem with the slides' two examples (a 2PL schedule and a timestamp schedule), answers the slide's "Why?", and animates the cascading-rollback algorithm that cleans up after it.</p>
+
+<h2>1. Where this lecture fits</h2>
+
+<p>The previous lectures built two separate pieces of a database system. The <b class="term">scheduler</b> (concurrency control: locking, timestamps) decides the order in which the actions of concurrent transactions run, so that the result is serializable. The <b class="term">log manager</b> and <b class="term">recovery manager</b> (logging) make sure that after a crash the database reflects exactly the committed transactions. The textbook's Chapter 19 (the slides' "DS-TCB", <i>Database Systems: The Complete Book</i>) looks at what goes wrong when these two pieces meet. Serializability says nothing about when a transaction may <em>abort</em>, and logging says nothing about the order of reads and writes. Problems appear in the gap between them.</p>
+
+<dl class="def">
+  <dt>Transaction</dt><dd>A unit of work on the database (a sequence of reads, writes and computation) that must run as a whole. It ends either with <b>commit</b> (its changes become permanent) or <b>abort</b> (all its changes are cancelled, also called <b>rollback</b>).</dd>
+  <dt>Committed</dt><dd>In this lecture, a transaction counts as committed only when its <code>COMMIT</code> log record has reached disk. Until then a crash would undo it.</dd>
+  <dt>Notation</dt><dd><i>r<sub>i</sub>(X)</i> and <i>w<sub>i</sub>(X)</i>: transaction T<sub>i</sub> reads or writes element X. <i>l<sub>i</sub>(X)</i> and <i>u<sub>i</sub>(X)</i>: T<sub>i</sub> locks or unlocks X. <i>c<sub>i</sub></i> and <i>a<sub>i</sub></i>: T<sub>i</sub> commits or aborts.</dd>
+</dl>
+
+<h2>2. Dirty data (slide 2)</h2>
+
+<dl class="def">
+  <dt>Dirty data</dt><dd>A value is <b>dirty</b> if it was written by a transaction that has not committed yet.</dd>
+  <dt>Dirty read</dt><dd>A read of a dirty value: transaction T<sub>1</sub> reads X after T<sub>2</sub> wrote X and before T<sub>2</sub> commits.</dd>
+</dl>
+
+<p>The dirty value can sit in a main-memory <b>buffer</b>, on <b>disk</b>, or in <b>both</b>. Where it sits does not matter for the problem: another transaction reads it from the buffer just as easily as from disk.</p>
+
+<p>The <b class="term">dirty-data problem</b> is the following chain of events from the slide:</p>
+<ol>
+  <li>T<sub>1</sub> reads dirty data written by T<sub>2</sub>.</li>
+  <li>T<sub>1</sub> commits.</li>
+  <li>T<sub>2</sub> later aborts, so its write is cancelled. The value T<sub>1</sub> read "never existed".</li>
+  <li>T<sub>1</sub>'s read, and every write T<sub>1</sub> computed from it, are now based on a value that is not part of any consistent database state. The database is <b>inconsistent</b>.</li>
+</ol>
+<p>Aborts happen for ordinary reasons: a constraint is violated, the user cancels, the scheduler kills a transaction to resolve a deadlock or a timestamp conflict. So the problem is real even without any crash.</p>
+
+<h2>3. Dirty data in a 2PL schedule (slide 3)</h2>
+
+<p>Two-phase locking (2PL) guarantees conflict-serializability, but plain 2PL lets a transaction release a lock before it commits. The slide's example (the textbook's Fig. 19.1) uses two transactions that should keep the constraint <b>A = B</b>: T<sub>1</sub> adds 100 to both A and B, T<sub>2</sub> doubles both. Both start at 25. Step through it:</p>
+
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="f191"></div>
+</figure>
+
+<p>Look at what T<sub>2</sub> did. It read A = 125, a value produced by T<sub>1</sub>, and B = 25, a value from before T<sub>1</sub>. That is not a state the database was ever consistently in. The result A = 250, B = 50 breaks A = B. If T<sub>1</sub> had never run, T<sub>2</sub> alone would give A = B = 50. The schedule obeyed 2PL (each transaction took all its locks before releasing any), so the slide's conclusion is: <strong>a 2PL schedule allows dirty reads.</strong> The only clean fix after the fact is to roll back T<sub>2</sub> as well.</p>
+
+<h2>4. Dirty data in a timestamp schedule (slide 4)</h2>
+
+<p>Recall timestamp-based concurrency control: each transaction T gets a timestamp TS(T), and the scheduler makes the schedule equivalent to the serial order of timestamps. Each element X keeps RT(X), the largest timestamp of a transaction that read X, and WT(X), the timestamp of the transaction that last wrote X. The slide (the textbook's Fig. 19.2) assumes the scheduler does <b>not</b> use the <b class="term">commit bit</b> C(X), the flag that says whether the last writer of X has committed. Here TS(T<sub>1</sub>) = 200, TS(T<sub>2</sub>) = 150, TS(T<sub>3</sub>) = 175.</p>
+
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="f192"></div>
+</figure>
+
+<div class="q">
+<h4>Slide 4 question: why is T<sub>2</sub>'s write of C "physically unrealizable"?</h4>
+<p>The timestamp scheduler pretends that each transaction runs instantly at the moment of its timestamp. T<sub>2</sub> has timestamp 150, so its write of C must look as if it happened at time 150. But T<sub>3</sub>, with timestamp 175, has already read C (RT(C) = 175). In the pretended serial order T<sub>2</sub> (150) comes before T<sub>3</sub> (175), so T<sub>3</sub> should have seen T<sub>2</sub>'s value of C. It saw the old value instead. Allowing the write would mean changing the past of a read that has already happened. The rule is: a write by T on X is too late when <b>TS(T) &lt; RT(X)</b>, here 150 &lt; 175, so T<sub>2</sub> must abort.</p>
+<p>When T<sub>2</sub> aborts, its write of B is cancelled and WT(B) goes back to 0. But T<sub>1</sub> already read T<sub>2</sub>'s value of B at step 2. Nothing stopped it, because without the commit bit the scheduler did not know that B was dirty. T<sub>1</sub> may have used that value to compute and write other elements, and it could even have committed. T<sub>1</sub>'s first read of B is now inconsistent.</p>
+</div>
+
+<p><strong>With the commit bit</strong> (slide 4, bottom), the scheduler sees that C(B) is false when T<sub>1</sub> tries to read B, and it <em>delays</em> the read until T<sub>2</sub> commits or aborts. Here T<sub>2</sub> aborts, B is restored, and only then does T<sub>1</sub> read the restored committed value. So timestamp scheduling with a commit bit never allows a dirty read.</p>
+
+<h2>5. The fix: cascading rollback (slide 5)</h2>
+
+<dl class="def">
+  <dt>Cascading rollback</dt><dd>When a transaction T aborts, every transaction that read dirty data written by T must also be aborted, and then every transaction that read from <em>those</em>, and so on. One abort can trigger a chain ("cascade") of aborts.</dd>
+</dl>
+
+<p>The slide's algorithm, written out:</p>
+<pre>cascade_rollback(T):            -- called when transaction T aborts
+    roll back T: restore the old value of every element T wrote
+    for each transaction U that read a value written by T:
+        cascade_rollback(U)     -- abort U, then repeat for U's readers</pre>
+
+<p>To <em>restore former values</em>, the system uses the log if it is an undo log or an undo/redo log, because those record each element's old value. If the dirty value has not reached disk yet, the disk copy of the database still has the right value. The recursion is what makes it a cascade: if T<sub>2</sub> read from T<sub>1</sub> and T<sub>3</sub> read from T<sub>2</sub>, aborting T<sub>1</sub> forces T<sub>2</sub> out, which forces T<sub>3</sub> out.</p>
+
+<p>Here is the algorithm on a chain of four transactions. T<sub>2</sub> reads A from T<sub>1</sub>, T<sub>3</sub> reads B from T<sub>2</sub>, T<sub>4</sub> reads C from T<sub>3</sub>, and then T<sub>1</sub> aborts:</p>
+
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="casc"></div>
+<figcaption><b>Figure 1.</b> Orange cells are reads of a value written by the transaction being rolled back; the dashed outline marks the write they read. Struck-out columns are rolled back.</figcaption>
+</figure>
+
+<p>Cascading rollback is expensive (work is thrown away, and the chain can be long), and it is only possible if none of the readers has committed. The next chapter turns these two observations into conditions on schedules: <em>recoverable</em> schedules make the cascade possible, and <em>ACR</em> schedules make it unnecessary.</p>
+
+<p><strong>Schedulers that never need it</strong> (slide 5 and the textbook, §19.1.2):</p>
+<ul>
+  <li>A <b>timestamp scheduler with a commit bit</b> never lets a transaction read dirty data, so it never needs cascading rollback.</li>
+  <li>A <b>validation-based scheduler</b> writes to the database (even to buffers) only after it has decided that the transaction will commit, so other transactions never see uncommitted values.</li>
+  <li>A <b>strict 2PL</b> scheduler (Chapter 3) holds exclusive locks until commit, which has the same effect.</li>
+</ul>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+<div id="try2"></div>
+
+<div class="key"><p><strong>Summary:</strong> data is dirty while the transaction that wrote it is uncommitted. Reading it is dangerous because the writer may abort. Plain 2PL allows dirty reads (slide 3), and so does a timestamp scheduler without a commit bit (slide 4, where T<sub>2</sub> aborts because its write of C comes after a later transaction already read C). The repair is cascading rollback: abort every transaction that read from the aborted one, recursively, restoring old values from the log.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="lecture.js"></script>
+<script>
+// Fig 19.1: 2PL schedule with a dirty read. Columns: step, T1, T2, A, B
+const R191 = [
+  ['', '', '', '25', '25'],
+  ['1', 'l<sub>1</sub>(A); r<sub>1</sub>(A);', '', '', ''],
+  ['2', 'A := A+100;', '', '', ''],
+  ['3', 'w<sub>1</sub>(A); l<sub>1</sub>(B); u<sub>1</sub>(A);', '', '125', ''],
+  ['4', '', 'l<sub>2</sub>(A); r<sub>2</sub>(A);', '', ''],
+  ['5', '', 'A := A*2;', '', ''],
+  ['6', '', 'w<sub>2</sub>(A);', '250', ''],
+  ['7', '', 'l<sub>2</sub>(B) <b>Denied</b>', '', ''],
+  ['8', 'r<sub>1</sub>(B);', '', '', ''],
+  ['9', '<b>Abort</b>; u<sub>1</sub>(B);', '', '', ''],
+  ['10', '', 'l<sub>2</sub>(B); u<sub>2</sub>(A); r<sub>2</sub>(B);', '', ''],
+  ['11', '', 'B := B*2;', '', ''],
+  ['12', '', 'w<sub>2</sub>(B); u<sub>2</sub>(B);', '', '50'],
+];
+const H191 = ['step', 'T<sub>1</sub>', 'T<sub>2</sub>', 'A', 'B'];
+const cap191 = [
+  'Both elements start at 25, so A = B holds. T<sub>1</sub> will add 100 to each; T<sub>2</sub> will double each.',
+  'T<sub>1</sub> locks A and reads it (25).',
+  'T<sub>1</sub> computes A + 100 = 125 in its own workspace.',
+  'T<sub>1</sub> writes A = 125 into the buffer, locks B, and, still in 2PL (all locks taken), <b>releases A</b> before committing. A = 125 is now <b>dirty</b>.',
+  'T<sub>2</sub> locks A and reads it. It gets <b>125, a dirty value</b>.',
+  'T<sub>2</sub> computes 125 × 2 = 250.',
+  'T<sub>2</sub> writes A = 250.',
+  'T<sub>2</sub> wants B, but T<sub>1</sub> holds the lock on B, so T<sub>2</sub> waits.',
+  'T<sub>1</sub> reads B (25).',
+  'T<sub>1</sub> <b>aborts</b> for some reason and releases B. Its change to A should now be cancelled, but T<sub>2</sub> has already used it.',
+  'T<sub>2</sub> gets the lock on B, releases A and reads B = 25, the value from <em>before</em> T<sub>1</sub>.',
+  'T<sub>2</sub> computes 25 × 2 = 50.',
+  'Final state: <b>A = 250, B = 50</b>, so A ≠ B. T<sub>2</sub> combined a value from T<sub>1</sub> (A) with a value from before T<sub>1</sub> (B). The database is inconsistent.',
+];
+stepper('#f191', R191.map((r, i) => ({
+  html: s4table(H191, R191, { upto: i, cur: i, cls: { '4,2': i >= 4 ? 'hl' : '', '9,1': i >= 9 ? 'del' : '', '3,3': i >= 3 && i < 9 ? 'hl' : '', '6,3': i >= 9 ? 'del' : '', '12,4': i >= 12 ? 'del' : '' } }),
+  cap: cap191[i],
+})));
+
+// Fig 19.2: timestamp schedule without commit bit. Columns: step, T1, T2, T3, A, B, C
+const R192 = [
+  ['', '200', '150', '175', 'RT=0 WT=0', 'RT=0 WT=0', 'RT=0 WT=0'],
+  ['1', '', 'w<sub>2</sub>(B);', '', '', 'WT=150', ''],
+  ['2', 'r<sub>1</sub>(B);', '', '', '', 'RT=200', ''],
+  ['3', '', 'r<sub>2</sub>(A);', '', 'RT=150', '', ''],
+  ['4', '', '', 'r<sub>3</sub>(C);', '', '', 'RT=175'],
+  ['5', '', 'w<sub>2</sub>(C);', '', '', '', ''],
+  ['6', '', '<b>Abort</b>;', '', '', 'WT=0', ''],
+  ['7', '', '', 'w<sub>3</sub>(A);', 'WT=175', '', ''],
+];
+const H192 = ['step', 'T<sub>1</sub>', 'T<sub>2</sub>', 'T<sub>3</sub>', 'A', 'B', 'C'];
+const cap192 = [
+  'Timestamps: T<sub>2</sub> = 150 is the oldest, then T<sub>3</sub> = 175, then T<sub>1</sub> = 200. All read and write times start at 0. No commit bit is used.',
+  'T<sub>2</sub> writes B. TS(T<sub>2</sub>) = 150 ≥ RT(B) = 0, so the write is allowed: WT(B) = 150. B is now dirty.',
+  'T<sub>1</sub> reads B. TS(T<sub>1</sub>) = 200 ≥ WT(B) = 150, so the read is allowed and RT(B) becomes 200 (the textbook\'s figure leaves this entry out). With no commit bit, nothing tells T<sub>1</sub> that B is <b>dirty</b>.',
+  'T<sub>2</sub> reads A: RT(A) = 150.',
+  'T<sub>3</sub> reads C: RT(C) = 175.',
+  'T<sub>2</sub> tries to write C. But TS(T<sub>2</sub>) = 150 &lt; RT(C) = 175: a younger transaction already read C. The write is <b>physically unrealizable</b>, so T<sub>2</sub> must abort.',
+  'T<sub>2</sub> aborts. Its write of B is cancelled: B gets its old value back and WT(B) returns to 0. But <b>T<sub>1</sub> already read the cancelled value of B</b> at step 2.',
+  'T<sub>3</sub> writes A: 175 ≥ RT(A) = 150 and ≥ WT(A) = 0, so WT(A) = 175. Meanwhile T<sub>1</sub> may have computed and written new values from its dirty read; it must be rolled back too.',
+];
+stepper('#f192', R192.map((r, i) => ({
+  html: s4table(H192, R192, { upto: i, cur: i, cls: { '2,1': i >= 2 ? 'hl' : '', '5,2': i >= 5 ? 'del' : '', '6,2': i >= 6 ? 'del' : '' } }),
+  cap: cap192[i],
+})));
+
+stepper('#casc', s4cascadeFrames(s4parse('w1(A); r2(A); w2(B); r3(B); w3(C); r4(C); a1').acts, 1));
+
+flashcards('#cards', [
+  { f: 'Dirty data', b: 'A value written by a transaction that has not committed yet. It may be in a buffer, on disk, or both.' },
+  { f: 'Dirty read', b: 'Reading a value whose writer has not committed. If the writer aborts, the reader used a value that never really existed.' },
+  { f: 'Abort / rollback', b: 'Ending a transaction by cancelling all of its changes, restoring the old values.' },
+  { f: 'Cascading rollback', b: 'When T aborts, abort every transaction that read data written by T, then recursively every transaction that read from those.' },
+  { f: 'Commit bit C(X)', b: 'Timestamp schedulers: true when the last writer of X has committed. A read of X while C(X) is false is delayed, so dirty reads cannot happen.' },
+  { f: 'Physically unrealizable write', b: 'Timestamp rule: T writes X but TS(T) < RT(X). A younger transaction already read X, so T\'s write would have to change the past. T aborts.' },
+  { f: 'Where the old values come from', b: 'An undo or undo/redo log (it records old values), or the disk copy if the dirty value never reached disk.' },
+]);
+quiz('#quiz', [
+  { q: 'Which schedulers can produce a dirty read?', opts: ['Only non-serializable ones', 'Plain 2PL and a timestamp scheduler without a commit bit', 'Strict 2PL', 'A timestamp scheduler with a commit bit'], a: 1, why: 'Slides 3 and 4: both examples are serializable schedulers, yet T<sub>2</sub> (2PL) and T<sub>1</sub> (timestamps, no commit bit) read uncommitted values.' },
+  { q: 'In the 2PL example, why is the final state A = 250, B = 50 wrong?', opts: ['T<sub>2</sub> did not follow 2PL', 'T<sub>2</sub> doubled A twice', 'T<sub>2</sub> read A from the aborted T<sub>1</sub> but read B from before T<sub>1</sub>', 'B was never written'], a: 2, why: 'T<sub>2</sub> mixed one value from T<sub>1</sub> (A = 125) with one from before T<sub>1</sub> (B = 25). Without T<sub>1</sub>, the right answer is A = B = 50.' },
+  { q: 'In the timestamp example, T<sub>2</sub> (TS 150) aborts at w<sub>2</sub>(C) because…', opts: ['WT(C) &gt; 150', 'RT(C) = 175 &gt; 150', 'T<sub>1</sub> holds a lock on C', 'C is dirty'], a: 1, why: 'A write is too late when TS(T) &lt; RT(X). T<sub>3</sub> (175) already read C.' },
+  { q: 'T<sub>2</sub> read from T<sub>1</sub>, T<sub>3</sub> read from T<sub>2</sub>, T<sub>4</sub> read only committed values. T<sub>1</sub> aborts. Who is rolled back?', opts: ['Only T<sub>1</sub>', 'T<sub>1</sub> and T<sub>2</sub>', 'T<sub>1</sub>, T<sub>2</sub> and T<sub>3</sub>', 'All four'], a: 2, why: 'The cascade follows "read from" links: T<sub>1</sub> → T<sub>2</sub> → T<sub>3</sub>. T<sub>4</sub> did not read from any of them.' },
+  { q: 'Which statement about the commit bit is correct?', opts: ['It makes T abort on every dirty read', 'It delays a read of dirty data until the writer commits or aborts', 'It is used by 2PL schedulers', 'It records the read time of X'], a: 1, why: 'Slide 4: the dirty-read attempt is paused, not refused.' },
+]);
+ask('#try1', { q: 'In Fig. 19.1, if T<sub>1</sub> had never run, what value would T<sub>2</sub> leave in A (and in B)?', a: 50, why: 'T<sub>2</sub> alone doubles 25 to 50 in both, keeping A = B.', hint: 'Start from A = B = 25 and apply only T<sub>2</sub>.' });
+ask('#try2', { q: 'In Fig. 19.2, what is RT(B) right after r<sub>1</sub>(B)?', a: 200, why: 'RT(B) = max(0, TS(T<sub>1</sub>)) = 200. The textbook\'s figure simply omits this entry.', hint: 'A read sets RT(X) to the larger of RT(X) and the reader\'s timestamp.' });
+</script>
+</body>
+</html>

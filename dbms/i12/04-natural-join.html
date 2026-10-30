@@ -1,0 +1,302 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Natural Join and SQL to RA · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 12 (Ishrak) · Chapter 4 · Slides 17–20 · Book §2.4.8</div>
+<h1>Natural Join (⋈) and Translating SQL to RA</h1>
+<p class="lede">The natural join pairs rows that agree on every attribute the two relations share. This chapter derives it from ×, σ, π and ρ as slide 17 does, answers slide 19's three schema questions, and then turns SQL blocks into RA, including the question bank's "write it using a Cartesian product, then using a natural join" questions.</p>
+
+<h2>1. Definition (slide 17)</h2>
+
+<dl class="def">
+  <dt>Natural join R<sub>1</sub> ⋈ R<sub>2</sub></dt>
+  <dd>Pairs each tuple of R<sub>1</sub> with each tuple of R<sub>2</sub> that has <b>equal values on all shared attributes</b> (attributes with the same name), and keeps one copy of each shared attribute. If R<sub>1</sub> has attribute set A and R<sub>2</sub> has B, the result's attributes are A ∪ B.</dd>
+  <dt>Shared attributes C = A ∩ B</dt>
+  <dd>The attributes that appear in both schemas. Slide 17 also writes the join as R<sub>1</sub> ⋈<sub>C</sub> R<sub>2</sub> to make them explicit.</dd>
+  <dt>Dangling tuple</dt>
+  <dd>A tuple of one relation that matches no tuple of the other. It does not appear in the natural join at all. (The outer joins of <a href="06-theta-outer-joins.html">Chapter 6</a> keep dangling tuples.)</dd>
+</dl>
+
+<p>The natural join is the slides' first <b>derived</b> operator. Slide 17 gives its meaning in terms of the basic operators:</p>
+<p class="ra-big">R<sub>1</sub> ⋈ R<sub>2</sub> = π<sub>A ∪ B</sub>(σ<sub>C = D</sub>(ρ<sub>C→D</sub>(R<sub>1</sub>) × R<sub>2</sub>))</p>
+<ol>
+  <li><b>ρ<sub>C→D</sub>(R<sub>1</sub>)</b> renames the shared attributes C in one relation to new names D, so the product does not contain two attributes with the same name.</li>
+  <li><b>× R<sub>2</sub></b> forms all pairs.</li>
+  <li><b>σ<sub>C = D</sub></b> keeps the pairs where every renamed attribute equals its original partner.</li>
+  <li><b>π<sub>A ∪ B</sub></b> drops the renamed copies D, leaving one copy of each shared attribute.</li>
+</ol>
+<p>The same thing in SQL, for Students(sid, name, gpa) and People(ssn, name, address), which share <code>name</code> (slide 17):</p>
+<div class="figrow">
+<pre>SELECT DISTINCT sid, S.name, gpa,
+       ssn, address
+FROM Students S, People P
+WHERE S.name = P.name;</pre>
+<p class="ra-big">Students ⋈ People</p>
+</div>
+<p>The slide's SQL says <code>ssid</code> in the SELECT list; that is a typo for <code>sid</code>. Oracle also has the join written out as a keyword, <code>SELECT * FROM Students NATURAL JOIN People;</code>, which does the matching and the single copy of <code>name</code> automatically.</p>
+
+<h3>Slide 18's example, step by step</h3>
+<p>The animation evaluates slide 17's formula literally, so you can see each of the four steps, and then the ⋈ operator directly. Both give the same two tuples. (Slide 18 prints Bob's address in the result as 216 Rosse; People says <b>217 Rosse</b>, and a join only copies values, so 217 Rosse is correct.)</p>
+
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="formula"></div>
+<figcaption><b>Figure 1.</b> Slide 17's definition, evaluated literally: rename, product, select, project.</figcaption>
+</figure>
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="nj"></div>
+<figcaption><b>Figure 2.</b> The same join with the ⋈ operator: one step.</figcaption>
+</figure>
+
+<h2>2. Slide 19's three questions</h2>
+
+<div class="q"><h4>Given R(A, B, C, D) and S(A, C, E), what is the schema of R ⋈ S?</h4>
+<p>The shared attributes are A and C. The result has every attribute once: <b>(A, B, C, D, E)</b>. A tuple r of R joins a tuple s of S when r.A = s.A and r.C = s.C.</p></div>
+<div class="q"><h4>Given R(A, B, C) and S(D, E), what is R ⋈ S?</h4>
+<p>There are no shared attributes, so the condition "agree on all shared attributes" is true for every pair (there is nothing to check). <b>R ⋈ S = R × S</b>, with schema (A, B, C, D, E).</p></div>
+<div class="q"><h4>Given R(A, B) and S(A, B), what is R ⋈ S?</h4>
+<p>Every attribute is shared, so a pair joins only when the two tuples are identical, and the result keeps one copy of each attribute. <b>R ⋈ S = R ∩ S</b>, schema (A, B).</p></div>
+<p>Check all three in the evaluator below (examples 3–5 use small relations R, S with those schemas).</p>
+
+<figure class="wide">
+<span class="anim-tag">Interactive tool</span>
+<div id="lab"></div>
+</figure>
+
+<h3>A trap: shared names that mean different things</h3>
+<p>The natural join matches attributes by <em>name</em> only. If two relations happen to use the same name for unrelated things, the join silently adds an unwanted condition. Example from the question bank: Emp(eno, ename, title, city) and Proj(pno, pname, budget, city). Emp ⋈ Works ⋈ Proj would also force Emp.city = Proj.city, keeping only employees who live in their project's city. The fix is to project away (or rename) the clashing attribute first, or to use a theta join with an explicit condition (<a href="06-theta-outer-joins.html">Chapter 6</a>). Always list the shared attributes before writing ⋈.</p>
+
+<h2>3. Converting an SFW query to RA (slide 20)</h2>
+
+<p>A <b class="term">SELECT-FROM-WHERE (SFW)</b> query translates mechanically:</p>
+<ol>
+  <li><code>FROM R1, R2, …</code> becomes R1 × R2 × … (rename with ρ if a table appears twice or has an alias that the query uses).</li>
+  <li><code>WHERE c</code> becomes σ<sub>c</sub> on top.</li>
+  <li><code>SELECT DISTINCT list</code> becomes π<sub>list</sub> on top of that.</li>
+  <li>Optionally, a σ whose condition equates the shared attributes, on top of ×, can be written as ⋈ (and other equality conditions as a theta join).</li>
+</ol>
+
+<div class="q"><h4>Slide 20: how do we represent this query in RA?</h4>
+<p>Schema: Students(sid, sname, gpa), People(ssn, sname, address).</p>
+<pre>SELECT DISTINCT gpa, address
+FROM Students S, People P
+WHERE gpa &gt; 3.5 AND S.sname = P.sname;</pre>
+<p>Literal translation: π<sub>gpa,address</sub>(σ<sub>gpa&gt;3.5 ∧ S.sname=P.sname</sub>(ρ<sub>S</sub>(Students) × ρ<sub>P</sub>(People))). The condition S.sname = P.sname equates the only shared attribute, so σ and × together are a natural join, which gives the slide's answer:</p>
+<p class="ra-big">π<sub>gpa,address</sub>(σ<sub>gpa&gt;3.5</sub>(S ⋈ P))</p>
+<p>Both are in the evaluator above (examples 6 and 7). On the sample data (John 3.4, Bob 1.3, Rina 3.8, Tanvir 3.6, and only John and Bob are People) the result is <b>empty</b>: the two students with gpa &gt; 3.5 have no matching person. That is a correct answer, not a bug; an empty relation is still a relation.</p>
+</div>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+<h3>Write it yourself</h3>
+<div id="ex1"></div>
+<div id="ex2"></div>
+<div id="ex3"></div>
+<div id="ex4"></div>
+<div id="ex5"></div>
+
+<h3>Exam questions</h3>
+<div class="exam">
+  <div class="exam-src">DB QB · Jan 20 15 · 10 marks + Jan 20 16 · 10 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-2 | 2018–19 · 20 marks</div>
+  <div class="exam-q"><p>Consider the following schema of Sonali Bank Limited.</p>
+  <p>customer (customer_id, customer_name, customer_address)<br>account (account_id, account_type, account_branch, account_balance)<br>branch (branch_routing_number, branch_name)<br>transaction (account_id, transaction_amount, transaction_date)<br>loan (loan_id, customer_id, loan_amount)</p>
+  <p>Notice that the attribute account_branch of table account is a foreign key referencing the primary key branch_routing_number from table branch. On the other hand, the attribute account_id of table account is a foreign key referencing the primary key customer_id from table customer.</p>
+  <p>(a) Write a relational algebra expression using Cartesian product to find out the customers' name and their corresponding loan amounts who have a "savings" type account at the branch named "BUET Br.".</p>
+  <p>(b) Write the equivalent relational algebra expression for the following SQL statement:</p>
+  <pre>select c.customer_name, a.account_id, t.transaction_amount
+from customer c, account a, transaction t
+where c.customer_id = a.account_id and a.account_id = t.account_id
+and t.transaction_date = "01-JAN-2020" and t.transaction_amount &gt; 5000</pre></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><b>Reading the schema.</b> The odd foreign key says that an account's id <em>is</em> the id of the customer who owns it, so "customer c owns account a" is the condition c.customer_id = a.account_id. A loan belongs to a customer through loan.customer_id. An account is at a branch through account_branch = branch_routing_number.</p>
+    <p><b>(a)</b> Take the product of the four relations, keep the combinations that are linked by the three foreign keys and that satisfy the two filters, and project:</p>
+    <p class="ra-big">π<sub>customer_name, loan_amount</sub>(σ<sub>θ</sub>(customer × account × branch × loan))</p>
+    <p>θ = customer.customer_id = account.account_id ∧ account.account_branch = branch.branch_routing_number ∧ loan.customer_id = customer.customer_id ∧ account.account_type = 'savings' ∧ branch.branch_name = 'BUET Br.'</p>
+    <p>All the attribute names except customer_id are unique, so only customer_id needs its relation prefix. A customer with two loans appears twice with two amounts, which is what "their corresponding loan amounts" asks for. A better plan pushes the two filters down (σ<sub>account_type='savings'</sub>(account), σ<sub>branch_name='BUET Br.'</sub>(branch)) before the products, but the question asks for the Cartesian-product form.</p>
+    <p><b>(b)</b> FROM is a product, WHERE is a selection, SELECT is a projection. The aliases c, a, t become ρ (or simply the relation names, since each table appears once):</p>
+    <p class="ra-big">π<sub>c.customer_name, a.account_id, t.transaction_amount</sub>(σ<sub>φ</sub>(ρ<sub>c</sub>(customer) × ρ<sub>a</sub>(account) × ρ<sub>t</sub>(transaction)))</p>
+    <p>φ = c.customer_id = a.account_id ∧ a.account_id = t.account_id ∧ t.transaction_date = '01-JAN-2020' ∧ t.transaction_amount &gt; 5000</p>
+    <p>Note the SQL is not <code>SELECT DISTINCT</code>, so strictly it returns a bag; the RA answer is the set version, which is the standard reading in this course. (The date literal in double quotes is not valid Oracle; it should be <code>DATE '2020-01-01'</code> or <code>TO_DATE('01-JAN-2020', 'DD-MON-YYYY')</code>.)</p>
+    <p>Both expressions were evaluated on invented sample data in the evaluator below; the SQL box under it runs the matching Oracle SQL and gives the same rows. (In the SQL box the table name is written <code>"transaction"</code> in double quotes, because the playground's SQLite engine treats TRANSACTION as a keyword. Oracle accepts it unquoted.)</p>
+    <div id="bankLab"></div>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2016–17 · 20 marks</div>
+  <div class="exam-q"><p>Given three relations: customer(customer_id, name, street, city), account(account_number, type, balance), transaction(customer_id, account_number, date, amount).</p>
+  <p>(a) Write a relational algebra expression using Cartesian product to find customer_id, date and amount of all transactions made by customer id "C005".<br>(b) Rewrite the expression of (i) using natural join.<br>(c) Write the equivalent relational algebra expression for the following SQL:</p>
+  <pre>SELECT a.customer_id, b.account_number, name, street, city
+FROM customer AS a, account AS b, transaction AS c
+WHERE a.customer_id = c.customer_id
+  AND b.account_number = c.account_number
+  AND date = '01-JAN-2017'
+  AND amount &gt; 10000;</pre></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><b>(a)</b> Pair customers with transactions, keep the pairs that belong together and are for C005, then project:</p>
+    <p class="ra-big">π<sub>transaction.customer_id, date, amount</sub>(σ<sub>customer.customer_id = transaction.customer_id ∧ customer.customer_id = 'C005'</sub>(customer × transaction))</p>
+    <p>Only customer_id appears in both relations, so only it needs a prefix. (All three wanted attributes are in transaction, so π<sub>customer_id,date,amount</sub>(σ<sub>customer_id='C005'</sub>(transaction)) would also do; the product is there because the question asks for it. The two differ only if a transaction referred to a customer that does not exist, which the foreign key forbids.)</p>
+    <p><b>(b)</b> The selection's first conjunct equates the only shared attribute, so σ + × is a natural join:</p>
+    <p class="ra-big">π<sub>customer_id, date, amount</sub>(σ<sub>customer_id = 'C005'</sub>(customer ⋈ transaction))</p>
+    <p><b>(c)</b> Literal translation (the aliases a, b, c are renamings):</p>
+    <p class="ra-big">π<sub>a.customer_id, b.account_number, name, street, city</sub>(σ<sub>a.customer_id = c.customer_id ∧ b.account_number = c.account_number ∧ date = '01-JAN-2017' ∧ amount &gt; 10000</sub>(ρ<sub>a</sub>(customer) × ρ<sub>b</sub>(account) × ρ<sub>c</sub>(transaction)))</p>
+    <p>Equivalently with natural joins, because customer–transaction share only customer_id and account–transaction share only account_number (customer and account share nothing):</p>
+    <p class="ra-big">π<sub>customer_id, account_number, name, street, city</sub>(σ<sub>date = '01-JAN-2017' ∧ amount &gt; 10000</sub>(customer ⋈ transaction ⋈ account))</p>
+    <p>All four expressions were run on sample data below (dates stored as 'YYYY-MM-DD' text, so the evaluator compares with '2017-01-01'). In real Oracle, DATE is a reserved word, so the column would have to be called something else (for example txn_date).</p>
+    <div id="custLab"></div>
+  </div></details>
+</div>
+
+<div class="key"><p><strong>Summary:</strong> R ⋈ S pairs the tuples that agree on all shared attributes and keeps one copy of each, = π<sub>A∪B</sub>(σ<sub>C=D</sub>(ρ<sub>C→D</sub>(R) × S)). No shared attributes: ⋈ = ×. All attributes shared: ⋈ = ∩. A SQL block becomes π<sub>SELECT</sub>(σ<sub>WHERE</sub>(FROM-product)); equalities on shared attributes turn σ + × into ⋈. Check for accidental shared names before using ⋈.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/sqlplay.js"></script>
+<script src="lecture.js"></script>
+<script>
+const DB4 = { ...raDB(`
+Students(sid, name, gpa)
+001 | John | 3.4
+002 | Bob | 1.3
+
+People(ssn, name, address)
+1234545 | John | 216 Rosse
+5423341 | Bob | 217 Rosse
+`) };
+raSteps('#formula', DB4, 'project[sid, name, gpa, ssn, address](select[D = name](rename[name -> D](Students) x People))',
+  { sql: 'SELECT DISTINCT sid, S.name, gpa, ssn, address FROM Students S, People P WHERE S.name = P.name;' });
+raSteps('#nj', DB4, 'Students join People', { sql: 'SELECT * FROM Students NATURAL JOIN People;' });
+
+const DBQ = { ...DB_SLIDES, ...raDB(`
+R(A, B, C, D)
+1 | b1 | 10 | d1
+2 | b2 | 20 | d2
+3 | b3 | 30 | d3
+
+S(A, C, E)
+1 | 10 | e1
+2 | 99 | e2
+3 | 30 | e3
+
+T(D2, E2)
+x | 1
+y | 2
+
+RR(A, B)
+1 | 2
+3 | 4
+5 | 6
+
+SS(A, B)
+3 | 4
+5 | 6
+7 | 8
+`) };
+raLab('#lab', { db: DBQ, presets: [
+  { label: '1. Students ⋈ People with sname renamed to match pname', ra: 'Students join rename[pname -> sname](People)', sql: 'SELECT *\nFROM Students NATURAL JOIN (SELECT ssn, pname AS sname, address FROM People);' },
+  { label: '2. Students ⋈ People as they are: no shared names, so ×', ra: 'Students join People', sql: 'SELECT *\nFROM Students, People;' },
+  { label: '3. R(A,B,C,D) ⋈ S(A,C,E)', ra: 'R join S', sql: 'SELECT *\nFROM R NATURAL JOIN S;' },
+  { label: '4. R(A,B,C,D) ⋈ T(D2,E2): no shared attributes', ra: 'R join T', sql: 'SELECT *\nFROM R, T;' },
+  { label: '5. RR(A,B) ⋈ SS(A,B) = RR ∩ SS', ra: 'RR join SS', sql: 'SELECT *\nFROM RR NATURAL JOIN SS;' },
+  { label: '6. Slide 20, literal translation', ra: 'project[gpa, address](select[gpa > 3.5 and S.sname = P.sname](rename[S](Students) x rename[P](rename[pname -> sname](People))))', sql: 'SELECT DISTINCT gpa, address\nFROM Students S, (SELECT ssn, pname AS sname, address FROM People) P\nWHERE gpa > 3.5 AND S.sname = P.sname;' },
+  { label: '7. Slide 20 with ⋈ (gpa > 3 to get rows)', ra: 'project[gpa, address](select[gpa > 3](Students join rename[pname -> sname](People)))', sql: 'SELECT DISTINCT gpa, address\nFROM Students S, People P\nWHERE gpa > 3 AND S.sname = P.pname;' },
+] });
+
+const BANK = raDB(`
+customer(customer_id, customer_name, customer_address)
+1 | Karim | Dhanmondi
+2 | Rahim | Mirpur
+3 | Sumi | Uttara
+4 | Nadia | Banani
+
+account(account_id, account_type, account_branch, account_balance)
+1 | savings | 101 | 50000
+2 | current | 101 | 20000
+3 | savings | 101 | 75000
+4 | savings | 102 | 10000
+
+branch(branch_routing_number, branch_name)
+101 | BUET Br.
+102 | Motijheel Br.
+
+transaction(account_id, transaction_amount, transaction_date)
+1 | 7000 | 2020-01-01
+1 | 3000 | 2020-01-01
+2 | 9000 | 2020-01-01
+3 | 8000 | 2020-01-02
+4 | 12000 | 2020-01-01
+
+loan(loan_id, customer_id, loan_amount)
+L1 | 1 | 50000
+L2 | 2 | 120000
+L3 | 1 | 30000
+L4 | 4 | 80000
+`);
+raLab('#bankLab', { db: BANK, presets: [
+  { label: '(a) with Cartesian product', ra: "project[customer_name, loan_amount](select[customer.customer_id = account.account_id and account.account_branch = branch.branch_routing_number and loan.customer_id = customer.customer_id and account.account_type = 'savings' and branch.branch_name = 'BUET Br.'](customer x account x branch x loan))",
+    sql: "SELECT DISTINCT c.customer_name, l.loan_amount\nFROM customer c, account a, branch b, loan l\nWHERE c.customer_id = a.account_id\n  AND a.account_branch = b.branch_routing_number\n  AND l.customer_id = c.customer_id\n  AND a.account_type = 'savings'\n  AND b.branch_name = 'BUET Br.';" },
+  { label: '(b) the SQL as RA', ra: "project[c.customer_name, a.account_id, t.transaction_amount](select[c.customer_id = a.account_id and a.account_id = t.account_id and t.transaction_date = '2020-01-01' and t.transaction_amount > 5000](rename[c](customer) x rename[a](account) x rename[t](transaction)))",
+    sql: "SELECT DISTINCT c.customer_name, a.account_id, t.transaction_amount\nFROM customer c, account a, \"transaction\" t\nWHERE c.customer_id = a.account_id AND a.account_id = t.account_id\n  AND t.transaction_date = '2020-01-01' AND t.transaction_amount > 5000;" },
+] });
+const CUST = raDB(`
+customer(customer_id, name, street, city)
+C001 | Rafi | Road 5 | Dhaka
+C005 | Mitu | Road 9 | Khulna
+C007 | Anis | Lake Rd | Dhaka
+
+account(account_number, type, balance)
+A10 | savings | 30000
+A20 | current | 90000
+A30 | savings | 5000
+
+transaction(customer_id, account_number, date, amount)
+C005 | A10 | 2017-01-01 | 15000
+C005 | A20 | 2017-01-03 | 2000
+C001 | A20 | 2017-01-01 | 8000
+C007 | A30 | 2017-01-01 | 20000
+C001 | A10 | 2017-01-02 | 12000
+`);
+raLab('#custLab', { db: CUST, presets: [
+  { label: '(a) with ×', ra: "project[transaction.customer_id, date, amount](select[customer.customer_id = transaction.customer_id and customer.customer_id = 'C005'](customer x transaction))", sql: "SELECT DISTINCT t.customer_id, t.date, t.amount\nFROM customer c, \"transaction\" t\nWHERE c.customer_id = t.customer_id AND c.customer_id = 'C005';" },
+  { label: '(b) with ⋈', ra: "project[customer_id, date, amount](select[customer_id = 'C005'](customer join transaction))", sql: "SELECT DISTINCT customer_id, date, amount\nFROM customer NATURAL JOIN \"transaction\"\nWHERE customer_id = 'C005';" },
+  { label: '(c) literal translation', ra: "project[a.customer_id, b.account_number, name, street, city](select[a.customer_id = c.customer_id and b.account_number = c.account_number and date = '2017-01-01' and amount > 10000](rename[a](customer) x rename[b](account) x rename[c](transaction)))", sql: "SELECT DISTINCT a.customer_id, b.account_number, name, street, city\nFROM customer a, account b, \"transaction\" c\nWHERE a.customer_id = c.customer_id\n  AND b.account_number = c.account_number\n  AND date = '2017-01-01' AND amount > 10000;" },
+  { label: '(c) with natural joins', ra: "project[customer_id, account_number, name, street, city](select[date = '2017-01-01' and amount > 10000](customer join transaction join account))", sql: "SELECT DISTINCT customer_id, account_number, name, street, city\nFROM customer NATURAL JOIN \"transaction\" NATURAL JOIN account\nWHERE date = '2017-01-01' AND amount > 10000;" },
+] });
+
+flashcards('#cards', [
+  { f: 'R ⋈ S', b: 'Pairs tuples that agree on all shared attributes; keeps one copy of each shared attribute.' },
+  { f: 'Natural join from basic operators', b: 'π<sub>A∪B</sub>(σ<sub>C=D</sub>(ρ<sub>C→D</sub>(R) × S)).' },
+  { f: 'No shared attributes', b: 'R ⋈ S = R × S.' },
+  { f: 'All attributes shared', b: 'R ⋈ S = R ∩ S.' },
+  { f: 'Dangling tuple', b: 'A tuple with no partner in the other relation; it disappears from a natural join.' },
+  { f: 'SFW → RA', b: 'π<sub>SELECT list</sub>(σ<sub>WHERE</sub>(R1 × R2 × …)); aliases become ρ.' },
+  { f: 'Natural-join trap', b: 'Unrelated attributes with the same name (e.g. city in Emp and Proj) are also matched. Project or rename them away first.' },
+]);
+quiz('#quiz', [
+  { q: 'Schema of R(A, B, C, D) ⋈ S(A, C, E)?', opts: ['(A, B, C, D, A, C, E)', '(A, B, C, D, E)', '(A, C)', '(B, D, E)'], a: 1, why: 'Shared attributes A and C appear once.' },
+  { q: 'R(A, B, C) ⋈ S(D, E) equals…', opts: ['∅', 'R × S', 'R ∩ S', 'R ∪ S'], a: 1, why: 'No shared attributes: every pair qualifies.' },
+  { q: 'R(A, B) ⋈ S(A, B) equals…', opts: ['R × S', 'R ∪ S', 'R ∩ S', 'R − S'], a: 2, why: 'Tuples must agree on every attribute, so they are identical.' },
+  { q: 'In slide 17\'s formula, what is ρ<sub>C→D</sub> for?', opts: ['To sort the result', 'To give the shared attributes of one side new names so the product has no duplicate names', 'To remove duplicates', 'To pick the key'], a: 1, why: 'σ<sub>C=D</sub> then compares the copies, and π drops D.' },
+  { q: 'Emp(eno, ename, title, city) ⋈ Proj(pno, pname, budget, city) matches on…', opts: ['nothing', 'city', 'eno and pno', 'every attribute'], a: 1, why: 'city is the only shared name, even though it means different things in the two tables.' },
+  { q: 'An instructor whose dept_name appears in no department tuple, in instructor ⋈ department…', opts: ['appears with NULL building', 'does not appear', 'appears once per department', 'causes an error'], a: 1, why: 'It is a dangling tuple; only an outer join keeps it.' },
+]);
+ask('#try1', { q: 'R has 3 tuples, S has 4, and they share attribute A. All R tuples have A = 1 and two S tuples have A = 1. How many tuples in R ⋈ S?', a: 6, why: 'Each of the 3 R tuples pairs with each of the 2 matching S tuples: 3 × 2 = 6.' });
+
+raCheck('#ex1', { db: DB_UNI, task: '1. (Easy) Join instructor with department (natural join) and keep name and building.', solution: 'project[name, building](instructor join department)', hint: 'The shared attribute is dept_name.' });
+raCheck('#ex2', { db: DB_UNI, task: '2. The IDs and names of students who took a course in Fall 2022.', solution: "project[ID, name](student join select[semester = 'Fall' and year = 2022](takes))", hint: 'student and takes share ID. Select on takes first.' });
+raCheck('#ex3', { db: DB_UNI, task: '3. Translate to RA: <code>SELECT DISTINCT i.name FROM instructor i, department d WHERE i.dept_name = d.dept_name AND d.budget &gt; 80000;</code>', solution: 'project[name](select[budget > 80000](instructor join department))', hint: 'The equality is on the shared attribute, so σ + × becomes ⋈.' });
+sqlCheck('#ex4', { setup: raSetup(DB_UNI), task: '4. Write in SQL: π<sub>name, building</sub>(instructor ⋈ department).', solution: 'SELECT DISTINCT name, building\nFROM instructor NATURAL JOIN department;', hint: 'NATURAL JOIN, or FROM instructor i, department d WHERE i.dept_name = d.dept_name.' });
+sqlCheck('#ex5', { setup: raSetup(DB_UNI), task: '5. (Exam style) Write in SQL: π<sub>student.name, course_id</sub>(σ<sub>student.dept_name = \'Comp. Sci.\'</sub>(student ⋈ takes)).', solution: "SELECT DISTINCT s.name, t.course_id\nFROM student s, takes t\nWHERE s.ID = t.ID AND s.dept_name = 'Comp. Sci.';" });
+</script>
+</body>
+</html>

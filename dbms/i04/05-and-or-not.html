@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Combining Conditions: AND, OR, NOT · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="../i03/lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 04 (Ishrak) · Chapter 5 · Slides 36–40 · Book §6.1.2</div>
+<h1>Combining Conditions: AND, OR, NOT and Precedence</h1>
+<p class="lede">How to join several conditions in one WHERE clause, the classic mistake of using AND to ask "makes both kinds of product" (slide 38), and why <code>A OR B AND C</code> means <code>A OR (B AND C)</code> (slides 39–40), shown row by row on the slide's table.</p>
+
+<h2>1. AND, OR and NOT</h2>
+<dl class="def">
+  <dt>C1 AND C2</dt>
+  <dd>TRUE when both conditions are TRUE for the row.</dd>
+  <dt>C1 OR C2</dt>
+  <dd>TRUE when at least one of the conditions is TRUE for the row.</dd>
+  <dt>NOT C</dt>
+  <dd>TRUE when C is FALSE. (NOT BETWEEN, NOT LIKE and NOT IN are shorthand for NOT applied to those conditions.)</dd>
+</dl>
+<p>Every condition is evaluated on <em>one row at a time</em>. This sentence explains all the examples below. (When NULLs are involved, a third truth value UNKNOWN appears; <a href="08-null-and-three-valued-logic.html">Chapter 8</a> extends these rules.)</p>
+
+<h2>2. AND (slide 36)</h2>
+<p><em>Show all household products having prices more than $100.</em></p>
+<pre>SELECT *
+FROM   Product
+WHERE  category = 'Household'
+AND    price &gt;= 100;              -- MultiTouch</pre>
+<p>A small mismatch: the request says "more than $100" (<code>&gt;</code>) but the query uses <code>&gt;=</code>. On this data both give MultiTouch; a household product priced exactly 100 would separate them. When translating English to SQL, "more than" is <code>&gt;</code> and "at least" is <code>&gt;=</code>.</p>
+
+<h2>3. OR (slide 37)</h2>
+<p><em>Show all manufacturers that make photography or household items.</em></p>
+<pre>SELECT DISTINCT manufacturer
+FROM   Product
+WHERE  category = 'Photography'
+OR     category = 'Household';    -- Canon, Hitachi</pre>
+<p>Each row is tested on its own: SingleTouch passes the first test, MultiTouch the second, the gadgets neither. DISTINCT then lists each manufacturer once (it matters when a manufacturer has several qualifying products).</p>
+
+<h2>4. The "both" mistake (slide 38)</h2>
+<p><em>Show all manufacturers that make both photography and household items.</em> The slide marks this query WRONG:</p>
+<pre>SELECT DISTINCT maker
+FROM   Product
+WHERE  category = 'Photography'
+AND    category = 'Household';    -- always empty</pre>
+<div class="q">
+<h4>Why it is wrong (worked answer)</h4>
+<p>WHERE looks at one row at a time, and one row has one category. No single product can have category Photography and category Household at the same time, so the condition is FALSE for every row and the answer is always empty, whatever the data. "Makes both" is a statement about <em>two different rows</em> of the same manufacturer, which a single-row condition cannot express.</p>
+<p>(The query also says <code>maker</code>, but this Product table's column is <code>manufacturer</code>: a second slip on the slide.)</p>
+<p><strong>A correct query</strong> finds the manufacturers of photography products, the manufacturers of household products, and keeps those in both lists. SQL's set operator <code>INTERSECT</code> does that (set operations and other methods, such as subqueries, come in Lectures 8–11):</p>
+<pre>SELECT manufacturer FROM Product WHERE category = 'Photography'
+INTERSECT
+SELECT manufacturer FROM Product WHERE category = 'Household';</pre>
+<p>On the slide data this is also empty, but for the right reason: Canon makes only photography items and Hitachi only household items. Add a Canon household product and it returns Canon, while the AND query stays empty.</p>
+</div>
+<div id="p1"></div>
+
+<h2>5. Precedence: AND before OR (slides 39–40)</h2>
+<dl class="def">
+  <dt>Operator precedence</dt>
+  <dd>The order in which operators are applied when there are no parentheses. In SQL, comparisons and LIKE are evaluated first, then <code>NOT</code>, then <code>AND</code>, and <code>OR</code> last. So AND binds tighter than OR, just as × binds tighter than + in arithmetic.</dd>
+</dl>
+<div class="figrow">
+<pre>-- slide 39
+SELECT *
+FROM   Product
+WHERE  pname LIKE '%Giz%'
+OR     category LIKE '%hold'
+AND    price &gt; 100;
+-- means  A OR (B AND C)
+-- → Gizmo, MultiTouch</pre>
+<pre>-- slide 40
+SELECT *
+FROM   Product
+WHERE  (pname LIKE '%Giz%'
+OR      category LIKE '%hold')
+AND    price &gt; 100;
+-- means  (A OR B) AND C
+-- → MultiTouch</pre>
+</div>
+<p>Name the three conditions A = <code>pname LIKE '%Giz%'</code>, B = <code>category LIKE '%hold'</code>, C = <code>price &gt; 100</code>. The animation evaluates them on every row and then combines them both ways.</p>
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="a1"></div>
+</figure>
+<p>Gizmo is the row that separates the two queries: it satisfies A alone. In slide 39, A on its own is enough (A OR …), so Gizmo is returned even though it costs only 19.99. In slide 40 the parentheses force the price test on every row, and Gizmo fails it. Notice also that Powergizmo fails A: its name contains <code>giz</code> with a lower-case g, and LIKE is case-sensitive.</p>
+<p><strong>Rule:</strong> whenever a WHERE clause mixes AND and OR, write the parentheses, even when the default precedence already gives what you mean. It costs nothing and removes all doubt for the reader.</p>
+<div id="p2"></div>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div><div id="try2"></div>
+<h3>SQL exercises</h3>
+<div id="c1"></div><div id="c2"></div><div id="c3"></div><div id="c4"></div><div id="c5"></div><div id="c6"></div>
+
+<div class="key"><p><strong>Summary:</strong> AND needs both conditions, OR at least one, NOT reverses a condition; each is evaluated on one row at a time, so <code>category = 'X' AND category = 'Y'</code> can never be true. "Makes both X and Y" needs two rows, e.g. INTERSECT. Without parentheses, NOT binds before AND, and AND before OR: <code>A OR B AND C</code> = <code>A OR (B AND C)</code>. Write parentheses whenever AND and OR are mixed.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/sqlplay.js"></script>
+<script src="../i03/lecture.js"></script>
+<script>
+(() => {
+  const A = r => likeAlign(r[0], '%Giz%').ok, B = r => likeAlign(r[2], '%hold').ok, C = r => r[1] > 100;
+  const b = x => x ? '<span class="tv-t">T</span>' : '<span class="tv-f">F</span>';
+  const H = ['pname', 'price', 'category'];
+  const fr = (cols, cap, res) => {
+    const head = [...H, ...cols.map(c => c[0])];
+    const rows = GIZ_ROWS.map(r => { const v = cols.map(c => c[1](r)); const ok = res ? res(r) : null; return { c: [r[0], r[1], r[2], ...v.map(b)], cls: ok == null ? '' : ok ? 'hl' : '' }; });
+    // T escapes cells; build manually to keep the T/F spans
+    let h = '<table class="rec"><tr>' + head.map(x => `<th>${x}</th>`).join('') + '</tr>';
+    rows.forEach(r => h += `<tr class="${r.cls}">${r.c.map(x => `<td>${x}</td>`).join('')}<td class="side"></td></tr>`);
+    return { html: `<div class="relt">${h}</table></div>`, cap };
+  };
+  const AND = r => B(r) && C(r), S39 = r => A(r) || AND(r), AOR = r => A(r) || B(r), S40 = r => AOR(r) && C(r);
+  stepper('#a1', [
+    fr([['A', A], ['B', B], ['C', C]], "Evaluate the three simple conditions on each row. A = pname LIKE '%Giz%' is TRUE only for Gizmo (Powergizmo has a lower-case g). B = category LIKE '%hold' is TRUE for Household. C = price &gt; 100 for the two Touch products."),
+    fr([['A', A], ['B', B], ['C', C], ['B AND C', AND]], '<b>Slide 39, without parentheses.</b> AND is applied first: B AND C is TRUE only for MultiTouch.'),
+    fr([['A', A], ['B', B], ['C', C], ['B AND C', AND], ['A OR (B AND C)', S39]], 'Then OR: A OR (B AND C) is TRUE for Gizmo (because of A) and MultiTouch (because of B AND C). Result of slide 39: <b>Gizmo, MultiTouch</b>.', S39),
+    fr([['A', A], ['B', B], ['C', C], ['A OR B', AOR]], '<b>Slide 40, with parentheses.</b> Now the OR inside the brackets is evaluated first: A OR B is TRUE for Gizmo and MultiTouch.'),
+    fr([['A', A], ['B', B], ['C', C], ['A OR B', AOR], ['(A OR B) AND C', S40]], 'Then AND C: Gizmo fails the price test. Result of slide 40: <b>MultiTouch</b> only.', S40),
+  ], { interval: 2800 });
+})();
+sqlPlay('#p1', { setup: GIZ, query: "SELECT manufacturer FROM Product WHERE category = 'Photography'\nINTERSECT\nSELECT manufacturer FROM Product WHERE category = 'Household';", note: "Empty on the slide data. Run <code>INSERT INTO Product VALUES ('HomeCam', 120, 'Household', 'Canon');</code> first (in the same box, before the query) and Canon appears." });
+sqlPlay('#p2', { setup: GIZ, query: "SELECT *\nFROM   Product\nWHERE  pname LIKE '%Giz%'\nOR     category LIKE '%hold'\nAND    price > 100;", note: 'Add the parentheses of slide 40 and run again.' });
+flashcards('#cards', [
+  { f: 'AND', b: 'TRUE only if both sides are TRUE.' },
+  { f: 'OR', b: 'TRUE if at least one side is TRUE.' },
+  { f: 'Precedence', b: 'Comparisons, then NOT, then AND, then OR.' },
+  { f: 'A OR B AND C', b: 'Means A OR (B AND C).' },
+  { f: "category = 'X' AND category = 'Y'", b: 'Always FALSE: one row has one category.' },
+  { f: '"Makes both X and Y"', b: 'Needs two rows: INTERSECT of the two maker lists (or a subquery/join).' },
+]);
+quiz('#quiz', [
+  { q: '<code>WHERE price &lt; 50 OR price &gt; 200 AND category = \'Gadgets\'</code> returns (slide data)…', opts: ['Gizmo, Powergizmo', 'Gizmo, Powergizmo, MultiTouch', 'MultiTouch', 'nothing'], a: 0, why: 'price < 50 OR (price > 200 AND Gadgets). MultiTouch is not a gadget.' },
+  { q: 'Which query lists manufacturers that make photography <em>or</em> household items?', opts: ["category = 'Photography' AND category = 'Household'", "category = 'Photography' OR category = 'Household'", "category = 'Photography' AND NOT 'Household'", "category LIKE 'Photography Household'"], a: 1, why: 'Slide 37.' },
+  { q: '<code>NOT price &gt; 100 AND category = \'Gadgets\'</code> means…', opts: ['NOT (price > 100 AND category = \'Gadgets\')', '(NOT price > 100) AND category = \'Gadgets\'', 'price > 100 OR category <> \'Gadgets\'', 'an error'], a: 1, why: 'NOT binds tighter than AND.' },
+  { q: 'Why is slide 38\'s query wrong?', opts: ['DISTINCT is missing', 'A single row cannot have two categories', 'AND needs parentheses', 'Strings need double quotes'], a: 1, why: 'Conditions see one row at a time.' },
+  { q: 'Which rows satisfy slide 39\'s condition but not slide 40\'s?', opts: ['Gizmo', 'Powergizmo', 'SingleTouch', 'MultiTouch'], a: 0, why: 'Gizmo satisfies A alone.' },
+]);
+ask('#try1', { q: 'On the Employees table, how many rows satisfy <code>department_id = 60 OR department_id = 50 AND salary &gt; 5000</code>?', a: 4, hint: 'AND first: (department 50 AND salary > 5000), then OR every row of department 60.', why: 'All of department 60 (Hunold, Ernst, Lorentz) plus department 50 rows above 5000 (Mourgos): 4.' });
+ask('#try2', { q: 'And with parentheses, <code>(department_id = 60 OR department_id = 50) AND salary &gt; 5000</code>?', a: 3, why: 'Now the salary test applies to department 60 too: Hunold 9000, Ernst 6000, Mourgos 5800. Lorentz (4200) drops out.' });
+chk('#c1', GIZ, '<b>Easy (slide 36).</b> Show all information about household products costing at least $100.', "SELECT * FROM Product WHERE category = 'Household' AND price >= 100;");
+chk('#c2', GIZ, '<b>Slide 37.</b> Show, each once, the manufacturers that make photography or household items.', "SELECT DISTINCT manufacturer FROM Product WHERE category = 'Photography' OR category = 'Household';");
+chk('#c3', GIZ, '<b>Slide 39.</b> Write slide 39\'s query (no parentheses) and check which two products it returns.', "SELECT * FROM Product WHERE pname LIKE '%Giz%' OR category LIKE '%hold' AND price > 100;");
+chk('#c4', GIZ, '<b>Slide 40.</b> Change the query so that the price condition applies to both name and category tests.', "SELECT * FROM Product WHERE (pname LIKE '%Giz%' OR category LIKE '%hold') AND price > 100;");
+chk('#c5', HR, '<b>Parentheses matter.</b> Show <code>last_name</code>, <code>department_id</code> and <code>salary</code> of employees in department 50 or 60 who earn more than 4000.', 'SELECT last_name, department_id, salary\nFROM Employees\nWHERE (department_id = 50 OR department_id = 60)\n  AND salary > 4000;', { hint: 'Without parentheses, the salary test would only apply to department 60.' });
+chk('#c6', PCS, '<b>Exam style: "both".</b> Using the products database, find the makers that make both PCs and printers.', "SELECT maker FROM Product WHERE type = 'pc'\nINTERSECT\nSELECT maker FROM Product WHERE type = 'printer';", { hint: "A single row cannot be both a pc and a printer. Take the makers of PCs INTERSECT the makers of printers." });
+</script>
+</body>
+</html>

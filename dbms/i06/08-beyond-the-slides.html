@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Constraints Beyond the Slides · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 06 (Ishrak) · Chapter 8 · Exam topics beyond the slides · Textbook §7.1.3</div>
+<h1>Exam Topics Beyond the Slides: Kinds of Integrity Constraints and Deferred Checking</h1>
+<p class="lede">Two topics the slides do not name but exams and Oracle practice need: the classification of integrity constraints (domain, entity, key, referential, general), which the compulsory "create a table with all types of integrity constraints" question asks for, and deferrable constraints, which solve the chicken-and-egg problem of two tables that refer to each other.</p>
+
+<h2>1. The kinds of integrity constraints</h2>
+<p>Textbooks group the constraints of this lecture into a few families. When a question says "all types of integrity constraints", it means one example of each:</p>
+<dl class="def">
+  <dt>Domain constraint</dt>
+  <dd>Restricts the values a single attribute may take: its data type and size (<code>NUMBER(3,2)</code>, <code>VARCHAR2(50)</code>), <code>NOT NULL</code>, <code>DEFAULT</code>, and an attribute-based <code>CHECK</code> (cgpa BETWEEN 0 AND 4). In standard SQL a reusable domain is <code>CREATE DOMAIN</code> (slide 51's VALUE keyword), which Oracle lacks.</dd>
+  <dt>Entity integrity constraint</dt>
+  <dd>Every row is identifiable: the <code>PRIMARY KEY</code> is unique and never NULL.</dd>
+  <dt>Key constraint</dt>
+  <dd>Alternate keys are unique: <code>UNIQUE</code> (usually with NOT NULL). Some books fold this into entity integrity.</dd>
+  <dt>Referential integrity constraint</dt>
+  <dd>References point at existing rows: <code>FOREIGN KEY … REFERENCES …</code>, with a referential action (ON DELETE CASCADE / SET NULL).</dd>
+  <dt>General (semantic) constraint</dt>
+  <dd>Any other business rule: tuple-based <code>CHECK</code> across columns of a row; assertions across rows and tables (standard SQL); triggers in Oracle.</dd>
+</dl>
+
+<h2>2. Deferred constraint checking</h2>
+<p>Every constraint so far was checked <em>immediately</em>, at the end of each statement. Sometimes no order of statements can satisfy that. The classic case is a cycle of foreign keys:</p>
+<pre>CREATE TABLE Department (name CHAR(3) PRIMARY KEY, head INT NOT NULL);
+CREATE TABLE Employee   (id INT PRIMARY KEY, name VARCHAR2(20),
+                         dept CHAR(3) NOT NULL REFERENCES Department(name));
+ALTER TABLE Department ADD CONSTRAINT dept_head_fk
+  FOREIGN KEY (head) REFERENCES Employee(id);</pre>
+<p>Every employee must belong to an existing department, and every department must have an existing head. To start a new department CE with a new employee 5 as head, you need both rows at once: inserting the employee first fails (no department CE), inserting the department first fails (no employee 5), and NULL is forbidden. The chicken needs the egg and the egg needs the chicken.</p>
+<dl class="def">
+  <dt>Deferrable constraint</dt>
+  <dd>A constraint whose check may be postponed until the transaction <b>COMMIT</b>s. During the transaction it may be temporarily violated; at COMMIT it must hold, otherwise the whole transaction is rolled back.</dd>
+  <dt>INITIALLY IMMEDIATE / INITIALLY DEFERRED</dt>
+  <dd>Whether a deferrable constraint starts each transaction checked per statement (IMMEDIATE, the default) or at commit (DEFERRED). A transaction can switch with <code>SET CONSTRAINT name DEFERRED</code> or <code>SET CONSTRAINTS ALL DEFERRED</code>.</dd>
+</dl>
+<pre>-- Oracle
+ALTER TABLE Department ADD CONSTRAINT dept_head_fk
+  FOREIGN KEY (head) REFERENCES Employee(id)
+  DEFERRABLE INITIALLY DEFERRED;
+
+INSERT INTO Department VALUES ('CE', 5);       -- no employee 5 yet: allowed
+INSERT INTO Employee   VALUES (5, 'E', 'CE');  -- CE exists: immediate FK OK
+COMMIT;                                        -- dept_head_fk checked now: OK</pre>
+<p>If the second INSERT is forgotten, COMMIT fails with <code>ORA-02091: transaction rolled back</code> followed by <code>ORA-02291: integrity constraint (…DEPT_HEAD_FK) violated - parent key not found</code>, and both rows are gone. Constraints are NOT DEFERRABLE unless declared otherwise, and this cannot be changed later with ALTER (drop and re-create the constraint). The textbook covers this in §7.1.3.</p>
+<figure class="wide"><span class="anim-tag">Animation</span><div id="def"></div></figure>
+<p>Deferral is also Oracle's answer to the missing ON UPDATE CASCADE (Chapter 4): with a deferred foreign key, <code>UPDATE Employee SET id = 9 WHERE id = 4; UPDATE Department SET head = 9 WHERE head = 4; COMMIT;</code> works, because the dangling moment between the two updates is never checked.</p>
+<p><strong>In the playground.</strong> SQLite supports <code>DEFERRABLE INITIALLY DEFERRED</code> for <em>foreign keys only</em> (not for CHECK, UNIQUE or PRIMARY KEY), and has no SET CONSTRAINT(S) statement. The deferral only matters inside an explicit transaction <code>BEGIN; … COMMIT;</code> (otherwise every statement is its own transaction). One difference from Oracle: when COMMIT fails, SQLite leaves the transaction open instead of rolling it back, so run <code>ROLLBACK;</code> before trying again.</p>
+<div id="p1"></div>
+
+<h2>3. The compulsory question</h2>
+<div class="exam">
+  <div class="exam-src">DB QB · 24-25 5b · 13 marks · compulsory</div>
+  <div class="exam-q"><p>Create a table SQL from a real life scenario, where you need to apply all types of integrity constraints.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+  <p><strong>Scenario: course registration at a university.</strong> Departments offer courses; students belong to a department and enrol in courses each term. Rules: department codes and names are unique; every student has a unique id and a unique e-mail; CGPA lies between 0 and 4; a student's level is 1–4; a course's credit is one of 0.75, 1.5, 3, 4 and its contact hours are at least its credit; grades come from a fixed list; a student can enrol in a course only once per term; deleting a student removes the enrolments; closing a department leaves its students without a department; a course cannot be removed while students are enrolled in it.</p>
+<pre>CREATE TABLE Department (
+  dept_code VARCHAR2(5)   CONSTRAINT dept_pk PRIMARY KEY,                    -- entity integrity
+  dept_name VARCHAR2(50)  CONSTRAINT dept_name_nn NOT NULL                   -- domain
+                          CONSTRAINT dept_name_uq UNIQUE,                    -- key (alternate key)
+  budget    NUMBER(12,2)  DEFAULT 0
+                          CONSTRAINT dept_budget_ck CHECK (budget &gt;= 0)      -- domain (attribute CHECK)
+);
+
+CREATE TABLE Student (
+  student_id NUMBER(7)    CONSTRAINT stu_pk PRIMARY KEY,
+  name       VARCHAR2(50) CONSTRAINT stu_name_nn NOT NULL,
+  email      VARCHAR2(60) CONSTRAINT stu_email_nn NOT NULL
+                          CONSTRAINT stu_email_uq UNIQUE,
+  dept_code  VARCHAR2(5)  CONSTRAINT stu_dept_fk REFERENCES Department(dept_code)
+                          ON DELETE SET NULL,                                -- referential
+  level_no   NUMBER(1)    DEFAULT 1 CONSTRAINT stu_level_ck CHECK (level_no BETWEEN 1 AND 4),
+  cgpa       NUMBER(3,2)  CONSTRAINT stu_cgpa_ck CHECK (cgpa BETWEEN 0 AND 4)
+);
+
+CREATE TABLE Course (
+  course_id     VARCHAR2(8)  CONSTRAINT crs_pk PRIMARY KEY,
+  title         VARCHAR2(60) NOT NULL,
+  credit        NUMBER(3,2)  CONSTRAINT crs_credit_ck CHECK (credit IN (0.75, 1.5, 3, 4)),
+  contact_hours NUMBER(3,2),
+  dept_code     VARCHAR2(5)  NOT NULL CONSTRAINT crs_dept_fk REFERENCES Department(dept_code),
+  CONSTRAINT crs_hours_ck CHECK (contact_hours &gt;= credit)                     -- general (tuple CHECK)
+);
+
+CREATE TABLE Enrollment (
+  student_id NUMBER(7),
+  course_id  VARCHAR2(8),
+  term       VARCHAR2(10),
+  grade      VARCHAR2(2),
+  CONSTRAINT enr_pk     PRIMARY KEY (student_id, course_id, term),          -- composite key
+  CONSTRAINT enr_stu_fk FOREIGN KEY (student_id) REFERENCES Student(student_id) ON DELETE CASCADE,
+  CONSTRAINT enr_crs_fk FOREIGN KEY (course_id)  REFERENCES Course(course_id),  -- default: reject
+  CONSTRAINT enr_grade_ck CHECK (grade IN ('A+','A','A-','B+','B','B-','C+','C','D','F'))
+);
+
+-- general constraint over several rows (standard SQL; in Oracle a trigger):
+-- no student takes more than 25 credits in one term
+CREATE ASSERTION credit_limit CHECK (NOT EXISTS (
+  SELECT E.student_id, E.term
+  FROM Enrollment E JOIN Course C ON E.course_id = C.course_id
+  GROUP BY E.student_id, E.term
+  HAVING SUM(C.credit) &gt; 25));</pre>
+  <p><strong>Where each type appears.</strong></p>
+  <ul>
+    <li><b>Domain:</b> data types and sizes on every column; NOT NULL on names, e-mail, title; DEFAULT on budget and level; attribute CHECKs on budget, level, CGPA, credit, grade.</li>
+    <li><b>Entity integrity:</b> PRIMARY KEY on every table (dept_pk, stu_pk, crs_pk, and the composite enr_pk, whose columns are all NOT NULL).</li>
+    <li><b>Key:</b> UNIQUE alternate keys dept_name and email (also NOT NULL).</li>
+    <li><b>Referential integrity:</b> stu_dept_fk (ON DELETE SET NULL: a student survives a closed department), crs_dept_fk (default: a department with courses cannot be deleted), enr_stu_fk (ON DELETE CASCADE: enrolments are existence-dependent on the student), enr_crs_fk (default: a course with enrolments cannot be deleted).</li>
+    <li><b>General:</b> the tuple-based CHECK crs_hours_ck relates two columns of a row; the assertion credit_limit involves many rows and two tables.</li>
+  </ul>
+  <p><strong>Showing that they work</strong> (each statement on the data after the previous ones):</p>
+<pre>INSERT INTO Department VALUES ('CSE', 'Computer Science and Engineering', 5000000);
+INSERT INTO Student VALUES (2105001, 'Rafi', 'rafi@cse.buet.ac.bd', 'CSE', 2, 3.85);   -- OK
+INSERT INTO Student VALUES (2105001, 'Nila', 'nila@cse.buet.ac.bd', 'CSE', 2, 3.60);   -- ORA-00001 (entity)
+INSERT INTO Student VALUES (2105002, 'Nila', 'nila@cse.buet.ac.bd', 'EEE', 2, 3.60);   -- ORA-02291 (referential)
+INSERT INTO Student VALUES (2105003, 'Tama', 'tama@cse.buet.ac.bd', 'CSE', 2, 4.20);   -- ORA-02290 (domain CHECK)
+INSERT INTO Course  VALUES ('CSE215', 'Database', 3, 2, 'CSE');                        -- ORA-02290 (tuple CHECK)</pre>
+  <p>The playground below runs this schema (without the assertion, which no real DBMS accepts).</p>
+  </div></details>
+</div>
+<div id="p2"></div>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<h3>Write it yourself</h3>
+<p>Exercises 1–3 use transactions (<code>BEGIN; … COMMIT;</code>) and are checked on the final contents of both tables.</p>
+<div id="c1"></div><div id="c2"></div><div id="c3"></div><div id="c4"></div><div id="c5"></div>
+
+<div class="key"><p><strong>Summary:</strong> Integrity constraints come in families: domain (type, NOT NULL, DEFAULT, attribute CHECK), entity (PRIMARY KEY), key (UNIQUE), referential (FOREIGN KEY with actions) and general (tuple CHECK, assertions, triggers). A DEFERRABLE constraint, when deferred, is checked at COMMIT instead of after each statement; that is how cycles of foreign keys are filled and how Oracle re-keys a parent without ON UPDATE CASCADE.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/sqlplay.js"></script>
+<script src="lecture.js"></script>
+<script>
+// chicken-and-egg animation
+(() => {
+  const fig = (dept, emp, dc = {}, ec = {}, note = '') => `<div class="figrow"><div><div class="figlabel">Department · head → Employee(id) DEFERRABLE INITIALLY DEFERRED</div>${recTable(null, dept.map((r, i) => ({ cells: r.map(String), cls: dc[i], side: (dc[i] === 'hl' ? note : '') })), ['name', 'head'])}</div>` +
+    `<div><div class="figlabel">Employee · dept → Department(name) (immediate)</div>${recTable(null, emp.map((r, i) => ({ cells: r.map(String), cls: ec[i] })), ['id', 'name', 'dept'])}</div></div>`;
+  const D0 = [['CSE', 2]], E0 = [[2, 'B', 'CSE']], D1 = [...D0, ['CE', 5]], E1 = [...E0, [5, 'E', 'CE']];
+  stepper('#def', [
+    { html: fig(D0, E0), cap: 'Start: CSE is headed by employee 2, who works in CSE. Both foreign keys hold. <code>BEGIN</code> a transaction.' },
+    { html: fig(D1, E0, { 1: 'hl' }, {}, 'head 5 missing: check postponed'), cap: '<code>INSERT INTO Department VALUES (\'CE\', 5)</code>. Employee 5 does not exist, but dept_head_fk is deferred, so the INSERT is accepted. The DBMS notes a pending violation.' },
+    { html: fig(D1, E1, { 1: 'hl' }, { 1: 'new' }, 'head 5 missing: check postponed'), cap: '<code>INSERT INTO Employee VALUES (5, \'E\', \'CE\')</code>. This foreign key is immediate: department CE exists now, so it passes.' },
+    { html: fig(D1, E1, { 1: 'new' }, { 1: 'new' }), cap: '<code>COMMIT</code>. Deferred constraints are checked now: head 5 exists. <span class="good">Committed.</span>' },
+    { html: fig(D1, E0, { 1: 'del' }, {}), cap: 'The other ending: if the employee row had not been inserted, COMMIT finds head 5 dangling. Oracle: ORA-02091 transaction rolled back (ORA-02291); <span class="bad">both new rows are discarded</span>.' },
+  ], { interval: 2600 });
+})();
+const CYCLE = (def) => `CREATE TABLE Department (name CHAR(3) PRIMARY KEY, head INT${def === 'null' ? '' : ' NOT NULL'} REFERENCES Employee(id)${def === 'def' ? ' DEFERRABLE INITIALLY DEFERRED' : ''});
+CREATE TABLE Employee (id INT PRIMARY KEY, name VARCHAR2(20), dept CHAR(3)${def === 'null' ? '' : ' NOT NULL'} REFERENCES Department(name));
+`;
+const CYC_DATA = `BEGIN;
+INSERT INTO Department VALUES ('CSE', 2);
+INSERT INTO Employee VALUES (2, 'B', 'CSE');
+COMMIT;
+`;
+const BOTH = "(SELECT 'Department' AS t, name AS a, head AS b FROM Department UNION ALL SELECT 'Employee', id, dept FROM Employee)";
+sqlPlay('#p1', { setup: CYCLE('def') + CYC_DATA,
+  query: "BEGIN;\nINSERT INTO Department VALUES ('CE', 5);     -- head 5 not there yet: allowed (deferred)\nINSERT INTO Employee VALUES (5, 'E', 'CE');\nCOMMIT;\nSELECT * FROM Department;",
+  note: 'Delete the Employee INSERT, press Reset and Run: COMMIT fails with <code>FOREIGN KEY constraint failed</code>. In SQLite then run <code>ROLLBACK;</code>. Department\'s head here is deferred; Employee\'s dept is immediate (SQLite checks it per statement).' });
+const UNI = `CREATE TABLE Department (dept_code VARCHAR2(5) CONSTRAINT dept_pk PRIMARY KEY,
+  dept_name VARCHAR2(50) CONSTRAINT dept_name_nn NOT NULL CONSTRAINT dept_name_uq UNIQUE,
+  budget NUMBER(12,2) DEFAULT 0 CONSTRAINT dept_budget_ck CHECK (budget >= 0));
+CREATE TABLE Student (student_id NUMBER(7) CONSTRAINT stu_pk PRIMARY KEY,
+  name VARCHAR2(50) CONSTRAINT stu_name_nn NOT NULL,
+  email VARCHAR2(60) CONSTRAINT stu_email_nn NOT NULL CONSTRAINT stu_email_uq UNIQUE,
+  dept_code VARCHAR2(5) CONSTRAINT stu_dept_fk REFERENCES Department(dept_code) ON DELETE SET NULL,
+  level_no NUMBER(1) DEFAULT 1 CONSTRAINT stu_level_ck CHECK (level_no BETWEEN 1 AND 4),
+  cgpa NUMBER(3,2) CONSTRAINT stu_cgpa_ck CHECK (cgpa BETWEEN 0 AND 4));
+CREATE TABLE Course (course_id VARCHAR2(8) CONSTRAINT crs_pk PRIMARY KEY, title VARCHAR2(60) NOT NULL,
+  credit NUMBER(3,2) CONSTRAINT crs_credit_ck CHECK (credit IN (0.75, 1.5, 3, 4)), contact_hours NUMBER(3,2),
+  dept_code VARCHAR2(5) NOT NULL CONSTRAINT crs_dept_fk REFERENCES Department(dept_code),
+  CONSTRAINT crs_hours_ck CHECK (contact_hours >= credit));
+CREATE TABLE Enrollment (student_id NUMBER(7), course_id VARCHAR2(8), term VARCHAR2(10), grade VARCHAR2(2),
+  CONSTRAINT enr_pk PRIMARY KEY (student_id, course_id, term),
+  CONSTRAINT enr_stu_fk FOREIGN KEY (student_id) REFERENCES Student(student_id) ON DELETE CASCADE,
+  CONSTRAINT enr_crs_fk FOREIGN KEY (course_id) REFERENCES Course(course_id),
+  CONSTRAINT enr_grade_ck CHECK (grade IN ('A+','A','A-','B+','B','B-','C+','C','D','F')));
+INSERT INTO Department VALUES ('CSE', 'Computer Science and Engineering', 5000000);
+INSERT INTO Department VALUES ('EEE', 'Electrical and Electronic Engineering', 4000000);
+INSERT INTO Student VALUES (2105001, 'Rafi', 'rafi@cse.buet.ac.bd', 'CSE', 2, 3.85);
+INSERT INTO Student VALUES (2106010, 'Mim', 'mim@eee.buet.ac.bd', 'EEE', 2, 3.40);
+INSERT INTO Course VALUES ('CSE215', 'Database', 3, 3, 'CSE');
+INSERT INTO Course VALUES ('CSE216', 'Database Sessional', 1.5, 3, 'CSE');
+INSERT INTO Enrollment VALUES (2105001, 'CSE215', '2024-T1', 'A');
+INSERT INTO Enrollment VALUES (2105001, 'CSE216', '2024-T1', NULL);
+`;
+sqlPlay('#p2', { setup: UNI,
+  query: "INSERT INTO Student VALUES (2105003, 'Tama', 'tama@cse.buet.ac.bd', 'CSE', 2, 4.20);   -- breaks stu_cgpa_ck\n-- try also:\n--   INSERT INTO Course VALUES ('CSE300', 'Project', 3, 2, 'CSE');          -- crs_hours_ck\n--   DELETE FROM Student WHERE student_id = 2105001; SELECT * FROM Enrollment;  -- cascade\n--   DELETE FROM Course WHERE course_id = 'CSE215';                          -- rejected (enrolments)",
+  note: 'The worked answer\'s schema with a little data. SQLite prints the constraint names, e.g. <code>CHECK constraint failed: stu_cgpa_ck</code>.' });
+
+flashcards('#cards', [
+  { f: 'Domain constraint', b: 'Type, size, NOT NULL, DEFAULT, attribute CHECK: limits one attribute\'s values.' },
+  { f: 'Entity integrity', b: 'Primary key: unique and never NULL.' },
+  { f: 'Referential integrity', b: 'Foreign keys point at existing rows (with CASCADE / SET NULL actions).' },
+  { f: 'General constraint', b: 'Tuple CHECK, assertion, or trigger for any other business rule.' },
+  { f: 'DEFERRABLE INITIALLY DEFERRED', b: 'Checked at COMMIT, not after each statement.' },
+  { f: 'SET CONSTRAINTS ALL DEFERRED', b: 'Oracle: defer every deferrable constraint for the current transaction.' },
+  { f: 'ORA-02091', b: 'Transaction rolled back: a deferred constraint failed at COMMIT.' },
+]);
+quiz('#quiz', [
+  { q: 'Which is a referential integrity constraint?', opts: ['cgpa BETWEEN 0 AND 4', 'PRIMARY KEY (student_id)', 'dept_code REFERENCES Department(dept_code)', 'email UNIQUE'], a: 2, why: 'Domain, entity, referential, key respectively.' },
+  { q: 'Department.head and Employee.dept refer to each other and are NOT NULL. Without deferral, how can a new department with a new head be inserted?', opts: ['Insert the department first', 'Insert the employee first', 'It cannot, in any order of single statements', 'Use ON DELETE CASCADE'], a: 2, why: 'Each insert needs the other row to exist already. Defer one of the two foreign keys.' },
+  { q: 'A deferred constraint is violated at COMMIT in Oracle. What happens?', opts: ['COMMIT succeeds with a warning', 'Only the last statement is undone', 'The whole transaction is rolled back (ORA-02091)', 'The constraint is disabled'], a: 2, why: 'All changes of the transaction are discarded.' },
+  { q: 'An existing NOT DEFERRABLE constraint should become deferrable. In Oracle you…', opts: ['ALTER TABLE … MODIFY CONSTRAINT … DEFERRABLE', 'SET CONSTRAINT … DEFERRED', 'drop it and add it again with DEFERRABLE', 'cannot ever do it'], a: 2, why: 'Deferrability is fixed when the constraint is created.' },
+  { q: 'How does a deferred FK replace ON UPDATE CASCADE in Oracle?', opts: ['It copies keys automatically', 'You update the parent key and the children in one transaction; the FK is checked only at COMMIT', 'It sets the children to NULL', 'It cannot'], a: 1, why: 'The temporary dangling state between the two UPDATEs is never checked.' },
+]);
+
+sqlCheck('#c1', { setup: CYCLE('def') + CYC_DATA, check: 'state', table: BOTH,
+  task: 'Easy. Department.head is deferred, Employee.dept is immediate, both NOT NULL. In one transaction, create department CE headed by a new employee 5 named E who works in CE.',
+  solution: "BEGIN;\nINSERT INTO Department VALUES ('CE', 5);\nINSERT INTO Employee VALUES (5, 'E', 'CE');\nCOMMIT;" });
+sqlCheck('#c2', { setup: CYCLE('null') + "INSERT INTO Department VALUES ('CSE', NULL);\nINSERT INTO Employee VALUES (2, 'B', 'CSE');\nUPDATE Department SET head = 2 WHERE name = 'CSE';", check: 'state', table: BOTH,
+  task: 'No deferral here, but both foreign-key columns allow NULL. Create department CE headed by new employee 5 (E, works in CE) <b>without</b> a transaction trick.',
+  hint: 'Insert CE with head NULL, then the employee, then set the head.',
+  solution: "INSERT INTO Department VALUES ('CE', NULL);\nINSERT INTO Employee VALUES (5, 'E', 'CE');\nUPDATE Department SET head = 5 WHERE name = 'CE';" });
+sqlCheck('#c3', { setup: EMP_SQL + "CREATE TABLE Department (name CHAR(3), head INT REFERENCES Employee(id) DEFERRABLE INITIALLY DEFERRED);\n" + DEPT_ROWS, check: 'state',
+  table: "(SELECT 'Employee' AS t, id AS a, name AS b FROM Employee UNION ALL SELECT 'Department', name, head FROM Department)",
+  task: 'Exam level, Oracle\'s substitute for ON UPDATE CASCADE. The foreign key Department.head → Employee.id is deferred. In one transaction, change employee 4\'s id to 9 and keep EEE pointing at that employee.',
+  solution: 'BEGIN;\nUPDATE Employee SET id = 9 WHERE id = 4;\nUPDATE Department SET head = 9 WHERE head = 4;\nCOMMIT;' });
+sqlCheck('#c4', { setup: UNI, check: 'state', table: '(SELECT * FROM Enrollment ORDER BY 1, 2)',
+  task: 'Using the registration schema of the worked answer: add a new student 2105007, Ayan, ayan@cse.buet.ac.bd, department CSE, level 2, CGPA 3.70, and enrol Ayan in CSE215 and CSE216 for term \'2024-T1\', grades not yet known (NULL). Every statement must pass all constraints.',
+  solution: "INSERT INTO Student VALUES (2105007, 'Ayan', 'ayan@cse.buet.ac.bd', 'CSE', 2, 3.70);\nINSERT INTO Enrollment VALUES (2105007, 'CSE215', '2024-T1', NULL);\nINSERT INTO Enrollment VALUES (2105007, 'CSE216', '2024-T1', NULL);" });
+sqlCheck('#c5', { setup: "CREATE TABLE Student (student_id NUMBER(7) PRIMARY KEY, name VARCHAR2(50));\nCREATE TABLE Course (course_id VARCHAR2(8) PRIMARY KEY, title VARCHAR2(60));", check: 'state', table: FKS('Enrollment'),
+  task: 'Exam level. Create Enrollment(student_id NUMBER(7), course_id VARCHAR2(8), term VARCHAR2(10), grade VARCHAR2(2)) with primary key (student_id, course_id, term), a foreign key to Student that deletes enrolments with the student, a foreign key to Course with the default policy, and a CHECK on grade. (The checker compares the foreign keys.)',
+  solution: "CREATE TABLE Enrollment (\n  student_id NUMBER(7), course_id VARCHAR2(8), term VARCHAR2(10), grade VARCHAR2(2),\n  CONSTRAINT enr_pk PRIMARY KEY (student_id, course_id, term),\n  CONSTRAINT enr_stu_fk FOREIGN KEY (student_id) REFERENCES Student(student_id) ON DELETE CASCADE,\n  CONSTRAINT enr_crs_fk FOREIGN KEY (course_id) REFERENCES Course(course_id),\n  CONSTRAINT enr_grade_ck CHECK (grade IN ('A+','A','A-','B+','B','B-','C+','C','D','F'))\n);" });
+</script>
+</body>
+</html>

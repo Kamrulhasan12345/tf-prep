@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Multilevel Indices · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 15 · Chapter 4 · Slides 16–17</div>
+<h1>Multilevel Indices</h1>
+<p class="lede">When an index is too big to keep in memory, searching it costs disk reads too. The fix is to index the index. This chapter explains why, builds a two-level index, and animates a lookup through it.</p>
+
+<h2>1. The problem: an index that does not fit in memory (slide 16)</h2>
+
+<p>So far we assumed the index sits in memory, so searching it is free and only the final record costs a block read. Real indices can be huge. Take a table with 1,000,000 records and a dense index with 100 entries per block: the index is 10,000 blocks, around 40&nbsp;MB, and a database has many such indices competing for memory.</p>
+
+<p><em>If the index does not fit in memory, access becomes expensive. Explain?</em> The index then lives on disk like any other file, and searching it needs block reads. The best way to search a sorted file is <b class="term">binary search</b>: read the middle block, decide whether the key is in the left or right half, and repeat on that half. Each step halves the search space, so it takes about log₂(<i>b</i>) block reads for <i>b</i> blocks:</p>
+<div class="key"><p class="formula">log₂(10,000) ≈ 14 block reads, just to search the index</p></div>
+<p>Each of those reads is a random access (5 to 10 ms each), so finding one record could take over 100 ms. And if the index also has overflow blocks (Chapter 7), binary search does not even work properly on them.</p>
+
+<h2>2. The solution: an index on the index</h2>
+
+<p>The slide's solution: treat the index kept on disk as an ordinary sequential file, sorted by key, and <strong>build a sparse index on it</strong>. Recall from Chapter 2 that a sparse index with one entry per block is tiny and works on any sorted file. The index file is sorted, so it qualifies.</p>
+
+<dl class="def">
+  <dt>Inner index</dt><dd>The original (basic) index file. It points to the data.</dd>
+  <dt>Outer index</dt><dd>A sparse index of the inner index: one entry per block of the inner index, holding that block's first key. It points to inner index blocks.</dd>
+</dl>
+
+<figure>
+<div id="slide16"></div>
+<figcaption><b>Figure 1.</b> Slide 16's picture. The inner index is the dense index on id. The outer index (10101, 32343, 76766) is a sparse index on the <em>inner index</em>, not on the file.</figcaption>
+</figure>
+
+<p>If even the outer index is too large to fit in memory, build yet another sparse index on top of it, and so on, until the top level fits in one block. Each level is about 100 times smaller than the one below it (one entry per block of ~100 entries), so very few levels are ever needed:</p>
+
+<div class="tbl"><table>
+<tr><th>Level</th><th>Entries</th><th>Blocks (100 entries each)</th></tr>
+<tr><td>Inner index (dense)</td><td class="num">1,000,000</td><td class="num">10,000</td></tr>
+<tr><td>Outer index</td><td class="num">10,000</td><td class="num">100</td></tr>
+<tr><td>Top level</td><td class="num">100</td><td class="num">1</td></tr>
+</table></div>
+
+<p>A lookup reads one block per level: 3 index reads plus 1 data read = 4, instead of 14 + 1 with binary search. Keeping the top level in memory saves one more. This idea, a tree of sparse indices where each level indexes the level below, is exactly what a B+ tree is (Chapter 8).</p>
+
+<h2>3. A two-level sparse index (slide 17)</h2>
+
+<p>Slide 17 draws a two-level index where the file is sorted on id and <em>both</em> levels are sparse. The figure below uses the complete instructor file with 3 records per data block, so every number can be checked. (The slide skips some blocks with “⋮”, so its inner index shows 83821 where ours has 76766.)</p>
+<ul>
+  <li>The <strong>inner index</strong> has one entry per <em>data block</em>: its first id (10101, 22222, 45565, 76766). It is stored in index blocks of 2 entries.</li>
+  <li>The <strong>outer index</strong> has one entry per <em>inner index block</em>: its first key (10101, 45565).</li>
+</ul>
+
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="lookup"></div>
+</figure>
+
+<p>Every level uses the same rule as a single sparse index: <em>find the largest entry ≤ K and follow it</em>. Each step narrows the search from the whole file to one block of the level below.</p>
+
+<p>The slide's last point: <strong>indices at all levels must be updated on insertion or deletion</strong> from the file. If a new data block is created, the inner index gains an entry; if that fills an inner index block and a new one is created, the outer index gains an entry. Chapter 5 works through those algorithms.</p>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+<div id="try2"></div>
+
+<h3>Exam questions</h3>
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2016–17 · 6 marks</div>
+  <div class="exam-q"><p>Is it possible to implement an unclustered-sparse indexing scheme? If so, give an example. Otherwise, briefly explain the reason.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><strong>Directly on the data file: no.</strong> A sparse index finds key K by jumping to the largest entry ≤ K and scanning the file forward. That works only if the records between two entries are exactly the records whose keys lie between those entries, which is true only when the file is sorted on the key. In an unclustered (secondary) index the file is sorted on some other attribute, so the records after an entry have unrelated key values and the forward scan has no stopping point. Example: the instructor file is sorted on id; a sparse index on salary with entries 40000 and 80000 would send a search for 65000 to Mozart (40000), and the records after Mozart (Einstein 95000, El Said 60000, …) are in no salary order, so 65000 (Srinivasan, record 0) is never reached. So the lowest level of a secondary index must be dense.</p>
+    <p><strong>As an upper level: yes, and slide 12 recommends it.</strong> The dense secondary index is itself a file <em>sorted on the search key</em>. A sparse index can therefore be built on top of it: “for unclustered index: sparse index on top of dense index (multilevel index)”. Example: a dense secondary index on salary (one entry per salary value, each pointing to a bucket) stored in index blocks of 4 entries, and an outer sparse index holding the first salary of each index block (40000, 72000, 90000). A search for 87000 reads the outer index (largest entry ≤ 87000 is 72000), then that one inner block, then the bucket and the records. The outer level is sparse and the index as a whole is unclustered.</p>
+    <figure><div id="unclSparse"></div><figcaption>An unclustered index whose upper level is sparse: the outer index (left) is sparse over the dense salary index (middle), which points to buckets and then to records of a file sorted on id.</figcaption></figure>
+    <p>Note: the question bank says this is “fundamentally impossible”. That is true only for a sparse index placed directly on the data; the multilevel form above is a standard unclustered index with a sparse level, as slide 12 states.</p>
+  </div></details>
+</div>
+
+<div class="key">
+<p><strong>Summary:</strong> an index that does not fit in memory costs about log₂(<i>b</i>) block reads to search. A multilevel index fixes this by building a sparse index (outer) on the index file (inner), and repeating until the top level fits in memory. A lookup then reads one block per level.</p>
+</div>
+</main>
+<script src="../assets/book.js"></script>
+<script>
+const H = ['ID', 'Name', 'Dept.', 'Salary'];
+const dense = INSTR.map((r, i) => ({ key: r[0], to: [i], alignRow: i }));
+document.querySelector('#slide16').innerHTML = indexSVG({ rows: INSTR, head: H, index: dense,
+  outer: [{ key: '10101', to: 0 }, { key: '32343', to: 4 }, { key: '76766', to: 9 }], labels: { outer: 'outer index', idx: 'inner index', file: 'instructor file' } });
+
+// two-level sparse: data blocks of 3, inner index blocks of 2 entries
+const innerKeys = [0, 3, 6, 9];
+const two = (hot = {}) => indexSVG({ rows: INSTR, head: H, blockSize: 3, idxBlock: 2, rowCls: hot.rows || {},
+  labels: { outer: 'outer index', idx: 'inner index', file: 'data file (3 records per block)' },
+  index: innerKeys.map((t, k) => ({ key: INSTR[t][0], to: [t], cls: hot.inner === k ? 'hl' : '' })),
+  outer: [{ key: '10101', to: 0, cls: hot.outer === 0 ? 'hl' : '' }, { key: '45565', to: 2, cls: hot.outer === 1 ? 'hl' : '' }] });
+stepper('#lookup', [
+  { html: two(), cap: 'Find id = <b>58583</b>. The outer index is small enough to keep in memory. <b>Block reads: 0</b>.' },
+  { html: two({ outer: 1 }), cap: 'Outer index: largest entry ≤ 58583. 10101 ✓, 45565 ✓. So follow <b>45565</b> to inner index block 1. (In memory, free.)' },
+  { html: two({ outer: 1, inner: 2 }), cap: 'Read inner index block 1 (entries 45565, 76766). Largest entry ≤ 58583 is <b>45565</b>. <b>Block reads: 1</b>.' },
+  { html: two({ outer: 1, inner: 2, rows: { 6: 'hl', 7: 'new', 8: 'hl' } }), cap: 'Follow 45565 to data block 2 and read it: 45565, 58583, 76543. <b>58583 found</b> inside the block. <b>Block reads: 2</b>.' },
+]);
+(() => {
+  const vals = [...new Set(INSTR.map(r => r[3]))].sort();
+  const index = vals.map(v => ({ key: v, to: INSTR.map((r, i) => r[3] === v ? i : -1).filter(i => i >= 0) }));
+  document.querySelector('#unclSparse').innerHTML = indexSVG({ rows: INSTR.map(r => [r[0], r[1], r[3]]), head: ['ID', 'Name', 'Salary'], colW: [52, 88, 56],
+    bucket: true, idxBlock: 4, index, labels: { outer: 'outer (sparse)', idx: 'inner (dense, on salary)', file: 'file sorted on id' },
+    outer: [0, 4, 8].map(e => ({ key: vals[e], to: e })) });
+})();
+flashcards('#cards', [
+  { f: 'Multilevel index', b: 'An index on an index: a sparse outer index built on the (sorted) inner index file, repeated until the top fits in memory.' },
+  { f: 'Inner index', b: 'The basic index file that points to the data.' },
+  { f: 'Outer index', b: 'A sparse index with one entry per block of the inner index.' },
+  { f: 'Cost of binary search on an index of b blocks', b: 'About ⌈log₂ b⌉ block reads.' },
+  { f: 'Cost of a multilevel lookup', b: 'One block per level, plus the data block. Cached upper levels are free.' },
+  { f: 'Fan-out per level', b: 'Each level is smaller by the number of entries per block (e.g. 100×).' },
+]);
+quiz('#quiz', [
+  { q: 'An index occupies 10,000 blocks on disk and is searched by binary search. About how many block reads?', opts: ['4', '14', '100', '10,000'], a: 1, why: 'log₂ 10,000 ≈ 13.3, so 14 reads.' },
+  { q: 'The outer index of a two-level index is…', opts: ['A dense index on the data file', 'A sparse index on the inner index', 'A hash index', 'A copy of the inner index'], a: 1, why: 'It has one entry per inner-index block, holding that block\'s first key.' },
+  { q: 'Why can the outer index always be sparse, even when the inner index is a secondary index?', opts: ['The inner index file is sorted on the search key', 'Outer indices store no pointers', 'The data file is sorted', 'It is kept in memory'], a: 0, why: 'Any index file is sorted by its key, so a sparse index on it works.' },
+  { q: '1,000,000 entries, 100 entries per block, levels built until one block remains. How many index levels?', opts: ['2', '3', '4', '6'], a: 1, why: '10,000 blocks → 100 blocks → 1 block: 3 levels.' },
+  { q: 'In the slide 17 picture, which level changes when a record is inserted into a data block that has a free slot?', opts: ['All levels', 'Only the data block', 'The outer index', 'The inner index'], a: 1, why: 'No block is created, so no index entry changes.' },
+]);
+ask('#try1', { q: '5,000,000 entries, 250 entries per index block. How many blocks does the level directly above the inner index have?', a: 80, hint: 'First find the inner index blocks, then one outer entry per inner block.', why: 'Inner: 5,000,000 / 250 = 20,000 blocks. Outer: 20,000 entries / 250 = 80 blocks (and a third level of 1 block above that).' });
+ask('#try2', { q: 'A 3-level index (top level cached in memory) is used to fetch one record. How many disk block reads?', a: 3, why: 'Level 2 and level 1 blocks (2 reads, the top is cached) plus the data block = 3.' });
+
+</script>
+</body>
+</html>

@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Checkpointing an Undo/Redo Log · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="../s05/lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 06 (Sukarna) · Chapter 4 · Slides 17–18 · Book §17.4.3</div>
+<h1>Checkpointing an Undo/Redo Log</h1>
+<p class="lede">The simplest checkpoint of the three: flush every dirty buffer. This chapter gives the algorithm, the textbook's Example 17.12 with the slide's two crash scenarios and its “why not &lt;START T2&gt;?” question, a comparison of all three checkpoint methods, and an exam question.</p>
+
+<h2>1. The algorithm (slide 17)</h2>
+<pre>1. Write &lt;START CKPT(T1, …, Tk)&gt;, where T1 … Tk are all the active
+   (uncommitted) transactions, and flush the log.
+2. Write to disk ALL dirty buffers, i.e. every buffer holding a changed
+   database element, whoever changed it.
+3. Write &lt;END CKPT&gt; and flush the log.</pre>
+<p>The difference from redo logging is in step 2: <em>flush all dirty buffers, not just those of committed transactions</em>. Undo/redo logging tolerates uncommitted data on disk (it can be undone from the old values), so there is no need to sort buffers by transaction. That also means elements smaller than a block can share a buffer without the conflict described in the previous chapter.</p>
+<p>The textbook adds one requirement: <em>a transaction must not write any values, even to memory buffers, until it is certain not to abort.</em> Concurrency control (textbook §19.1) needs this anyway, to stop other transactions from reading uncommitted (“dirty”) data.</p>
+
+<h2>2. Textbook Example 17.12 and slide 18</h2>
+<div class="logrow">
+<pre class="log">&lt;START T1&gt;
+&lt;T1,A,4,5&gt;
+&lt;START T2&gt;
+&lt;COMMIT T1&gt;
+&lt;T2,B,9,10&gt;
+&lt;START CKPT(T2)&gt;
+&lt;T2,C,14,15&gt;
+&lt;START T3&gt;
+&lt;T3,D,19,20&gt;
+&lt;END CKPT&gt;
+&lt;COMMIT T2&gt;
+&lt;COMMIT T3&gt;</pre>
+<div style="flex:1 1 300px">
+<p>This is the redo log of Fig. 17.8 with old values added (each old value is one less than the new one). T2 is the only active transaction when the checkpoint begins. Under undo/redo logging T2's new value B = 10 may already be on disk, which was impossible under redo logging, but it does not matter: during the checkpoint B is flushed anyway, since <em>all</em> dirty buffers are. So is T1's A, if it was not on disk already.</p>
+</div></div>
+
+<figure class="wide">
+<span class="anim-tag">Interactive animation</span>
+<div id="tl"></div>
+</figure>
+
+<div class="q">
+<h4>Slide 18 (worked answers)</h4>
+<p><strong>Crash after &lt;COMMIT T3&gt;.</strong> T2 and T3 committed. T1 is before the checkpoint, and since &lt;END CKPT&gt; is on the log, T1's changes are on disk: ignore it. Recovery starts at &lt;START CKPT(T2)&gt;: redo <strong>&lt;T2,C,14,15&gt; (C = 15)</strong> and <strong>&lt;T3,D,19,20&gt; (D = 20)</strong>. Nothing to undo.</p>
+<p><strong>Why start at &lt;START CKPT(T2)&gt; and not at &lt;START T2&gt;?</strong> Under redo logging we had to go back to &lt;START T2&gt;, because T2's earlier change B = 10 might not be on disk. Under undo/redo logging the checkpoint flushed <em>every</em> dirty buffer, including B, before &lt;END CKPT&gt;. So every change logged before the START CKPT is on disk, and redo can start at the START CKPT.</p>
+<p><strong>Crash before &lt;COMMIT T3&gt;</strong> (after &lt;COMMIT T2&gt;). T2 committed, T3 incomplete. Redo T2 from the START CKPT: <strong>C = 15</strong> (B = 10 is already on disk). Undo T3: <strong>D = 19</strong>. Write &lt;ABORT T3&gt;. Unlike redo logging, T3 must be undone, because its D = 20 may have reached disk (the checkpoint itself may have flushed it). <strong>Could recovery have to go before the START CKPT?</strong> For the redo pass, no. For the undo pass, yes, if the incomplete transaction was already active at the START CKPT: its changes before the checkpoint were flushed to disk too, and must be undone, so the backward scan continues to that transaction's START record. T3 started after the START CKPT, so here it does not.</p>
+</div>
+
+<div class="figrow">
+<div><div class="figlabel">Crash after &lt;COMMIT T3&gt;</div><div id="c1"></div></div>
+</div>
+<div class="figrow" style="margin-top:16px">
+<div><div class="figlabel">Crash before &lt;COMMIT T3&gt;</div><div id="c2"></div></div>
+</div>
+
+<h2>3. The three checkpoint methods side by side</h2>
+<div class="tbl"><table>
+<tr><th></th><th>Undo logging</th><th>Redo logging</th><th>Undo/redo logging</th></tr>
+<tr><td>Between START and END CKPT</td><td>wait until T1 … Tk finish</td><td>flush data of transactions committed before START CKPT</td><td>flush all dirty buffers</td></tr>
+<tr><td>Waits for active transactions?</td><td>yes</td><td>no</td><td>no</td></tr>
+<tr><td>Recovery, END CKPT is last</td><td>scan back to START CKPT</td><td>redo from earliest START among T1 … Tk</td><td>redo from START CKPT; undo back to START of each incomplete transaction</td></tr>
+<tr><td>Recovery, START CKPT is last</td><td>scan back to earliest START of unfinished Ti</td><td>use previous END/START CKPT pair (or whole log)</td><td>use previous END/START CKPT pair for redo (or whole log)</td></tr>
+</table></div>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+
+<h3>Exam questions</h3>
+<div class="exam">
+  <div class="exam-src">DB QB · 20-21 4b · 15 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-2 | 2020–21 · 15 marks</div>
+  <div class="exam-q"><p>The log records for transactions are given as follows:</p>
+  <pre>1. &lt;T0 start&gt;              8. &lt;T3 start&gt;
+2. &lt;T0, A, 1000, 200&gt;      9. &lt;T3, D, 1000, 200&gt;
+3. &lt;T1 start&gt;             10. &lt;T3 commit&gt;
+4. &lt;T1, B, 1000, 200&gt;     11. &lt;T4 start&gt;
+5. &lt;T1 commit&gt;            12. &lt;T3, E, 1000, 200&gt;
+6. &lt;T2 start&gt;             13. &lt;T4 commit&gt;
+7. &lt;T2, C, 1000, 200&gt;</pre>
+  <p>a. Perform checkpoint after instruction 7. b. Assume a failure is occurred after instruction 13. Run the log-based recovery algorithm to recover the transactions from failure considering the checkpoint.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+  <p>The update records carry old and new values, so this is an undo/redo log.</p>
+  <p><strong>(a) Checkpoint after instruction 7.</strong> Active at that moment: T0 (started, not committed) and T2. T1 has committed. A quiescent checkpoint would have to wait for T0 and T2 to finish, which never happens in this log, so we take a nonquiescent one:</p>
+  <ol>
+    <li>Write <strong>&lt;START CKPT(T0, T2)&gt;</strong> and flush the log.</li>
+    <li>Write all dirty buffers to disk: A (T0), B (T1), C (T2), whichever are not already there. New transactions may keep running meanwhile.</li>
+    <li>Write <strong>&lt;END CKPT&gt;</strong> and flush. It does not wait for T0 and T2; say the flushing finishes after instruction 8.</li>
+  </ol>
+  <pre>1 &lt;T0 start&gt;  2 &lt;T0,A,1000,200&gt;  3 &lt;T1 start&gt;  4 &lt;T1,B,1000,200&gt;  5 &lt;T1 commit&gt;
+6 &lt;T2 start&gt;  7 &lt;T2,C,1000,200&gt;  &lt;START CKPT(T0,T2)&gt;  8 &lt;T3 start&gt;  &lt;END CKPT&gt;
+9 &lt;T3,D,1000,200&gt;  10 &lt;T3 commit&gt;  11 &lt;T4 start&gt;  12 &lt;T3,E,1000,200&gt;  13 &lt;T4 commit&gt;</pre>
+  <p><strong>(b) Failure after instruction 13.</strong> Committed: T1, T3, T4. Incomplete: T0, T2. (Record 12 is printed as an update of T3 after T3's commit, which a transaction cannot do; it is probably a typo for &lt;T4, E, 1000, 200&gt;. Either way it belongs to a committed transaction, so the answer is the same.)</p>
+  <ul>
+    <li>The last checkpoint record is &lt;END CKPT&gt;; its START CKPT lists T0 and T2. All dirty data from before the START CKPT is on disk, so T1 (committed before the checkpoint) needs nothing.</li>
+    <li><strong>Redo</strong> forward from &lt;START CKPT(T0,T2)&gt;: record 9 → <strong>D = 200</strong>; record 12 → <strong>E = 200</strong>.</li>
+    <li><strong>Undo</strong> backward from the end for T0 and T2. Both were active at the START CKPT, so the scan continues past it to their START records: record 7 → <strong>C = 1000</strong>; record 2 → <strong>A = 1000</strong>; stop at &lt;T0 start&gt;.</li>
+    <li>Log: append <strong>&lt;T0 abort&gt;</strong> and <strong>&lt;T2 abort&gt;</strong>, flush.</li>
+  </ul>
+  <p>Database after recovery: A = 1000, B = 200, C = 1000, D = 200, E = 200.</p>
+  <div id="ex118"></div>
+  </div></details>
+</div>
+
+<div class="key"><p><strong>Summary:</strong> an undo/redo checkpoint writes &lt;START CKPT(active list)&gt;, flushes <em>all</em> dirty buffers, and writes &lt;END CKPT&gt;, without waiting for anyone. After a crash with a completed checkpoint, redo starts at the START CKPT (everything earlier is on disk); undo goes back as far as the START of each incomplete transaction, which can be before the checkpoint if that transaction was in its list.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../s05/lecture.js"></script>
+<script>
+const F1710 = '<START T1> <T1,A,4,5> <START T2> <COMMIT T1> <T2,B,9,10> <START CKPT(T2)> <T2,C,14,15> <START T3> <T3,D,19,20> <END CKPT> <COMMIT T2> <COMMIT T3>';
+timelineTool('#tl', { log: F1710, mode: 'undoredo' });
+recoveryAnim('#c1', F1710, 'undoredo');
+recoveryAnim('#c2', F1710.replace(' <COMMIT T3>', ''), 'undoredo');
+recoveryTool('#ex118', { log: '<T0 start> <T0,A,1000,200> <T1 start> <T1,B,1000,200> <T1 commit>\n<T2 start> <T2,C,1000,200> <START CKPT(T0,T2)> <T3 start> <END CKPT>\n<T3,D,1000,200> <T3 commit> <T4 start> <T3,E,1000,200> <T4 commit>', mode: 'undoredo' });
+flashcards('#cards', [
+  { f: 'Undo/redo checkpoint, step 2', b: 'Flush ALL dirty buffers, committed or not.' },
+  { f: 'Redo start point (END CKPT seen)', b: 'The matching START CKPT: everything logged before it is on disk.' },
+  { f: 'Undo extent', b: 'Back to the START of each incomplete transaction, possibly before the checkpoint.' },
+  { f: 'Extra requirement (textbook)', b: 'A transaction must not write values, even in memory, until it is certain not to abort.' },
+]);
+quiz('#quiz', [
+  { q: 'Which buffers does an undo/redo checkpoint flush?', opts: ['Only committed ones', 'All dirty buffers', 'None', 'Only those of listed transactions'], a: 1, why: 'Uncommitted data on disk is fine; it can be undone.' },
+  { q: 'Example 17.12, crash at the end: is B = 10 redone?', opts: ['Yes', 'No, the checkpoint flushed it', 'No, T2 is incomplete', 'Only if B is dirty'], a: 1, why: 'Everything logged before START CKPT reached disk before END CKPT.' },
+  { q: 'Example 17.12, crash before &lt;COMMIT T3&gt;: D becomes…', opts: ['20', '19', 'unchanged', '15'], a: 1, why: 'T3 is incomplete; undo writes its old value 19.' },
+  { q: 'When must undo go back past START CKPT?', opts: ['Never', 'When an incomplete transaction was in the START CKPT list', 'Always', 'When END CKPT is missing'], a: 1, why: 'Its changes from before the checkpoint were flushed and must be undone.' },
+]);
+ask('#try1', { q: 'Example 17.12, crash right after <END CKPT> (before <COMMIT T2>). How many elements does recovery write?', a: 3, hint: 'Nothing after the checkpoint committed. Undo T2 and T3; T2 was already active at START CKPT.', why: 'Nothing to redo. Undo backward: D = 19 (T3), C = 14 (T2), and, past the START CKPT, B = 9 (T2).' });
+</script>
+</body>
+</html>

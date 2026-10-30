@@ -1,0 +1,325 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RAID 5 and Parity · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 13 · Chapter 7 · Slides 17–19 · Book §13.4.7–13.4.8</div>
+<h1>RAID 5: Block-Interleaved Distributed Parity</h1>
+<p class="lede">How one XOR parity block per stripe protects a whole stripe, where RAID 5 puts the parity, how a failed disk is rebuilt, what happens when two disks fail, and why updating one block costs four disk transfers. Includes Question w1-4 and the RAID 4/5 exam questions.</p>
+
+<h2>1. RAID 5 and RAID 4 (slide 17)</h2>
+
+<p>Mirroring works but spends half the disks on copies. RAID 5 protects the data with only <em>one</em> disk's worth of extra space, using parity.</p>
+
+<dl class="def">
+  <dt>RAID level 5: block-interleaved distributed parity</dt><dd><b class="term">Block-interleaved</b> means striped by blocks. <b class="term">Distributed parity</b> means the parity blocks are spread over all the disks. RAID 5 partitions data and parity among all <i>N</i> + 1 disks, instead of storing data in <i>N</i> disks and parity in 1 disk as RAID 4 does.</dd>
+  <dt>RAID level 4</dt><dd>Block striping over <i>N</i> data disks plus one dedicated <b class="term">parity disk</b> holding every parity block (textbook §13.4.7).</dd>
+  <dt>Parity block</dt><dd>A block computed from the data blocks of its stripe, from which any one missing block of the stripe can be rebuilt (Section 2).</dd>
+</dl>
+
+<p><strong>Why spread the parity?</strong> Every write anywhere in the array must also update its stripe's parity block (Section 5). In RAID 4 all parity blocks live on one disk, so that disk takes part in every write and becomes the bottleneck: with <i>N</i> data disks it receives <i>N</i> times as many writes as any data disk. RAID 5 rotates the parity from stripe to stripe so the parity work is shared by every disk.</p>
+
+<p><strong>The placement rule.</strong> With 5 disks, each stripe holds 4 data blocks and 1 parity block. The parity block P<sub>k</sub> for blocks 4k, 4k+1, 4k+2, 4k+3 is stored on disk <i>k</i> mod 5; the data blocks fill the other disks in order.</p>
+
+<figure>
+<svg id="r5"></svg>
+<figcaption><b>Figure 1.</b> RAID 5 with 5 disks and B0–B9, the slides' example. Stripe 0: P0 on D0, B0–B3 on D1–D4. Stripe 1: P1 on D1, B4 on D0, B5–B7 on D2–D4. Stripe 2: P2 on D2, B8 and B9 on D0 and D1. The slide's picture leaves out P2, but the partial stripe also needs its parity (P2 = B8 ⊕ B9) or B8 and B9 would be unprotected.</figcaption>
+</figure>
+
+<div class="q">
+<h4>Slide 17 example: how many disks for RAID 5?</h4>
+<p><em>You need 8 TB of storage and have 2 TB disks.</em> The data needs 8 ÷ 2 = 4 disks; RAID 5 adds one disk's worth of parity: <strong>5 disks</strong>. In general, <i>N</i> disks in RAID 5 give <i>N</i> − 1 disks of usable space.</p>
+</div>
+
+<h2>2. Parity and XOR (slide 18)</h2>
+
+<p>The slide: <em>“Parity block j stores XOR of bits from block j of each disk.”</em> It rests on one operation.</p>
+
+<dl class="def">
+  <dt>XOR (exclusive or, ⊕)</dt><dd>On two bits: 1 if they differ, 0 if they are equal. On many bits: 1 if the number of 1s is odd, 0 if it is even. Also called the <b class="term">modulo-2 sum</b>.</dd>
+</dl>
+
+<div class="tbl"><table style="max-width:340px">
+<tr><th>a</th><th>b</th><th>a ⊕ b</th></tr>
+<tr><td class="num">0</td><td class="num">0</td><td class="num">0</td></tr>
+<tr><td class="num">0</td><td class="num">1</td><td class="num">1</td></tr>
+<tr><td class="num">1</td><td class="num">0</td><td class="num">1</td></tr>
+<tr><td class="num">1</td><td class="num">1</td><td class="num">0</td></tr>
+</table></div>
+
+<p>Three algebra rules make RAID work (textbook §13.4.7): XOR is commutative and associative, x ⊕ 0 = x, and <strong>x ⊕ x = 0</strong>, so XOR-ing the same value twice cancels it.</p>
+
+<p>To compute a parity block, line up the data blocks of the stripe and XOR them column by column. Real blocks have thousands of bits; four bits show the idea.</p>
+
+<figure>
+<span class="anim-tag">Animation</span>
+<div id="xor"></div>
+</figure>
+
+<p>After this, every column (four data bits plus the parity bit) contains an <em>even</em> number of 1s. That is the whole trick.</p>
+
+<h2>3. Recovery from a single disk failure (slide 18)</h2>
+
+<p>The slide's rule: <em>to recover data for a block, compute the XOR of bits from all other blocks in the set, including the parity block.</em> Why it works: each column has an even number of 1s, so a missing bit must be whatever makes the count even again, which is exactly the XOR of the other bits. The same rule rebuilds a lost parity block, so it does not matter whether the failed disk held data or parity.</p>
+
+<figure>
+<svg id="rec"></svg>
+<figcaption><b>Figure 2.</b> B1 is lost. B0 ⊕ B2 ⊕ B3 ⊕ P0 = <code>0110</code>, exactly the lost B1.</figcaption>
+</figure>
+
+<p>To rebuild a whole failed disk, the system repeats this for every stripe: in each stripe the failed disk held one block (data or parity), and the XOR of the surviving blocks of that stripe gives it back. While the disk is missing, the array keeps working in <b class="term">degraded mode</b>: a read of a lost block is answered by computing it on the fly from the other disks of its stripe, which is slower than a normal read.</p>
+
+<h3>What will happen if two disks fail simultaneously? (slide 18)</h3>
+<p><strong>Data is lost.</strong> Each stripe has one parity block, which gives one equation per bit column. With one unknown block the equation can be solved. If two disks fail, a stripe that had blocks on both of them has two unknowns, and many pairs of values satisfy the single equation, with no way to tell which pair is right. RAID 5 survives exactly one disk failure (RAID 6, Chapter 8, survives two).</p>
+
+<h2>4. Try it: fail a disk, update a block</h2>
+<p>The simulator is set to the slides' 5-disk layout with D2 failed. Step through the rebuild stripe by stripe; then try failing two disks (<code>1, 3</code>), or change the level to RAID 4 and compare.</p>
+<figure class="wide">
+<span class="anim-tag">Interactive tool</span>
+<div id="sim"></div>
+</figure>
+
+<h2>5. Updating one block (slide 19)</h2>
+
+<p>When a data block changes, its stripe's parity is no longer correct and must be recomputed and written too. The slide gives two ways.</p>
+
+<p><strong>Way 1, read-modify-write (for a small write).</strong> Use the old parity block, the old value of the block and its new value:</p>
+<div class="key"><p class="formula">new P = old P ⊕ old B ⊕ new B</p></div>
+<p>XOR-ing old B into the parity cancels its old contribution (x ⊕ x = 0), and XOR-ing new B adds the new one. This needs <strong>2 block reads</strong> (old B, old P) and <strong>2 block writes</strong> (new B, new P), however many disks the array has.</p>
+<p>The slide's example says “updating block B2 of D2”, but in the slide's own picture B2 is on <strong>D3</strong> (D2 holds B1); its parity P0 is on D0. The procedure is the same either way.</p>
+
+<figure>
+<svg id="upd" viewBox="0 0 600 165" width="600" role="img" aria-label="RAID 5 update: 2 reads, compute, 2 writes"></svg>
+<figcaption><b>Figure 3.</b> Updating B2 in RAID 5: read old B2 and old P0, compute the new parity in memory, write new B2 and new P0. Four block transfers for one changed block.</figcaption>
+</figure>
+
+<p>This is the <b class="term">small-write penalty</b> of RAID 5: four transfers where RAID 1 needs two. The simulator above animates it with real bits.</p>
+
+<p><strong>Way 2, recompute from the new values (for large sequential writes).</strong> If a whole stripe is being written anyway (all of B0, B1, B2 and B3 are new), there is nothing to read: compute P0 directly as B0 ⊕ B1 ⊕ B2 ⊕ B3 from the new values and write five blocks. The slide notes this is more efficient for writing large amounts of data sequentially. That is why RAID 5 suits large sequential writes and is slow for small random updates.</p>
+
+<div class="q">
+<h4>Question w1-4 (worked answer)</h4>
+<p><em>You have been given six disks of 8 TB each. (a) What are the effective storage capacities in RAID 0, RAID 1 and RAID 5? (b) Explain why 4 blocks need to be transferred to update 1 block in RAID 5.</em></p>
+<p><strong>(a)</strong> Raw capacity is 6 × 8 = 48 TB.</p>
+<div class="tbl"><table>
+<tr><th>Level</th><th>Rule</th><th>Calculation</th><th>Effective capacity</th></tr>
+<tr><td>RAID 0</td><td>all disks hold data</td><td class="num">6 × 8</td><td class="num"><strong>48 TB</strong></td></tr>
+<tr><td>RAID 1</td><td>half the disks are mirrors</td><td class="num">(6 ÷ 2) × 8</td><td class="num"><strong>24 TB</strong></td></tr>
+<tr><td>RAID 5</td><td>one disk's worth is parity</td><td class="num">(6 − 1) × 8</td><td class="num"><strong>40 TB</strong></td></tr>
+</table></div>
+<p>(For comparison, RAID 6 would give (6 − 2) × 8 = 32 TB.)</p>
+<p><strong>(b)</strong> Changing a data block makes its stripe's parity wrong, so the parity must be updated with it. Without reading the other data blocks of the stripe, the system:</p>
+<ol>
+  <li>reads the old data block (1st transfer),</li>
+  <li>reads the old parity block (2nd transfer),</li>
+  <li>computes new parity = old parity ⊕ old data ⊕ new data in memory,</li>
+  <li>writes the new data block (3rd transfer),</li>
+  <li>writes the new parity block (4th transfer).</li>
+</ol>
+<p>2 reads + 2 writes = 4 block transfers. The old values must be read because the XOR needs them to remove the old data's contribution from the parity.</p>
+</div>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+<div id="try2"></div>
+
+<h3>Exam questions</h3>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 24-25 8b · 10 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-1 | 2024–25 · 10 marks</div>
+  <div class="exam-q"><p>Suppose we are using a RAID level 4 scheme with four data disks and one redundant disk, where each block is one byte. Calculate the block of the redundant disk if the corresponding blocks of the data disks are 01010110, 11000000, 00111011, and 11111011.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>In RAID 4 the redundant (parity) disk holds, in each bit position, the XOR (modulo-2 sum) of the corresponding bits of the data disks: 1 if the column has an odd number of 1s, else 0.</p>
+    <div class="tbl"><table>
+      <tr><th>bit position</th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th><th>7</th><th>8</th></tr>
+      <tr><td>disk 1</td><td>0</td><td>1</td><td>0</td><td>1</td><td>0</td><td>1</td><td>1</td><td>0</td></tr>
+      <tr><td>disk 2</td><td>1</td><td>1</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td></tr>
+      <tr><td>disk 3</td><td>0</td><td>0</td><td>1</td><td>1</td><td>1</td><td>0</td><td>1</td><td>1</td></tr>
+      <tr><td>disk 4</td><td>1</td><td>1</td><td>1</td><td>1</td><td>1</td><td>0</td><td>1</td><td>1</td></tr>
+      <tr><td>number of 1s</td><td>2</td><td>3</td><td>2</td><td>3</td><td>2</td><td>1</td><td>3</td><td>2</td></tr>
+      <tr><th>redundant disk</th><th>0</th><th>1</th><th>0</th><th>1</th><th>0</th><th>1</th><th>1</th><th>0</th></tr>
+    </table></div>
+    <p>Redundant block = <strong>01010110</strong>. Step by step: 01010110 ⊕ 11000000 = 10010110; ⊕ 00111011 = 10101101; ⊕ 11111011 = 01010110. (It happens to equal disk 1's block, because disks 2, 3 and 4 XOR to all zeros.) Check: every column of the five blocks now has an even number of 1s.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2016–17 · 15 marks</div>
+  <div class="exam-q"><p>In RAID level 4, one redundant disk is used regardless of how many data disks there are. When any block is written, the redundant disk must also be updated. Briefly explain an optimal policy for updating the redundant disk with an example (consider 1 byte of data is written). Explain the logic behind adopting such a policy.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><strong>Naive policy.</strong> Read the corresponding blocks of all the other data disks, XOR them with the new block, and write the new parity. With <i>n</i> data disks this costs 1 write of the data + (<i>n</i> − 1) reads + 1 write of the parity = <i>n</i> + 1 disk I/Os, which grows with the array.</p>
+    <p><strong>Optimal policy (read-modify-write).</strong> Look only at the old and new versions of the block being written:</p>
+    <ol>
+      <li>read the old value of the data block;</li>
+      <li>read the corresponding block of the redundant disk;</li>
+      <li>write the new data block;</li>
+      <li>write new parity = old parity ⊕ old data ⊕ new data.</li>
+    </ol>
+    <p>Always <strong>4 disk I/Os</strong>, however many data disks there are.</p>
+    <p><strong>Example (one byte per block, textbook Examples 13.9–13.10).</strong> Data disks: disk 1 = 11110000, disk 2 = 10101010, disk 3 = 00111000; redundant disk 4 = 01100010. Disk 2 is rewritten to 11001100.</p>
+    <ul>
+      <li>old ⊕ new = 10101010 ⊕ 11001100 = <strong>01100110</strong>: the bit positions that changed (2, 3, 6, 7).</li>
+      <li>new parity = 01100010 ⊕ 01100110 = <strong>00000100</strong>.</li>
+      <li>Check: 11110000 ⊕ 11001100 ⊕ 00111000 = 00000100. Every column again has an even number of 1s.</li>
+    </ul>
+    <p><strong>Logic.</strong> old data ⊕ new data marks exactly the positions where the data changed. In each such position the count of 1s among the data disks changes by one, from even to odd or back, so flipping the same positions of the parity restores even parity. Algebraically, P = D₁ ⊕ … ⊕ Dₙ, and since x ⊕ x = 0, P ⊕ D_old ⊕ D_new removes the old term and adds the new one. The other data disks never need to be read, which keeps the cost at 4 I/Os and leaves them free for other requests.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 19-20 1b · 20 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-2 | 2019–20 · 20 marks</div>
+  <div class="exam-q"><p>Compare between block-level striping and bit-level striping with examples. Show the storage of blocks B0, B1, B2, …, B11 of a relation r into a RAID level 5 storage system with 7 disks.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><strong>Comparison (Chapter 5).</strong></p>
+    <div class="tbl"><table>
+      <tr><th></th><th>Bit-level striping</th><th>Block-level striping</th></tr>
+      <tr><td>Rule</td><td>bit <i>i</i> of each byte → disk <i>i</i> (8 disks)</td><td>block <i>i</i> → disk <i>i</i> mod <i>n</i></td></tr>
+      <tr><td>Example</td><td>byte 10101111: disk 0 gets 1, disk 1 gets 0, …, disk 7 gets 1</td><td>8 disks: B0…B7 on D0…D7, B8 back on D0</td></tr>
+      <tr><td><code>SELECT * FROM r</code> (sequential)</td><td>8× the transfer rate of one disk</td><td>all disks read in parallel; same benefit</td></tr>
+      <tr><td><code>… WHERE id = 05050</code> (one record)</td><td>all 8 disks must seek; access time worse than one disk</td><td>one disk, one seek</td></tr>
+      <tr><td>Many concurrent small requests</td><td>each occupies every disk, so they queue</td><td>requests on different disks run in parallel (higher throughput)</td></tr>
+      <tr><td>Use today</td><td>rarely used</td><td>RAID 0, 1 (striped), 4, 5, 6</td></tr>
+    </table></div>
+    <p><strong>RAID 5 with 7 disks.</strong> Each stripe has 6 data blocks and 1 parity block; P<sub>k</sub> is on disk <i>k</i> mod 7 and the data fill the other disks in order. 12 blocks fill exactly 2 stripes.</p>
+    <figure><svg id="q12"></svg></figure>
+    <p>P0 = B0 ⊕ B1 ⊕ B2 ⊕ B3 ⊕ B4 ⊕ B5 and P1 = B6 ⊕ B7 ⊕ B8 ⊕ B9 ⊕ B10 ⊕ B11.</p>
+    <p>Note: the question bank's answer puts P0 on the last disk and rotates leftward. Any rotation that spreads the parity works in practice, but the slides' rule is P<sub>k</sub> on disk <i>k</i> mod <i>n</i>, as drawn here.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 19-20 1c · 10 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-2 | 2019–20 · 10 marks</div>
+  <div class="exam-q"><p>Explain the data recovery mechanism for single disk failure in RAID level 5 with an example.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><strong>Principle.</strong> Each stripe's parity block is the XOR of its data blocks, so every bit column of a stripe has an even number of 1s. If one disk fails, each stripe loses one block (data or parity), and that block equals the XOR of all the other blocks of the stripe, parity included.</p>
+    <p><strong>Example.</strong> The slides' 5-disk layout (Figure 1), with 4-bit blocks B0 = 1010, B1 = 0110, B2 = 1100, B3 = 0011 in stripe 0, so P0 = 1010 ⊕ 0110 ⊕ 1100 ⊕ 0011 = 0011 (on D0). Disk D2 fails; it held B1 (stripe 0) and B5 (stripe 1).</p>
+    <ul>
+      <li>Stripe 0: B1 = B0 ⊕ B2 ⊕ B3 ⊕ P0 = 1010 ⊕ 1100 ⊕ 0011 ⊕ 0011 = <strong>0110</strong>, the original B1.</li>
+      <li>Stripe 1: B5 = B4 ⊕ P1 ⊕ B6 ⊕ B7 (read from D0, D1, D3, D4).</li>
+      <li>Stripe 2: D2 holds P2 = B8 ⊕ B9, recomputed from D0 and D1.</li>
+    </ul>
+    <p><strong>Procedure.</strong> (1) The failed disk is detected and the array runs in degraded mode: a read of a block on the failed disk is answered by XOR-ing the rest of its stripe. (2) A replacement disk is installed. (3) The rebuild goes stripe by stripe, computing each lost block from the surviving disks and writing it to the new disk. (4) When every stripe is done, the array is fully protected again. During the rebuild every surviving disk must be read completely, so the array is slower, and a second failure before the rebuild finishes would lose data.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">DB QB · Jan 20 4a · 15 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-2 | 2018–19 · 15 marks</div>
+  <div class="exam-q"><p>Describe the storage mechanism, data read and update of data block for RAID level 5 storage with a set of 4 disks: D0, D1, D2 and D3; and a relation with 8 blocks: B0, B1, B2 … B7. Describe the full recovery mechanism of all blocks of D1, if disk D1 fails.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><strong>Storage.</strong> 4 disks: each stripe holds 3 data blocks and 1 parity block; P<sub>k</sub> = XOR of stripe <i>k</i>'s data blocks, on disk <i>k</i> mod 4. 8 blocks need ⌈8/3⌉ = 3 stripes.</p>
+    <figure><svg id="q14"></svg></figure>
+    <p>P0 = B0 ⊕ B1 ⊕ B2, P1 = B3 ⊕ B4 ⊕ B5, P2 = B6 ⊕ B7 (the empty slot on D3 counts as all zeros).</p>
+    <p><strong>Read.</strong> A block is read directly from its disk; no parity is involved. B<sub>i</sub> is found from the layout (e.g. B4 is in stripe 1 on D2). Reads of blocks on different disks run in parallel, and a scan of the relation uses all four disks.</p>
+    <p><strong>Update of one block</strong> (say B4): read old B4 (D2) and old P1 (D1); compute new P1 = old P1 ⊕ old B4 ⊕ new B4; write new B4 and new P1. That is 2 reads + 2 writes = 4 block transfers. If a whole stripe is rewritten (B3, B4, B5 together), P1 is simply recomputed from the new blocks, with no reads.</p>
+    <p><strong>Recovery of D1.</strong> D1 holds B0 (stripe 0), P1 (stripe 1) and B7 (stripe 2). A new disk replaces D1 and each block is rebuilt as the XOR of the rest of its stripe:</p>
+    <ul>
+      <li>B0 = P0 ⊕ B1 ⊕ B2 (read D0, D2, D3);</li>
+      <li>P1 = B3 ⊕ B4 ⊕ B5 (read D0, D2, D3; recomputing the parity);</li>
+      <li>B7 = B6 ⊕ P2 (read D0 and D2).</li>
+    </ul>
+    <p>Each rebuilt block is written to the new D1; after the third stripe the array is fully protected again. Try it in the simulator above with 4 disks, 8 blocks, fail disk 1.</p>
+    <p>Note: the question bank's answer uses a different parity rotation (P0 on D3), so its D1 holds B1, B4 and P2. The recovery method is the same; the layout here follows the slides' rule.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 18 CT3 2 · 3+2 marks</div>
+  <div class="exam-q"><p>You have been given 8 disks of 4 TB each and the customer relation has blocks (B0, B1, B2, B3, B4, B5, …, B14). Show the storage of the customer relation using a RAID level 5 storage system. Explain how data will be recovered if blocks B6 and B7 are corrupted but there is no disk failure.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><strong>Storage.</strong> 8 disks: 7 data blocks + 1 parity block per stripe, P<sub>k</sub> on disk <i>k</i> mod 8. 15 blocks need 3 stripes. Usable capacity = 7 × 4 = 28 TB.</p>
+    <figure><svg id="q172"></svg></figure>
+    <p><strong>Recovery of B6 and B7.</strong> A corrupted block is detected when it is read (each sector carries a checksum that no longer matches). B6 is in stripe 0 (on D7) and B7 is in stripe 1 (on D0): they are in <em>different stripes</em>, so each stripe has only one bad block and each is recovered on its own from its stripe:</p>
+    <ul>
+      <li>B6 = P0 ⊕ B0 ⊕ B1 ⊕ B2 ⊕ B3 ⊕ B4 ⊕ B5;</li>
+      <li>B7 = P1 ⊕ B8 ⊕ B9 ⊕ B10 ⊕ B11 ⊕ B12 ⊕ B13.</li>
+    </ul>
+    <p>The recomputed values are written back over the corrupted blocks (or to spare sectors). No disk needs replacing. Had both corrupted blocks been in the same stripe, RAID 5 could not have recovered them.</p>
+  </div></details>
+</div>
+
+<div class="key"><p><strong>Summary:</strong> RAID 5 stripes blocks and adds one XOR parity block per stripe, placed on disk k mod n for stripe k so that parity work is spread over all disks (RAID 4 keeps it on one disk, a write bottleneck). Usable space is n − 1 disks. Any one lost block of a stripe is the XOR of all its other blocks, so one disk failure is recoverable; two failures lose the stripes that had blocks on both. A small update costs 2 reads + 2 writes (new P = old P ⊕ old B ⊕ new B); full-stripe writes compute parity from the new data without reads.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="lecture.js"></script>
+<script>
+const put = (id, level, n, m, title) => { document.getElementById(id).outerHTML = raidSVG({ rows: raidLayout(level, n, m).rows, n, title }); };
+put('r5', 5, 5, 10, 'red = parity block');
+put('q12', 5, 7, 12);
+put('q14', 5, 4, 8);
+put('q172', 5, 8, 15);
+
+// bit grid for XOR figures: rows [[name, bits, cls, separatorAbove]], colHl = column index to highlight
+function grid(rows, colHl = -1, note = '') {
+  const cw = 34, x0 = 110, rh = 30;
+  let s = '';
+  rows.forEach(([name, bits, cls, sep], r) => {
+    const y = 20 + r * rh + (sep ? 12 : 0);
+    if (sep) s += `<line x1="20" x2="${x0 + 4 * cw + 10}" y1="${y - 8}" y2="${y - 8}" class="s-fg" style="stroke-width:1.5"/>`;
+    s += `<text x="20" y="${y + 18}" class="big ${cls || ''}">${name}</text>`;
+    [...bits].forEach((b, i) => {
+      s += `<rect class="${i === colHl ? 'cell-hl' : 'cell-plain'}" x="${x0 + i * cw}" y="${y}" width="${cw - 4}" height="24"/>`;
+      s += `<text x="${x0 + i * cw + (cw - 4) / 2}" y="${y + 17}" text-anchor="middle" class="big ${cls || ''}">${b}</text>`;
+    });
+  });
+  const H = 20 + rows.length * rh + 30;
+  if (note) s += `<text x="${x0 + 4 * cw + 24}" y="${H / 2}" class="lbl">${note}</text>`;
+  return `<svg viewBox="0 0 560 ${H}" width="560" role="img" aria-label="XOR of bit columns">${s}</svg>`;
+}
+(() => {
+  const D = [['B0', '1010'], ['B1', '0110'], ['B2', '1100'], ['B3', '0011']], P = '0011';
+  const steps = [{ html: grid([...D, ['P0 = ⊕', '????', 'red', 1]]), cap: 'Stripe 0 holds four data blocks (4 bits each here). P0 is computed one bit column at a time.' }];
+  for (let c = 0; c < 4; c++) {
+    const ones = D.filter(d => d[1][c] === '1').length;
+    steps.push({ html: grid([...D, ['P0 = ⊕', P.slice(0, c + 1) + '?'.repeat(3 - c), 'red', 1]], c),
+      cap: `Column ${c + 1}: the bits are ${D.map(d => d[1][c]).join(', ')}. That is ${ones} one${ones === 1 ? '' : 's'}, ${ones % 2 ? 'odd, so the parity bit is 1' : 'even, so the parity bit is 0'}.` });
+  }
+  steps[4].cap += ' P0 = 0011: every column now has an even number of 1s.';
+  stepper('#xor', steps, { interval: 1800 });
+  document.getElementById('rec').outerHTML = grid([['B0', '1010'], ['B2', '1100'], ['B3', '0011'], ['P0', '0011', 'red'], ['B1 = ⊕', '0110', 'grn', 1]], -1, 'lost B1 rebuilt');
+})();
+// Figure 3: update steps
+(() => {
+  const box = (x, y, t, c) => `<rect class="cell-plain" x="${x}" y="${y}" width="110" height="34" rx="4"/><text x="${x + 55}" y="${y + 22}" text-anchor="middle" class="big ${c}">${t}</text>`;
+  let s = `<text x="20" y="18" class="lbl">STEP 1: 2 READS</text><text x="230" y="18" class="lbl">STEP 2: COMPUTE (no disk)</text><text x="470" y="18" class="lbl">STEP 3: 2 WRITES</text>`;
+  s += box(20, 34, 'old B2', '') + box(20, 90, 'old P0', 'red');
+  s += `<rect class="cell-plain" x="230" y="52" width="200" height="54" rx="4"/><text x="330" y="74" text-anchor="middle" class="big red">new P0 =</text><text x="330" y="94" text-anchor="middle" style="font-size:11px">old P0 ⊕ old B2 ⊕ new B2</text>`;
+  s += box(470, 34, 'new B2', 'grn') + box(470, 90, 'new P0', 'red');
+  s += `<path d="M132 51 L226 70" class="s-acc" marker-end="url(#m-acc)"/><path d="M132 107 L226 90" class="s-acc" marker-end="url(#m-acc)"/>`;
+  s += `<path d="M432 70 L466 51" class="s-acc" marker-end="url(#m-acc)"/><path d="M432 90 L466 107" class="s-acc" marker-end="url(#m-acc)"/>`;
+  s += `<text x="330" y="150" text-anchor="middle" class="big">2 reads + 2 writes = 4 block transfers</text>`;
+  document.getElementById('upd').innerHTML = s;
+})();
+raidTool('#sim', { level: 5, n: 5, m: 10, size: 2, fail: '2', upd: 2 });
+
+flashcards('#cards', [
+  { f: 'RAID 5', b: 'Block-interleaved distributed parity: one parity block per stripe, rotating over all N+1 disks.' },
+  { f: 'RAID 4', b: 'Block striping with all parity on one dedicated disk, which becomes a write bottleneck.' },
+  { f: 'Parity block', b: 'XOR of the corresponding bits of all data blocks in the stripe.' },
+  { f: 'Recovering one block', b: 'XOR of all the other blocks of the stripe, including parity.' },
+  { f: 'Two disk failures in RAID 5', b: 'Data loss: one parity equation cannot solve two unknowns.' },
+  { f: 'Small-write penalty', b: 'Updating 1 block = read old B, read old P, write new B, write new P (4 transfers).' },
+  { f: 'new P', b: 'old P ⊕ old B ⊕ new B.' },
+  { f: 'Placement (slides)', b: 'With n disks, parity of stripe k is on disk k mod n; data fill the other disks in order.' },
+]);
+quiz('#quiz', [
+  { q: 'B0 = 1001, B1 = 0011, B2 = 0101, B3 = 1111. What is P0?', opts: ['0000', '1010', '1111', '0110'], a: 0, why: '1001 ⊕ 0011 = 1010; ⊕ 0101 = 1111; ⊕ 1111 = 0000.' },
+  { q: 'In the 5-disk layout, which disk holds P3?', opts: ['D0', 'D2', 'D3', 'D4'], a: 2, why: '3 mod 5 = 3.' },
+  { q: 'Why is RAID 5 preferred to RAID 4?', opts: ['It survives two failures', 'Parity is spread over all disks, so no single parity disk bottleneck', 'It needs fewer disks', 'It does not compute parity'], a: 1, why: 'Every write updates a parity block; RAID 4 sends all of them to one disk.' },
+  { q: 'Two disks of a RAID 5 array fail at once. What happens?', opts: ['Nothing is lost', 'Only parity is lost', 'Stripes with blocks on both disks lose data', 'The array rebuilds using mirrors'], a: 2, why: 'Two unknowns, one equation.' },
+  { q: 'How many block transfers does a one-block update take in RAID 5?', opts: ['1', '2', '4', '6'], a: 2, why: '2 reads (old data, old parity) + 2 writes (new data, new parity).' },
+  { q: 'When is recomputing parity from the new blocks better than read-modify-write?', opts: ['Never', 'When the whole stripe is being written (large sequential writes)', 'When a disk has failed', 'For single-byte writes'], a: 1, why: 'All data blocks of the stripe are new, so no reads are needed.' },
+]);
+ask('#try1', { q: 'Five data disks hold 1100, 1010, 0110, 1111, 0001 in one stripe. What is the parity block?', a: ['1110'], hint: 'XOR them two at a time.', why: '1100 ⊕ 1010 = 0110; ⊕ 0110 = 0000; ⊕ 1111 = 1111; ⊕ 0001 = 1110.' });
+ask('#try2', { q: 'Seven 4 TB disks in RAID 5: usable capacity in TB?', a: 24, why: '(7 − 1) × 4 = 24 TB.' });
+</script>
+</body>
+</html>

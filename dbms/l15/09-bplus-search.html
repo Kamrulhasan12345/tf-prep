@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Searching a B+ Tree · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 15 · Chapter 9 · Slides 31–34</div>
+<h1>Searching a B+ Tree</h1>
+<p class="lede">The <code>find(v)</code> algorithm from the slides, run step by step on the slides' trees with every comparison shown. You can type any name into the tracers and watch the search. Includes Question W-1 and why B+ trees need so few disk reads.</p>
+
+<h2>1. The find(v) algorithm (slide 32)</h2>
+
+<p>To find the record with search key <i>V</i>, start at the root and go down one level at a time. At each non-leaf node, pick the pointer whose key range (Chapter 8) contains <i>V</i>. At the leaf, look for <i>V</i> itself.</p>
+
+<pre>function find(V)
+1.  C = root
+2.  while (C is not a leaf node)
+2.1     Let i be least number s.t. V ≤ C.Kᵢ
+2.2     if there is no such number i then
+2.3         Set C = last non-null pointer in C
+2.4     else if (V = C.Kᵢ) Set C = C.Pᵢ₊₁
+2.5     else set C = C.Pᵢ
+3.  if for some i, Kᵢ = V then return C.Pᵢ
+4.  else return null   /* no record with search-key value V exists */</pre>
+
+<p>Line by line, in plain words:</p>
+<ul>
+  <li><strong>2.1</strong> Scan the node's keys from left to right and stop at the first key that is <em>greater than or equal to</em> V.</li>
+  <li><strong>2.2–2.3</strong> If every key is smaller than V, V belongs to the rightmost subtree, so follow the last pointer.</li>
+  <li><strong>2.4</strong> If that key <em>equals</em> V, follow the pointer to its <em>right</em>, P<sub>i+1</sub>. Recall from Chapter 8 that the subtree right of K<sub>i</sub> holds keys ≥ K<sub>i</sub>, so V is there.</li>
+  <li><strong>2.5</strong> Otherwise the key is strictly greater than V, so follow the pointer to its <em>left</em>, P<sub>i</sub>, where keys are smaller than K<sub>i</sub>.</li>
+  <li><strong>3–4</strong> At the leaf, either V is one of its keys (return its record pointer) or it is not in the file at all.</li>
+</ul>
+
+<h2>2. Slide 31 question: find “Gold”</h2>
+
+<p><em>Given the B+ tree index on name, how is <code>SELECT * FROM instructor WHERE name = 'Gold'</code> executed?</em> Press Play, or step through. The highlighted line in the code is the one being executed. You can also type another name and press <b>Trace find(v)</b>.</p>
+
+<figure class="wide">
+<span class="anim-tag">Interactive animation</span>
+<div id="t31"></div>
+</figure>
+
+<p>In words: at the root, “Gold” ≤ “Mozart”, and they are not equal, so go left (line 2.5). At [Einstein, Gold], “Gold” ≤ “Einstein” is false, “Gold” ≤ “Gold” is true with i = 2, and V equals K₂, so follow P₃ (line 2.4) to the leaf [Gold, Katz, Kim]. K₁ = Gold matches, so return P₁ and fetch the record (33456, Gold, Physics, 87000). That is 3 node reads plus 1 record read.</p>
+
+<h2>3. Slide 32's trace, on a slightly different tree</h2>
+
+<p>Slides 32 and 33 use a second tree that also contains “Adams”, so its left internal node is [Califieri, Einstein, Gold]. The slide's trace on the right (“i = 1 … Else C = left child … i = 3 … Elseif (true) C = P₄ … Return node with ‘Gold’”) is exactly what the tracer below shows:</p>
+
+<figure class="wide">
+<span class="anim-tag">Interactive animation</span>
+<div id="t32"></div>
+</figure>
+
+<div class="tbl"><table>
+<tr><th>Slide's trace</th><th>Meaning</th></tr>
+<tr><td><code>C = root</code></td><td>Start at [Mozart].</td></tr>
+<tr><td><code>i = 1; If (false); Elseif (false); Else (C = left child)</code></td><td>Gold ≤ Mozart, so i = 1. There is a key ≥ V (not line 2.2). Gold ≠ Mozart (not 2.4). So line 2.5: C = P₁, the left child.</td></tr>
+<tr><td><code>i = 3; If (false); Elseif (true) C = P₄</code></td><td>In [Califieri, Einstein, Gold], the first key ≥ Gold is K₃ = Gold, so i = 3. It equals V, so line 2.4: C = P₄.</td></tr>
+<tr><td><code>While (False)</code></td><td>C is now the leaf [Gold, Katz, Kim]. The loop ends.</td></tr>
+<tr><td><code>Return node with ‘Gold’</code></td><td>Line 3: K₁ = Gold, return P₁.</td></tr>
+</table></div>
+
+<div class="q">
+<h4>Question W-1 (worked answer)</h4>
+<p><em>Explain how the following queries are executed using the given B+ tree index (slide 33's tree).</em></p>
+
+<p><strong>(a) <code>SELECT * FROM instructor WHERE name = 'Crick'</code></strong></p>
+<figure class="wide"><div id="crick"></div></figure>
+<ol>
+  <li>C = root [Mozart]. Crick ≤ Mozart, so i = 1. Not equal, so C = P₁ → [Califieri, Einstein, Gold].</li>
+  <li>Crick ≤ Califieri? No (“Cr” comes after “Ca”). Crick ≤ Einstein? Yes, so i = 2. Not equal, so C = P₂ → leaf [Califieri, Crick].</li>
+  <li>C is a leaf. K₂ = Crick matches, so return P₂ → record (76766, Crick, Biology, 72000).</li>
+</ol>
+
+<p><strong>(b) <code>SELECT * FROM instructor WHERE name = 'Rafique'</code></strong></p>
+<figure class="wide"><div id="rafique"></div></figure>
+<ol>
+  <li>C = root [Mozart]. Rafique ≤ Mozart? No. There is no such i, so line 2.3: follow the last non-null pointer, P₂ → [Srinivasan].</li>
+  <li>Rafique ≤ Srinivasan? Yes, i = 1. Not equal, so C = P₁ → leaf [Mozart, Singh].</li>
+  <li>C is a leaf. Neither Mozart nor Singh equals Rafique, so line 4: <strong>return null</strong>. No instructor is called Rafique. The tree proves it after reading just 3 nodes. Rafique would sit between Mozart and Singh if it existed, and it is not there.</li>
+</ol>
+</div>
+
+<h2>4. How many nodes does a search read? (slide 34)</h2>
+
+<p>Every search reads exactly one node per level, so its cost is the <b class="term">height</b> of the tree. Because every non-root node has at least ⌈n/2⌉ children, each level multiplies the number of reachable keys by at least ⌈n/2⌉. So with <i>K</i> search-key values in the file:</p>
+<div class="key"><p class="formula">height ≤ ⌈ log<sub>⌈n/2⌉</sub>(K) ⌉</p></div>
+
+<p>Realistic numbers from the slide: a node is the size of a disk block, typically 4&nbsp;KB, and with about 40 bytes per index entry (key + pointer), n is around 100. With 1 million search-key values:</p>
+<div class="key"><p class="formula">log₅₀(1,000,000) ≈ 3.53, so at most 4 nodes are read</p></div>
+<p>(50 = ⌈100/2⌉, the worst case where every node is only half full. 50⁴ = 6.25 million, which is more than 1 million, so 4 levels are always enough.)</p>
+
+<p>Compare a <b class="term">balanced binary tree</b>, where every node has only 2 children. Each level only doubles the reach, so 1 million keys need log₂(1,000,000) ≈ 20 levels, and a search reads around 20 nodes.</p>
+
+<figure>
+<svg id="cmp" viewBox="0 0 800 110" width="800" role="img" aria-label="4 node reads vs 20 node reads"></svg>
+<figcaption><b>Figure 1.</b> Node reads for one lookup among 1 million keys. Each square is one node access, which may be a disk I/O costing around 20 ms (the slide's figure).</figcaption>
+</figure>
+
+<p>This is why the difference matters: <em>every node access may need a disk I/O</em>. 4 reads × 20 ms = <strong>80 ms</strong> for the B+ tree, versus 20 × 20 ms = <strong>400 ms</strong> for a binary tree. In practice the root and the second level of a B+ tree are almost always cached in memory, so a lookup often costs only 1 or 2 actual disk reads. That large fan-out is the whole reason databases use B+ trees rather than binary trees.</p>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+<div id="try2"></div>
+
+<h3>Exam questions</h3>
+<div class="exam">
+  <div class="exam-src">DB QB · 24-25 4b · 15 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-1 | 2024–25 · 15 marks</div>
+  <div class="exam-q"><p>Given a B+ tree index with 10 million records, suppose the node size is 4 kilobytes, search-key size is 8 bytes, and disk-pointer size is 4 bytes. Answer the following questions:<br>(i) Given a search-key, how many index blocks need to be read from the disk in the best case for finding the pointer to the data record?<br>(ii) Given a range query assuming 1000 records will be retrieved, how many index blocks need to be read from the disk in the best case for finding the pointers to all the data records?<br>(iii) Given a search-key, how many index blocks need to be read from the disk in the best and worst cases to find the data pointer if we use a hash index instead of a B+ tree index? Assume that the hash index requires at most three overflow blocks.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><strong>Fan-out.</strong> A node of 4,096 bytes holds n pointers and n − 1 keys: 4n + 8(n − 1) ≤ 4096 ⇒ 12n ≤ 4104 ⇒ <strong>n = 342</strong>. A leaf therefore holds up to 341 keys (with 341 record pointers and the next-leaf pointer).</p>
+    <p><strong>Height.</strong> Count the levels for 10,000,000 keys:</p>
+    <ul>
+      <li>Full nodes: ⌈10⁷/341⌉ = 29,326 leaves → ⌈29,326/342⌉ = 86 nodes → 1 root: <strong>3 levels</strong>.</li>
+      <li>Least full nodes allowed (leaves 171 keys, internal nodes 171 children, root 2 children): a 4-level tree would need at least 2 × 171 × 171 = 58,482 leaves, but 10⁷ keys fill at most ⌊10⁷/171⌋ = 58,479 leaves of 171 keys. So 4 levels are impossible, and the tree has exactly <strong>3 levels</strong> however full it is.</li>
+    </ul>
+    <p><strong>(i)</strong> A B+ tree lookup always goes from the root to a leaf, and the record pointers are only in the leaves: <strong>3 index blocks</strong> (root, one internal node, one leaf). Because the height is always 3, this is also the worst case.</p>
+    <p><strong>(ii)</strong> Descend once to the leaf holding the first key in the range (3 blocks), then follow the leaf chain. In the best case the leaves are full and the range starts at the first key of a leaf, so 1000 keys occupy ⌈1000/341⌉ = 3 leaves (341 + 341 + 318). The first of them was already read during the descent, so 2 more leaf reads: <strong>3 + 2 = 5 index blocks</strong>.</p>
+    <p><strong>(iii)</strong> A hash index computes the bucket number from the key, so there is no tree to descend. Best case: the pointer is in the bucket's primary block: <strong>1 block</strong>. Worst case: the bucket has the maximum three overflow blocks and the key is in the last one (or is absent, which also requires reading the whole chain): 1 + 3 = <strong>4 blocks</strong>. (Hashing is taught in <a href="13-static-hashing.html">Static hashing</a>.) The hash index can beat the B+ tree on a point lookup, but it cannot do part (ii): a hash index has no key order, so a range query cannot use it.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 22-23 8b · 5 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-1 | 2022–23 · 5 marks</div>
+  <div class="exam-q"><p>For a degree 5 B+ tree, what will be the height of the B+ tree when the numbers from 1 to 100 are inserted sequentially? Hint: a tree with l leaves and internal nodes of degree d (some constant number of internal nodes can have degree &gt; d) has height approximately log<sub>d</sub> l.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>Degree 5 means n = 5: at most 5 pointers and 4 keys per node. The standard insertion algorithm (taught in the B+ tree insertion chapter after this lecture) splits an overfull leaf of 5 keys into 3 + 2 keys, and an overfull internal node of 6 pointers into 3 + 3 pointers.</p>
+    <p><strong>Sequential inserts</strong> always go into the rightmost leaf. When it splits, the left half (3 keys) is never touched again. So every leaf except the last ends with exactly 3 keys, and likewise every internal node except the rightmost one on each level ends with 3 children: nodes stay partly empty (3 of 4 key slots in a leaf, 3 of 5 pointers in an internal node), and the effective degree is d ≈ 3.</p>
+    <ul>
+      <li><strong>Leaves:</strong> 32 leaves of 3 keys (1–96) and a last leaf with 4 keys (97–100): <strong>33 leaves</strong>.</li>
+      <li><strong>Level above the leaves:</strong> 33 pointers, 3 per node: <strong>11 nodes</strong>.</li>
+      <li><strong>Next level:</strong> 11 pointers as 3 + 3 + 5: <strong>3 nodes</strong>, [10, 19], [37, 46], [64, 73, 82, 91].</li>
+      <li><strong>Root:</strong> 3 pointers: [28, 55].</li>
+    </ul>
+    <p>The tree has <strong>4 levels</strong> (root, two internal levels, leaves), so its height is <strong>3</strong> counted in edges (4 counted in nodes, the convention of the find(v) cost). The hint agrees: with d ≈ 3 and l = 33, log₃ 33 ≈ 3.2, about 3 levels above the leaves. With full nodes (d = 5) it would be lower: 25 leaves of 4 keys need only ⌈log₅ 25⌉ = 2 levels above them.</p>
+    <p>This was checked by running the insertion algorithm for 1…100 with n = 5 and testing the tree's invariants (sorted keys, all leaves at one depth, occupancy limits).</p>
+    <div class="tbl"><table><tr><th>Level</th><th>Nodes</th><th>Contents</th></tr>
+      <tr><td>Root</td><td class="num">1</td><td class="num">[28, 55]</td></tr>
+      <tr><td>Internal 1</td><td class="num">3</td><td class="num">[10, 19] [37, 46] [64, 73, 82, 91]</td></tr>
+      <tr><td>Internal 2</td><td class="num">11</td><td class="num">[4, 7] [13, 16] [22, 25] … [94, 97]</td></tr>
+      <tr><td>Leaves</td><td class="num">33</td><td class="num">[1,2,3] [4,5,6] … [94,95,96] [97,98,99,100]</td></tr></table></div>
+  </div></details>
+</div>
+
+<div class="key">
+<p><strong>Summary:</strong> find(V) walks from the root to a leaf. At each node it finds the first key ≥ V: if equal, it goes right of that key; if greater, left of it; if none, to the last pointer. At the leaf it either finds V and returns the record pointer, or returns null. A search reads one node per level, and with fan-out around 100 even a million keys need at most 4 levels, compared with about 20 for a binary tree.</p>
+</div>
+</main>
+<script src="../assets/book.js"></script>
+<script>
+const T31 = () => ({ k: ['Mozart'], c: [
+  { k: ['Einstein', 'Gold'], c: [{ k: ['Brandt', 'Califieri', 'Crick'] }, { k: ['Einstein', 'El Said'] }, { k: ['Gold', 'Katz', 'Kim'] }] },
+  { k: ['Srinivasan'], c: [{ k: ['Mozart', 'Singh'] }, { k: ['Srinivasan', 'Wu'] }] }] });
+const T32 = () => ({ k: ['Mozart'], c: [
+  { k: ['Califieri', 'Einstein', 'Gold'], c: [{ k: ['Adams', 'Brandt'] }, { k: ['Califieri', 'Crick'] }, { k: ['Einstein', 'El Said'] }, { k: ['Gold', 'Katz', 'Kim'] }] },
+  { k: ['Srinivasan'], c: [{ k: ['Mozart', 'Singh'] }, { k: ['Srinivasan', 'Wu'] }] }] });
+bpTracer('#t31', T31(), 'Gold');
+bpTracer('#t32', T32(), 'Gold');
+bpTracer('#crick', T32(), 'Crick');
+bpTracer('#rafique', T32(), 'Rafique');
+
+(() => {
+  let s = '';
+  const row = (y, label, n, cls) => {
+    s += `<text x="10" y="${y + 16}" class="big" style="font-size:12px">${label}</text>`;
+    for (let i = 0; i < n; i++) s += `<rect class="${cls}" x="${170 + i * 22}" y="${y}" width="18" height="22"/>`;
+    s += `<text x="${170 + n * 22 + 8}" y="${y + 16}" class="lbl">${n} reads × 20 ms = ${n * 20} ms</text>`;
+  };
+  row(20, 'B+ tree (n = 100)', 4, 'cell-new');
+  row(70, 'Binary tree', 20, 'cell-del');
+  document.querySelector('#cmp').innerHTML = s;
+})();
+flashcards('#cards', [
+  { f: 'find(v), line 2.1', b: 'In a non-leaf node, find the first key K<sub>i</sub> ≥ V.' },
+  { f: 'V = K<sub>i</sub> in a non-leaf node', b: 'Follow P<sub>i+1</sub>, the pointer to the right of K<sub>i</sub>.' },
+  { f: 'V &lt; K<sub>i</sub>', b: 'Follow P<sub>i</sub>, the pointer to the left of K<sub>i</sub>.' },
+  { f: 'No key ≥ V', b: 'Follow the last non-null pointer.' },
+  { f: 'Cost of a lookup', b: 'One node read per level: the height of the tree, ≤ ⌈log<sub>⌈n/2⌉</sub>(K)⌉.' },
+  { f: 'Range query on a B+ tree', b: 'Descend once to the first key, then walk along the leaf chain.' },
+]);
+quiz('#quiz', [
+  { q: 'In node [Einstein, Gold], searching for “Gold”. Which pointer is followed?', opts: ['P₁', 'P₂', 'P₃', 'None'], a: 2, why: 'First key ≥ Gold is K₂ = Gold and it is equal, so follow P₃.' },
+  { q: 'At the root [Mozart], searching for “Wu”. Which line of find(v) applies?', opts: ['2.3 (last non-null pointer)', '2.4', '2.5', '3'], a: 0, why: 'No key ≥ Wu, so take the last pointer.' },
+  { q: 'Searching the slide 31 tree for “Kim” reads how many nodes?', opts: ['1', '2', '3', '5'], a: 2, why: 'Root, [Einstein, Gold], leaf [Gold, Katz, Kim]: every path has 3 nodes.' },
+  { q: 'n = 100 and 1,000,000 keys. Upper bound on nodes read?', opts: ['2', '4', '20', '100'], a: 1, why: '⌈log₅₀ 10⁶⌉ = ⌈3.53⌉ = 4.' },
+  { q: 'A balanced binary tree with 1,000,000 keys needs about how many node reads?', opts: ['4', '10', '20', '1000'], a: 2, why: 'log₂ 10⁶ ≈ 20.' },
+  { q: 'find(“Rafique”) on the slide 33 tree ends with…', opts: ['Return P₁ of [Mozart, Singh]', 'Return null', 'An error', 'Return Singh'], a: 1, why: 'The leaf [Mozart, Singh] has no Rafique, so line 4 returns null.' },
+]);
+ask('#try1', { q: 'n = 200 and 8,000,000 keys. Using ⌈log<sub>⌈n/2⌉</sub>(K)⌉, what is the maximum number of nodes read in a lookup?', a: 4, hint: 'log base 100 of 8,000,000.', why: 'log₁₀₀ 8×10⁶ ≈ 3.45, so at most 4.' });
+ask('#try2', { q: 'Each node read costs 10 ms and the top two levels are cached in memory. A 4-level B+ tree lookup plus fetching the record costs how many ms?', a: 30, why: 'Disk reads: levels 3 and 4 (2 reads) + the record (1) = 3 × 10 ms = 30 ms.' });
+
+</script>
+</body>
+</html>

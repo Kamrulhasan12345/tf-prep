@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Views, Privileges and Roles · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="../i03/lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 05 (Ishrak) · Chapter 5 · Exam topics beyond the slides · Book §8.1–8.2, §10.1</div>
+<h1>Exam Topics Beyond the Slides: Views, Privileges and Roles</h1>
+<p class="lede">Two topics that the exams ask about but Lectures 3–5 do not teach. Views are stored queries that behave like tables; the exam asks what goes wrong when rows are inserted through one. Privileges and roles control who may read or change which table; three exam questions ask you to create users and roles and grant and revoke privileges. Each topic is taught briefly first, then the questions are worked in full.</p>
+
+<h2>1. Views</h2>
+<dl class="def">
+  <dt>View</dt>
+  <dd>A named query that can be used like a table. It is the second of SQL's three kinds of relations (Lec 03, Chapter 2): its rows are not stored; they are computed from the base tables each time the view is used, so a view is always up to date.</dd>
+</dl>
+<pre>CREATE VIEW Gadget AS
+SELECT pname, price, manufacturer
+FROM   Product
+WHERE  category = 'Gadgets';
+
+SELECT * FROM Gadget WHERE price &gt; 20;      -- use it like a table
+CREATE OR REPLACE VIEW Gadget AS …;         -- change its definition
+DROP VIEW Gadget;                            -- remove it (the base table is untouched)</pre>
+<p>Uses of views: hiding complexity (a long query written once and reused by name), security (grant users access to a view that shows only some columns or rows, but not to the base table), and logical data independence (if the base tables are reorganised, the view can be redefined so that programs using it keep working).</p>
+<p>When a query uses a view, the DBMS replaces the view's name by its definition and runs the combined query on the base tables:</p>
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="a1"></div>
+</figure>
+
+<h3>Changing data through a view</h3>
+<p>Because a view stores no rows, an INSERT, UPDATE or DELETE on a view must be translated into changes of its base tables. That is only possible when each view row corresponds to exactly one base-table row that can be identified. Oracle allows modification through a view when:</p>
+<ul>
+  <li>the view is defined on <strong>one table</strong> (or, for a join view, the change affects only one <b class="term">key-preserved</b> table: a table whose key is still a key of the view), and</li>
+  <li>the view has no DISTINCT, GROUP BY, aggregate functions, set operators (UNION, MINUS…), and the changed columns are plain columns, not expressions; and</li>
+  <li>for an INSERT, every NOT NULL column of the base table without a default is in the view.</li>
+</ul>
+<p>Two more details: columns not in the view get NULL (or their DEFAULT) when inserting through it, and an inserted row may not satisfy the view's WHERE condition, so it "disappears" from the view right after it was inserted. <code>WITH CHECK OPTION</code> at the end of the view definition forbids such inserts and updates; <code>WITH READ ONLY</code> forbids all changes. (The playground's SQLite never allows changes through views, so only queries on views can be tried there.)</p>
+<div id="p1"></div>
+
+<h3>Exam question</h3>
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2016–17 · 5 marks</div>
+  <div class="exam-q"><p>Given the customer/account/transaction schema, a view is created:</p>
+  <p>customer(customer_id, name, street, city)<br>account(account_number, type, balance)<br>transaction(customer_id, account_number, date, amount)</p>
+  <pre>CREATE VIEW cust_balance AS
+  SELECT a.customer_id, balance
+  FROM customer AS a, account AS b, transaction AS c
+  WHERE a.customer_id = c.customer_id
+    AND b.account_number = c.account_number;</pre>
+  <p>Discuss the possible problems if insertion is allowed through the view cust_balance.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>The view combines three tables: for every transaction, it pairs the customer who made it with the balance of the account it was made on. A view row (customer_id, balance) is therefore derived from one customer row, one account row and one transaction row. Inserting a row such as <code>('C9', 5000)</code> through the view would have to be turned into inserts into the base tables, and that causes these problems:</p>
+    <ol>
+      <li><strong>Missing key values.</strong> The view has no account_number. To store the balance 5000, an account row must be created, but its primary key account_number is unknown and cannot be NULL, so the insert into account is impossible. The transaction row that should link them also needs account_number (and date, amount), which the view does not supply.</li>
+      <li><strong>Missing other values.</strong> A new customer row would get only customer_id; name, street and city become NULL (and fail if any is NOT NULL). The account type is unknown.</li>
+      <li><strong>Ambiguity.</strong> If customer C9 already exists, should a new customer row be inserted or the existing one used? Which existing account (if any) has balance 5000, or should a new one be made? Many different base-table changes would produce the same view row, so the DBMS cannot choose one.</li>
+      <li><strong>Several tables at once.</strong> One view row needs rows in three tables. Oracle allows a change through a join view only if it affects a single key-preserved table. Here neither customer nor account is key-preserved (one customer has many transactions, so customer_id is not a key of the view; one account has many transactions, so neither is account_number), so Oracle rejects the insert (ORA-01779 / ORA-01776).</li>
+      <li><strong>The row might not appear.</strong> Even if rows were inserted into customer and account, the new view row appears only if a matching transaction row exists. Without it the inserted row would immediately vanish from the view, and the user could not see the result of the insert.</li>
+      <li><strong>Duplicates and meaning.</strong> The view may already show the same (customer_id, balance) several times (one per transaction); an inserted duplicate has no clear meaning in the base tables.</li>
+    </ol>
+    <p>Conclusion: cust_balance is a join view without the keys of the base tables, so insertion through it should not be allowed; changes must be made directly on customer, account and transaction. (Small syntax note: Oracle does not accept <code>AS</code> before a table alias; in Oracle write <code>FROM customer a, account b, transaction c</code>. Also <code>date</code> is a reserved word in Oracle, so a real table would need another column name.)</p>
+  </div></details>
+</div>
+
+<h2>2. Privileges and roles (textbook §10.1)</h2>
+<dl class="def">
+  <dt>Privilege</dt>
+  <dd>A permission to perform an action. <b class="term">Object privileges</b> apply to one table or view: SELECT, INSERT, UPDATE, DELETE (and REFERENCES, ALTER, INDEX). <b class="term">System privileges</b> allow actions on the database as a whole, such as CREATE SESSION (log in) or CREATE TABLE.</dd>
+  <dt>GRANT / REVOKE</dt>
+  <dd><code>GRANT privileges ON object TO user_or_role [WITH GRANT OPTION];</code> gives privileges; <code>WITH GRANT OPTION</code> lets the receiver pass them on. <code>REVOKE privileges ON object FROM user_or_role;</code> takes them back.</dd>
+  <dt>Role</dt>
+  <dd>A named set of privileges. Privileges are granted to the role, and the role is granted to users (or to other roles). A user holds every privilege of every role granted to them.</dd>
+</dl>
+<pre>CREATE USER U1 IDENTIFIED BY pass1;      -- Oracle: a user needs a password
+GRANT CREATE SESSION TO U1;              -- allow U1 to log in
+CREATE ROLE clerk;
+GRANT SELECT, INSERT ON Student TO clerk;
+GRANT clerk TO U1;
+REVOKE INSERT ON Student FROM clerk;     -- U1 loses INSERT too</pre>
+<p><strong>Why roles?</strong> In an organisation many users need the same access, and access follows the job, not the person. Without roles, giving 50 clerks access to a new table takes 50 GRANT statements, and a clerk who changes job must have each privilege revoked one by one, which invites mistakes. With roles, privileges are granted once to the role; adding or removing a user is one GRANT or REVOKE of the role; changing what clerks may do is one GRANT or REVOKE on the role, and every member follows at once. Roles also make it easy to check who can do what, and to follow the principle of least privilege.</p>
+<p>The playground cannot run these statements (SQLite has no users), so the animation below tracks the privileges instead.</p>
+
+<h3>Exam questions</h3>
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 215 | L-2/T-1 | 2023–24 · 10 marks</div>
+  <div class="exam-q"><p>Why are roles used for assigning privileges to users? Create three users U1, U2, and U3 and assign them INSERT and UPDATE privileges on tables T1 and T2 by assigning them a role of "Admin". Then transfer these privileges to another role named "Super-Admin". Finally, revoke the UPDATE privilege from "Admin".</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><strong>Why roles:</strong> a role groups privileges under one name. Privileges are granted once to the role and the role is granted to users, so (1) many users get the same access with one GRANT each, (2) changing the access of a whole group is one GRANT/REVOKE on the role, (3) when a user changes job, one REVOKE of the role removes all of its privileges, and (4) access mirrors job functions, which makes it easier to audit and to keep to least privilege. Fewer statements mean fewer mistakes.</p>
+    <p><strong>Statements (Oracle):</strong></p>
+    <pre>-- 1. users (Oracle requires a password; CREATE SESSION lets them log in)
+CREATE USER U1 IDENTIFIED BY u1pass;
+CREATE USER U2 IDENTIFIED BY u2pass;
+CREATE USER U3 IDENTIFIED BY u3pass;
+GRANT CREATE SESSION TO U1, U2, U3;
+
+-- 2. role Admin with INSERT and UPDATE on T1 and T2, given to the users
+CREATE ROLE Admin;
+GRANT INSERT, UPDATE ON T1 TO Admin;
+GRANT INSERT, UPDATE ON T2 TO Admin;
+GRANT Admin TO U1, U2, U3;
+
+-- 3. "transfer" the privileges to a second role
+CREATE ROLE Super_Admin;
+GRANT INSERT, UPDATE ON T1 TO Super_Admin;
+GRANT INSERT, UPDATE ON T2 TO Super_Admin;
+
+-- 4. revoke UPDATE from Admin
+REVOKE UPDATE ON T1 FROM Admin;
+REVOKE UPDATE ON T2 FROM Admin;</pre>
+    <p><strong>Resulting state:</strong> Admin (and therefore U1, U2, U3) has INSERT on T1 and T2; Super_Admin has INSERT and UPDATE on T1 and T2.</p>
+    <p><strong>Why step 3 grants the privileges directly.</strong> A shorter alternative is <code>GRANT Admin TO Super_Admin;</code>, which makes Super_Admin inherit whatever Admin has. But then step 4 would also take UPDATE away from Super_Admin, since it holds UPDATE only through Admin. Granting the privileges to Super_Admin directly keeps them independent, which is what "transfer these privileges" intends. (A name with a hyphen, Super-Admin, would have to be written as a quoted identifier, <code>"Super-Admin"</code>; an underscore avoids that.)</p>
+  </div></details>
+</div>
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="a2"></div>
+</figure>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2014–15 · 13 marks</div>
+  <div class="exam-q"><p>Why are roles used for assigning privileges to users? Create three users U1, U2 and U3 and assign INSERT and UPDATE privileges to them on tables T1 and T2 respectively. Do this by assigning the users a role of "Admin". Then transfer these privileges to another role named "SuperAdmin". Finally, revoke UPDATE privilege from "Admin".</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><strong>Why roles:</strong> as in the previous question: privileges are granted once to a named role and the role to users, so groups of users are managed with single statements, access follows job functions, changes apply to all members at once, and errors and forgotten privileges are less likely.</p>
+    <p>"INSERT and UPDATE … on tables T1 and T2 respectively" means INSERT on T1 and UPDATE on T2.</p>
+    <pre>CREATE USER U1 IDENTIFIED BY u1pass;
+CREATE USER U2 IDENTIFIED BY u2pass;
+CREATE USER U3 IDENTIFIED BY u3pass;
+GRANT CREATE SESSION TO U1, U2, U3;
+
+CREATE ROLE Admin;
+GRANT INSERT ON T1 TO Admin;
+GRANT UPDATE ON T2 TO Admin;
+GRANT Admin TO U1, U2, U3;
+
+CREATE ROLE SuperAdmin;
+GRANT INSERT ON T1 TO SuperAdmin;
+GRANT UPDATE ON T2 TO SuperAdmin;
+
+REVOKE UPDATE ON T2 FROM Admin;</pre>
+    <p>Final state: Admin, and so U1, U2 and U3, can only INSERT into T1; SuperAdmin can INSERT into T1 and UPDATE T2. As before, granting the privileges to SuperAdmin directly (instead of <code>GRANT Admin TO SuperAdmin</code>) keeps SuperAdmin's UPDATE when it is revoked from Admin.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2013–14 · 8 marks</div>
+  <div class="exam-q"><p>Create three users U1, U2 and U3 and assign them SELECT and DELETE privileges respectively on T1 and T2 tables. Do this by assigning the users a role of "Admin". Then transfer these privileges to another role named "SuperAdmin".</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>"SELECT and DELETE privileges respectively on T1 and T2" means SELECT on T1 and DELETE on T2.</p>
+    <pre>CREATE USER U1 IDENTIFIED BY u1pass;
+CREATE USER U2 IDENTIFIED BY u2pass;
+CREATE USER U3 IDENTIFIED BY u3pass;
+GRANT CREATE SESSION TO U1, U2, U3;
+
+CREATE ROLE Admin;
+GRANT SELECT ON T1 TO Admin;
+GRANT DELETE ON T2 TO Admin;
+GRANT Admin TO U1, U2, U3;
+
+CREATE ROLE SuperAdmin;
+GRANT SELECT ON T1 TO SuperAdmin;
+GRANT DELETE ON T2 TO SuperAdmin;</pre>
+    <p>U1, U2 and U3 now hold SELECT on T1 and DELETE on T2 through Admin; SuperAdmin holds the same two privileges directly. Since this question has no later REVOKE, <code>GRANT Admin TO SuperAdmin;</code> is an acceptable alternative for the last step: SuperAdmin then receives exactly Admin's privileges through the role. If "transfer" is meant as "move", finish with <code>REVOKE SELECT ON T1 FROM Admin; REVOKE DELETE ON T2 FROM Admin;</code> (and then the role-to-role alternative must not be used, because SuperAdmin would lose the privileges too).</p>
+    <p>The question bank's answers to these three questions use generic SQL without passwords; Oracle's CREATE USER requires <code>IDENTIFIED BY</code>, and users need CREATE SESSION to log in.</p>
+  </div></details>
+</div>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<h3>SQL exercises (views)</h3>
+<div id="c1"></div><div id="c2"></div><div id="c3"></div><div id="c4"></div><div id="c5"></div>
+
+<div class="key"><p><strong>Summary:</strong> a view is a named, stored query; using it substitutes its definition into the query. Changes through a view are possible only when each view row maps to one identifiable row of one base table (no joins of non-key-preserved tables, DISTINCT, grouping or expressions); join views such as cust_balance cannot accept inserts. Privileges (SELECT, INSERT, UPDATE, DELETE on objects; CREATE SESSION etc.) are given with GRANT and taken back with REVOKE. Roles bundle privileges so groups of users are managed with single statements; a privilege held only through a role disappears when it is revoked from that role.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/sqlplay.js"></script>
+<script src="../i03/lecture.js"></script>
+<script>
+(() => {
+  const V = [['v', 'CREATE VIEW Gadget AS'], ['v', 'SELECT pname, price, manufacturer'], ['v', 'FROM Product'], ['v', "WHERE category = 'Gadgets';"]];
+  const Qv = [['q', 'SELECT pname, price'], ['q', 'FROM   Gadget'], ['q', 'WHERE  price > 20;']];
+  const Qx = [['q', 'SELECT pname, price'], ['q', 'FROM   (SELECT pname, price, manufacturer'], ['q', '        FROM Product'], ['q', "        WHERE category = 'Gadgets')"], ['q', 'WHERE  price > 20;']];
+  stepper('#a1', [
+    { html: dmlFrame(V, 'v', [T(GIZ_HEAD, GIZ_ROWS, { name: 'Product (base table)' })]), cap: 'CREATE VIEW stores only the query text in the data dictionary. No rows are copied.' },
+    { html: dmlFrame(Qv, 'q', [T(GIZ_HEAD, GIZ_ROWS, { name: 'Product (base table)' })]), cap: 'A user queries the view as if it were a table.' },
+    { html: dmlFrame(Qx, 'q', [T(GIZ_HEAD, GIZ_ROWS.map(r => ({ c: r, cls: r[2] === 'Gadgets' ? 'hl' : '' })), { name: 'Product' })]), cap: 'The DBMS replaces <code>Gadget</code> by its definition. The inner query picks the two gadgets.' },
+    { html: dmlFrame(Qx, 'q', [T(['pname', 'price'], [['Powergizmo', 29.99]], { name: 'result' })]), cap: 'The outer condition price &gt; 20 is applied: only Powergizmo. If Product changes tomorrow, the same query on the view sees the new data.' },
+  ], { interval: 2400 });
+})();
+(() => {
+  const P = ['INS T1', 'UPD T1', 'INS T2', 'UPD T2'];
+  const fr = (cmd, st, cap) => {
+    const who = Object.keys(st);
+    let h = '<table class="rec"><tr><th></th>' + P.map(p => `<th>${p}</th>`).join('') + '<th>via</th></tr>';
+    who.forEach(w => { const [privs, via, cls] = st[w]; h += `<tr class="${cls || ''}"><th>${w}</th>${P.map(p => `<td style="text-align:center">${privs.includes(p) ? '✓' : ''}</td>`).join('')}<td>${via}</td><td class="side"></td></tr>`; });
+    return { html: `<div class="evf">${Q(cmd.map(c => ['c', c]), 'c')}<div class="relt">${h}</table></div></div>`, cap };
+  };
+  const all = P, ins = ['INS T1', 'INS T2'];
+  stepper('#a2', [
+    fr(['CREATE USER U1/U2/U3 …;', 'CREATE ROLE Admin;'], { Admin: [[], 'role'], U1: [[], ''], U2: [[], ''], U3: [[], ''] }, 'Three users and an empty role. Nobody can insert or update T1 or T2 yet.'),
+    fr(['GRANT INSERT, UPDATE ON T1 TO Admin;', 'GRANT INSERT, UPDATE ON T2 TO Admin;'], { Admin: [all, 'direct', 'new'], U1: [[], ''], U2: [[], ''], U3: [[], ''] }, 'The four privileges go to the role, once.'),
+    fr(['GRANT Admin TO U1, U2, U3;'], { Admin: [all, 'direct'], U1: [all, 'Admin', 'new'], U2: [all, 'Admin', 'new'], U3: [all, 'Admin', 'new'] }, 'One statement gives all three users everything Admin has.'),
+    fr(['CREATE ROLE Super_Admin;', 'GRANT INSERT, UPDATE ON T1 TO Super_Admin;', 'GRANT INSERT, UPDATE ON T2 TO Super_Admin;'], { Admin: [all, 'direct'], Super_Admin: [all, 'direct', 'new'], U1: [all, 'Admin'], U2: [all, 'Admin'], U3: [all, 'Admin'] }, 'The privileges are "transferred" (granted directly) to Super_Admin.'),
+    fr(['REVOKE UPDATE ON T1 FROM Admin;', 'REVOKE UPDATE ON T2 FROM Admin;'], { Admin: [ins, 'direct', 'hl'], Super_Admin: [all, 'direct'], U1: [ins, 'Admin', 'hl'], U2: [ins, 'Admin', 'hl'], U3: [ins, 'Admin', 'hl'] }, 'Revoking UPDATE from Admin removes it from all three users at once (they held it only through Admin). Super_Admin keeps it because it was granted directly. Had we used <code>GRANT Admin TO Super_Admin</code>, Super_Admin would have lost UPDATE as well.'),
+  ], { interval: 2800 });
+})();
+sqlPlay('#p1', { setup: GIZ, query: "CREATE OR REPLACE VIEW Gadget AS\nSELECT pname, price, manufacturer\nFROM   Product\nWHERE  category = 'Gadgets';\n\nSELECT pname, price FROM Gadget WHERE price > 20;", note: "Then run <code>INSERT INTO Product VALUES ('Nanogizmo', 39.99, 'Gadgets', 'GizmoWorks');</code> and query the view again: the new gadget appears, because the view is computed from Product each time." });
+flashcards('#cards', [
+  { f: 'View', b: 'A named query; rows computed from base tables when used.' },
+  { f: 'CREATE OR REPLACE VIEW', b: 'Create a view or change an existing one\'s definition.' },
+  { f: 'Updatable view (Oracle)', b: 'One key-preserved base table; no DISTINCT, GROUP BY, aggregates, set operators or expressions in changed columns.' },
+  { f: 'WITH CHECK OPTION', b: 'Rejects inserts/updates through the view that the view could not show.' },
+  { f: 'GRANT', b: 'GRANT privs ON object TO user/role [WITH GRANT OPTION];' },
+  { f: 'REVOKE', b: 'REVOKE privs ON object FROM user/role;' },
+  { f: 'Role', b: 'Named set of privileges, granted to users or other roles.' },
+  { f: 'Oracle CREATE USER', b: 'CREATE USER u IDENTIFIED BY password; plus GRANT CREATE SESSION.' },
+]);
+quiz('#quiz', [
+  { q: 'Does a view store a copy of its rows?', opts: ['Yes, refreshed nightly', 'No, only its query; rows are computed when used', 'Only the first time', 'Only in Oracle'], a: 1, why: 'Views are virtual relations (materialized views are a different object).' },
+  { q: 'Which view can accept an INSERT in Oracle?', opts: ['SELECT DISTINCT category FROM Product', "SELECT pname, price, category, manufacturer FROM Product WHERE price > 100", 'SELECT category, COUNT(*) FROM Product GROUP BY category', 'SELECT price * 1.15 FROM Product'], a: 1, why: 'A plain single-table view with the key column.' },
+  { q: 'U1 has UPDATE only through role R. After <code>REVOKE UPDATE ON T FROM R</code>…', opts: ['U1 keeps UPDATE', 'U1 loses UPDATE', 'U1 loses all privileges', 'Error'], a: 1, why: 'Privileges held through a role follow the role.' },
+  { q: 'Super_Admin was given Admin\'s privileges by <code>GRANT Admin TO Super_Admin</code>. Then UPDATE is revoked from Admin. Super_Admin…', opts: ['keeps UPDATE', 'loses UPDATE', 'loses INSERT', 'is dropped'], a: 1, why: 'It held UPDATE only through Admin.' },
+  { q: 'What lets a user pass a privilege on to others?', opts: ['WITH CHECK OPTION', 'WITH GRANT OPTION', 'CREATE SESSION', 'CASCADE'], a: 1, why: 'GRANT … WITH GRANT OPTION.' },
+]);
+chk('#c1', GIZ, "<b>Easy.</b> Create a view <code>Gadget</code> with columns pname, price and manufacturer of the products in category 'Gadgets'. (The checker reads <code>SELECT * FROM Gadget</code>.)", "CREATE VIEW Gadget AS\nSELECT pname, price, manufacturer FROM Product WHERE category = 'Gadgets';", { check: 'state', table: 'Gadget' });
+chk('#c2', GIZ, "<b>Query through a view.</b> Create the Gadget view as above, then use it to list the gadgets cheaper than $25 (name and price).", "CREATE VIEW Gadget AS\nSELECT pname, price, manufacturer FROM Product WHERE category = 'Gadgets';\nSELECT pname, price FROM Gadget WHERE price < 25;");
+chk('#c3', PCS, '<b>Views with computed columns.</b> Create a view <code>PCPrice</code> with columns <code>model</code> and <code>price_bdt</code> = price × 120 for every PC. (The checker reads the view.)', 'CREATE VIEW PCPrice AS\nSELECT model, price * 120 AS price_bdt FROM PC;', { check: 'state', table: 'PCPrice' });
+chk('#c4', PCS, '<b>The view follows the data.</b> Create a view <code>FastPC</code> of model and speed of PCs with speed of at least 3.00. Then delete PC 1005 from PC and query the view.', 'CREATE VIEW FastPC AS SELECT model, speed FROM PC WHERE speed >= 3.00;\nDELETE FROM PC WHERE model = 1005;\nSELECT * FROM FastPC;');
+chk('#c5', HR, "<b>Exam style: a security view.</b> HR clerks may see employees' names, job and department but not salaries or commissions. Create a view <code>EmpPublic</code> with <code>employee_id, first_name, last_name, job_id, department_id</code> for all employees, then use it to list the IT programmers (job IT_PROG) sorted by last name.", "CREATE VIEW EmpPublic AS\nSELECT employee_id, first_name, last_name, job_id, department_id FROM Employees;\nSELECT * FROM EmpPublic WHERE job_id = 'IT_PROG' ORDER BY last_name;", { ordered: true, hint: 'In Oracle you would then <code>GRANT SELECT ON EmpPublic TO clerk_role;</code> and grant nothing on Employees.' });
+</script>
+</body>
+</html>

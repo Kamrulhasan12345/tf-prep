@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Data, Databases and the DBMS · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 01 (Ishrak) · Chapter 1 · Slides 1–11 · Book §1.1</div>
+<h1>Data, Databases and the DBMS</h1>
+<p class="lede">The first lecture introduces the course and then builds up three words step by step: data, database and database management system (DBMS). This chapter explains each one with the slides' university examples and shows what happens when an application asks a DBMS for data.</p>
+
+<h2>1. The course in one picture (slides 1–7)</h2>
+
+<p>CSE 215 is taught in two halves. The first half (slide 4) is about <em>using and designing</em> data: the <b class="term">relational model</b> (how data is shaped into tables), <b class="term">SQL</b> (the language for asking questions of those tables), <b class="term">ER modeling</b> (drawing the things and relationships a system must remember) and <b class="term">normalization</b> (checking that a table design does not repeat facts). The second half (slide 5) opens the box and asks how a DBMS stays fast, correct and dependable: <b class="term">storage</b> (how tables sit on disk), <b class="term">indexes</b> (how rows are found without reading everything), <b class="term">transactions</b> (how many users work at once without damage) and <b class="term">recovery</b> (how the data survives a crash).</p>
+
+<figure>
+<svg id="roadmap" role="img" aria-label="Course roadmap"></svg>
+<figcaption><b>Figure 1.</b> The roadmap from slides 4–5. The first row is about representing, querying and designing data; the second row is about what happens inside the DBMS. In this book the second half is covered by <a href="../l13/01-storage-media.html">Lec 13 (storage)</a>, <a href="../l15/01-what-is-an-index.html">Lec 15 (indexing)</a> and Sukarna sir's lectures on transactions and recovery.</figcaption>
+</figure>
+
+<p>Slide 6 gives the learning method: <strong>concepts</strong> (the slides explain the idea), <strong>examples</strong>, <strong>practice</strong> and <strong>build</strong> (write real queries and designs yourself). Every chapter of this book follows the same order and ends with practice. Slide 7 lists the plan for the first day: meet the course, meet data, meet the DBMS. Slides 1–3 are the title, the instructor (Md. Ishrak Ahsan, Lecturer, CSE, BUET) and contact details (email, office Room 515 ECE Building, and Moodle as the course channel).</p>
+
+<h2>2. Where did you use a database today? (slide 8)</h2>
+
+<p>Slide 8 lists four everyday systems: a messaging app, <b>BIIS</b> (BUET's academic information system, where you register for courses and see results), <b>Pathao/Uber</b> and a <b>payment</b> app. Each one is mostly a story built around data:</p>
+<ul>
+<li>A messaging app remembers who sent which message to whom, and when.</li>
+<li>BIIS remembers students, courses, registrations and grades.</li>
+<li>A ride app remembers riders, drivers, trips, locations and fares.</li>
+<li>A payment app remembers accounts, balances and every transfer.</li>
+</ul>
+<p>The screens you see are thin. Behind every screen there is a program that reads and writes stored facts, and those facts must still be there tomorrow, correct, even if a thousand people use the app at the same moment. Keeping such facts is the job this course studies.</p>
+
+<h2>3. Data = recorded facts (slide 9)</h2>
+
+<dl class="def">
+<dt>Data</dt><dd>Recorded facts: values that have been written down so that they can be used later. A sentence like “A student enrolled in CSE 215” becomes data once it is recorded in a fixed form.</dd>
+<dt>Field (attribute)</dt><dd>One named piece of a recorded fact, such as <i>Student ID</i>, <i>Course</i> or <i>Status</i>. Each field holds one value.</dd>
+<dt>Record</dt><dd>The group of field values that together state one fact, such as (24FF501, CSE 215, Enrolled).</dd>
+</dl>
+
+<p>Slide 9 turns the English sentence “A student enrolled in CSE 215.” into a small card with three labelled values: <i>Student ID</i> = 24FF501, <i>Course</i> = CSE 215, <i>Status</i> = Enrolled. The sentence and the card say the same thing, but the card is far more useful to a computer. A program can find every card whose Course is CSE 215, count them, or change one Status to “Dropped”, because each value sits in a known, named place. A program cannot do that reliably with free English text. Structuring facts into named fields is the first step toward a database.</p>
+
+<figure>
+<svg id="fact" role="img" aria-label="A sentence turned into a structured record"></svg>
+<figcaption><b>Figure 2.</b> Slide 9: the same fact as a sentence and as a structured record with three fields.</figcaption>
+</figure>
+
+<h2>4. A database organizes related data (slide 10)</h2>
+
+<dl class="def">
+<dt>Database</dt><dd>A collection of related data, organized so that it can be stored, found and updated, and kept over a long period of time (the textbook, §1.1: “a collection of information that exists over a long period of time”).</dd>
+<dt>Entity</dt><dd>A thing the system needs to remember facts about: a student, a course, a professor. Things of the same kind form an <b class="term">entity set</b> (all students).</dd>
+<dt>Attribute</dt><dd>A property that describes an entity: a student's ID, name and email. Each attribute has a value for each entity.</dd>
+<dt>Relationship</dt><dd>A connection between entities: “student 24FF501 is enrolled in CSE 215”. An enrollment involves one student and one course.</dd>
+</dl>
+
+<p>Slide 10 shows three groups of facts kept together: <b>Students</b> (ID, name, email), <b>Courses</b> (code, title, credit) and <b>Enrollments</b> (student + course). The first two are entity sets with their attributes. The third is a relationship: each enrollment links one student to one course. The point of the slide is “related facts, kept together”: the three groups belong to one university, and the enrollment facts only make sense together with the student and course facts they refer to.</p>
+
+<figure>
+<svg id="related" role="img" aria-label="Students, Courses and Enrollments"></svg>
+<figcaption><b>Figure 3.</b> Slide 10 with sample rows. Each enrollment refers to a student ID and a course code, so the three groups form one connected database. Lecture 02 turns exactly these groups into tables.</figcaption>
+</figure>
+
+<p>Why keep enrollments separate instead of writing the course list inside each student? Because a fact should be stored once. If “CSE 215 has 3 credits” were copied into every enrolled student's data, a change to the credit value would have to be made in hundreds of places. Lecture 02 (<a href="../i02/04-document-model.html">Chapter 4</a> of the next part) returns to this trade-off.</p>
+
+<h2>5. A DBMS manages the database (slide 11)</h2>
+
+<p>Slide 11 quotes the definition from Connolly and Begg, <i>Database Systems</i> (6th ed.):</p>
+
+<dl class="def">
+<dt>Database management system (DBMS)</dt><dd>A “software system that enables users to define, create, maintain and control access to the database.” Oracle, PostgreSQL, MySQL, SQL Server and SQLite are DBMSs. CSE 215 uses <b>Oracle</b>.</dd>
+<dt>Database system</dt><dd>The database together with the DBMS software and the applications that use it.</dd>
+<dt>Application</dt><dd>A program written for end users (the BIIS portal, a mobile app, a web API). It never touches the database files directly. It sends requests to the DBMS.</dd>
+</dl>
+
+<p>Each verb in the definition is a separate job:</p>
+<ul>
+<li><strong>Define</strong>: describe what will be stored, for example “a student has an ID, a name and an email; the ID is unique”. This description is the <b class="term">schema</b>. In SQL it is written with <code>CREATE TABLE</code>.</li>
+<li><strong>Create</strong>: actually store the data: insert students, courses and enrollments.</li>
+<li><strong>Maintain</strong>: keep the data correct and available over time: answer queries, apply updates, change the structure when requirements change, survive crashes.</li>
+<li><strong>Control access</strong>: decide who may see or change what, and keep many simultaneous users from damaging each other's work.</li>
+</ul>
+
+<p>Slide 11's diagram is a chain: <b>Application</b> (portal / app / API) sends a <em>request</em> to the <b>DBMS</b>, which “stores, queries, protects”, and only the DBMS does the <em>read / write</em> on the <b>Database</b>. The animation below follows one request through that chain.</p>
+
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="arch"></div>
+<figcaption><b>Figure 4.</b> Users → application → DBMS → stored database. Step through to follow a BIIS request for “my courses”.</figcaption>
+</figure>
+
+<p>The most important consequence of this design is that <strong>applications describe <em>what</em> data they want, and the DBMS decides <em>how</em> to get it</strong>. The application above never says which file or which disk block holds the enrollments. That knowledge lives in one place, inside the DBMS, which is why the DBMS can reorganize storage, add an index, or block an unauthorized user without any application changing. The next two chapters show what goes wrong when there is no such layer.</p>
+
+<div class="q">
+<h4>Why put a separate DBMS between the application and the data?</h4>
+<p>Without a DBMS, every application must contain its own code to find records in files, check that values are valid, stop two users from overwriting each other, and repair the files after a crash. Each application does this differently, and each one can get it wrong. With a DBMS, these jobs are written once, carefully, in the DBMS, and every application gets them for free. The application only states its question (in SQL). Chapters 2 and 3 compare the two approaches question by question, as slides 12–23 do.</p>
+</div>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+
+<div class="key"><p><strong>Summary:</strong> data are recorded facts; structuring them into named fields makes them usable by programs. A database is a collection of related data (entities such as students and courses, and relationships such as enrollments) kept over a long time. A DBMS is the software that lets users define, create, maintain and control access to the database. Applications send requests to the DBMS, and only the DBMS reads and writes the stored data.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="lecture.js"></script>
+<script>
+// Figure 1: roadmap
+(() => {
+  const top = ['Relational model', 'SQL', 'ER modeling', 'Normalization'], bot = ['Storage', 'Indexes', 'Transactions', 'Recovery'];
+  let s = T(10, 18, 'FIRST HALF: represent, query and design data', { a: 'start', cls: 'lbl' }) + T(10, 118, 'SECOND HALF: how a DBMS stays fast, correct and dependable', { a: 'start', cls: 'lbl' });
+  [top, bot].forEach((row, r) => row.forEach((t, i) => {
+    const x = 10 + i * 175, y = 30 + r * 100;
+    s += box(x, y, 140, 50, t, [], r ? 'cell-hl' : 'cell');
+    if (i < 3) s += arrow(x + 142, y + 25, x + 173, y + 25);
+  }));
+  const el = $('#roadmap'); el.setAttribute('viewBox', '0 0 680 190'); el.setAttribute('width', 680); el.innerHTML = s;
+})();
+// Figure 2: sentence → record
+(() => {
+  let s = `<rect x="10" y="30" width="230" height="110" rx="8" class="cell-plain"/>` +
+    T(125, 75, '“A student enrolled', { size: 15 }) + T(125, 98, 'in CSE 215.”', { size: 15 }) + T(125, 20, 'free text', { cls: 'lbl' });
+  s += arrow(250, 85, 330, 85, { label: 'record it', m: 'm-acc', cls: 's-acc' });
+  const f = [['Student ID', '24FF501'], ['Course', 'CSE 215'], ['Status', 'Enrolled']];
+  f.forEach(([k, v], i) => {
+    s += `<rect x="340" y="${20 + i * 42}" width="120" height="38" class="cell-hl"/><rect x="460" y="${20 + i * 42}" width="140" height="38" class="cell"/>`;
+    s += T(400, 44 + i * 42, k, { w: 1 }) + T(530, 44 + i * 42, v, { size: 13 });
+  });
+  s += T(470, 160, 'field name → value', { cls: 'lbl' });
+  const el = $('#fact'); el.setAttribute('viewBox', '0 0 620 170'); el.setAttribute('width', 620); el.innerHTML = s;
+})();
+// Figure 3: related data
+(() => {
+  const Y = 58;
+  const tbl = (x, title, head, rows, w) => {
+    let s = T(x + w.reduce((a, b) => a + b) / 2, Y - 12, title, { w: 1, size: 13 });
+    let cx = x; head.forEach((h, j) => { s += `<rect x="${cx}" y="${Y}" width="${w[j]}" height="24" class="cell-hl"/>` + T(cx + w[j] / 2, Y + 16, h, { w: 1, size: 11 }); cx += w[j]; });
+    rows.forEach((r, i) => { cx = x; r.forEach((v, j) => { s += `<rect x="${cx}" y="${Y + 24 + i * 24}" width="${w[j]}" height="24" class="cell"/>` + T(cx + w[j] / 2, Y + 40 + i * 24, v, { size: 11 }); cx += w[j]; }); });
+    return s;
+  };
+  let s = tbl(10, 'Students', ['ID', 'name', 'email'], [['24FF501', 'Nadia', 'nadia@…'], ['24FF502', 'Rafi', 'rafi@…']], [70, 60, 80]);
+  s += tbl(280, 'Courses', ['code', 'title', 'credit'], [['CSE 215', 'Database', '3'], ['CSE 216', 'DB Sessional', '1.5']], [62, 96, 50]);
+  s += tbl(560, 'Enrollments', ['student', 'course'], [['24FF501', 'CSE 215'], ['24FF501', 'CSE 216'], ['24FF502', 'CSE 215']], [76, 70]);
+  s += `<path d="M568 ${Y} V22 H30 V${Y - 3}" class="s-acc dash" marker-end="url(#m-acc)"/>` + T(330, 16, 'Enrollments.student refers to a student ID', { cls: 'lbl acc' });
+  s += `<path d="M666 ${Y + 96} V176 H310 V${Y + 75}" class="s-red dash" marker-end="url(#m-red)"/>` + T(488, 192, 'Enrollments.course refers to a course code', { cls: 'lbl red' });
+  const el = $('#related'); el.setAttribute('viewBox', '0 0 720 200'); el.setAttribute('width', 720); el.innerHTML = s;
+})();
+// Figure 4: request journey
+(() => {
+  const H = 'cell-hl', N = 'cell';
+  const frame = (on, extra = '') => {
+    const c = k => on.includes(k) ? H : N, a = k => on.includes(k) ? { cls: 's-red', m: 'm-red' } : {};
+    let s = box(10, 105, 130, 70, 'Users', ['student, teacher,', 'DBA'], c('u'));
+    s += box(180, 105, 180, 70, 'Application', ['BIIS portal / app / API'], c('a'));
+    s += `<rect x="405" y="30" width="230" height="220" rx="8" class="${c('d')}"/>` + T(520, 52, 'DBMS', { w: 1, size: 14 }) + T(520, 68, 'stores · queries · protects', { cls: 'lbl' });
+    s += box(420, 80, 200, 36, 'Access control', [], c('ac') === H ? H : 'cell-plain');
+    s += box(420, 124, 200, 36, 'Query processor', [], c('qp') === H ? H : 'cell-plain');
+    s += box(420, 168, 200, 36, 'Transactions & recovery', [], c('tr') === H ? H : 'cell-plain');
+    s += box(420, 208, 200, 34, 'Storage manager', [], c('sm') === H ? H : 'cell-plain');
+    s += `<path d="M700 95 v100 a60 14 0 0 0 120 0 v-100" class="${c('db')}"/><ellipse cx="760" cy="95" rx="60" ry="14" class="${c('db')}"/>`;
+    s += T(760, 140, 'Database', { w: 1, size: 13 }) + T(760, 158, 'files on disk', { cls: 'lbl' }) + T(760, 174, 'data + metadata', { cls: 'lbl' });
+    s += arrow(142, 140, 176, 140, { ...a('ua'), label: 'click' });
+    s += arrow(362, 132, 401, 132, { ...a('ad'), label: 'request', dy: -8 });
+    s += arrow(624, 225, 696, 200, { ...a('ds'), label: 'read / write', dy: 30, dx: 30 });
+    if (on.includes('back')) s += arrow(401, 152, 362, 152, { cls: 's-grn', m: 'm-grn', label: 'rows', dy: 16, lcls: 'lbl grn' }) + arrow(176, 158, 142, 158, { cls: 's-grn', m: 'm-grn', label: 'page', dy: 16, lcls: 'lbl grn' });
+    return svgWrap(840, 290, s + extra, 'Users, application, DBMS and database');
+  };
+  const note = t => T(420, 280, t, { cls: 'lbl' });
+  stepper('#arch', [
+    { html: frame([]), cap: 'The four layers of slide 11. <b>Users</b> work with an <b>application</b>. The application talks to the <b>DBMS</b>. Only the DBMS reads and writes the <b>database</b> files on disk.' },
+    { html: frame(['u', 'a', 'ua']), cap: 'Student 2405190 opens BIIS and clicks “My courses”. The click goes to the application (the BIIS web server), not to any file.' },
+    { html: frame(['a', 'd', 'ad'], note('SELECT cid, term FROM Enrolled WHERE sid = 2405190')), cap: 'The application sends a <b>request</b> to the DBMS, written in SQL. It says <em>what</em> it wants (this student\'s enrollments), not where those rows are stored.' },
+    { html: frame(['d', 'ac']), cap: '<b>Access control</b>: the DBMS first checks that the application\'s database account is allowed to read the Enrolled table. A request without permission stops here.' },
+    { html: frame(['d', 'qp']), cap: 'The <b>query processor</b> decides <em>how</em> to answer: for example, use an index on sid instead of reading the whole table. The application never sees this decision.' },
+    { html: frame(['d', 'sm', 'db', 'ds']), cap: 'The <b>storage manager</b> reads the needed blocks from the database files on disk. Updates would go through <b>transactions & recovery</b> first, so that a crash cannot leave them half done.' },
+    { html: frame(['u', 'a', 'back']), cap: 'The matching rows go back to the application, which turns them into a web page. The student never touched a file, and the application never needed to know the file format.' },
+  ], { interval: 2600 });
+})();
+flashcards('#cards', [
+  { f: 'Data', b: 'Recorded facts, such as (Student ID 24FF501, Course CSE 215, Status Enrolled).' },
+  { f: 'Database', b: 'A collection of related data, organized for storage, retrieval and update, and kept over a long period of time.' },
+  { f: 'DBMS', b: 'A software system that enables users to define, create, maintain and control access to the database (Connolly & Begg).' },
+  { f: 'Entity', b: 'A thing the system records facts about, e.g. a student or a course.' },
+  { f: 'Attribute', b: 'A property describing an entity, e.g. a student\'s name or email.' },
+  { f: 'Relationship', b: 'A connection between entities, e.g. an enrollment links one student and one course.' },
+  { f: 'Schema', b: 'The description of what is stored (tables, attributes, types, rules). Defining it is the “define” job of a DBMS.' },
+  { f: 'Application', b: 'An end-user program (portal, app, API) that sends requests to the DBMS instead of reading files itself.' },
+]);
+quiz('#quiz', [
+  { q: 'Which of the four DBMS jobs is “decide that a student has an ID, a name and an email, and the ID is unique”?', opts: ['Define', 'Create', 'Maintain', 'Control access'], a: 0,
+    why: 'Describing the structure and rules of the data is defining the schema. Creating means inserting the actual rows.' },
+  { q: 'In slide 10, what is Enrollments?', opts: ['An entity set', 'A relationship between students and courses', 'An attribute of Students', 'A DBMS'], a: 1,
+    why: 'Each enrollment links one student and one course, so it is a relationship. Students and Courses are the entity sets.' },
+  { q: 'In slide 11, who reads and writes the database files?', opts: ['The user', 'The application', 'The DBMS', 'All three'], a: 2,
+    why: 'Applications send requests; only the DBMS performs the read/write on the stored database.' },
+  { q: 'Why is “Student ID = 24FF501, Course = CSE 215” more useful to a program than the sentence “A student enrolled in CSE 215”?', opts: ['It is shorter', 'Each value is in a named field, so programs can search, count and update it', 'Sentences cannot be stored', 'It uses less disk space'], a: 1,
+    why: 'Named fields give every value a known place, so a program can reliably find all records with Course = CSE 215.' },
+  { q: 'Which statement about an application using a DBMS is true?', opts: ['It must know which disk block holds each row', 'It states what data it wants; the DBMS decides how to get it', 'It locks files itself', 'It must re-implement crash recovery'], a: 1,
+    why: 'This separation is the main reason a DBMS exists: storage details and protection live in one place.' },
+]);
+ask('#try1', { q: 'Slide 9\'s record has how many fields?', a: 3, why: 'Student ID, Course and Status.' });
+</script>
+</body>
+</html>

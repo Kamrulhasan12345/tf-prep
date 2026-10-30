@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Conflicts and Conflict-Serializability · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 02 (Sukarna) · Chapter 3 · Slides 15–21 · Book §18.2.1</div>
+<h1>Conflicts and Conflict-Serializability</h1>
+<p class="lede">Real schedulers check a stronger, easier condition than serializability: can the schedule be turned into a serial one by swapping neighbouring actions that do not conflict? This chapter defines conflicts, animates the slides' swap sequence, and explains why conflict-serializability is sufficient but not necessary.</p>
+
+<h2>1. What a conflict is (slide 15)</h2>
+<p>Commercial schedulers enforce <b class="term">conflict-serializability</b>, a condition stronger than serializability (every conflict-serializable schedule is serializable, Section 4). It is built on one idea:</p>
+<dl class="def">
+  <dt>Conflict</dt><dd>A pair of consecutive actions in a schedule such that, if their order is swapped, the behaviour of at least one of the transactions involved can change (the value it reads, or the final value it leaves in the database).</dd>
+</dl>
+
+<h2>2. Which pairs conflict (slides 16–18)</h2>
+<p>Let T<sub>i</sub> and T<sub>j</sub> be <em>different</em> transactions (i ≠ j). Four kinds of pairs never conflict:</p>
+<ol>
+  <li><strong>r<sub>i</sub>(X); r<sub>j</sub>(Y) never conflict, even if X = Y.</strong> Neither action changes any element, so each reads the same value whichever goes first.</li>
+  <li><strong>r<sub>i</sub>(X); w<sub>j</sub>(Y) do not conflict if X ≠ Y.</strong> If T<sub>j</sub> writes Y first, X is unchanged, so T<sub>i</sub> reads the same X. And T<sub>i</sub>'s read of X has no effect on the value T<sub>j</sub> writes into Y.</li>
+  <li><strong>w<sub>i</sub>(X); r<sub>j</sub>(Y) do not conflict if X ≠ Y</strong>, for the same reason.</li>
+  <li><strong>w<sub>i</sub>(X); w<sub>j</sub>(Y) do not conflict if X ≠ Y.</strong> They change different elements, so the final state is the same in either order.</li>
+</ol>
+<p>Three kinds of pairs always conflict:</p>
+<ol type="a">
+  <li><strong>Two actions of the same transaction</strong>, e.g. r<sub>i</sub>(X); w<sub>i</sub>(Y). The order of a transaction's own actions is fixed; the scheduler may never reorder them. (Slide 17 writes this as r<sub>i</sub>(X); w<sub>i</sub>(Y): note the same subscript i on both.)</li>
+  <li><strong>w<sub>i</sub>(X); w<sub>j</sub>(X)</strong>: two writes of the same element by different transactions. As written, X ends with T<sub>j</sub>'s value; swapped, it ends with T<sub>i</sub>'s. By “no coincidences” the two values differ for some initial state.</li>
+  <li><strong>r<sub>i</sub>(X); w<sub>j</sub>(X)</strong> (and likewise w<sub>i</sub>(X); r<sub>j</sub>(X)): a read and a write of the same element by different transactions. Swapping changes the value T<sub>i</sub> reads, which may change everything T<sub>i</sub> does afterwards.</li>
+</ol>
+
+<div class="key"><p><strong>Slide 18 rule.</strong> Two adjacent actions of <em>different</em> transactions may be swapped <strong>unless</strong> (1) they involve the same database element <strong>and</strong> (2) at least one of them is a write. Both conditions must hold for a conflict: same element alone (two reads) is fine, and a write alone (on different elements) is fine.</p></div>
+
+<figure>
+<div class="tbl"><table style="width:auto;margin:0 auto;text-align:center">
+<tr><th>pair (i ≠ j)</th><th>X ≠ Y</th><th>X = Y</th></tr>
+<tr><th>r<sub>i</sub>(X); r<sub>j</sub>(Y)</th><td class="good">swap OK</td><td class="good">swap OK</td></tr>
+<tr><th>r<sub>i</sub>(X); w<sub>j</sub>(Y)</th><td class="good">swap OK</td><td class="bad">conflict</td></tr>
+<tr><th>w<sub>i</sub>(X); r<sub>j</sub>(Y)</th><td class="good">swap OK</td><td class="bad">conflict</td></tr>
+<tr><th>w<sub>i</sub>(X); w<sub>j</sub>(Y)</th><td class="good">swap OK</td><td class="bad">conflict</td></tr>
+<tr><th>any two actions of the same T<sub>i</sub></th><td class="bad">conflict</td><td class="bad">conflict</td></tr>
+</table></div>
+<figcaption><b>Figure 1.</b> The whole rule in one table.</figcaption>
+</figure>
+
+<h2>3. Conflict-equivalent and conflict-serializable (slide 19)</h2>
+<dl class="def">
+  <dt>Conflict-equivalent</dt><dd>Two schedules are conflict-equivalent if one can be turned into the other by a sequence of swaps of <em>adjacent, non-conflicting</em> actions.</dd>
+  <dt>Conflict-serializable</dt><dd>A schedule is conflict-serializable if it is conflict-equivalent to some serial schedule.</dd>
+</dl>
+<p>Each non-conflicting swap leaves every transaction's reads and the final database state unchanged (that is what “non-conflicting” means). So a whole sequence of such swaps also changes nothing, and if it ends at a serial schedule, the original schedule has exactly that serial schedule's effect.</p>
+
+<div class="q">
+<h4>Slide 19 question: why are only adjacent actions swapped?</h4>
+<p>Because the safety argument is about two actions with nothing in between. When two neighbours swap, the order of every <em>other</em> pair of actions in the schedule stays the same, so we only have to check that one pair. If we jumped an action several places at once, it would pass over every action in between, and some of those could conflict with it (for example, moving w₁(A) forward past r₂(A) changes what T₂ reads). Moving in adjacent steps forces us to check each pair it passes. It loses nothing: any rearrangement that keeps every conflicting pair in its original order can be built from adjacent swaps (this is how bubble sort or insertion sort works), and every rearrangement that changes the order of some conflicting pair is correctly forbidden.</p>
+</div>
+
+<h2>4. Conflict-serializable vs serializable (slide 20)</h2>
+<ul>
+  <li><strong>Every conflict-serializable schedule is serializable.</strong> Conflict-serializability is a <em>sufficient</em> condition.</li>
+  <li><strong>Some serializable schedules are not conflict-serializable.</strong> Conflict-serializability is <em>not necessary</em>.</li>
+  <li>DBMSs enforce conflict-serializability anyway, because the scheduler can check it from reads and writes alone (next chapter), with no knowledge of what the transactions compute.</li>
+</ul>
+<figure>
+<svg viewBox="0 0 520 220" width="520" role="img" aria-label="Nested sets: serial inside conflict-serializable inside serializable inside all schedules">
+  <rect x="10" y="10" width="500" height="200" rx="14" class="cell-plain"/><text x="24" y="32" class="big">all schedules</text>
+  <rect x="40" y="44" width="380" height="156" rx="14" class="cell"/><text x="54" y="66" class="big">serializable</text>
+  <rect x="70" y="78" width="270" height="112" rx="14" class="cell-new"/><text x="84" y="100" class="big">conflict-serializable</text>
+  <rect x="100" y="114" width="130" height="64" rx="12" class="cell-hl"/><text x="165" y="151" text-anchor="middle" class="big">serial</text>
+  <circle cx="380" cy="160" r="5" style="fill:var(--red)"/><text x="372" y="182" text-anchor="end" class="lbl red">S₂ below</text>
+  <circle cx="465" cy="120" r="5" style="fill:var(--red)"/><text x="458" y="108" text-anchor="middle" class="lbl red">Fig. 3, Ch. 2</text>
+</svg>
+<figcaption><b>Figure 2.</b> Every serial schedule is conflict-serializable, every conflict-serializable schedule is serializable, and each inclusion is strict.</figcaption>
+</figure>
+
+<h3>Why conflict-serializability is not necessary: blind writes</h3>
+<p>The textbook's example (box in §18.2): T₁ and T₂ each write Y and then X, and T₃ writes X. None of them reads anything (writes without a preceding read are called <b class="term">blind writes</b>).</p>
+<pre>S₁: w₁(Y); w₁(X); w₂(Y); w₂(X); w₃(X);     (serial: T₁, T₂, T₃)
+S₂: w₁(Y); w₂(Y); w₂(X); w₁(X); w₃(X);</pre>
+<p>Both leave Y with T₂'s value and X with T₃'s value, and nobody reads anything, so S₂ has exactly the effect of the serial S₁ from every initial state: <strong>S₂ is serializable</strong>. But w₁(Y) must stay before w₂(Y) and w₂(X) must stay before w₁(X) (each is a write–write conflict), so T₁ would have to come both before and after T₂. No sequence of legal swaps reaches any serial schedule: <strong>S₂ is not conflict-serializable</strong>. The values T₁ and T₂ wrote into X are overwritten by T₃ and never seen, so their order does not matter, but the conflict rule cannot know that.</p>
+
+<h2>5. Slide 21: turning a schedule into a serial one by swaps</h2>
+<p>Is <code>r₁(A); w₁(A); r₂(A); w₂(A); r₁(B); w₁(B); r₂(B); w₂(B)</code> (Figure 2 of Chapter 2) conflict-serializable? The slide answers by moving T₁'s B-actions up past T₂'s A-actions. Every one of those swaps involves an A action and a B action, so none conflicts. The underlined pair is the one about to be swapped:</p>
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="swaps"></div>
+<figcaption><b>Figure 3.</b> The slide's four swaps (textbook Fig. 18.8). Colours mark transactions: blue T₁, green T₂.</figcaption>
+</figure>
+<p>After four swaps the schedule is the serial schedule (T₁, T₂), so the given schedule is conflict-serializable. Note what was <em>not</em> swapped: w₁(A) stays ahead of r₂(A), and w₁(B) ahead of r₂(B). Those are conflicts, and they are exactly the reason the serial order has to be (T₁, T₂).</p>
+
+<h3>Try it: swap your own schedule into a serial one</h3>
+<p>Type a schedule. The tool finds a serial order (if one exists, using the method of the next chapter) and then animates the adjacent swaps that reach it, each time saying why the pair does not conflict.</p>
+<figure class="wide">
+<span class="anim-tag">Interactive</span>
+<div id="tool"></div>
+</figure>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+
+<h3>Exam questions</h3>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2013–14 · 5 marks</div>
+  <div class="exam-q"><p>Define the following terms: conflict-equivalent and conflict-serializable.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+  <p>Two actions <b>conflict</b> if they belong to the same transaction, or if they belong to different transactions, access the same element, and at least one is a write.</p>
+  <p><b>Conflict-equivalent:</b> two schedules (of the same transactions) are conflict-equivalent if one can be transformed into the other by a sequence of swaps of adjacent non-conflicting actions. Equivalently, they contain the same actions and every pair of conflicting actions appears in the same order in both.</p>
+  <p><b>Conflict-serializable:</b> a schedule is conflict-serializable if it is conflict-equivalent to some serial schedule.</p>
+  <p>Example: S = r₁(A); w₁(A); r₂(A); w₂(A); r₁(B); w₁(B); r₂(B); w₂(B) is conflict-equivalent to the serial schedule (T₁, T₂) by the four swaps of Figure 3, so S is conflict-serializable. Swapping r₂(A) ahead of w₁(A) would not be allowed (same element, one write).</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2012–13 · 5 marks</div>
+  <div class="exam-q"><p>Why is conflict-serializability not necessary for serializability? Explain with an example.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+  <p>Conflict-serializability treats every write–write pair on the same element as order-sensitive. But when a later transaction overwrites an element without anyone reading the intermediate values, the order of the earlier writes is invisible. A schedule can then have the effect of a serial schedule even though its conflicts cannot be untangled by swaps.</p>
+  <p>Example (textbook §18.2): S₂: w₁(Y); w₂(Y); w₂(X); w₁(X); w₃(X).</p>
+  <ul>
+    <li><b>Serializable:</b> it leaves Y = T₂'s value and X = T₃'s value, and no transaction reads anything. The serial schedule (T₁, T₂, T₃) leaves the same values for every initial state.</li>
+    <li><b>Not conflict-serializable:</b> w₁(Y) before w₂(Y) gives the arc T₁ → T₂; w₂(X) before w₁(X) gives T₂ → T₁. The precedence graph (next chapter) has a cycle, so no serial schedule is conflict-equivalent to S₂.</li>
+  </ul>
+  <p>So S₂ is serializable without being conflict-serializable: the condition is sufficient but not necessary.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 23-24 5a · 12 marks (Compulsory) &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-1 | 2023–24 · 12 marks</div>
+  <div class="exam-q"><p>Determine whether each of the following schedules is serializable or conflict-serializable, or both. If a schedule is serializable or conflict-serializable, specify the equivalent serial order. Additionally, construct the precedence graph for each schedule to justify your answer.<br>(i) w₁(X); w₂(Y); w₁(Y); w₃(X); w₂(X)<br>(ii) w₁(X); w₂(Y); w₁(Y); w₂(X); w₃(X)</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+  <p>All actions are blind writes. An arc T<sub>i</sub> → T<sub>j</sub> is added for each pair of writes of the same element by different transactions, in schedule order.</p>
+  <div class="figrow"><div><div class="figlabel">(i)</div><div id="g80a"></div></div><div><div class="figlabel">(ii)</div><div id="g80b"></div></div></div>
+  <p><b>(i)</b> X: w₁(X) … w₃(X) … w₂(X) gives T₁ → T₃, T₁ → T₂, T₃ → T₂. Y: w₂(Y) … w₁(Y) gives T₂ → T₁. Cycle T₁ → T₂ → T₁, so <b>not conflict-serializable</b>.<br>
+  Serializable? With no reads, a serial order has the same effect only if it leaves the same last writer for every element. Here X's last writer is T₂ and Y's is T₁. A serial order ending X with T₂ needs T₂ after T₁ (both write X); one ending Y with T₁ needs T₁ after T₂. Impossible, so <b>(i) is not serializable either</b>.</p>
+  <p><b>(ii)</b> X: w₁(X), w₂(X), w₃(X) gives T₁ → T₂, T₁ → T₃, T₂ → T₃. Y: w₂(Y) … w₁(Y) gives T₂ → T₁. Cycle T₁ → T₂ → T₁, so <b>not conflict-serializable</b>.<br>
+  Serializable? Last writers: X by T₃, Y by T₁. The serial order <b>(T₂, T₁, T₃)</b> leaves Y = T₁'s value (T₁ writes Y after T₂) and X = T₃'s value, and nothing is read, so it has the same effect from every initial state. <b>(ii) is serializable (equivalent to (T₂, T₁, T₃)) but not conflict-serializable.</b> This is the blind-write situation of Section 4.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 24-25 2b · 6 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-1 | 2024–25 · 9 marks</div>
+  <div class="exam-q"><p>Consider the two transactions given below:<br>T₁: r₁(A); w₁(B)<br>T₂: r₂(A); w₂(A); w₂(B)<br>Determine the number of possible schedules, number of serializable schedules, and number of conflict-serializable schedules that can be constructed for the given transactions.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+  <p><b>Possible schedules.</b> Choose the 2 positions of T₁'s actions among 5: C(5, 2) = 5!/(2!·3!) = <b>10</b>.</p>
+  <p><b>Conflicts.</b> r₁(A) conflicts with w₂(A); w₁(B) conflicts with w₂(B). (r₁(A), r₂(A) is read–read: no conflict.) A schedule has a cycle exactly when the two conflicts point in opposite directions:</p>
+  <ul><li>r₁(A) before w₂(A) gives T₁ → T₂, and w₂(B) before w₁(B) gives T₂ → T₁; or</li><li>w₂(A) before r₁(A) gives T₂ → T₁, and w₁(B) before w₂(B) gives T₁ → T₂.</li></ul>
+  <div class="tbl"><table>
+  <tr><th>#</th><th>schedule</th><th>arcs</th><th>conflict-serializable?</th></tr>
+  <tr><td>1</td><td>r₁(A) w₁(B) r₂(A) w₂(A) w₂(B)</td><td>T₁→T₂</td><td class="good">yes (T₁,T₂)</td></tr>
+  <tr><td>2</td><td>r₁(A) r₂(A) w₁(B) w₂(A) w₂(B)</td><td>T₁→T₂</td><td class="good">yes (T₁,T₂)</td></tr>
+  <tr><td>3</td><td>r₁(A) r₂(A) w₂(A) w₁(B) w₂(B)</td><td>T₁→T₂</td><td class="good">yes (T₁,T₂)</td></tr>
+  <tr><td>4</td><td>r₁(A) r₂(A) w₂(A) w₂(B) w₁(B)</td><td>T₁→T₂, T₂→T₁</td><td class="bad">no</td></tr>
+  <tr><td>5</td><td>r₂(A) r₁(A) w₁(B) w₂(A) w₂(B)</td><td>T₁→T₂</td><td class="good">yes (T₁,T₂)</td></tr>
+  <tr><td>6</td><td>r₂(A) r₁(A) w₂(A) w₁(B) w₂(B)</td><td>T₁→T₂</td><td class="good">yes (T₁,T₂)</td></tr>
+  <tr><td>7</td><td>r₂(A) r₁(A) w₂(A) w₂(B) w₁(B)</td><td>T₁→T₂, T₂→T₁</td><td class="bad">no</td></tr>
+  <tr><td>8</td><td>r₂(A) w₂(A) r₁(A) w₁(B) w₂(B)</td><td>T₂→T₁, T₁→T₂</td><td class="bad">no</td></tr>
+  <tr><td>9</td><td>r₂(A) w₂(A) r₁(A) w₂(B) w₁(B)</td><td>T₂→T₁</td><td class="good">yes (T₂,T₁)</td></tr>
+  <tr><td>10</td><td>r₂(A) w₂(A) w₂(B) r₁(A) w₁(B)</td><td>T₂→T₁</td><td class="good">yes (T₂,T₁)</td></tr>
+  </table></div>
+  <p><b>Conflict-serializable: 7.</b> (Checked by running all 10 through the precedence-graph test.)</p>
+  <p><b>Serializable.</b> Under the “no coincidences” assumption, a schedule is equivalent to a serial one only if every read sees the same writer and every element has the same final writer. (T₁,T₂): r₁(A) reads the initial A, r₂(A) reads the initial A, final B by T₂. (T₂,T₁): r₁(A) reads T₂'s A, final B by T₁. Schedules 4 and 7 have r₁(A) reading the initial A but final B by T₁: matches neither. Schedule 8 has r₁(A) reading T₂'s A but final B by T₂: matches neither. So the 3 non-conflict-serializable schedules are not serializable either, and the number of <b>serializable schedules is 7</b>.</p>
+  <p>Answer: 10 possible, 7 serializable, 7 conflict-serializable. (The question bank's answer agrees.)</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2015–16 · 20 marks</div>
+  <div class="exam-q"><p>Find the equivalent serial schedule for the concurrent schedule of four transactions shown below by swapping non-conflicting instructions. Verify the resulting serial schedule using a precedence graph.</p>
+  <div class="tbl"><table style="width:auto"><tr><th>T₁</th><th>T₂</th><th>T₃</th><th>T₄</th></tr>
+  <tr><td>READ(A)</td><td></td><td></td><td></td></tr><tr><td></td><td>READ(C)</td><td></td><td></td></tr><tr><td>READ(B)</td><td></td><td></td><td></td></tr><tr><td></td><td>WRITE(C)</td><td></td><td></td></tr>
+  <tr><td></td><td></td><td>READ(C)</td><td></td></tr><tr><td></td><td></td><td>WRITE(C)</td><td></td></tr><tr><td></td><td></td><td></td><td>READ(B)</td></tr><tr><td></td><td></td><td></td><td>READ(A)</td></tr><tr><td></td><td></td><td></td><td>READ(D)</td></tr>
+  <tr><td>WRITE(A)</td><td></td><td></td><td></td></tr><tr><td></td><td></td><td></td><td>WRITE(D)</td></tr><tr><td>READ(B)</td><td></td><td></td><td></td></tr><tr><td></td><td></td><td>READ(B)</td><td></td></tr></table></div></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+  <p>In r/w notation: r₁(A) r₂(C) r₁(B) w₂(C) r₃(C) w₃(C) r₄(B) r₄(A) r₄(D) w₁(A) w₄(D) r₁(B) r₃(B).</p>
+  <p><b>Conflicts.</b> On C: r₂(C), w₂(C) before r₃(C), w₃(C) gives T₂ → T₃. On A: r₄(A) before w₁(A) gives T₄ → T₁. (r₁(A) before r₄(A) is read–read.) B is only read; D is used only by T₄. So the only constraints are T₂ before T₃ and T₄ before T₁. Valid serial orders: (T₂,T₃,T₄,T₁), (T₂,T₄,T₃,T₁), (T₂,T₄,T₁,T₃), (T₄,T₂,T₃,T₁), (T₄,T₂,T₁,T₃), (T₄,T₁,T₂,T₃): six in all.</p>
+  <p><b>By swapping</b>, to reach (T₂, T₃, T₄, T₁): move r₂(C) and w₂(C) to the front (they pass only r₁(A), r₁(B): different elements); then move r₃(C), w₃(C) up behind them (they pass r₁(A), r₁(B)); then move r₃(B) from the end up to join them (it passes r₁(B), w₄(D), w₁(A), r₄(D), r₄(A), r₄(B), r₁(B), r₁(A): every one is a different element or a read of B); then move T₄'s four actions ahead of T₁'s (r₄(B), r₄(A), r₄(D) pass r₁(B), r₁(A): reads or different elements; w₄(D) passes w₁(A), r₁(B), r₁(A): different elements). The key point: r₄(A) never has to pass w₁(A), because it is already ahead of it. Result:</p>
+  <pre>r₂(C) w₂(C) r₃(C) w₃(C) r₃(B) r₄(B) r₄(A) r₄(D) w₄(D) r₁(A) r₁(B) w₁(A) r₁(B)</pre>
+  <p><b>Verification</b>: the precedence graph has only the arcs T₂ → T₃ (on C) and T₄ → T₁ (on A); it is acyclic and (T₂, T₃, T₄, T₁) is one of its topological orders. You can watch every swap by typing the schedule into the tool above.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2010–11 · 10 marks</div>
+  <div class="exam-q"><p>A concurrent schedule of three transactions T₁, T₂ and T₃ is given in Figure 3. Show the steps to transform the above schedule into an equivalent conflict serial schedule.</p><p><em>(The figure is missing from the question bank, which notes “No Figure found in PDF”. The method is shown on the textbook schedule of three transactions instead.)</em></p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+  <p><b>Method.</b> (1) List the conflicting pairs (same element, different transactions, at least one write) and draw the precedence graph. (2) If it has a cycle, no conflict-equivalent serial schedule exists. (3) Otherwise pick a topological order. (4) Move the actions of the first transaction in that order to the front, one adjacent swap at a time, never passing an action it conflicts with; then the second transaction's actions behind them; and so on.</p>
+  <p><b>Example</b> (textbook Example 18.7): S: r₂(A); r₁(B); w₂(A); r₃(A); w₁(B); w₃(A); r₂(B); w₂(B).</p>
+  <ol>
+    <li>Conflicts: on A, r₂(A)/w₂(A) before r₃(A)/w₃(A): T₂ → T₃. On B, r₁(B)/w₁(B) before w₂(B), and w₁(B) before r₂(B): T₁ → T₂. Graph T₁ → T₂ → T₃, acyclic. Order (T₁, T₂, T₃).</li>
+    <li>Swap r₁(B) ahead of r₂(A) (different elements): r₁(B); r₂(A); w₂(A); r₃(A); w₁(B); w₃(A); r₂(B); w₂(B).</li>
+    <li>Move w₁(B) up past r₃(A), w₂(A), r₂(A) (all on A): r₁(B); w₁(B); r₂(A); w₂(A); r₃(A); w₃(A); r₂(B); w₂(B).</li>
+    <li>Move r₂(B) up past w₃(A), r₃(A) (different elements), then w₂(B) the same way: r₁(B); w₁(B); r₂(A); w₂(A); r₂(B); w₂(B); r₃(A); w₃(A). This is the serial schedule (T₁, T₂, T₃).</li>
+  </ol>
+  </div></details>
+</div>
+
+<div class="key"><p><strong>Summary:</strong> two actions conflict if they are from the same transaction, or if they touch the same element and at least one is a write. Adjacent non-conflicting actions can be swapped without changing any transaction's behaviour. A schedule is conflict-serializable if such swaps can turn it into a serial schedule. Conflict-serializable implies serializable, but not conversely: blind writes can make a schedule serializable while its conflicts form a cycle.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="lecture.js"></script>
+<script>
+{
+  const R = CC.csAnalyze(CC.parse('r1(A); w1(A); r2(A); w2(A); r1(B); w1(B); r2(B); w2(B)').acts);
+  const rank = { 1: 0, 2: 1 }, last = R.swaps.length - 1;
+  stepper('#swaps', R.swaps.map((s, k) => ({
+    html: `<div class="swapbox">${CC.tokens(s.seq, s.at, rank)}</div>`,
+    cap: k === 0 ? 'The starting schedule. First swap: w₂(A) and r₁(B), different elements.'
+      : k === last ? '<b>Serial schedule (T₁, T₂)</b> reached by four non-conflicting swaps: the original schedule is conflict-serializable.'
+      : `Swap ${CC.fmt(s.seq[s.at])} and ${CC.fmt(s.seq[s.at + 1])}: one is on A, the other on B, so they do not conflict.`,
+  })));
+}
+CC.csTool('#tool', 'r2(A) r1(B) w2(A) r3(A) w1(B) w3(A) r2(B) w2(B)');
+{
+  const g = s => { const R = CC.csAnalyze(CC.parse(s).acts); return CC.graphSVG(R.txns, R.edges.map(e => ({ from: e.from, to: e.to, label: [...e.elems].join(','), cls: (R.cycle && R.edges.some(f => f.from === e.to && f.to === e.from)) ? 'red' : '' }))); };
+  document.querySelector('#g80a').innerHTML = g('w1(X); w2(Y); w1(Y); w3(X); w2(X)');
+  document.querySelector('#g80b').innerHTML = g('w1(X); w2(Y); w1(Y); w2(X); w3(X)');
+}
+flashcards('#cards', [
+  { f: 'Conflict', b: 'Two actions of the same transaction, or two actions of different transactions on the same element where at least one is a write.' },
+  { f: 'r₁(X); r₂(X)', b: 'No conflict: two reads never conflict.' },
+  { f: 'r₁(X); w₂(Y), X ≠ Y', b: 'No conflict: different elements.' },
+  { f: 'w₁(X); w₂(X)', b: 'Conflict: swapping changes which value X ends with.' },
+  { f: 'Conflict-equivalent', b: 'Transformable into each other by swaps of adjacent non-conflicting actions.' },
+  { f: 'Conflict-serializable', b: 'Conflict-equivalent to some serial schedule.' },
+  { f: 'Blind write', b: 'A write of an element the transaction did not read first. Blind writes allow serializable schedules that are not conflict-serializable.' },
+]);
+quiz('#quiz', [
+  { q: 'Which pair can be swapped when adjacent?', opts: ['w₁(A); r₂(A)', 'r₁(A); w₁(B)', 'r₁(A); r₂(A)', 'w₁(B); w₂(B)'], a: 2, why: 'Two reads never conflict. r₁(A); w₁(B) is the same transaction, so never swapped.' },
+  { q: 'Slide 18 says actions conflict if they involve the same element AND at least one is a write. Which pair shows why “and” matters?', opts: ['w₁(A); w₂(B)', 'w₁(A); w₂(A)', 'r₁(A); w₁(A)', 'r₁(A); w₂(A)'], a: 0, why: 'Both are writes, but on different elements, so they do not conflict.' },
+  { q: 'A conflict-serializable schedule is always…', opts: ['serial', 'serializable', 'free of conflicts', 'produced by 2PL'], a: 1, why: 'Conflict-serializability is sufficient for serializability.' },
+  { q: 'w₁(Y); w₂(Y); w₂(X); w₁(X); w₃(X) is…', opts: ['conflict-serializable and serializable', 'serializable but not conflict-serializable', 'neither', 'serial'], a: 1, why: 'T₃ overwrites X, so the order of T₁ and T₂ on X is invisible; but the conflicts on X and Y point in opposite directions.' },
+  { q: 'Why are only adjacent swaps allowed?', opts: ['To make the proof shorter', 'A swap of neighbours changes the relative order of only that one pair', 'Non-adjacent actions always conflict', 'Because of locks'], a: 1, why: 'Moving an action several places would pass actions it might conflict with.' },
+]);
+ask('#try1', { q: 'How many swaps of adjacent actions does slide 21 need to make r₁(A); w₁(A); r₂(A); w₂(A); r₁(B); w₁(B); r₂(B); w₂(B) serial?', a: 4, why: 'r₁(B) passes w₂(A) and r₂(A); w₁(B) passes the same two.' });
+</script>
+</body>
+</html>

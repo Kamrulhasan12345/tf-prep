@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Transactions and Consistency · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 05 (Sukarna) · Chapter 2 · Slides 7–13 · Book §17.1.2–17.1.3</div>
+<h1>Transactions, Atomicity and Consistency</h1>
+<p class="lede">What a transaction is, why it must be atomic, which DBMS components keep it so (transaction, log, buffer and recovery managers), and what “consistent state” and the correctness principle mean.</p>
+
+<h2>1. What is a transaction? (slide 7)</h2>
+
+<dl class="def">
+  <dt>Transaction</dt><dd>The unit of execution of database operations: a group of reads and writes that the DBMS treats as one piece of work.</dd>
+  <dt>COMMIT</dt><dd>The command that ends a transaction successfully: all its changes become permanent.</dd>
+  <dt>ROLLBACK (abort)</dt><dd>The command that ends a transaction unsuccessfully: all its changes are cancelled, as if it never ran.</dd>
+</dl>
+
+<p>The slide describes how transactions look to an SQL user (the textbook says the same in §17.1.2):</p>
+<ul>
+  <li>A transaction <strong>starts when a session is created</strong> with the database, that is, as soon as you connect and issue the first statement.</li>
+  <li><strong>Each SQL statement is part of the ongoing transaction.</strong> Several <code>UPDATE</code>s in a row belong to the same transaction.</li>
+  <li>The transaction <strong>ends when COMMIT or ROLLBACK</strong> is issued.</li>
+  <li><strong>A new transaction automatically starts</strong> after COMMIT or ROLLBACK, so the session is always inside some transaction.</li>
+</ul>
+<pre>-- one transaction: transfer 100 from B to A
+UPDATE account SET balance = balance + 100 WHERE id = 'A';   -- credit A
+UPDATE account SET balance = balance - 100 WHERE id = 'B';   -- debit B
+COMMIT;                                                      -- a new transaction begins here</pre>
+
+<h2>2. Atomicity (slide 8)</h2>
+
+<dl class="def">
+  <dt>Atomicity</dt><dd>A transaction executes fully or not at all. There is no visible state in which only part of it has happened. (“Atomic” means indivisible.)</dd>
+</dl>
+
+<p>For the transfer above, either both the credit and the debit happen, or neither does. If only one happens, money is created or destroyed and the database is inconsistent. Atomicity is kept by two parties:</p>
+<ul>
+  <li>The <strong>user</strong> chooses the boundaries: they issue COMMIT when the whole unit of work is done, or ROLLBACK to cancel it.</li>
+  <li>The <strong>transaction manager</strong> makes sure that, whatever happens (including crashes), either all changes of a committed transaction are saved, or no change of an aborted or unfinished transaction is.</li>
+</ul>
+
+<h2>3. The components that keep transactions safe (slides 9–10)</h2>
+
+<p>Slides 9 and 10 show the textbook's Figure 17.1. The arrows show which component talks to which.</p>
+
+<figure>
+<svg id="fig171" viewBox="0 0 620 330" width="620" role="img" aria-label="Transaction manager, log manager, buffer manager, recovery manager, query processor and disk"></svg>
+<figcaption><b>Figure 1.</b> The log manager and transaction manager (textbook Fig. 17.1). Every access to the disk, for data and for the log, goes through the buffer manager.</figcaption>
+</figure>
+
+<dl class="def">
+  <dt>Transaction manager</dt><dd>Runs transactions. It sends the queries of a transaction to the <b class="term">query processor</b>; it tells the log manager what to record; and it ensures an appropriate <b class="term">isolation level</b> (SERIALIZABLE, READ COMMITTED, …) so that concurrent transactions do not interfere (Lectures 02–04).</dd>
+  <dt>Log manager</dt><dd>Maintains the log: a record of all changes made to the database. Log records are first written to <b class="term">log buffers</b> in memory and later flushed to disk. Because the log is on disk, lost changes can be re-applied after a crash.</dd>
+  <dt>Buffer manager</dt><dd>Manages the memory buffers. It reads data blocks from disk into memory and writes them back. All changes are made in memory first and flushed to disk later.</dd>
+  <dt>Recovery manager</dt><dd>Activated after a crash. It examines the log records and repairs the data, by reapplying changes (redo) or undoing them.</dd>
+</dl>
+
+<h2>4. Database elements and database state (slide 11)</h2>
+
+<dl class="def">
+  <dt>Database element</dt><dd>A unit of data that has a value and can be read or written by transactions. Depending on the system it may be a relation, a disk block (page), or a tuple. The textbook recommends disk blocks, and assumes no element is larger than one block.</dd>
+  <dt>Database state</dt><dd>The value of every element of the database at one moment.</dd>
+  <dt>Consistent state</dt><dd>A state that satisfies all the constraints the data should obey: (1) the explicit constraints in the schema (keys, foreign keys, CHECK), (2) implicit constraints enforced by triggers, and (3) implicit constraints that exist only in the mind of the database designer.</dd>
+</dl>
+
+<p>The third kind is the troublesome one. “Credit and debit happen together” is a business rule. You cannot write it as a <code>CHECK</code>, primary key or foreign key, because it is about how two updates relate, not about what one row looks like. So the DBMS cannot test for it. It can only make sure transactions run atomically, and trust that a complete transaction keeps the rule.</p>
+<p>(Do not confuse the <em>database</em> state with the <em>transaction's</em> state: the latter is the transaction's position in its code plus its local variables.)</p>
+
+<h2>5. The correctness principle and its converse (slides 12–13)</h2>
+
+<div class="key">
+<p><strong>Correctness principle.</strong> If a transaction executes in the absence of any other transactions or system failures, and it starts with the database in a consistent state, then the database is also in a consistent state when the transaction ends.</p>
+</div>
+
+<p>In words: each transaction, run alone and to completion, is assumed to be correct. The DBMS does not check this; the person who writes the transaction is trusted to know the business rules. (Explicit constraints are enforced anyway: a transaction that violates one is rejected.)</p>
+
+<p>The <b class="term">converse</b> lists what can break consistency even though every transaction is individually correct:</p>
+<ol>
+  <li><strong>Partial execution.</strong> If only part of a transaction executes, the database state may become inconsistent. That is why a transaction must be atomic. Guarding against partial execution after a crash is the job of <em>logging and recovery</em>, Lectures 05–06.</li>
+  <li><strong>Simultaneous execution.</strong> Transactions running at the same time are likely to lead to an inconsistent state unless the system controls how they interact. That is the job of <em>concurrency control</em>, Lectures 02–04.</li>
+</ol>
+
+<figure>
+<span class="anim-tag">Animation</span>
+<div id="states"></div>
+</figure>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+
+<div class="key"><p><strong>Summary:</strong> a transaction is the unit of execution; it ends with COMMIT or ROLLBACK and a new one starts automatically. It must be atomic. The transaction manager drives execution and isolation, the log manager keeps the log, the buffer manager moves blocks between memory and disk, and the recovery manager repairs the database from the log after a crash. A complete transaction takes a consistent state to a consistent state (correctness principle); partial or uncontrolled concurrent execution can break consistency.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="lecture.js"></script>
+<script>
+(() => {
+  const box = (x, y, w, t1, t2, cls = 'cell') => `<rect x="${x}" y="${y}" width="${w}" height="48" rx="4" class="${cls}"/><text x="${x + w / 2}" y="${y + (t2 ? 20 : 29)}" text-anchor="middle" class="big">${t1}</text>${t2 ? `<text x="${x + w / 2}" y="${y + 38}" text-anchor="middle" class="big">${t2}</text>` : ''}`;
+  const ar = (d, both) => `<path d="${d}" class="s-fg" marker-end="url(#m-fg)" ${both ? 'marker-start="url(#m-fg)"' : ''}/>`;
+  let s = box(20, 20, 140, 'Query', 'processor') + box(240, 20, 140, 'Transaction', 'manager', 'cell-hl') + box(460, 20, 140, 'Log', 'manager') +
+    box(240, 150, 140, 'Buffer', 'manager') + box(460, 150, 140, 'Recovery', 'manager');
+  s += ar('M240 44 H164') + ar('M380 44 H456') + ar('M90 68 L270 146') + ar('M310 68 V146') + ar('M530 68 L350 146') + ar('M460 174 H384', true) + ar('M310 198 V236', true);
+  s += `<ellipse cx="310" cy="250" rx="60" ry="12" class="cell-plain"/><path d="M250 250 V306 A60 12 0 0 0 370 306 V250" class="cell-plain"/><line x1="250" x2="370" y1="280" y2="280" class="s-fg"/>
+    <text x="310" y="273" text-anchor="middle" class="big">Data</text><text x="310" y="300" text-anchor="middle" class="big">Log</text>`;
+  s += `<text x="390" y="270" class="lbl">disk: data and log</text>`;
+  document.querySelector('#fig171').innerHTML = s;
+
+  const st = (label, ok, note) => `<svg viewBox="0 0 560 120" width="560"><rect x="20" y="30" width="160" height="60" rx="30" class="${ok === 1 ? 'cell-new' : ok === 0 ? 'cell-del' : 'cell'}"/><text x="100" y="66" text-anchor="middle" class="big">${label}</text><text x="210" y="56" class="lbl" style="font-size:13px">${note}</text></svg>`;
+  stepper('#states', [
+    { html: st('A=B=8', 1, 'Consistent: the designer\'s rule is A = B.'), cap: 'The textbook\'s running example: two elements A and B that must always be equal. The database starts consistent.' },
+    { html: st('A=16, B=8', 0, 'T has doubled A but not yet B.'), cap: 'Transaction T is “A := A*2; B := B*2”. In the middle of T the state is inconsistent. That is allowed, as long as nobody sees it and T finishes.' },
+    { html: st('A=B=16', 1, 'T completed: consistent again.'), cap: '<b>Correctness principle</b>: run alone and to completion, T takes a consistent state to a consistent state.' },
+    { html: st('A=16, B=8', 0, 'Crash in the middle of T, and this is what stays on disk.'), cap: '<b>Converse, point 1</b>: if only part of T executes (a crash between the two writes reaches the disk), the state stays inconsistent. Recovery must turn it into A=B=8 or A=B=16.' },
+  ]);
+
+  flashcards('#cards', [
+    { f: 'Transaction', b: 'The unit of execution of database operations; ends with COMMIT or ROLLBACK.' },
+    { f: 'Atomicity', b: 'All or nothing: every change of a transaction happens, or none does.' },
+    { f: 'Transaction manager', b: 'Executes transactions via the query processor, signals the log manager, enforces isolation.' },
+    { f: 'Log manager', b: 'Keeps log records of all changes, in log buffers first and then on disk.' },
+    { f: 'Buffer manager', b: 'Moves blocks between disk and memory buffers; all changes happen in memory first.' },
+    { f: 'Recovery manager', b: 'After a crash, reads the log and undoes or redoes changes.' },
+    { f: 'Database state', b: 'The values of all database elements at one time.' },
+    { f: 'Consistent state', b: 'Satisfies explicit constraints, trigger-enforced constraints, and the designer\'s implicit rules.' },
+    { f: 'Correctness principle', b: 'A transaction run alone, without failures, from a consistent state, ends in a consistent state.' },
+  ]);
+  quiz('#quiz', [
+    { q: 'You issue two UPDATEs and then COMMIT, then a SELECT. How many transactions?', opts: ['One', 'Two: the SELECT is in a new transaction', 'Three', 'Four'], a: 1, why: 'The two UPDATEs and the COMMIT form one transaction; a new one starts automatically after COMMIT and contains the SELECT.' },
+    { q: 'Which component reads the log after a crash and repairs the data?', opts: ['Log manager', 'Recovery manager', 'Query processor', 'Buffer manager'], a: 1, why: 'The recovery manager examines the log records and undoes or reapplies changes.' },
+    { q: '“Credit and debit happen together” is…', opts: ['a primary key constraint', 'a CHECK constraint', 'an implicit constraint in the designer\'s mind', 'a foreign key'], a: 2, why: 'It relates two updates; no schema constraint can express it. Atomic transactions keep it.' },
+    { q: 'The correctness principle assumes the transaction runs…', opts: ['concurrently with others', 'alone and without system failure', 'only on committed data', 'with a log'], a: 1, why: 'Its two hypotheses are: no other transactions and no system errors, starting from a consistent state.' },
+    { q: 'Which two things can still break consistency, per the converse?', opts: ['Bad SQL and slow disks', 'Partial execution and uncontrolled concurrent execution', 'Indexes and views', 'COMMIT and ROLLBACK'], a: 1, why: 'Partial execution is handled by logging/recovery; concurrent interaction by concurrency control.' },
+  ]);
+  ask('#try1', { q: 'Constraint A = B, initially A = B = 8; T doubles both. After T commits, what is A?', a: 16, why: 'T takes A = B = 8 to A = B = 16, a consistent state.' });
+})();
+</script>
+</body>
+</html>

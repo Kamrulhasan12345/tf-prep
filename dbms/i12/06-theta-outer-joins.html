@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Theta, Equi- and Outer Joins · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 12 (Ishrak) · Chapter 6 · Slides 25–27 · Book §2.4.9, §5.2.7</div>
+<h1>Theta Joins, Equi-Joins, Outer Joins and Semi-Joins</h1>
+<p class="lede">The "fancier" joins: a theta join is a product followed by any condition, an equi-join is the special case with equalities. Outer joins keep the dangling tuples that every other join drops, and a semi-join only asks whether a partner exists. The chapter ends with the bank's two "compute the output" questions, worked step by step.</p>
+
+<h2>1. Theta join (slides 25–26)</h2>
+
+<dl class="def">
+  <dt>Theta join R<sub>1</sub> ⋈<sub>θ</sub> R<sub>2</sub></dt>
+  <dd>The pairs of tuples (one from each relation) that satisfy condition θ: R<sub>1</sub> ⋈<sub>θ</sub> R<sub>2</sub> = σ<sub>θ</sub>(R<sub>1</sub> × R<sub>2</sub>). θ can be any condition, using =, &lt;, ≤, &gt;, ≥, &lt;&gt;, ∧, ∨. The result keeps <b>all</b> attributes of both relations, like ×.</dd>
+</dl>
+<div class="figrow">
+<pre>SELECT *
+FROM Students, People
+WHERE θ;</pre>
+<p class="ra-big">Students ⋈<sub>θ</sub> People</p>
+</div>
+<p>Slide 26's note, "natural join is a theta join + a projection", follows from the definitions: R ⋈ S = π<sub>A∪B</sub>(R ⋈<sub>R.C=S.C</sub> S), where C are the shared attributes and the projection drops the second copy of each.</p>
+<p>A non-equality example: pair each student with every person whose name comes alphabetically before the student's name. Theta joins with &lt; or ≠ are common in "find pairs" and "find the maximum" queries (<a href="08-writing-queries.html">Chapter 8</a>).</p>
+
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="theta"></div>
+<figcaption><b>Figure 1.</b> Students ⋈<sub>sname &lt; pname</sub> People: of the 8 pairs, the ones whose student name sorts before the person's name.</figcaption>
+</figure>
+
+<h2>2. Equi-join (slide 27)</h2>
+<dl class="def">
+  <dt>Equi-join R<sub>1</sub> ⋈<sub>A=B</sub> R<sub>2</sub></dt>
+  <dd>A theta join whose condition is a conjunction of equalities: σ<sub>A=B</sub>(R<sub>1</sub> × R<sub>2</sub>). Unlike the natural join, the attributes may have different names, and both copies are kept.</dd>
+</dl>
+<div class="figrow">
+<pre>SELECT *
+FROM Students S, People P
+WHERE sname = pname;</pre>
+<p class="ra-big">S ⋈<sub>sname=pname</sub> P</p>
+</div>
+<p>The slide's other example, Employee ⋈<sub>SSN=SSN</sub> Dependents, should be read as Employee ⋈<sub>Employee.SSN = Dependents.SSN</sub> Dependents: pair each employee with his or her own dependents. The slide calls the equi-join "the most common join in practice": almost every join in real queries follows a foreign key, and a foreign-key join is an equality.</p>
+
+<div class="tbl"><table>
+<tr><th></th><th>Natural join R ⋈ S</th><th>Equi-join R ⋈<sub>R.a=S.b</sub> S</th><th>Theta join R ⋈<sub>θ</sub> S</th></tr>
+<tr><td>Condition</td><td>equality on all same-named attributes, implicit</td><td>equalities you write</td><td>anything you write</td></tr>
+<tr><td>Joined attributes in result</td><td>once</td><td>twice (R.a and S.b)</td><td>all attributes</td></tr>
+<tr><td>Oracle SQL</td><td><code>R NATURAL JOIN S</code></td><td><code>R JOIN S ON R.a = S.b</code></td><td><code>R JOIN S ON θ</code></td></tr>
+</table></div>
+
+<h2>3. Outer joins (beyond the slides)</h2>
+<p>Every join so far drops <b>dangling tuples</b>, the tuples with no partner. Sometimes you want them: "list every supplier with the parts it supplies, including suppliers that supply nothing". The <b>outer joins</b> (textbook §5.2.7, and Lec 09 of this course for the SQL side) keep them and fill the missing side with NULL.</p>
+<dl class="def">
+  <dt>Left outer join R ⟕ S</dt>
+  <dd>R ⋈ S plus every tuple of R that has no partner in S, padded with NULL in S's attributes. SQL: <code>R LEFT OUTER JOIN S ON …</code>.</dd>
+  <dt>Right outer join R ⟖ S</dt>
+  <dd>R ⋈ S plus the dangling tuples of S, padded with NULL in R's attributes.</dd>
+  <dt>Full outer join R ⟗ S</dt>
+  <dd>R ⋈ S plus the dangling tuples of both sides.</dd>
+</dl>
+<p>(Some fonts draw ⟕ ⟖ ⟗ almost like ⋈: the left outer join has the extra short lines on the left, the right outer join on the right, the full outer join on both sides. The trees in this lecture also label them "left outer", "right outer", "full outer".) Each comes in a natural version (match on shared names) and a theta version (⟕<sub>θ</sub>). Size: |R ⟕ S| ≥ |R| always, because each R tuple appears at least once. (The bank question asking for the minimum and maximum size of A ⟕ B under bag semantics is answered in <a href="../s08/07-beyond-the-slides.html">Sukarna sir's Lec 08 chapter</a>.)</p>
+
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="outer"></div>
+<figcaption><b>Figure 2.</b> Suppliers ⟕ Catalog: supplier 6 supplies nothing, so it appears once with NULL pid and cost.</figcaption>
+</figure>
+
+<h2>4. Semi-join</h2>
+<dl class="def">
+  <dt>Semi-join R ⋉ S</dt>
+  <dd>The tuples of R that have at least one partner in S (on the shared attributes, or on a condition θ). Only R's attributes are kept: R ⋉ S = π<sub>attrs(R)</sub>(R ⋈ S). Each R tuple appears at most once, however many partners it has. SQL: <code>WHERE EXISTS (…)</code> or <code>IN (…)</code>.</dd>
+</dl>
+<p>Slide 22 lists the semi-join among the derived joins. It is what <code>IN</code> subqueries compute (Lec 11), and distributed databases use it to ship fewer tuples between sites.</p>
+
+<figure class="wide">
+<span class="anim-tag">Interactive tool</span>
+<div id="lab"></div>
+</figure>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+<h3>Write it yourself</h3>
+<div id="ex1"></div>
+<div id="ex2"></div>
+<div id="ex3"></div>
+<div id="ex4"></div>
+<div id="ex5"></div>
+
+<h3>Exam questions</h3>
+<div class="exam">
+  <div class="exam-src">DB QB · 24-25 5a · 9 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-1 | 2024–25 · 9 marks</div>
+  <div class="exam-q"><p>Consider the relations Instructor and Teaches below. Compute the output of the following:</p>
+  <p>i) Π<sub>name</sub>(σ<sub>salary&lt;900000</sub>(Instructor))<br>ii) σ<sub>year=2024</sub>(σ<sub>Instructor.id=Teaches.id</sub>(Instructor × Teaches))<br>iii) Π<sub>name</sub>(Instructor ⋈<sub>Instructor.id = Teaches.id</sub> Teaches)</p>
+  <div id="itData"></div></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><b>(i)</b> σ<sub>salary&lt;900000</sub> tests each salary: 950000, 2300000, 720000, 2200000, 2500000. Only Carol's 720000 is below 900000. Projecting onto name gives:</p>
+    <div id="a1"></div>
+    <p><b>(ii)</b> Instructor × Teaches has 5 × 5 = 25 tuples with 8 attributes. σ<sub>Instructor.id=Teaches.id</sub> keeps the 5 pairs where the ids match (Alice twice, Bob, Carol, Eve; David teaches nothing). σ<sub>year=2024</sub> then keeps only Alice's Spring 2024 course. The result keeps all 8 attributes:</p>
+    <div id="a2"></div>
+    <p><b>(iii)</b> The equi-join gives the same 5 matching pairs as the inner selection of (ii). Projecting onto name gives Alice, Alice, Bob, Carol, Eve, and the set keeps Alice once. David is not there because he teaches nothing (a dangling tuple):</p>
+    <div id="a3"></div>
+    <p>Step through all three below.</p>
+    <div id="itLab"></div>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 23 CT1 1 · 6 marks</div>
+  <div class="exam-q"><p>Consider the relations Instructor and Teaches (same data as above), and write the output of the following, where x is your Student id (e.g., 2305005).</p>
+  <p class="ra-big">Π<sub>name</sub>(σ<sub>salary&gt;x</sub>(Instructor ⋈ (π<sub>ID</sub>(σ<sub>semester='Fall' ∧ year=2023</sub>(Teaches)) − π<sub>ID</sub>(σ<sub>semester='Spring' ∧ year=2024</sub>(Teaches)))))</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>Work from the inside out.</p>
+    <ol>
+      <li>σ<sub>semester='Fall' ∧ year=2023</sub>(Teaches): the four Fall 2023 rows, ids 1, 2, 3, 5. π<sub>ID</sub> gives {1, 2, 3, 5}.</li>
+      <li>σ<sub>semester='Spring' ∧ year=2024</sub>(Teaches): only (1, CS102). π<sub>ID</sub> gives {1}.</li>
+      <li>Difference: {1, 2, 3, 5} − {1} = {2, 3, 5}: instructors who taught in Fall 2023 but not in Spring 2024.</li>
+      <li>Instructor ⋈ that set (shared attribute id): Bob (2300000), Carol (720000), Eve (2500000).</li>
+      <li>σ<sub>salary&gt;x</sub>, then Π<sub>name</sub>. For the example id x = 2305005: Bob's 2300000 is not greater, Carol's is not, Eve's 2500000 is. Result: <b>{Eve}</b>.</li>
+    </ol>
+    <p>The answer depends on x:</p>
+    <div class="tbl"><table><tr><th>x</th><th>Result</th></tr>
+    <tr><td>x &lt; 720000</td><td>{Bob, Carol, Eve}</td></tr>
+    <tr><td>720000 ≤ x &lt; 2300000 (for example a 21-batch id like 2105012)</td><td>{Bob, Eve}</td></tr>
+    <tr><td>2300000 ≤ x &lt; 2500000 (for example 2305005)</td><td>{Eve}</td></tr>
+    <tr><td>x ≥ 2500000</td><td>∅ (empty)</td></tr></table></div>
+    <p>Type your own id to evaluate it:</p>
+    <div class="ask"><form class="ask-f" id="xform"><input type="text" id="xin" value="2305005" aria-label="Your student id" autocomplete="off"><button type="submit">Evaluate with my id</button></form><div id="xout"></div></div>
+  </div></details>
+</div>
+
+<div class="key"><p><strong>Summary:</strong> R ⋈<sub>θ</sub> S = σ<sub>θ</sub>(R × S) keeps all attributes; with equalities it is an equi-join (the most common join). The natural join is an equi-join on the shared attributes plus a projection. Outer joins ⟕ ⟖ ⟗ keep dangling tuples padded with NULL. The semi-join R ⋉ S keeps the R tuples that have a partner, with R's attributes only.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/sqlplay.js"></script>
+<script src="lecture.js"></script>
+<script>
+raSteps('#theta', DB_SLIDES, 'Students join[sname < pname] People', { sql: 'SELECT * FROM Students, People WHERE sname < pname;' });
+raSteps('#outer', DB_SPC, 'project[sid, sname](Suppliers) ljoin project[sid, pid, cost](Catalog)', { sql: 'SELECT s.sid, s.sname, c.pid, c.cost FROM Suppliers s LEFT OUTER JOIN Catalog c ON s.sid = c.sid;' });
+raLab('#lab', { db: { ...DB_SLIDES, ...DB_SPC }, presets: [
+  { label: 'Slide 27: S ⋈_sname=pname P (equi-join)', ra: 'rename[S](Students) join[sname = pname] rename[P](People)', sql: 'SELECT *\nFROM Students S, People P\nWHERE sname = pname;' },
+  { label: 'Same pairs with natural join after renaming (one name column)', ra: 'Students join rename[pname -> sname](People)', sql: 'SELECT *\nFROM Students NATURAL JOIN (SELECT ssn, pname AS sname, address FROM People);' },
+  { label: 'Theta join with <', ra: 'Students join[sname < pname] People', sql: 'SELECT *\nFROM Students JOIN People ON sname < pname;' },
+  { label: 'Left outer join: every supplier, with its parts', ra: 'project[sid, sname](Suppliers) ljoin Catalog', sql: 'SELECT s.sid, s.sname, c.pid, c.cost\nFROM Suppliers s LEFT OUTER JOIN Catalog c ON s.sid = c.sid;' },
+  { label: 'Full outer join with a θ condition', ra: "rename[S](Students) fjoin[sname = pname and gpa > 2] rename[P](People)", sql: "SELECT *\nFROM Students S FULL OUTER JOIN People P ON (S.sname = P.pname AND S.gpa > 2);" },
+  { label: 'Semi-join: suppliers that supply something', ra: 'Suppliers semijoin Catalog', sql: 'SELECT *\nFROM Suppliers s\nWHERE EXISTS (SELECT * FROM Catalog c WHERE c.sid = s.sid);' },
+] });
+
+raShow('#itData', DB_IT);
+raResult('#a1', DB_IT, 'project[name](select[salary < 900000](Instructor))', '(i)');
+raResult('#a2', DB_IT, 'select[year = 2024](select[Instructor.id = Teaches.id](Instructor x Teaches))', '(ii)');
+raResult('#a3', DB_IT, 'project[name](Instructor join[Instructor.id = Teaches.id] Teaches)', '(iii)');
+raLab('#itLab', { db: DB_IT, presets: [
+  { label: '(i)', ra: 'project[name](select[salary < 900000](Instructor))', sql: 'SELECT DISTINCT name\nFROM Instructor\nWHERE salary < 900000;' },
+  { label: '(ii)', ra: 'select[year = 2024](select[Instructor.id = Teaches.id](Instructor x Teaches))', sql: 'SELECT *\nFROM Instructor I, Teaches T\nWHERE I.id = T.id AND T.year = 2024;' },
+  { label: '(iii)', ra: 'project[name](Instructor join[Instructor.id = Teaches.id] Teaches)', sql: 'SELECT DISTINCT name\nFROM Instructor I JOIN Teaches T ON I.id = T.id;' },
+  { label: 'CT question with x = 2305005', ra: "project[name](select[salary > 2305005](Instructor join (project[id](select[semester = 'Fall' and year = 2023](Teaches)) - project[id](select[semester = 'Spring' and year = 2024](Teaches)))))", sql: "SELECT DISTINCT name FROM Instructor\nWHERE salary > 2305005\n  AND id IN (SELECT id FROM Teaches WHERE semester = 'Fall' AND year = 2023\n             MINUS\n             SELECT id FROM Teaches WHERE semester = 'Spring' AND year = 2024);" },
+] });
+document.querySelector('#xform').addEventListener('submit', e => {
+  e.preventDefault();
+  const x = document.querySelector('#xin').value.trim(), out = document.querySelector('#xout');
+  if (!/^\d{1,10}$/.test(x)) { out.innerHTML = '<p class="sq-msg err">Type your student id as digits only, e.g. 2305005.</p>'; return; }
+  const r = raRun(DB_IT, `project[name](select[salary > ${x}](Instructor join (project[id](select[semester = 'Fall' and year = 2023](Teaches)) - project[id](select[semester = 'Spring' and year = 2024](Teaches)))))`).result;
+  out.innerHTML = relHTML(r, { title: `result for x = ${x}` });
+});
+
+flashcards('#cards', [
+  { f: 'R ⋈<sub>θ</sub> S', b: 'σ<sub>θ</sub>(R × S). Keeps all attributes of both.' },
+  { f: 'Equi-join', b: 'A theta join with only equalities. Both joined attributes stay. Most common join in practice.' },
+  { f: 'Natural join vs theta join', b: 'Natural join = equi-join on all same-named attributes + projection that drops the duplicates.' },
+  { f: 'R ⟕ S', b: 'Left outer join: R ⋈ S plus R\'s dangling tuples padded with NULL.' },
+  { f: 'R ⟗ S', b: 'Full outer join: dangling tuples of both sides kept.' },
+  { f: 'R ⋉ S', b: 'Semi-join: R tuples that have a partner in S; only R\'s attributes. SQL EXISTS / IN.' },
+  { f: '|R ⟕ S| lower bound', b: 'At least |R|: every R tuple appears.' },
+]);
+quiz('#quiz', [
+  { q: 'R(a, b) ⋈<sub>R.a = S.a</sub> S(a, c) has how many attributes?', opts: ['3', '4', '2', '5'], a: 1, why: 'An equi-join keeps both R.a and S.a: a, b, a, c.' },
+  { q: 'Which expression equals R ⋈<sub>θ</sub> S?', opts: ['σ<sub>θ</sub>(R ∪ S)', 'σ<sub>θ</sub>(R × S)', 'π<sub>θ</sub>(R × S)', 'R × σ<sub>θ</sub>(S)'], a: 1, why: 'Slide 26.' },
+  { q: 'Suppliers has 6 tuples; supplier 6 has no Catalog row; Catalog has 12 rows. |Suppliers ⟕ Catalog| = ?', opts: ['6', '12', '13', '72'], a: 2, why: '12 matched pairs + 1 dangling supplier.' },
+  { q: 'Supplier 1 has 5 Catalog rows. How many times does it appear in Suppliers ⋉ Catalog?', opts: ['0', '1', '5', '6'], a: 1, why: 'A semi-join only tests existence.' },
+  { q: 'In question (iii) above, why is David missing?', opts: ['His salary is too high', 'His id does not appear in Teaches, so he has no partner in the join', 'Projection removed him as a duplicate', 'He is in Math'], a: 1, why: 'A dangling tuple is dropped by an inner join.' },
+]);
+ask('#try1', { q: 'In question (ii) above, how many tuples does σ<sub>Instructor.id=Teaches.id</sub>(Instructor × Teaches) have (before σ<sub>year=2024</sub>)?', a: 5, why: 'One per Teaches row, since every Teaches id exists in Instructor.' });
+
+raCheck('#ex1', { db: DB_UNI, task: '1. (Easy) Pairs (instructor name, dept_name of a department) where the instructor\'s salary is greater than that department\'s budget. Use a theta join.', solution: 'project[name, department.dept_name](instructor join[salary > budget] department)', hint: 'instructor join[salary &gt; budget] department, then project.' });
+raCheck('#ex2', { db: DB_UNI, task: '2. Every student\'s name with the course_ids taken, including students who took nothing (NULL course_id). (All current students took something, so the answer equals the inner join here, but write the outer join.)', solution: 'project[name, course_id](student ljoin takes)' });
+raCheck('#ex3', { db: DB_SPC, task: '3. The full Suppliers tuples of suppliers that supply at least one part costing more than 200. Use a semi-join.', solution: 'Suppliers semijoin select[cost > 200](Catalog)' });
+sqlCheck('#ex4', { setup: raSetup(DB_SPC), task: '4. Write in Oracle SQL: π<sub>sname, pid</sub>(Suppliers ⟕ Catalog).', solution: 'SELECT DISTINCT s.sname, c.pid\nFROM Suppliers s LEFT OUTER JOIN Catalog c ON s.sid = c.sid;' });
+sqlCheck('#ex5', { setup: raSetup(DB_IT), task: '5. (Exam style) Write question (iii) above in SQL.', solution: 'SELECT DISTINCT name\nFROM Instructor I JOIN Teaches T ON I.id = T.id;' });
+</script>
+</body>
+</html>

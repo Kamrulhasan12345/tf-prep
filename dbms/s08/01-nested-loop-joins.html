@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nested-Loop Joins · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="../s07/lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 08 (Sukarna) · Chapter 1 · Slides 2–8 · Book §15.3</div>
+<h1>Nested-Loop Joins: Tuple-Based and Block-Based</h1>
+<p class="lede">When neither relation fits in memory, the simplest join that still works is the nested-loop join. This chapter derives the cost of the tuple-based and block-based versions, works the slides' 1000/500/101 example both ways round, animates the memory chunks, and answers five exam questions on nested-loop joins.</p>
+
+<h2>1. "One and a half passes" (slide 2)</h2>
+<dl class="def">
+<dt>Nested-loop join</dt>
+<dd>A family of join algorithms with two nested loops: an <b>outer loop</b> over one relation and an <b>inner loop</b> over the other. The tuples of one argument are read <b>only once</b>, while the other argument is read <b>repeatedly</b>, once per iteration of the outer loop. That is why the textbook calls them "one-and-a-half-pass" algorithms.</dd>
+</dl>
+<p>Properties (slide 2): they can be used for relations <b>of any size</b>; neither relation has to fit in main memory; <b>M = 2 is sufficient</b> (one buffer per relation). More memory only makes them faster.</p>
+
+<h2>2. Tuple-based nested-loop join (slide 3)</h2>
+<p>To compute R(X, Y) ⋈ S(Y, Z):</p>
+<pre>FOR each tuple s in S DO
+    FOR each tuple r in R DO
+        IF r and s join to make a tuple t THEN
+            output t;</pre>
+<p><b>Cost.</b> If we are careless about buffering, every (s, r) pair can cost a disk read: <b>as much as T(R) × T(S)</b> disk I/Os. If the inner relation is at least read a block at a time, each tuple s causes one scan of R, so the cost is about T(S) × B(R) + B(S); and if the outer relation is also handled a block at a time, every block of S meets every block of R once, so it drops to about <b>B(R) × B(S)</b>. That last step is exactly the block-based algorithm below. The tuple-based join is still useful as an <em>iterator</em> (Lec 07, Chapter 5) and when an index on R's join attribute lets each s find its matches without scanning R.</p>
+
+<h2>3. Block-based nested-loop join (slides 4–5)</h2>
+<p>An improvement over the tuple-based join, assuming <b>B(S) ≤ B(R)</b> and <b>B(S) &gt; M</b> (S does not fit; otherwise the one-pass join of Lec 07 is used). Two ideas:</p>
+<ol>
+  <li>Access both relations <b>by blocks</b>, so each pass over R reads B(R) blocks, not T(R).</li>
+  <li>Use <b>as much memory as possible for the outer relation S</b>: hold M − 1 blocks of S at once, so one pass over R serves M − 1 blocks' worth of S tuples.</li>
+</ol>
+<pre>FOR each chunk of M-1 blocks of S DO BEGIN
+    read these blocks into main-memory buffers;
+    organize their tuples into a search structure whose
+        search key is the common attributes of R and S;
+    FOR each block b of R DO BEGIN
+        read b into main memory;
+        FOR each tuple t of b DO BEGIN
+            find the tuples of S in main memory that join with t;
+            output the join of t with each of these tuples;
+        END;
+    END;
+END;</pre>
+<p>The code looks like three loops, but there are really two: the outer one over (chunks of) S, and the inner one over R. The inner work is written as two loops only to stress that R is visited a block at a time, finishing each block before reading the next.</p>
+
+<figure class="wide">
+<span class="anim-tag">Interactive animation</span>
+<div id="bnlj"></div>
+</figure>
+
+<h2>4. I/O cost (slides 6–7)</h2>
+<p><b>The slides' example (textbook Example 15.4):</b> B(R) = 1000, B(S) = 500, M = 101. Use 100 buffers for chunks of S, so there are 500/100 = 5 chunks.</p>
+<ul>
+  <li>Each chunk: 100 disk I/Os to read the chunk of S, plus 1000 I/Os to read all of R in the inner loop.</li>
+  <li>Total = (500/100) × 1000 + 500 = 5 × 1000 + 500 = <b>5500</b>.</li>
+  <li>If we read <b>one block of S at a time</b> instead of M − 1 (slide 6's "what if", and slide 5's question), the outer loop runs 500 times and each reads all of R: 500 × 1000 + 500 = <b>500,500</b> I/Os, about 91 times more. Using memory for big chunks is what makes the block-based join cheap.</li>
+</ul>
+
+<p><b>The general formula (slide 7).</b> With S the outer relation:</p>
+<ul>
+  <li>Number of outer iterations (chunks) = B(S)/(M − 1).</li>
+  <li>Each iteration reads M − 1 blocks of S and B(R) blocks of R.</li>
+</ul>
+<div class="key">
+<p class="formula">I/Os = (B(S)/(M − 1)) × (M − 1 + B(R)) = B(S) + B(S)·B(R)/(M − 1)</p>
+<p style="text-align:center;margin:0">≈ B(R)·B(S)/M when M is much smaller than B(R) and B(S). If B(S) ≤ M − 1, this is B(S) + B(R): the one-pass join.</p>
+</div>
+<p>When B(S) is not a multiple of M − 1, the last chunk is partial but still costs a full scan of R, so the exact count is <b>B(S) + ⌈B(S)/(M − 1)⌉ · B(R)</b>. The calculators in this book use the ceiling.</p>
+
+<div class="q">
+<h4>Slide 7 question (worked answer): what if R is used in the outer loop instead of S?</h4>
+<p>Swap the roles: I/Os = B(R) + B(R)·B(S)/(M − 1). For the example: 1000 + (1000/100) × 500 = 1000 + 10 × 500 = <b>6000</b>, against 5500 with S outside. The dominant term B(R)B(S)/(M − 1) is the same either way (5000); the difference is the once-only read of the outer relation, B(S) = 500 versus B(R) = 1000. So there is a <b>slight advantage in putting the smaller relation in the outer loop</b>, and the advantage is small. (The first exam question in Chapter 6, with B(R) = 8000, B(S) = 4000 and M = 101, shows how small the difference is: 324,000 against 328,000.)</p>
+</div>
+
+<h2>5. Summary so far (slide 8, textbook Fig. 15.9)</h2>
+<div class="tbl"><table>
+<tr><th>Operators</th><th>Approximate M required</th><th>Disk I/O</th><th>Algorithm</th></tr>
+<tr><td>σ, π</td><td class="num">1</td><td class="num">B</td><td>one-pass (Lec 07)</td></tr>
+<tr><td>γ, δ</td><td class="num">B</td><td class="num">B</td><td>one-pass (Lec 07)</td></tr>
+<tr><td>∪, ∩, −, ×, ⋈</td><td class="num">min(B(R), B(S))</td><td class="num">B(R) + B(S)</td><td>one-pass (Lec 07)</td></tr>
+<tr><td>⋈</td><td class="num">any M ≥ 2</td><td class="num">B(R)B(S)/M</td><td>nested-loop (this chapter)</td></tr>
+</table></div>
+<p>The M for γ and δ is a loose approximation: γ really needs room for one entry per group and δ for one copy of each distinct tuple. Nested-loop join is quadratic in the sizes, which is why Lecture 08 goes on to two-pass algorithms whose cost is linear, 3(B(R) + B(S)). It remains useful when one relation is only a little bigger than memory, and as a subroutine when many tuples share one join value (Chapter 4).</p>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+<div id="try2"></div>
+
+<h3>Exam questions</h3>
+<div class="exam">
+  <div class="exam-src">DB QB · 24-25 8a · 5 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-1 | 2024–25 · 5 marks</div>
+  <div class="exam-q"><p>Differentiate between Nested-loop Join algorithm and Block Nested-loop Join algorithm.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+  <div class="tbl"><table>
+  <tr><th></th><th>(Tuple-based) nested-loop join</th><th>Block nested-loop join</th></tr>
+  <tr><td>Unit of the loops</td><td>tuples: for each tuple s of S, for each tuple r of R</td><td>blocks: for each chunk of M − 1 blocks of S, for each block of R</td></tr>
+  <tr><td>Memory use</td><td>one tuple of the outer relation at a time</td><td>M − 1 buffers of the outer relation, with a search structure on the join attributes</td></tr>
+  <tr><td>Scans of the inner relation</td><td>once per <b>tuple</b> of the outer: T(S) scans</td><td>once per <b>chunk</b>: ⌈B(S)/(M − 1)⌉ scans</td></tr>
+  <tr><td>Disk I/O</td><td>up to T(R)·T(S) if careless; B(S) + T(S)·B(R) if R is read by blocks</td><td>B(S) + B(S)·B(R)/(M − 1) ≈ B(R)B(S)/M</td></tr>
+  <tr><td>Example B(R)=1000, B(S)=500, M=101 (say 10 tuples per block)</td><td>500 + 5000 × 1000 = 5,000,500</td><td>500 + 5 × 1000 = 5,500</td></tr>
+  <tr><td>Strength</td><td>trivial to implement; fits the iterator model; good with an index on the inner join attribute</td><td>far fewer I/Os; becomes the one-pass join when B(S) ≤ M − 1</td></tr>
+  </table></div>
+  <p>Both need only M ≥ 2 and work for relations of any size; the block version simply uses the memory it is given.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2012–13 · 5 marks</div>
+  <div class="exam-q"><p>Derive the total number of disk I/Os for nested loop join of two relations R and S, where the number of records in R is smaller than the number of records in S.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+  <p>R is smaller, so put <b>R in the outer loop</b> and S in the inner loop (the slides' derivation with the names swapped). Use the block-based nested-loop join with M buffers: M − 1 for a chunk of R, 1 for a block of S.</p>
+  <ol>
+    <li>R is split into chunks of M − 1 blocks: the outer loop runs B(R)/(M − 1) times.</li>
+    <li>Each iteration reads its M − 1 blocks of R once, and then every block of S once: M − 1 + B(S) I/Os.</li>
+    <li>Total = (B(R)/(M − 1)) × (M − 1 + B(S)) = <b>B(R) + B(R)·B(S)/(M − 1)</b> (exactly B(R) + ⌈B(R)/(M − 1)⌉·B(S)).</li>
+  </ol>
+  <p>For large relations this is ≈ B(R)B(S)/M. With the smaller relation outside, the once-only term is B(R) rather than B(S), which is the cheaper choice. If B(R) ≤ M − 1, R fits in memory and the cost falls to B(R) + B(S). (For the tuple-based version with R outer: up to T(R)·T(S) if careless, or B(R) + T(R)·B(S) if S is read a block at a time.)</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2013–14 · 3 marks</div>
+  <div class="exam-q"><p>What is the I/O complexity of nested loop join?</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+  <p>Nested-loop join is <b>quadratic</b>: its I/O cost is proportional to the <b>product</b> of the relation sizes. Tuple-based, it can be as much as <b>T(R)·T(S)</b>. Block-based with M buffers and the smaller relation S outside, it is <b>B(S) + B(S)·B(R)/(M − 1) ≈ B(R)·B(S)/M</b>, that is, O(B(R)·B(S)/M). Only when the smaller relation fits in M − 1 buffers does it become linear, B(R) + B(S).</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2014–15 · 10 marks</div>
+  <div class="exam-q"><p>Let relation r1(A, B, C) and r2(C, D, E) have the following properties: r1 has 20,000 tuples, r2 has 45,000 tuples, 25 tuples of r1 fit on one block, and 30 tuples of r2 fit on one block. Estimate the number of block transfers and seeks required using: (a) Nested loop join. (b) Block nested loop join.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+  <p>This question uses the Silberschatz cost model, which counts <b>seeks</b> as well as block transfers, and assumes the <b>worst case</b>: memory holds only one block of each relation. Sizes: b<sub>r1</sub> = 20,000/25 = <b>800</b> blocks, b<sub>r2</sub> = 45,000/30 = <b>1,500</b> blocks.</p>
+  <p><b>(a) Tuple nested-loop join.</b> For each outer tuple, the inner relation is scanned once (one seek, then b<sub>inner</sub> sequential transfers); the outer relation is read once, a block at a time, with a seek per block because the disk head keeps moving to the inner relation.</p>
+  <ul>
+    <li>Transfers = n<sub>outer</sub> × b<sub>inner</sub> + b<sub>outer</sub>; seeks = n<sub>outer</sub> + b<sub>outer</sub>.</li>
+    <li>r1 outer: 20,000 × 1,500 + 800 = <b>30,000,800</b> transfers; 20,000 + 800 = <b>20,800</b> seeks.</li>
+    <li>r2 outer: 45,000 × 800 + 1,500 = 36,001,500 transfers; 46,500 seeks. So r1 should be the outer relation.</li>
+  </ul>
+  <p><b>(b) Block nested-loop join.</b> The inner relation is scanned once per outer <em>block</em>.</p>
+  <ul>
+    <li>Transfers = b<sub>outer</sub> × b<sub>inner</sub> + b<sub>outer</sub>; seeks = 2 × b<sub>outer</sub> (one to read the outer block, one to start the inner scan).</li>
+    <li>r1 outer: 800 × 1,500 + 800 = <b>1,200,800</b> transfers; 2 × 800 = <b>1,600</b> seeks.</li>
+    <li>r2 outer: 1,500 × 800 + 1,500 = 1,201,500 transfers; 3,000 seeks.</li>
+  </ul>
+  <p><b>Best case</b> (the smaller relation r1 fits in memory): both algorithms read each relation once: 800 + 1,500 = 2,300 transfers and 2 seeks. With M buffers and M − 2 used for the outer relation, block nested loop needs ⌈b<sub>r1</sub>/(M − 2)⌉ × b<sub>r2</sub> + b<sub>r1</sub> transfers and 2⌈b<sub>r1</sub>/(M − 2)⌉ seeks. (The slides use M − 1 for the outer relation because they do not count the output buffer.)</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 22-23 1a · 10 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-1 | 2022–23 · 10 marks</div>
+  <div class="exam-q"><p>Construct a one and a half pass algorithm for computing R ⟕ S natural join operation where ⟕ denotes the left outer join operation. Assume the R is the smaller relation. Compute the memory and disk I/O requirements.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+  <p>R ⟕ S keeps every tuple of R: joined with each matching S tuple, or, if no S tuple matches, padded with NULLs for S's attributes Z. A "one and a half pass" algorithm is a block nested-loop join; R is smaller, so R is the outer relation held in memory. That is also the natural choice for a <em>left</em> outer join, because the algorithm must remember which R tuples found a match, and an R tuple stays in memory for the whole scan of S.</p>
+  <pre>FOR each chunk of M−1 blocks of R DO BEGIN
+    read the chunk into memory; build a search structure on Y (the common attributes);
+    give every R tuple in memory a flag matched := false;
+    FOR each block b of S DO BEGIN          -- read into the last buffer
+        FOR each tuple s of b DO
+            FOR each tuple r in memory with r.Y = s.Y DO
+                output (r, s); r.matched := true;
+    END;
+    FOR each tuple r in memory with r.matched = false DO
+        output (r, NULL, …, NULL);           -- the dangling R tuples
+END;</pre>
+  <p><b>Why it is correct:</b> during the scan of S every R tuple of the chunk meets every S tuple, so after the scan "matched = false" means "no S tuple joins with r", exactly the tuples to pad.</p>
+  <p><b>Memory:</b> any M ≥ 2 works (one buffer of R, one of S). <b>Disk I/O:</b> R is read once and S once per chunk:</p>
+  <p class="formula">B(R) + ⌈B(R)/(M − 1)⌉ · B(S) ≈ B(R) + B(R)B(S)/(M − 1)</p>
+  <p>If B(R) ≤ M − 1 the whole of R fits, and it is a true one-pass algorithm costing B(R) + B(S). Example: B(R) = 500, B(S) = 1000, M = 101: 500 + 5 × 1000 = 5500 I/Os. (If the output buffer is counted, as in the bank's answer, use M − 2 in place of M − 1.)</p>
+  </div></details>
+</div>
+
+<div class="key"><p><strong>Summary:</strong> nested-loop joins read one relation once and the other once per outer iteration, work for any sizes, and need only M ≥ 2. Tuple-based costs up to T(R)T(S). Block-based reads the smaller relation S in chunks of M − 1 blocks and scans R once per chunk: B(S) + ⌈B(S)/(M − 1)⌉B(R) ≈ B(R)B(S)/M (5500 for 1000/500/101; 6000 with R outside; 500,500 with one-block chunks). It equals the one-pass join when S fits in M − 1 buffers.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../s07/lecture.js"></script>
+<script>
+QE.bnljTool('#bnlj');
+flashcards('#cards', [
+  { f: '"One and a half passes"', b: 'One argument is read once, the other repeatedly (once per outer iteration).' },
+  { f: 'Tuple-based NLJ cost', b: 'Up to T(R)·T(S) if careless.' },
+  { f: 'Block-based NLJ', b: 'Chunks of M − 1 blocks of the outer (smaller) relation; scan the inner relation once per chunk.' },
+  { f: 'Block NLJ cost', b: 'B(S) + B(S)B(R)/(M − 1) ≈ B(R)B(S)/M; exactly B(S) + ⌈B(S)/(M−1)⌉B(R).' },
+  { f: 'Example 15.4', b: 'B(R)=1000, B(S)=500, M=101: 5500 (S outer), 6000 (R outer), 500,500 with 1-block chunks.' },
+  { f: 'Minimum memory for NLJ', b: 'M = 2.' },
+]);
+quiz('#quiz', [
+  { q: 'B(R) = 1000, B(S) = 500, M = 51, S outer. Block NLJ cost?', opts: ['5,500', '10,500', '20,500', '500,500'], a: 1, why: '500/50 = 10 chunks: 500 + 10 × 1000 = 10,500.' },
+  { q: 'Which part of the block NLJ formula changes when you swap the outer and inner relations?', opts: ['B(R)B(S)/(M−1)', 'The once-only read of the outer relation', 'Both equally', 'Neither'], a: 1, why: 'The product term is symmetric; only the "+ B(outer)" changes, so the smaller relation outside saves a little.' },
+  { q: 'B(S) = 80, M = 101. What does block NLJ become?', opts: ['A two-pass join', 'The one-pass join, B(R) + B(S)', 'Impossible', 'A hash join'], a: 1, why: 'All of S fits in M − 1 = 100 buffers: one chunk, one scan of R.' },
+  { q: 'Why build a search structure on the chunk of S?', opts: ['To sort the output', 'So each R tuple finds its matching S tuples quickly in memory', 'To save disk I/Os', 'It is required for correctness'], a: 1, why: 'It saves CPU time, not I/Os; without it every R tuple would be compared with every tuple of the chunk.' },
+  { q: 'The I/O cost of block NLJ grows…', opts: ['linearly in B(R) + B(S)', 'with the product B(R)·B(S), divided by M', 'logarithmically', 'only with M'], a: 1, why: 'It is quadratic: B(R)B(S)/M.' },
+]);
+ask('#try1', { q: 'B(R) = 10,000, B(S) = 5,000, M = 101, S outer. Block NLJ disk I/Os?', a: 505000, why: '5000 + (5000/100) × 10,000 = 5000 + 500,000 = 505,000 (slide 25 of this lecture uses this number).' });
+ask('#try2', { q: 'B(R) = B(S) = 10,000 and M = 1000 (textbook Exercise 15.3.2). Block NLJ disk I/Os, counting a partial last chunk as a full scan?', a: 120000, why: '10,000/999 = 10.01, so there are ⌈10.01⌉ = 11 chunks, and the cost is 10,000 + 11 × 10,000 = 120,000. The slides\' approximate formula B(S) + B(S)B(R)/(M − 1) gives 10,000 + 10⁸/999 ≈ 110,100; the gap is the nearly empty eleventh chunk, which still forces a full scan of R.' });
+</script>
+</body>
+</html>

@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Foreign Keys · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 06 (Ishrak) · Chapter 2 · Slides 10–13 · Textbook §7.1.1</div>
+<h1>Foreign Keys: Linking a Table to Another</h1>
+<p class="lede">A foreign key says "this value must be the key of some row over there". This chapter defines foreign keys and referential integrity on the slides' Department and Employee tables, explains why the master table must be created first and why a foreign key may only reference a PRIMARY KEY or UNIQUE column, and shows the two ways to declare one in Oracle.</p>
+
+<h2>1. The rule: a departmental head must be an employee (slide 10)</h2>
+<p>Slide 10 has two tables. <b>Employee(id, name, address, gender)</b> lists the employees, with <code>id</code> as primary key. <b>Department(name, head)</b> lists the departments, and <code>head</code> holds the id of the employee who heads the department: CSE is headed by employee 2 (B), EEE by employee 4 (D), ME by employee 1 (A).</p>
+<p>The business rule is: <em>a departmental head must be an employee</em>. In table terms, every non-NULL value in Department.head must appear in Employee.id. Without a constraint nothing stops a row like ('CE', 5), headed by an employee who does not exist.</p>
+<dl class="def">
+  <dt>Foreign key</dt>
+  <dd>A column (or set of columns) of one table whose values must match the primary key or a UNIQUE key of some row in another table (or the same table), or be NULL.</dd>
+  <dt>Master table (parent table, referenced table)</dt>
+  <dd>The table being pointed at: Employee. The slides call it the <i>master table</i> and mark its column "PK/UK".</dd>
+  <dt>Foreign table (child table, referencing table)</dt>
+  <dd>The table that holds the foreign key: Department. The slides call it the <i>foreign table</i> and mark its column "FK".</dd>
+  <dt>Referential integrity</dt>
+  <dd>The property that every reference points at something that exists: no <i>dangling</i> foreign-key values. A foreign-key constraint is how SQL makes the DBMS enforce it.</dd>
+</dl>
+<figure>
+<svg id="anat" role="img" aria-label="Department.head references Employee.id"></svg>
+<figcaption><b>Figure 1.</b> Slide 10's tables. Each head value is a pointer to one Employee row, found by the primary key id. Employee 3 (C) heads no department; that is allowed.</figcaption>
+</figure>
+<p>The playground below has the same two tables, created <em>without</em> a foreign key, and the row ('CE', 5) has slipped in. The query finds it: the dangling reference that a foreign key would have prevented.</p>
+<div id="p0"></div>
+
+<h2>2. Only a PRIMARY KEY or UNIQUE column can be referenced (slide 10)</h2>
+<p>Slide 10 states: "foreign keys, which reference attributes of a second relation, can only reference PRIMARY or UNIQUE KEY". The reason is that a reference must identify <em>exactly one</em> row. If Department.head referred to Employee.name, and two employees were both called "B", the head of CSE would be ambiguous; and the DBMS would need to search the whole table to check every insert. A key column guarantees at most one match, and Oracle already has a unique index on it, so each check is one index lookup.</p>
+<p>If you try to reference a column that is neither, Oracle refuses the CREATE TABLE with <code>ORA-02270: no matching unique or primary key for this column-list</code>. SQLite accepts the CREATE TABLE and complains later, at the first INSERT, with <code>foreign key mismatch</code>:</p>
+<div id="p1"></div>
+
+<h2>3. Create the master table first (slide 11)</h2>
+<p>Because Department refers to Employee, Employee must exist before Department is created. The slide creates it like this (Oracle accepts <code>INT</code> and turns it into <code>NUMBER(38)</code>):</p>
+<pre>CREATE TABLE Employee (
+  id      INT PRIMARY KEY,
+  name    CHAR(20),
+  address CHAR(20),
+  gender  CHAR(1)
+);</pre>
+<p>In Oracle, creating Department first fails with <code>ORA-00942: table or view does not exist</code>, because the REFERENCES clause is checked when the table is created. (SQLite is lazier: it accepts the CREATE TABLE and only fails when a row is inserted. Do not rely on that habit in an Oracle exam.) The same order applies to data: master rows first, then the rows that point at them. And when tables are dropped, the order reverses: <code>DROP TABLE Employee</code> fails with <code>ORA-02449: unique/primary keys in table referenced by foreign keys</code> while Department still refers to it. Drop Department first, or write <code>DROP TABLE Employee CASCADE CONSTRAINTS</code>, which drops the foreign-key constraints that point at Employee (the Department rows stay).</p>
+
+<h2>4. Declaring the foreign key: column form (slide 12)</h2>
+<pre>CREATE TABLE Department (
+  name CHAR(3),
+  head INT REFERENCES Employee(id)
+);</pre>
+<p><code>REFERENCES Employee(id)</code> written after the column's type is a <b class="term">column constraint</b>: it says that this one column refers to Employee.id. The word FOREIGN KEY does not appear in this form. If the column list is left out, <code>REFERENCES Employee</code> means Employee's primary key.</p>
+
+<h2>5. Declaring the foreign key: table form (slide 13)</h2>
+<pre>CREATE TABLE Department (
+  name CHAR(3),
+  head INT,
+  FOREIGN KEY (head) REFERENCES Employee(id)
+);</pre>
+<p>This is the <b class="term">table constraint</b> form. It means exactly the same thing. It is required when the foreign key has several columns, which must match a composite key of the master table column by column:</p>
+<pre>CREATE TABLE Section (course_id VARCHAR2(8), sec_id NUMBER(2), room VARCHAR2(10),
+                      PRIMARY KEY (course_id, sec_id));
+CREATE TABLE Takes (student_id NUMBER(7), course_id VARCHAR2(8), sec_id NUMBER(2),
+                    FOREIGN KEY (course_id, sec_id) REFERENCES Section(course_id, sec_id));</pre>
+<p>Either form can be given a name, which Oracle shows in its error messages and which you need later to drop the constraint (<a href="07-naming-and-altering.html">Chapter 7</a>):</p>
+<pre>CREATE TABLE Department (
+  name CHAR(3),
+  head INT CONSTRAINT dept_head_fk REFERENCES Employee(id)        -- named column constraint
+);
+-- or:  CONSTRAINT dept_head_fk FOREIGN KEY (head) REFERENCES Employee(id)</pre>
+<div class="q">
+<h4>Question: may a foreign key be NULL?</h4>
+<p>Yes, unless the column is also declared NOT NULL. A NULL head means "this department has no head at the moment"; it does not point anywhere, so there is nothing to check. Oracle treats a composite foreign key as satisfied as soon as <em>any</em> of its columns is NULL (the standard's default "MATCH SIMPLE" rule). Chapter 4 uses this: ON DELETE SET NULL puts NULL into the foreign key on purpose.</p>
+</div>
+<p>Here is the declared version, with the slide's data. Try an INSERT with head 5, then one with head NULL.</p>
+<div id="p2"></div>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+<h3>Write it yourself</h3>
+<p>Exercises 1, 2 and 4 check the foreign keys of the table you create (parent table, columns, referenced column), read from the catalogue.</p>
+<div id="c1"></div><div id="c2"></div><div id="c3"></div><div id="c4"></div><div id="c5"></div>
+
+<div class="key"><p><strong>Summary:</strong> A foreign key makes every non-NULL value of a child column match the PRIMARY KEY or UNIQUE key of a row in the master table; that is referential integrity. Only key columns can be referenced, because a reference must name exactly one row. Create (and fill) the master table first, drop it last. Declare the key inline with <code>REFERENCES T(col)</code> or as a table constraint <code>FOREIGN KEY (cols) REFERENCES T(cols)</code>; the second form is needed for composite keys.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/sqlplay.js"></script>
+<script src="lecture.js"></script>
+<script>
+// Figure 1: two tables with arrows from Department.head to Employee rows
+(() => {
+  const rh = 26, y0 = 60, dX = 20, dW = [70, 60], eX = 330, eW = [44, 60, 74, 66];
+  let s = `<text x="${dX}" y="22" class="big">Department</text><text x="${dX}" y="38" class="lbl">foreign (child) table</text>
+    <text x="${eX}" y="22" class="big">Employee</text><text x="${eX}" y="38" class="lbl">master (parent) table</text>`;
+  const row = (x, ws, y, vals, cls) => { let cx = x, o = ''; vals.forEach((v, i) => { o += `<rect class="${(cls || [])[i] || 'cell'}" x="${cx}" y="${y}" width="${ws[i]}" height="${rh}"/><text x="${cx + 8}" y="${y + 17}" style="font-size:12px">${v}</text>`; cx += ws[i]; }); return o; };
+  s += row(dX, dW, y0, ['name', 'head'], ['cell-plain', 'cell-hl']);
+  s += row(eX, eW, y0, ['id', 'name', 'address', 'gender'], ['cell-new', 'cell-plain', 'cell-plain', 'cell-plain']);
+  s += `<text x="${dX + dW[0] + dW[1] / 2}" y="${y0 - 6}" text-anchor="middle" class="lbl red" style="font-weight:600">FK</text>`;
+  s += `<text x="${eX + eW[0] / 2}" y="${y0 - 6}" text-anchor="middle" class="lbl grn" style="font-weight:600">PK</text>`;
+  DEPT0.forEach((r, i) => { s += row(dX, dW, y0 + rh * (i + 1), r); });
+  EMP0.forEach((r, i) => { s += row(eX, eW, y0 + rh * (i + 1), r, r[0] === 3 ? ['cell-dim', 'cell-dim', 'cell-dim', 'cell-dim'] : null); });
+  DEPT0.forEach((r, i) => {
+    const y1 = y0 + rh * (i + 1) + rh / 2, j = EMP0.findIndex(e => e[0] === r[1]), y2 = y0 + rh * (j + 1) + rh / 2;
+    s += `<path d="M${dX + dW[0] + dW[1] - 6} ${y1} C ${dX + 200} ${y1}, ${eX - 100} ${y2}, ${eX - 3} ${y2}" class="s-acc" marker-end="url(#m-acc)"/>`;
+  });
+  const H = y0 + rh * 5 + 34;
+  s += `<text x="${dX}" y="${H - 8}" class="lbl">every non-NULL head must equal some Employee.id</text>`;
+  const el = $('#anat'); el.setAttribute('viewBox', `0 0 ${eX + 260} ${H}`); el.setAttribute('width', eX + 260); el.innerHTML = s;
+})();
+
+sqlPlay('#p0', { setup: ED_NOFK, query: 'SELECT name, head\nFROM Department\nWHERE head NOT IN (SELECT id FROM Employee);',
+  note: 'Department here has no foreign key, so the bad row (CE, 5) was accepted. The query lists every dangling head.' });
+sqlPlay('#p1', { setup: "CREATE TABLE Employee (id INT PRIMARY KEY, name CHAR(20));\nINSERT INTO Employee VALUES (1, 'A');",
+  query: "CREATE TABLE Department (\n  name      CHAR(3),\n  head_name CHAR(20) REFERENCES Employee(name)   -- name is not a key\n);\nINSERT INTO Department VALUES ('CSE', 'A');",
+  note: 'Employee.name is not a key, so the reference is illegal. Oracle stops at the CREATE TABLE (ORA-02270); SQLite reports <code>foreign key mismatch</code> here instead.' });
+sqlPlay('#p2', { setup: ED, query: "INSERT INTO Department VALUES ('CE', 5);",
+  note: 'SQLite: <code>FOREIGN KEY constraint failed</code>. Oracle: <code>ORA-02291: integrity constraint (SCHEMA.SYS_C00…) violated - parent key not found</code>. Change 5 to 3 or to NULL and run again; then use Show tables.' });
+
+flashcards('#cards', [
+  { f: 'Foreign key', b: 'Column(s) whose non-NULL values must equal a PRIMARY KEY or UNIQUE value of a row in the referenced table.' },
+  { f: 'Master / parent table', b: 'The referenced table (Employee). Must be created first and dropped last.' },
+  { f: 'Foreign / child table', b: 'The table that holds the foreign key (Department).' },
+  { f: 'Referential integrity', b: 'No dangling references: every foreign-key value points at an existing row.' },
+  { f: 'Dangling reference', b: 'A foreign-key value that matches no row of the master table, like head = 5.' },
+  { f: 'ORA-02270', b: 'No matching unique or primary key for this column-list: you referenced a non-key column.' },
+  { f: 'ORA-02449', b: 'Cannot drop a table whose key is referenced by foreign keys (use CASCADE CONSTRAINTS).' },
+]);
+quiz('#quiz', [
+  { q: 'Which column can Department.head legally reference?', opts: ['Employee.name (no constraint)', 'Employee.gender', 'Employee.id (PRIMARY KEY)', 'any column of the same data type'], a: 2, why: 'Only PRIMARY KEY or UNIQUE columns: the reference must identify exactly one row.' },
+  { q: 'In Oracle you run CREATE TABLE Department (… head INT REFERENCES Employee(id)) before Employee exists. What happens?', opts: ['It works; the check happens at INSERT time', 'ORA-00942: table or view does not exist', 'The foreign key is silently ignored', 'Employee is created automatically'], a: 1, why: 'Oracle resolves the REFERENCES clause at CREATE time. (SQLite would accept it; Oracle does not.)' },
+  { q: 'Which is NOT a way to declare the foreign key of slide 12/13?', opts: ['head INT REFERENCES Employee(id)', 'FOREIGN KEY (head) REFERENCES Employee(id)', 'CONSTRAINT fk FOREIGN KEY (head) REFERENCES Employee(id)', 'head INT FOREIGN KEY Employee(id)'], a: 3, why: 'The inline form uses only REFERENCES; FOREIGN KEY (…) belongs to the table-constraint form.' },
+  { q: 'Can Department.head be NULL?', opts: ['No, foreign keys are always NOT NULL', 'Yes, unless declared NOT NULL; NULL references nothing', 'Only if Employee contains a NULL id', 'Only for composite keys'], a: 1, why: 'A NULL foreign key is not checked. Add NOT NULL if every department must have a head.' },
+  { q: 'A composite foreign key (course_id, sec_id) must be declared…', opts: ['as two column constraints', 'with the table-constraint form FOREIGN KEY (course_id, sec_id) REFERENCES …', 'with two separate FOREIGN KEY clauses', 'it cannot be declared in Oracle'], a: 1, why: 'Two column constraints would be two separate one-column keys, each needing its own unique target.' },
+]);
+ask('#try1', { q: 'With the slide-10 data (heads 2, 4, 1), how many Employee rows are referenced by at least one Department row?', a: 3, why: 'Employees 1, 2 and 4. Employee 3 is not referenced.' });
+
+sqlCheck('#c1', { setup: EMP_SQL, check: 'state', table: FKS('Department'),
+  task: 'Easy. Employee already exists. Create Department(name CHAR(3), head INT) with head referencing Employee(id), using the <b>column form</b> of slide 12.',
+  solution: 'CREATE TABLE Department (\n  name CHAR(3),\n  head INT REFERENCES Employee(id)\n);' });
+sqlCheck('#c2', { setup: "CREATE TABLE Department (name CHAR(3) PRIMARY KEY, head INT);", check: 'state', table: FKS('Course'),
+  task: 'Department(name, head) exists with name as its primary key. Create Course(code VARCHAR2(7) PRIMARY KEY, title VARCHAR2(50), dept CHAR(3)) where dept references Department(name). Use the <b>table form</b> with the constraint name <code>course_dept_fk</code>.',
+  solution: 'CREATE TABLE Course (\n  code  VARCHAR2(7) PRIMARY KEY,\n  title VARCHAR2(50),\n  dept  CHAR(3),\n  CONSTRAINT course_dept_fk FOREIGN KEY (dept) REFERENCES Department(name)\n);' });
+sqlCheck('#c3', { setup: EMP_SQL.replace(/INSERT.*\n/g, '') + 'CREATE TABLE Department (name CHAR(3), head INT REFERENCES Employee(id));', check: 'state',
+  table: "(SELECT 'Employee' AS t, id AS a, name AS b FROM Employee UNION ALL SELECT 'Department', name, head FROM Department)",
+  task: 'Both tables exist and are empty, with the foreign key in place. Insert the data of slide 10: employees (1,A,X,M), (2,B,Y,M), (3,C,Z,F), (4,D,W,M) and departments (CSE,2), (EEE,4), (ME,1). Get the order right.',
+  hint: 'Master rows first: a Department row can only point at an Employee that is already there.',
+  solution: EMP0.map(r => `INSERT INTO Employee VALUES (${r[0]}, '${r[1]}', '${r[2]}', '${r[3]}');`).join('\n') + '\n' + DEPT_ROWS });
+sqlCheck('#c4', { setup: 'CREATE TABLE Section (course_id VARCHAR2(8), sec_id NUMBER(2), room VARCHAR2(10), PRIMARY KEY (course_id, sec_id));\nCREATE TABLE Student (id NUMBER(7) PRIMARY KEY, name VARCHAR2(40));', check: 'state', table: FKS('Takes'),
+  task: 'Section(course_id, sec_id, room) has the composite primary key (course_id, sec_id); Student(id, name) has primary key id. Create Takes(student_id NUMBER(7), course_id VARCHAR2(8), sec_id NUMBER(2), grade CHAR(2)) with a foreign key to Student and a composite foreign key to Section.',
+  solution: 'CREATE TABLE Takes (\n  student_id NUMBER(7) REFERENCES Student(id),\n  course_id  VARCHAR2(8),\n  sec_id     NUMBER(2),\n  grade      CHAR(2),\n  FOREIGN KEY (course_id, sec_id) REFERENCES Section(course_id, sec_id)\n);' });
+sqlCheck('#c5', { setup: ED_NOFK + "INSERT INTO Department VALUES ('BME', 7);\nINSERT INTO Department VALUES ('URP', NULL);",
+  task: 'Exam level. Department was created without a foreign key, and some bad rows got in. List name and head of every department whose head is <b>not NULL</b> and is not an employee id. (These rows would make <code>ALTER TABLE … ADD FOREIGN KEY</code> fail.)',
+  hint: 'WHERE head IS NOT NULL AND head NOT IN (SELECT id FROM Employee)',
+  solution: 'SELECT name, head\nFROM Department\nWHERE head IS NOT NULL\n  AND head NOT IN (SELECT id FROM Employee);' });
+</script>
+</body>
+</html>

@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Subqueries in WHERE; ALL and ANY · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 11 (Ishrak) · Chapter 1 · Slides 1–7</div>
+<h1>Subqueries in WHERE; ALL and ANY</h1>
+<p class="lede">A subquery is a query inside another query. This chapter covers slides 1–7: why "find the highest-paid employee" should not be answered with a hard-coded number, the scalar subquery that computes the number instead, the quantified comparisons &gt;ALL, &gt;=ALL, &gt;ANY, &lt;=ANY and friends, and IN / NOT IN, including the NULL trap. A tool lets you evaluate any x op ALL/ANY (set) yourself.</p>
+
+<h2>1. What is a subquery? (slides 2–3)</h2>
+<p>Slide 2 outlines the lecture: what a subquery is, subqueries in the WHERE clause, the comparisons &gt;ALL, &gt;ANY, &gt;=ALL, &lt;=ANY etc., and subqueries in the FROM clause.</p>
+<dl class="def">
+<dt>Subquery (nested query, inner query)</dt>
+<dd>A complete SELECT statement written in parentheses inside another statement (the outer query). It can appear in WHERE and HAVING (this chapter and the next two), in FROM (Chapter 4), in the SELECT list, and in INSERT, UPDATE and DELETE.</dd>
+</dl>
+<p>Slide 3 numbers the clauses of the outer query: (1) WHERE, (2) FROM. Read it as "a subquery placed in the WHERE clause (1) is a condition on the rows produced by FROM (2)": the WHERE clause can now ask questions whose answers come from another query. The running example (slide 4) is a small table <code>Employee(id, dept, salary)</code> with salaries 50,000, 55,000, 60,000 and 75,000.</p>
+<figure><div id="emp"></div><figcaption><b>Figure 1.</b> Employee (slide 4).</figcaption></figure>
+
+<h2>2. The highest-paid employee (slides 5–6)</h2>
+<p><em>Find the employee(s) with the highest paid salary.</em> Slide 5's "first thought" reads the maximum off the table and hard-codes it:</p>
+<pre>SELECT id FROM Employee WHERE salary = 75000;</pre>
+<p>It returns 5004, but it is wrong as a query: the moment salaries change, the number 75000 is stale, and the database cannot know where it came from. The query must <em>compute</em> the maximum. Slide 6 does that with a subquery:</p>
+<pre>SELECT id
+FROM   Employee
+WHERE  salary = (SELECT MAX(salary)
+                 FROM   Employee);</pre>
+<dl class="def">
+<dt>Scalar subquery</dt>
+<dd>A subquery that returns exactly one row with one column, so it can be used wherever a single value can (here, on the right of =). If it returned several rows, Oracle would raise <code>ORA-01427: single-row subquery returns more than one row</code>; if it returns no row, its value is NULL.</dd>
+</dl>
+<p>The inner query does not depend on the outer row, so it is evaluated once: MAX(salary) = 75000, and the outer query becomes the first-thought query, but with the value computed. Slide 6 also asks: <em>suppose you are not allowed to use any aggregate function?</em> That is what ALL is for.</p>
+<div id="p6"></div>
+
+<h2>3. Quantified comparisons: ALL and ANY (slide 7)</h2>
+<p>Slide 7 lists eight operators: &gt; ALL, &gt;= ALL, &lt; ALL, &lt;= ALL, &gt; ANY, &gt;= ANY, &lt; ANY, &lt;= ANY (and = and &lt;&gt; can be quantified too). Each compares one value with <em>every</em> value of a one-column subquery:</p>
+<dl class="def">
+<dt>x op ALL (subquery)</dt>
+<dd>TRUE if x op v is true for <em>every</em> value v the subquery returns. "x &gt;= ALL (S)" means x is at least as big as everything in S.</dd>
+<dt>x op ANY (subquery) (also written SOME)</dt>
+<dd>TRUE if x op v is true for <em>at least one</em> value v. "x &gt; ANY (S)" means x is bigger than something in S.</dd>
+</dl>
+<pre>SELECT id
+FROM   Employee
+WHERE  salary &gt;= ALL (SELECT salary
+                      FROM   Employee);</pre>
+<p>A salary that is ≥ every salary, including itself, is the maximum. Only 75,000 qualifies, so the answer is 5004 again, without any aggregate. Note &gt;= rather than &gt;: with <code>&gt; ALL</code>, 75,000 would have to be greater than itself, and no row would qualify.</p>
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="allany"></div>
+</figure>
+<div id="p7"></div>
+
+<h3>Translating ALL and ANY</h3>
+<div class="tbl"><table>
+<tr><th>Quantified form</th><th>Equivalent (when S has no NULLs and is not empty)</th></tr>
+<tr><td>x &gt; ALL (S)</td><td>x &gt; MAX(S)</td></tr>
+<tr><td>x &lt; ALL (S)</td><td>x &lt; MIN(S)</td></tr>
+<tr><td>x &gt; ANY (S)</td><td>x &gt; MIN(S)</td></tr>
+<tr><td>x &lt; ANY (S)</td><td>x &lt; MAX(S)</td></tr>
+<tr><td>x = ANY (S)</td><td>x IN (S)</td></tr>
+<tr><td>x &lt;&gt; ALL (S)</td><td>x NOT IN (S)</td></tr>
+</table></div>
+<p>Two edge cases make ALL and the MAX/MIN versions differ, and both are popular exam traps:</p>
+<ul>
+<li><strong>Empty subquery.</strong> "x &gt; ALL (empty)" is TRUE (there is no value to contradict it), and "x &gt; ANY (empty)" is FALSE (there is no value to satisfy it). But MAX of nothing is NULL, so "x &gt; (SELECT MAX …)" is UNKNOWN. Example: "products more expensive than all products the same company made before 1972" must include products of companies with no pre-1972 products when written with ALL.</li>
+<li><strong>NULL in the subquery.</strong> If S contains a NULL, then x &gt; NULL is UNKNOWN, so "x &gt; ALL (S)" can never be TRUE (at best UNKNOWN), and the row is dropped. Slide 7's query would return nothing if some employee's salary were NULL. MAX ignores NULLs, so the slide 6 version still works.</li>
+</ul>
+
+<h3>Try it: evaluate x op ALL/ANY (set)</h3>
+<p>Type a value for x and a comma-separated set (use NULL for a null; leave the set empty for an empty subquery).</p>
+<div id="tool"></div>
+
+<h2>4. IN and NOT IN</h2>
+<p>The most common subquery test is membership:</p>
+<pre>x IN (subquery)        -- same as x = ANY (subquery)
+x NOT IN (subquery)    -- same as x &lt;&gt; ALL (subquery)</pre>
+<p>Example: makers who sell laptops, written with IN instead of a join: <code>SELECT DISTINCT maker FROM Product WHERE model IN (SELECT model FROM Laptop)</code>. IN also works with a list of literals, <code>type IN ('pc', 'laptop')</code>, and with several columns at once, <code>(dept, salary) IN (SELECT …)</code> (next chapter).</p>
+<div class="q">
+<h4>Question (worked answer): the NOT IN NULL trap</h4>
+<p>Suppose some employee has MANAGERID NULL (King, in the HR schema). Query: "employees who are not managers":</p>
+<pre>SELECT LASTNAME FROM EMPLOYEE
+WHERE  EMPLOYEEID NOT IN (SELECT MANAGERID FROM EMPLOYEE);</pre>
+<p>This returns <strong>no rows</strong>. NOT IN means "&lt;&gt; every value", and one of the values is NULL; <code>104 &lt;&gt; NULL</code> is UNKNOWN, so the whole condition is at best UNKNOWN for every employee. Fix: exclude NULLs inside the subquery (<code>WHERE MANAGERID IS NOT NULL</code>) or use NOT EXISTS (Chapter 3), which does not have this problem. IN has no such trap: <code>x IN (1, NULL)</code> is TRUE when x = 1.</p>
+</div>
+<div id="p-notin"></div>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div><div id="try2"></div>
+<h3>Try it in SQL</h3>
+<p>Exercises 1–2 use Employee(id, dept, salary); 3–4 the computer database; 5–6 the HR schema.</p>
+<div id="c1"></div><div id="c2"></div><div id="c3"></div><div id="c4"></div><div id="c5"></div><div id="c6"></div>
+
+<div class="key"><p><strong>Summary:</strong> a subquery is a query in parentheses inside another query. A scalar subquery returns one value and replaces a hard-coded constant (salary = (SELECT MAX(salary) …)). x op ALL (S) must hold for every value of S, x op ANY (S) for at least one; &gt;= ALL finds maxima without aggregates. ALL over an empty set is TRUE, ANY is FALSE; a NULL in S makes ALL and NOT IN never TRUE. IN = "= ANY", NOT IN = "&lt;&gt; ALL".</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/sqlplay.js"></script>
+<script src="../i08/lecture.js"></script>
+<script>
+const EMP = [[5001, 'EEE', 50000], [5002, 'EEE', 55000], [5003, 'CSE', 60000], [5004, 'CSE', 75000]];
+$('#emp').innerHTML = row2(rel('Employee', ['id', 'dept', 'salary'], EMP));
+const S = EMP.map(e => e[2]);
+const fr = [{ html: row2(rel('outer: Employee', ['id', 'dept', 'salary'], EMP), rel('subquery: SELECT salary', ['salary'], S.map(v => [v]))), cap: 'The subquery returns the bag {50000, 55000, 60000, 75000}. For each outer row, test salary &gt;= ALL of them.' }];
+EMP.forEach((e, i) => {
+  const ok = S.map(v => e[2] >= v), pass = ok.every(Boolean);
+  fr.push({ html: row2(rel('outer: Employee', ['id', 'dept', 'salary'], EMP, { cls: { [i]: pass ? 'new' : 'hl' }, side: { [i]: '◀' } }),
+    rel(`${e[2]} >= v ?`, ['v', 'result'], S.map((v, j) => [v, ok[j] ? 'TRUE' : 'FALSE']), { cls: Object.fromEntries(ok.map((b, j) => [j, b ? 'new' : 'del'])) })),
+    cap: `id ${e[0]}, salary ${e[2]}: ${pass ? '<b>TRUE for every value, so &gt;= ALL is TRUE: kept.</b>' : `FALSE against ${S.filter(v => e[2] < v).join(', ')}, so &gt;= ALL is FALSE.`} ${!pass ? `(But ${e[2]} &gt;= ANY would be TRUE: it is at least ${S[0]}.)` : ''}` });
+});
+fr.push({ html: row2(rel('result', ['id'], [[5004]], { cls: { 0: 'new' } })), cap: 'Only 5004 survives (slide 7).' });
+stepper('#allany', fr);
+// tool
+(() => {
+  const host = $('#tool');
+  host.innerHTML = `<form class="bp-form"><label>x <input id="tx" value="60" style="width:5em"></label>
+    <label>op <select id="top"><option>&gt;</option><option selected>&gt;=</option><option>&lt;</option><option>&lt;=</option><option>=</option><option>&lt;&gt;</option></select></label>
+    <label><select id="tq"><option>ALL</option><option>ANY</option></select></label>
+    <label>set <input id="ts" value="50, 55, 60" style="width:12em"></label><button type="submit">Evaluate</button></form><div id="tres"></div>`;
+  const cmp = (x, op, v) => x === null || v === null ? 0.5 : ({ '>': x > v, '>=': x >= v, '<': x < v, '<=': x <= v, '=': x === v, '<>': x !== v }[op] ? 1 : 0);
+  const name = t => ({ 1: 'TRUE', 0.5: 'UNKNOWN', 0: 'FALSE' })[t];
+  const run = () => {
+    const out = $('#tres'), xs = $('#tx').value.trim(), op = $('#top').value, q = $('#tq').value;
+    const parse = t => /^null$/i.test(t) ? null : (isNaN(+t) || t === '' ? undefined : +t);
+    const x = parse(xs), set = $('#ts').value.split(',').map(t => t.trim()).filter(t => t !== '').map(parse);
+    if (x === undefined || set.includes(undefined)) { out.innerHTML = '<p class="bad">Use numbers or NULL, separated by commas.</p>'; return; }
+    const each = set.map(v => cmp(x, op, v));
+    const res = q === 'ALL' ? (each.length ? Math.min(...each) : 1) : (each.length ? Math.max(...each) : 0);
+    out.innerHTML = (set.length ? `<p>${set.map((v, i) => `${x === null ? 'NULL' : x} ${op.replace('<', '&lt;').replace('>', '&gt;')} ${v === null ? 'NULL' : v} → <b>${name(each[i])}</b>`).join('<br>')}</p>` : '<p>The set is empty.</p>') +
+      `<p>${q === 'ALL' ? 'ALL = AND of all comparisons (TRUE if the set is empty)' : 'ANY = OR of all comparisons (FALSE if the set is empty)'}: <b class="${res === 1 ? 'good' : 'bad'}">${name(res)}</b>. ${res === 1 ? 'A row with this x is kept.' : 'A row with this x is dropped by WHERE.'}</p>`;
+  };
+  host.querySelector('form').addEventListener('submit', e => { e.preventDefault(); run(); });
+  run();
+})();
+sqlPlay('#p6', { setup: EMP11, query: 'SELECT id\nFROM   Employee\nWHERE  salary = (SELECT MAX(salary)\n                 FROM   Employee);', note: 'Slide 6. Try UPDATE Employee SET salary = 80000 WHERE id = 5002; before the SELECT: the answer follows the data.' });
+sqlPlay('#p7', { setup: EMP11, query: 'SELECT id\nFROM   Employee\nWHERE  salary >= ALL (SELECT salary\n                     FROM   Employee);', note: 'Slide 7. Change >= to > (no rows) or ALL to ANY (all rows).' });
+sqlPlay('#p-notin', { setup: HR, query: '-- returns nothing: the subquery contains a NULL (King has no manager)\nSELECT LASTNAME FROM EMPLOYEE\nWHERE  EMPLOYEEID NOT IN (SELECT MANAGERID FROM EMPLOYEE);', note: 'Add "WHERE MANAGERID IS NOT NULL" inside the subquery: 12 employees who manage nobody.' });
+flashcards('#cards', [
+  { f: 'Subquery', b: 'A SELECT in parentheses inside another statement.' },
+  { f: 'Scalar subquery', b: 'Returns one value (one row, one column); usable wherever a value is. More rows: ORA-01427.' },
+  { f: 'x > ALL (S)', b: 'x is greater than every value of S. TRUE if S is empty.' },
+  { f: 'x > ANY (S)', b: 'x is greater than at least one value of S. FALSE if S is empty.' },
+  { f: 'IN / NOT IN', b: 'IN = "= ANY"; NOT IN = "<> ALL".' },
+  { f: 'NOT IN with a NULL in the subquery', b: 'Never TRUE, so the query returns nothing.' },
+  { f: 'Max without aggregates', b: 'WHERE salary >= ALL (SELECT salary FROM Employee).' },
+]);
+quiz('#quiz', [
+  { q: 'Salaries 50, 55, 60, 75. Which ids satisfy salary > ANY (SELECT salary …)?', opts: ['5004 only', 'all except 5001', 'all', 'none'], a: 1, why: 'Every salary above the minimum 50 is greater than something.' },
+  { q: 'salary < ALL (SELECT salary FROM Employee) returns…', opts: ['5001', 'nothing', 'everyone', '5004'], a: 1, why: '50 is not < 50 (itself). <= ALL would give 5001.' },
+  { q: 'x > ALL (empty subquery) is…', opts: ['TRUE', 'FALSE', 'UNKNOWN', 'an error'], a: 0, why: 'Vacuously true.' },
+  { q: '5 NOT IN (1, 2, NULL) is…', opts: ['TRUE', 'FALSE', 'UNKNOWN'], a: 2, why: '5 <> NULL is UNKNOWN, so the AND is UNKNOWN.' },
+  { q: 'Which is equivalent to x IN (S)?', opts: ['x = ALL (S)', 'x = ANY (S)', 'x <> ANY (S)', 'x >= ALL (S)'], a: 1, why: 'Equal to at least one member.' },
+  { q: 'A scalar subquery returns two rows. Oracle…', opts: ['uses the first', 'returns NULL', 'raises ORA-01427', 'uses both'], a: 2, why: 'single-row subquery returns more than one row.' },
+]);
+ask('#try1', { q: 'Values {3, 7, 9}. Is 8 > ANY of them? Type TRUE or FALSE.', a: ['TRUE', 'true'], why: '8 > 3.' });
+ask('#try2', { q: 'Values {3, 7, NULL}. 10 > ALL? Type TRUE, FALSE or UNKNOWN.', a: ['UNKNOWN', 'unknown'], why: '10 > 3 and 10 > 7 are TRUE but 10 > NULL is UNKNOWN; min = UNKNOWN.' });
+sqlCheck('#c1', { setup: EMP11, task: '1. (Easy) Return the id of the employee(s) with the lowest salary, using a scalar subquery.', solution: 'SELECT id FROM Employee WHERE salary = (SELECT MIN(salary) FROM Employee);' });
+sqlCheck('#c2', { setup: EMP11, task: '2. The same, without any aggregate function.', solution: 'SELECT id FROM Employee WHERE salary <= ALL (SELECT salary FROM Employee);' });
+sqlCheck('#c3', { setup: PCDB, task: '3. Return the models of PCs that are more expensive than every laptop made by maker F.', solution: "SELECT model FROM PC WHERE price > ALL (SELECT price FROM Product, Laptop WHERE Product.model = Laptop.model AND maker = 'F');", hint: 'The subquery returns the prices of F\'s laptops (900 and 680).' });
+sqlCheck('#c4', { setup: PCDB, task: '4. Return the makers (each once) of PCs whose speed is at least the speed of some laptop of maker E.', solution: "SELECT DISTINCT maker FROM Product, PC WHERE Product.model = PC.model AND PC.speed >= ANY (SELECT speed FROM Product, Laptop WHERE Product.model = Laptop.model AND maker = 'E');" });
+sqlCheck('#c5', { setup: HR, task: '5. Return the last names of employees who work in the same department as Hunold (excluding Hunold).', solution: "SELECT LASTNAME FROM EMPLOYEE WHERE DEPARTMENTID = (SELECT DEPARTMENTID FROM EMPLOYEE WHERE LASTNAME = 'Hunold') AND LASTNAME <> 'Hunold';" });
+sqlCheck('#c6', { setup: HR, task: '6. (Exam style) Return the last names of employees who manage nobody (no one has them as MANAGERID). Beware of NULLs.', solution: 'SELECT LASTNAME FROM EMPLOYEE WHERE EMPLOYEEID NOT IN (SELECT MANAGERID FROM EMPLOYEE WHERE MANAGERID IS NOT NULL);' });
+</script>
+</body>
+</html>

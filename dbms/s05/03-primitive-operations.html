@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>INPUT, READ, WRITE, OUTPUT · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 05 (Sukarna) · Chapter 3 · Slides 14–17 · Book §17.1.4</div>
+<h1>The Primitive Operations: INPUT, READ, WRITE, OUTPUT</h1>
+<p class="lede">Every logging method is described in terms of four primitive operations that move data between disk, memory buffers and a transaction's local variables. This chapter defines them, traces the textbook's transaction “A := A*2; B := B*2” step by step, and answers the slide's two crash questions. The interactive animator lets you run and crash your own action sequences.</p>
+
+<h2>1. Three places where a value can live (slide 14)</h2>
+
+<p>When a transaction reads or writes a database element, three address spaces are involved (textbook §17.1.4):</p>
+<ol>
+  <li>The <strong>disk blocks</strong> that hold the database (non-volatile).</li>
+  <li>The <strong>memory buffers</strong> managed by the buffer manager (volatile).</li>
+  <li>The <strong>local address space</strong> of the transaction: its own variables, such as <code>t</code> (volatile).</li>
+</ol>
+<p>To read an element, the transaction first has it brought from disk into a buffer, then copies the buffer value into a local variable. To write, it computes a new value locally, copies it into the buffer, and <em>at some later time</em> the buffer is copied to disk. The slide names the two policies for “later”:</p>
+<dl class="def">
+  <dt>Immediate modification</dt><dd>The updated buffer is written to disk right away.</dd>
+  <dt>Deferred modification</dt><dd>Copying updated buffers to disk is delayed, to save disk I/Os (a buffer changed ten times is written once).</dd>
+</dl>
+<p>Deferring writes is good for speed and bad for safety: until the buffer reaches disk, a crash loses the change. The logging rules in the next chapters say exactly when a write may be delayed and when it must happen.</p>
+
+<h2>2. The four primitives (slide 15)</h2>
+
+<p>Let X be a database element (think of it as a disk block).</p>
+<dl class="def">
+  <dt>INPUT(X)</dt><dd>Copy the disk block containing X into a memory buffer.</dd>
+  <dt>READ(X, t)</dt><dd>Copy the value of X into the transaction's local variable t. If X is not in a memory buffer, INPUT(X) is executed first.</dd>
+  <dt>WRITE(X, t)</dt><dd>Copy the value of local variable t into X <em>in its memory buffer</em>. If X is not in a buffer, INPUT(X) is executed first. The disk is not touched.</dd>
+  <dt>OUTPUT(X)</dt><dd>Copy the buffer containing X to disk.</dd>
+</dl>
+<p><strong>Who issues them:</strong> READ and WRITE are issued by the transaction (through the transaction manager); INPUT and OUTPUT are normally issued by the buffer manager. (The log manager can also cause an OUTPUT, as later chapters show.) The textbook adds one assumption used everywhere in this chapter: <em>a database element is no larger than a single block</em>, so OUTPUT(X) writes X atomically.</p>
+
+<figure>
+<svg id="spaces" viewBox="0 0 640 170" width="640" role="img" aria-label="Disk, buffers and local variables with the four primitives"></svg>
+<figcaption><b>Figure 1.</b> INPUT and OUTPUT move blocks between disk and buffers. READ and WRITE move values between buffers and the transaction's variables.</figcaption>
+</figure>
+
+<h2>3. The transaction A := A*2; B := B*2 (slides 16–17)</h2>
+
+<p>The textbook's running example (Example 17.1). The database has two elements A and B with the consistency rule <strong>A = B</strong>. Transaction T doubles both:</p>
+<pre>A := A*2;
+B := B*2;</pre>
+<p>If T starts with A = B, it ends with A = B, so it is correct. In primitive steps, T is:</p>
+<pre>READ(A,t); t := t*2; WRITE(A,t); READ(B,t); t := t*2; WRITE(B,t);</pre>
+<p>The buffer manager adds INPUT(A) and INPUT(B) before the READs (because A and B are not yet in memory) and, eventually, OUTPUT(A) and OUTPUT(B) after T ends. With A = B = 8 initially, the slide's table (textbook Fig. 17.2) is:</p>
+
+<div class="tbl"><table>
+<tr><th>Action</th><th>t</th><th>Mem A</th><th>Mem B</th><th>Disk A</th><th>Disk B</th></tr>
+<tr><td><code>READ(A,t)</code></td><td class="num">8</td><td class="num">8</td><td></td><td class="num">8</td><td class="num">8</td></tr>
+<tr><td><code>t := t*2</code></td><td class="num">16</td><td class="num">8</td><td></td><td class="num">8</td><td class="num">8</td></tr>
+<tr><td><code>WRITE(A,t)</code></td><td class="num">16</td><td class="num">16</td><td></td><td class="num">8</td><td class="num">8</td></tr>
+<tr><td><code>READ(B,t)</code></td><td class="num">8</td><td class="num">16</td><td class="num">8</td><td class="num">8</td><td class="num">8</td></tr>
+<tr><td><code>t := t*2</code></td><td class="num">16</td><td class="num">16</td><td class="num">8</td><td class="num">8</td><td class="num">8</td></tr>
+<tr><td><code>WRITE(B,t)</code></td><td class="num">16</td><td class="num">16</td><td class="num">16</td><td class="num">8</td><td class="num">8</td></tr>
+<tr><td><code>OUTPUT(A)</code></td><td class="num">16</td><td class="num">16</td><td class="num">16</td><td class="num">16</td><td class="num">8</td></tr>
+<tr><td><code>OUTPUT(B)</code></td><td class="num">16</td><td class="num">16</td><td class="num">16</td><td class="num">16</td><td class="num">16</td></tr>
+</table></div>
+<p>Read the table column by column. <code>t := t*2</code> changes only t. WRITE changes only the memory copy. Only OUTPUT changes the disk, and the two OUTPUTs are separate actions, so there is a moment (between them) when the disk holds A = 16, B = 8.</p>
+
+<h3>Try it: the transaction execution animator</h3>
+<p>The tool below runs any sequence of primitive actions for one transaction T. It shows the local variables, the memory buffers and the disk at each step, and builds the table row by row. Edit the actions, the initial values, or set “Crash after step” to see what survives a crash. (The logging methods in the menu are explained in the next chapters; for now use “No log”.)</p>
+<figure class="wide">
+<span class="anim-tag">Interactive animation</span>
+<div id="xt1"></div>
+</figure>
+
+<div class="q">
+<h4>Slide 17 questions (worked answers)</h4>
+<p><strong>What happens if the system crashes before OUTPUT(A)?</strong> Every change so far exists only in memory (t, Mem A, Mem B). The crash wipes memory. The disk still holds A = 8, B = 8, exactly the state before T began. <strong>The database is consistent, as if T never executed.</strong> The user's transaction is lost, but it can be run again from scratch.</p>
+<p><strong>What happens if the system crashes after OUTPUT(A) but before OUTPUT(B)?</strong> The disk holds A = 16 (written) and B = 8 (not yet written). Memory, with the new B = 16, is gone. A ≠ B, so <strong>the database is in an inconsistent state.</strong> T executed partially, which the converse of the correctness principle says is not allowed. Nothing on disk tells us what T had done, so the system cannot repair it. A log is needed: with it, recovery can either reset A to 8 (undo) or set B to 16 (redo). Set “Crash after step” to 6 and then to 7 in the animator to see both outcomes.</p>
+</div>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+<div id="try2"></div>
+
+<div class="key"><p><strong>Summary:</strong> INPUT and OUTPUT move blocks between disk and memory buffers (issued by the buffer manager); READ and WRITE move values between buffers and the transaction's local variables (issued by the transaction). WRITE never touches the disk. A crash before any OUTPUT leaves the old consistent state; a crash between two OUTPUTs can leave a mix of old and new values, which only a log can repair.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="lecture.js"></script>
+<script>
+(() => {
+  const b = (x, t, sub, cls) => `<rect x="${x}" y="40" width="150" height="70" rx="6" class="${cls}"/><text x="${x + 75}" y="70" text-anchor="middle" class="big">${t}</text><text x="${x + 75}" y="90" text-anchor="middle" class="lbl">${sub}</text>`;
+  let s = b(10, 'Disk', 'non-volatile', 'cell') + b(245, 'Memory buffers', 'volatile', 'cell-hl') + b(480, 'Local variables', 'of T (volatile)', 'cell-new');
+  s += `<path d="M160 60 H241" class="s-acc" marker-end="url(#m-acc)"/><text x="200" y="52" text-anchor="middle" class="lbl acc" style="font-weight:600">INPUT</text>`;
+  s += `<path d="M241 92 H164" class="s-red" marker-end="url(#m-red)"/><text x="200" y="110" text-anchor="middle" class="lbl red" style="font-weight:600">OUTPUT</text>`;
+  s += `<path d="M395 60 H476" class="s-acc" marker-end="url(#m-acc)"/><text x="435" y="52" text-anchor="middle" class="lbl acc" style="font-weight:600">READ</text>`;
+  s += `<path d="M476 92 H399" class="s-red" marker-end="url(#m-red)"/><text x="435" y="110" text-anchor="middle" class="lbl red" style="font-weight:600">WRITE</text>`;
+  s += `<text x="200" y="145" text-anchor="middle" class="lbl">buffer manager</text><text x="435" y="145" text-anchor="middle" class="lbl">transaction</text>`;
+  document.querySelector('#spaces').innerHTML = s;
+
+  xactTool('#xt1', { mode: 'none' });
+
+  flashcards('#cards', [
+    { f: 'INPUT(X)', b: 'Copy the disk block holding X into a memory buffer.' },
+    { f: 'READ(X,t)', b: 'Copy X into local variable t (INPUT(X) first if X is not in memory).' },
+    { f: 'WRITE(X,t)', b: 'Copy t into X\'s memory buffer (INPUT(X) first if needed). Disk unchanged.' },
+    { f: 'OUTPUT(X)', b: 'Copy X\'s buffer to disk.' },
+    { f: 'Immediate modification', b: 'Updated buffers are written to disk at once.' },
+    { f: 'Deferred modification', b: 'Writing updated buffers to disk is delayed to save I/Os.' },
+  ]);
+  quiz('#quiz', [
+    { q: 'Which primitive changes the disk?', opts: ['READ', 'WRITE', 'OUTPUT', 'INPUT'], a: 2, why: 'Only OUTPUT copies a buffer to disk. WRITE changes the buffer only.' },
+    { q: 'Who usually issues INPUT and OUTPUT?', opts: ['The transaction', 'The buffer manager', 'The query optimizer', 'The user'], a: 1, why: 'READ/WRITE come from the transaction; INPUT/OUTPUT from the buffer manager.' },
+    { q: 'READ(A,t) is executed and A is not in memory. What happens?', opts: ['Error', 'INPUT(A) runs first, then the value is copied into t', 'OUTPUT(A) runs first', 't gets 0'], a: 1, why: 'READ triggers an INPUT when the block is not buffered.' },
+    { q: 'A crash happens right after WRITE(B,t) in Fig. 17.2. Disk holds…', opts: ['A=16, B=16', 'A=16, B=8', 'A=8, B=8', 'A=8, B=16'], a: 2, why: 'No OUTPUT has happened yet, so the disk still has the original values.' },
+    { q: 'Constraint 0 < A < B. Which transaction can break it? (textbook Exercise 17.1.1)', opts: ['A := A+B; B := A+B', 'B := A+B; A := A+B', 'A := B+1; B := A+1', 'None'], a: 1, why: 'After B := A+B and A := A+B, A = 2A+B > B = A+B, so A < B fails. The other two keep 0 < A < B.' },
+  ]);
+  ask('#try1', { q: 'Fig. 17.2: how many rows of the table change Disk A or Disk B?', a: 2, why: 'Only OUTPUT(A) and OUTPUT(B) change the disk.' });
+  ask('#try2', { q: 'Same transaction, but A = B = 5 initially. After WRITE(B,t), what is Mem B?', a: 10, hint: 'WRITE copies t into the buffer; t = B*2.', why: 'B is doubled in memory to 10; disk B stays 5 until OUTPUT(B).' });
+})();
+</script>
+</body>
+</html>

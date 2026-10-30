@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Many Users, Crashes and Security · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 01 (Ishrak) · Chapter 3 · Slides 18–24 · Book §1.1</div>
+<h1>Many Users, Crashes and Security</h1>
+<p class="lede">Slides 18–23 ask three more questions: what if two users update the same data, what if the system crashes halfway, and who may access the data. This chapter animates the slides' seat-booking race and money-transfer crash, shows how a DBMS prevents both, and answers the exam questions on the requirements and key properties of a DBMS.</p>
+
+<h2>1. Two users, one seat (slide 18)</h2>
+
+<p>The scenario: CSE 215 has only <b>one seat left</b>, stored in a shared record <code>available_seats = 1</code>. Alice and Bob try to enroll at the same moment. Each one's program does the obvious thing: read the number of seats, check it is positive, enroll, and write back the number minus one.</p>
+
+<p>Both read 1, both see a free seat, both enroll, and both write 0. The final state says <code>available_seats = 0</code> with <em>two</em> students enrolled in a course that had one seat. One of the two decrements was lost, because Bob's write overwrote Alice's without ever seeing it. The slide calls this a <b class="term">race condition</b>: both users act on an outdated value.</p>
+
+<dl class="def">
+<dt>Concurrent access</dt><dd>Several users or programs reading and writing the same data during overlapping periods of time.</dd>
+<dt>Race condition</dt><dd>A bug in which the result depends on the exact order in which concurrent actions happen to interleave.</dd>
+<dt>Lost update</dt><dd>The specific race on slide 18: two users read the same value, both compute a new value from it, and the second write silently erases the first.</dd>
+</dl>
+
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="race"></div>
+<figcaption><b>Figure 1.</b> Slide 18 step by step (steps 1–5), then the same requests under a DBMS that locks the record (steps 6–8).</figcaption>
+</figure>
+
+<h2>2. Who coordinates the users? (slide 19)</h2>
+
+<p><b>Files</b>: <span class="mid">manual coordination</span>, possible with custom locks. Your program must detect conflicts, lock files and protect every update, and every other program touching the file must follow the same rules. One program that forgets breaks everyone.</p>
+<p><b>Spreadsheets</b>: <span class="mid">some support</span>. Cloud tools such as Google Sheets coordinate edits to individual cells, which is useful for collaborative editing, but a multi-step operation (check seats, add the enrollment, decrement seats) cannot be made one indivisible unit.</p>
+<p><b>DBMS</b>: <span class="good">built in</span>. Every unit of work is a <b class="term">transaction</b>, and the DBMS's <b class="term">concurrency control</b> (using <b class="term">locking</b> or <b class="term">MVCC</b>, multiversion concurrency control) makes concurrent transactions behave as if they ran one after another. The slide's caveat: <em>contention</em> (many users wanting the same row) still requires good design, because they have to wait for each other.</p>
+
+<dl class="def">
+<dt>Transaction</dt><dd>A sequence of reads and writes that the DBMS treats as one logical unit of work, such as “enroll Alice: check seats, insert enrollment, decrement seats”. It ends with <b>COMMIT</b> (make it permanent) or <b>ROLLBACK</b> (undo it all).</dd>
+<dt>Lock</dt><dd>A mark a transaction places on a data item so that other transactions must wait before writing (or reading) it.</dd>
+<dt>MVCC</dt><dd>Multiversion concurrency control: writers create new versions of a row, so readers can keep reading the old committed version instead of waiting. Oracle uses MVCC for reads and row locks for writes.</dd>
+</dl>
+
+<p>In SQL the race disappears if the check and the decrement happen in one statement. A single <code>UPDATE</code> is atomic and the DBMS locks the row while it runs, so the second user's statement sees the first one's result:</p>
+<div id="seats"></div>
+<p>Run it: the first <code>UPDATE</code> reports 1 row affected; the second reports 0 rows, because <code>available_seats &gt; 0</code> is no longer true. The application treats “0 rows” as “course full”. How the DBMS's scheduler does this in general is the subject of Sukarna sir's Lec 02–03 (<a href="../s02/01-why-concurrency-control.html">concurrency control</a>).</p>
+
+<h2>3. What if the system crashes halfway? (slide 20)</h2>
+
+<p>The scenario: transfer $100 from Account A ($500) to Account B ($300). The transfer is two steps: <em>Step 1</em>, debit A (A becomes $400); <em>Step 2</em>, credit B (B becomes $400). The power fails between the two steps. A has lost $100 and B never received it. Before the transfer the total was $800; after the crash it is $700. <strong>The database is now inconsistent</strong>: it states something that was never true in the real world.</p>
+
+<dl class="def">
+<dt>Atomicity</dt><dd>A transaction happens completely or not at all. A half-done transfer must never be visible.</dd>
+<dt>Durability</dt><dd>Once a transaction has committed, its changes survive any later crash.</dd>
+<dt>Log (transaction log)</dt><dd>A file, written before the data itself, that records each change (“T changed A from 500 to 400”) and each commit. After a crash the DBMS reads the log to repair the database.</dd>
+<dt>Rollback / undo</dt><dd>Restoring the old values written by a transaction that did not commit.</dd>
+<dt>Redo</dt><dd>Re-applying the new values of a transaction that did commit, in case they had not reached the disk.</dd>
+</dl>
+
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="crash"></div>
+<figcaption><b>Figure 2.</b> Slide 20's crash, and how log-based recovery returns the database to a consistent state.</figcaption>
+</figure>
+
+<h2>4. Crash recovery: files, spreadsheets, DBMS (slide 21)</h2>
+
+<p><b>Files</b>: <span class="mid">application-defined</span>. Backups and logs are manual. The programmer must design, implement and test rollback or recovery logic, and recovery code that runs only after crashes is the code most likely to be wrong.</p>
+<p><b>Spreadsheets</b>: <span class="mid">document recovery</span>. Autosave and version history can restore a whole document to an earlier version, but they do not understand a multi-step business transaction: restoring yesterday's version also throws away every correct change made since.</p>
+<p><b>DBMS</b>: <span class="good">transactional</span>. Rollback, redo and durability are built in. The transaction log lets the DBMS restore the database to a consistent state after a failure: incomplete transactions are undone and committed ones are kept. Sukarna sir's Lec 05–06 (<a href="../s05/01-failure-modes.html">system failures</a>) teach the exact algorithms (undo logging, redo logging, undo/redo logging).</p>
+
+<h2>5. Who should be allowed to access the data? (slide 22)</h2>
+
+<p><b>Files</b>: <span class="mid">coarse-grained</span>. Operating-system permissions apply to a whole file or folder. If a file holds every student's record, a user who may read one record may read all of them, including fields such as CGPA or phone number that they should not see.</p>
+<p><b>Spreadsheets</b>: <span class="mid">sharing-based</span>. Share links and protected ranges are convenient for collaboration, but controls vary between tools and a link shared with “anyone” is a common misconfiguration.</p>
+<p><b>DBMS</b>: <span class="good">fine-grained</span>. The DBMS knows <b class="term">users</b>, <b class="term">roles</b> (named bundles of privileges) and <b class="term">privileges</b> (permission to do one kind of operation on one object). It can restrict access to particular tables, particular columns, or (through views) particular rows, and it can keep <b class="term">audit</b> records of who did what. In Oracle:</p>
+<pre>CREATE ROLE advisor;
+GRANT SELECT ON students TO advisor;                -- read whole table
+GRANT UPDATE (email, address) ON students TO portal; -- only two columns
+CREATE VIEW my_dept_students AS                      -- only some rows
+  SELECT sid, name, email FROM students WHERE dept = 'CSE';
+GRANT SELECT ON my_dept_students TO cse_office;
+GRANT advisor TO ishrak;                             -- give a user the role
+REVOKE SELECT ON students FROM advisor;</pre>
+<p>Roles exist so that privileges are managed per job, not per person: when a new advisor joins, one <code>GRANT advisor TO …</code> gives them everything the job needs. The SQL lectures cover GRANT and views in detail.</p>
+
+<h2>6. Operational reliability and control (slides 23–24)</h2>
+
+<div class="tbl"><table>
+<tr><th>Question</th><th>Files</th><th>Spreadsheets</th><th>DBMS</th></tr>
+<tr><td>Concurrent access</td><td class="mid">Custom code</td><td class="mid">Some support</td><td class="good">Built in</td></tr>
+<tr><td>Crash recovery</td><td class="mid">Manual</td><td class="mid">Document-level</td><td class="good">Transactional</td></tr>
+<tr><td>Security</td><td class="mid">File-level</td><td class="mid">Sharing-based</td><td class="good">Fine-grained</td></tr>
+</table></div>
+<p>Slide 23's message: <strong>a DBMS does more than store data: it coordinates users and protects correctness.</strong> Combined with slide 17 (large data, querying, structure changes), these six questions are the full case for a DBMS. The four transaction guarantees behind slides 18–21 are usually summarized as <b class="term">ACID</b>:</p>
+<dl class="def">
+<dt>A: Atomicity</dt><dd>All of a transaction's steps happen, or none do (slide 20).</dd>
+<dt>C: Consistency</dt><dd>A transaction that starts from a correct database leaves it correct (total money unchanged; seats never negative).</dd>
+<dt>I: Isolation</dt><dd>Concurrent transactions do not see each other's half-finished work; the result equals some one-at-a-time order (slide 18).</dd>
+<dt>D: Durability</dt><dd>Committed changes survive crashes (slide 21).</dd>
+</dl>
+<p>Slide 24 acknowledges Dr. A.K.M. Ashikur Rahman, Professor, Department of CSE, BUET.</p>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+<div id="try2"></div>
+
+<h3>Exam questions</h3>
+<div class="exam">
+  <div class="exam-src">DB QB · Jan 20 9 · 10 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-2 | 2018–19 · 10 marks</div>
+  <div class="exam-q"><p>What are the requirements of an ideal DBMS? Define entity and attribute in the context of database with suitable example(s).</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+<p><strong>Requirements of an ideal DBMS.</strong> The textbook (Garcia-Molina, Ullman, Widom, §1.1) lists five things a DBMS is expected to do; the lecture's six questions add the rest.</p>
+<ol>
+<li><strong>Data definition.</strong> Let users create databases and specify their schema (logical structure) with a data-definition language, e.g. <code>CREATE TABLE students (…)</code>.</li>
+<li><strong>Querying and modification.</strong> Let users ask questions and change data with a high-level query / data-manipulation language (SQL), without writing access code.</li>
+<li><strong>Large, persistent storage with efficient access.</strong> Store very large amounts of data (terabytes) for long periods, and access it efficiently with indexes and good storage organization (slide 14).</li>
+<li><strong>Durability and recovery.</strong> Recover the database to a correct state after failures, errors or misuse (slides 20–21).</li>
+<li><strong>Concurrent access with isolation and atomicity.</strong> Let many users work at once without unexpected interactions (isolation) and without actions being done partially (atomicity) (slides 18–19).</li>
+<li><strong>Security.</strong> Fine-grained authorization of users and roles on tables, columns and rows (slide 22).</li>
+<li><strong>Integrity and controlled redundancy.</strong> Enforce constraints (keys, foreign keys, checks) and store each fact once so that data stays consistent.</li>
+<li><strong>Data independence.</strong> Let structure and storage change (ALTER TABLE, new indexes) without rewriting existing applications (slide 16).</li>
+</ol>
+<p><strong>Entity.</strong> An entity is a real-world thing or concept, distinguishable from other things, about which the database stores facts. Entities of the same kind form an entity set. Example: each student, such as Jalil (ID 2405190), is an entity of the entity set Students; each course, such as CSE 215, is an entity of Courses.</p>
+<p><strong>Attribute.</strong> An attribute is a named property that describes an entity; each entity has a value for it, drawn from a set of allowed values (its domain). Example: Students has attributes sid, name and email; for Jalil, sid = 2405190, name = 'Jalil', email = 'jalil@university.edu'. In a relational table, an entity set becomes a table, each entity a row, and each attribute a column.</p>
+<div class="tbl"><table><tr><th colspan="3">Students (entity set) — columns are attributes, rows are entities</th></tr>
+<tr><th>sid</th><th>name</th><th>email</th></tr><tr><td>2405190</td><td>Jalil</td><td>jalil@university.edu</td></tr><tr><td>2405191</td><td>Karim</td><td>karim@university.edu</td></tr></table></div>
+<p>The bank's answer is correct. It also shows special attribute kinds (key, multivalued, derived); those belong to ER modeling and are not needed for this definition.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2011–12 · 8 marks</div>
+  <div class="exam-q"><p>What are the key properties of a DBMS?</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+<ol>
+<li><strong>Self-describing data and data abstraction.</strong> The DBMS stores the schema (metadata) in a data dictionary, and users see a logical view (tables) instead of files and bytes.</li>
+<li><strong>Data independence.</strong> Physical storage can change without changing the logical schema (physical independence), and the logical schema can grow without changing existing programs (logical independence).</li>
+<li><strong>Controlled redundancy and integrity.</strong> Each fact is stored once in a shared database, and declared constraints (PRIMARY KEY, FOREIGN KEY, CHECK, NOT NULL) are enforced on every change.</li>
+<li><strong>Declarative query language.</strong> SQL lets users state what they want; the optimizer chooses how to compute it.</li>
+<li><strong>Transactions with ACID guarantees.</strong> Atomicity (all or nothing), Consistency (correct state to correct state), Isolation (concurrent transactions do not interfere, solving the lost update of the seat example), Durability (committed work survives crashes).</li>
+<li><strong>Concurrency control.</strong> Locking or MVCC lets many users read and write at once.</li>
+<li><strong>Backup and recovery.</strong> A transaction log lets the DBMS undo incomplete and redo committed transactions after a failure.</li>
+<li><strong>Security.</strong> Users, roles and privileges at table, column and row level, with auditing.</li>
+<li><strong>Efficient storage of large data.</strong> Indexes, buffering and storage management for data much larger than memory.</li>
+</ol>
+<p>The bank's answer lists the same properties and is correct.</p>
+  </div></details>
+</div>
+
+<div class="key"><p><strong>Summary:</strong> when two users read the same value and both write back, one update is lost (slide 18); a DBMS prevents this with transactions and concurrency control (locking or MVCC). When a crash interrupts a multi-step change, the database is left inconsistent (slide 20); a DBMS's log lets it undo uncommitted work and redo committed work. Files offer only manual coordination, manual recovery and whole-file permissions; a DBMS offers built-in concurrency control, transactional recovery and fine-grained users, roles and privileges. These are the ACID properties: atomicity, consistency, isolation, durability.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/sqlplay.js"></script>
+<script src="lecture.js"></script>
+<script>
+// Figure 1: the race
+(() => {
+  const F = o => {
+    let s = '';
+    s += box(20, 40, 170, 66, 'Alice', [o.a || 'not started'], o.ac || 'cell');
+    s += box(590, 40, 170, 66, 'Bob', [o.b || 'not started'], o.bc || 'cell');
+    s += `<rect x="270" y="30" width="240" height="86" rx="6" class="${o.sc || 'cell-hl'}"/>` + T(390, 54, 'Shared record', { w: 1, size: 13 }) +
+      T(390, 82, `available_seats = ${o.seats}`, { size: 14, w: 1 }) + (o.lock ? T(390, 104, o.lock, { cls: 'lbl red' }) : '');
+    (o.arrows || []).forEach(([x1, y1, x2, y2, lab, c]) => { s += arrow(x1, y1, x2, y2, { label: lab, cls: c === 'r' ? 's-red' : c === 'g' ? 's-grn' : 's-acc', m: c === 'r' ? 'm-red' : c === 'g' ? 'm-grn' : 'm-acc', lcls: 'lbl' }); });
+    s += T(390, 150, 'Enrolled in CSE 215:', { cls: 'lbl' });
+    const en = o.en || [];
+    en.forEach((n, i) => { s += `<rect x="${330 + i * 66}" y="160" width="58" height="26" rx="4" class="${o.bad && i === 1 ? 'cell-del' : 'cell-new'}"/>` + T(359 + i * 66, 178, n); });
+    if (!en.length) s += T(390, 178, '(nobody yet)', { cls: 'lbl' });
+    if (o.msg) s += T(390, 214, o.msg, { cls: 'lbl ' + (o.mc || ''), size: 12 });
+    return svgWrap(780, 228, s, 'Two users updating one seat count');
+  };
+  stepper('#race', [
+    { html: F({ seats: 1 }), cap: 'One seat is left. Alice and Bob each run the program “read seats; if seats &gt; 0 then enroll and write seats − 1”.' },
+    { html: F({ seats: 1, a: 'reads: 1 seat', ac: 'cell-hl', arrows: [[268, 70, 194, 70, 'read', 'a']] }), cap: 'Alice reads <code>available_seats</code> and gets 1. Her program decides she can enroll.' },
+    { html: F({ seats: 1, a: 'reads: 1 seat', b: 'reads: 1 seat', bc: 'cell-hl', arrows: [[512, 70, 586, 70, 'read', 'a']] }), cap: 'Before Alice writes anything, Bob reads the same record and also gets 1. Both programs now hold the value 1, and Bob\'s is about to become outdated.' },
+    { html: F({ seats: 0, a: 'writes 0', b: 'reads: 1 seat', ac: 'cell-hl', en: ['Alice'], arrows: [[194, 90, 268, 90, 'write 0', 'r']] }), cap: 'Alice enrolls and writes 1 − 1 = 0. Correct so far.' },
+    { html: F({ seats: 0, a: 'writes 0', b: 'writes 0', bc: 'cell-hl', sc: 'cell-del', en: ['Alice', 'Bob'], bad: 1, arrows: [[586, 90, 512, 90, 'write 0', 'r']], msg: 'Incorrect final state: two enrolled for one seat, seats = 0', mc: 'red' }), cap: 'Bob enrolls too, computing 1 − 1 = 0 from his <b>stale</b> value, and overwrites Alice\'s 0 with his 0. Final state: <b>two students enrolled, available_seats = 0</b>. The correct state would have been one enrolled and Bob refused. Alice\'s decrement was lost.' },
+    { html: F({ seats: 1, a: 'locks, reads: 1', ac: 'cell-hl', lock: 'locked by Alice', arrows: [[268, 70, 194, 70, 'read', 'a']], msg: 'With a DBMS: the transaction locks the row before reading it', mc: 'acc' }), cap: 'Now the same requests through a DBMS. Alice\'s transaction locks the seat row (in Oracle: <code>SELECT … FOR UPDATE</code> or a single <code>UPDATE</code>) and reads 1.' },
+    { html: F({ seats: 0, a: 'writes 0, COMMIT', b: 'waits for the lock', ac: 'cell-hl', bc: 'cell-plain', lock: 'locked by Alice', en: ['Alice'], arrows: [[194, 90, 268, 90, 'write 0', 'r']], msg: 'Bob\'s transaction must wait; it cannot read the old value', mc: 'acc' }), cap: 'Bob\'s transaction asks for the same row and has to <b>wait</b>. Alice writes 0, enrolls, and commits, which releases the lock.' },
+    { html: F({ seats: 0, a: 'done', b: 'reads 0: course full', bc: 'cell-hl', en: ['Alice'], arrows: [[512, 70, 586, 70, 'read', 'g']], msg: 'Correct final state: one enrolled, seats = 0, Bob refused', mc: 'grn' }), cap: 'Only now does Bob read, and he gets the <b>current</b> value 0, so his program refuses the enrollment. The result is the same as if Alice and Bob had run one after the other. That property is called <b>isolation</b>.' },
+  ], { interval: 2800 });
+})();
+sqlPlay('#seats', {
+  setup: `CREATE TABLE course_seats (code VARCHAR2(10) PRIMARY KEY, available_seats NUMBER CHECK (available_seats >= 0));
+INSERT INTO course_seats VALUES ('CSE 215', 1);`,
+  query: `-- Alice's request
+UPDATE course_seats SET available_seats = available_seats - 1
+ WHERE code = 'CSE 215' AND available_seats > 0;
+
+-- Bob's request (run it again, or press Run a second time)
+UPDATE course_seats SET available_seats = available_seats - 1
+ WHERE code = 'CSE 215' AND available_seats > 0;
+
+SELECT * FROM course_seats;`,
+  note: 'Run the two UPDATEs one at a time to see “1 row affected” and then “0 rows”. The CHECK constraint is a second safety net: the DBMS rejects any change that would make the count negative.',
+});
+// Figure 2: crash and recovery
+(() => {
+  const esc = t => t.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const F = o => {
+    let s = '';
+    const acc = (x, n, v, cls) => box(x, 40, 140, 60, `Account ${n}`, [`$${v}`], cls);
+    s += acc(20, 'A', o.A, o.ac || 'cell') + acc(180, 'B', o.B, o.bc || 'cell');
+    s += T(170, 130, `total = $${o.A + o.B}`, { w: 1, size: 13, cls: o.A + o.B === 800 ? 'grn' : 'red' });
+    s += T(170, 150, o.A + o.B === 800 ? 'consistent' : 'inconsistent: $100 vanished', { cls: 'lbl ' + (o.A + o.B === 800 ? 'grn' : 'red') });
+    s += `<rect x="370" y="20" width="390" height="${24 + 22 * 5}" rx="6" class="cell-plain"/>` + T(380, 38, 'LOG (on disk, written before the data)', { a: 'start', cls: 'lbl' });
+    (o.log || []).forEach((l, i) => { s += T(384, 62 + i * 22, esc(l), { a: 'start', size: 12, cls: /CRASH/.test(l) ? 'red' : /commit/.test(l) ? 'grn' : '' }); });
+    if (o.msg) s += T(390, 186, esc(o.msg), { cls: 'lbl ' + (o.mc || ''), size: 12 });
+    if (o.boom) s += `<circle cx="330" cy="70" r="22" class="cell-del"/>` + T(330, 75, 'CRASH', { size: 10, w: 1, cls: 'red' });
+    return svgWrap(780, 200, s, 'Money transfer and crash recovery');
+  };
+  stepper('#crash', [
+    { html: F({ A: 500, B: 300 }), cap: 'Before: A has $500, B has $300, total $800. Transaction T will move $100 from A to B.' },
+    { html: F({ A: 400, B: 300, ac: 'cell-hl', log: ['<T start>', '<T, A, old 500, new 400>'] }), cap: 'Step 1: debit A. The DBMS first appends a log record saying “T changed A from 500 to 400”, then changes A to $400.' },
+    { html: F({ A: 400, B: 300, ac: 'cell-del', boom: 1, log: ['<T start>', '<T, A, old 500, new 400>', '— CRASH —'], msg: 'Step 2 (credit B) never ran', mc: 'red' }), cap: 'The power fails before Step 2. On disk, A = $400 and B = $300: <b>$100 was removed from A but never added to B</b>. A file-based program would restart with this broken state.' },
+    { html: F({ A: 500, B: 300, ac: 'cell-new', log: ['<T start>', '<T, A, old 500, new 400>', '— CRASH —', '<T abort>   (undo: A := 500)'], msg: 'Recovery: T has no <T commit>, so it is undone', mc: 'grn' }), cap: 'On restart the DBMS reads the log. T started but never committed, so atomicity says it must have no effect. The log holds A\'s old value, so the DBMS <b>undoes</b> it: A = $500. The database is consistent again ($800); the transfer can simply be retried.' },
+    { html: F({ A: 400, B: 400, ac: 'cell-new', bc: 'cell-new', log: ['<T start>', '<T, A, old 500, new 400>', '<T, B, old 300, new 400>', '<T commit>', '— CRASH — (redo T)'], msg: 'Had T committed, recovery would redo it instead', mc: 'grn' }), cap: 'The other case: if the crash had come <em>after</em> <code>&lt;T commit&gt;</code> was logged, the DBMS would <b>redo</b> T from the log\'s new values, so both changes survive even if they had not reached the data files. That is <b>durability</b>.' },
+  ], { interval: 3000 });
+})();
+flashcards('#cards', [
+  { f: 'Race condition', b: 'The result depends on how concurrent actions interleave; on slide 18 both users act on an outdated value.' },
+  { f: 'Lost update', b: 'Two users read the same value and both write back; the second write erases the first.' },
+  { f: 'Transaction', b: 'A unit of work the DBMS executes as a whole: it commits (permanent) or rolls back (no effect).' },
+  { f: 'Atomicity', b: 'All steps of a transaction happen, or none do.' },
+  { f: 'Isolation', b: 'Concurrent transactions behave as if run one at a time.' },
+  { f: 'Durability', b: 'Committed changes survive crashes.' },
+  { f: 'Transaction log', b: 'Records each change (old and new value) and each commit, written before the data; used to undo and redo after a crash.' },
+  { f: 'Role', b: 'A named bundle of privileges given to users, e.g. GRANT advisor TO ishrak.' },
+  { f: 'MVCC', b: 'Multiversion concurrency control: readers see an older committed version instead of waiting for writers.' },
+]);
+quiz('#quiz', [
+  { q: 'In slide 18, why do both Alice and Bob get enrolled?', opts: ['The DBMS crashed', 'Both read available_seats = 1 before either wrote', 'Bob had higher priority', 'The seat count was wrong from the start'], a: 1,
+    why: 'Both acted on the same, soon outdated, value. Bob\'s write overwrote Alice\'s: a lost update.' },
+  { q: 'After the slide-20 crash, what does log-based recovery do to the transfer?', opts: ['Completes Step 2 automatically', 'Undoes Step 1, because T never committed', 'Leaves A at $400', 'Deletes the log'], a: 1,
+    why: 'Without a commit record, atomicity requires the transaction to have no effect, so A is restored to $500.' },
+  { q: 'Which ACID property does slide 20 illustrate?', opts: ['Isolation', 'Atomicity', 'Consistency only', 'Security'], a: 1,
+    why: 'A half-done transfer violates all-or-nothing.' },
+  { q: 'Why is version history in a spreadsheet not enough for slide 20\'s problem?', opts: ['It is too slow', 'It restores a whole document, not one multi-step business transaction', 'It only works offline', 'It cannot store numbers'], a: 1,
+    why: 'Rolling the document back also discards every correct change made since that version.' },
+  { q: 'A file holding all students is readable by an advisor. Which DBMS feature lets the advisor see only name and email?', opts: ['Column-level privileges or a view', 'A bigger disk', 'An index', 'ALTER TABLE'], a: 0,
+    why: 'A DBMS can grant privileges per column, or grant access to a view that exposes only some columns and rows.' },
+  { q: 'Slide 19\'s caveat for a DBMS is that…', opts: ['it cannot handle two users', 'contention still requires good design', 'locks are manual', 'MVCC loses updates'], a: 1,
+    why: 'When many transactions want the same row they must wait for each other, so hot spots should be designed away.' },
+]);
+ask('#try1', { q: 'Slide 20: what is the total money (A + B) on disk right after the crash, in dollars?', a: 700, why: '$400 + $300 = $700, $100 less than before.' });
+ask('#try2', { q: 'Three students all read available_seats = 1 and each writes back 0 as in slide 18. How many end up enrolled?', a: 3, why: 'Each one saw a free seat, so all three enroll, and the final value is still 0.' });
+</script>
+</body>
+</html>

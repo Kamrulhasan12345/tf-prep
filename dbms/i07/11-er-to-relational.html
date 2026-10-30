@@ -1,0 +1,305 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>From ER Diagram to Tables · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 07 (Ishrak) · Chapter 11 · Beyond the slides (exam topic)</div>
+<h1>From ER Diagram to Tables, Rule by Rule</h1>
+<p class="lede">Almost every ER exam question ends with "convert the diagram into a relational schema". The conversion is mechanical: eleven rules, the first nine animated here on one university diagram, with the result as runnable Oracle CREATE TABLE statements. Then the figure-based exam questions, all worked.</p>
+
+<p>The slides stop at the diagram. Converting it to tables is taught in the textbook (Garcia-Molina et al. §4.5–4.6; Silberschatz §6.7; Elmasri–Navathe ch. 9) and asked in nearly every paper. The notation for results: <span class="mono">Table(<u>pk</u>, column, <i>fk</i>)</span>, with each foreign key's target listed under it.</p>
+
+<h2>1. The rules</h2>
+<div class="tbl"><table>
+<tr><th>#</th><th>ER element</th><th>Becomes</th></tr>
+<tr><td>1</td><td>Strong entity set</td><td>A table; simple attributes are columns; its key is the primary key.</td></tr>
+<tr><td>2</td><td>Composite attribute</td><td>Only its components become columns (flattened); the composite name disappears.</td></tr>
+<tr><td>3</td><td>Multivalued attribute</td><td>A new table (owner key, value); primary key = all columns; owner key is a foreign key.</td></tr>
+<tr><td>4</td><td>Derived attribute</td><td>Not stored; computed by a query or view.</td></tr>
+<tr><td>5</td><td>Weak entity set</td><td>A table with the owner's key added; primary key = owner key + partial key; no table for the identifying relationship.</td></tr>
+<tr><td>6</td><td>Many-to-one (1:N) relationship</td><td>No new table: put the key of the "one" side into the "many" side's table as a foreign key, with the relationship's attributes. NOT NULL if participation of the many side is total.</td></tr>
+<tr><td>7</td><td>One-to-one relationship</td><td>A foreign key on either side (prefer the side with total participation, NOT NULL), declared UNIQUE.</td></tr>
+<tr><td>8</td><td>Many-to-many relationship</td><td>A new table with both keys (each a foreign key) and the relationship's attributes; primary key = both keys.</td></tr>
+<tr><td>9</td><td>Recursive relationship</td><td>As rule 6 or 8, with the key columns renamed by role.</td></tr>
+<tr><td>10</td><td>Multi-way relationship</td><td>A new table with the keys of all participants and its attributes; primary key = keys of the participants without an arrow.</td></tr>
+<tr><td>11</td><td>isA hierarchy</td><td>Three strategies (E/R, object-oriented, nulls): Chapter 12.</td></tr>
+</table></div>
+<p>Rule 6 is an optimisation: the textbook's basic rule turns <em>every</em> relationship into a table (keys of both sides plus attributes) and then merges a many-to-one relationship's table into the "many" entity's table, because both have the same key. The merged result is what exams expect when they say "minimum" or "fewest" relations. When the many side's participation is partial and most entities have no partner, keeping a separate table avoids many NULLs; both answers are correct if stated.</p>
+
+<h2>2. All rules on one diagram</h2>
+<p>The diagram below has one of almost everything: strong entity sets, a composite, a multivalued and a derived attribute, a weak entity set, a many-to-one, a one-to-one, a many-to-many and a recursive relationship. Step through it: each frame highlights one element and shows the tables so far, with the newest table or column in green.</p>
+<figure class="wide"><span class="anim-tag">Animation</span><div id="conv"></div></figure>
+<p>The final schema, in textbook notation:</p>
+<div id="final" class="mono" style="font-size:.9rem;line-height:1.8"></div>
+<p>And as Oracle DDL. Run it: it creates the seven tables with some sample rows, then lists every student's enrolled sections with the course title and department name, a join that follows four foreign keys.</p>
+<div id="ddl"></div>
+
+<h2>3. Multi-way relationships (rule 10)</h2>
+<p>A multi-way relationship becomes a table with the keys of all its participants. Which of them form the primary key depends on the arrows: an arrow into Studio says (actor, film) determines the studio, so the key is (actor, film) and the studio is an ordinary (foreign-key) column. With no arrows, the key is all three.</p>
+<figure class="wide"><span class="anim-tag">Animation</span><div id="tern"></div></figure>
+<div id="ternPlay"></div>
+
+<h2>4. Common mistakes in conversions</h2>
+<ul>
+<li><strong>Making a table for every many-to-one relationship</strong> when the question asks for the minimum number of relations.</li>
+<li><strong>Putting the foreign key on the wrong side</strong> of a many-to-one: it goes into the "many" side (Course gets dept_id), never the "one" side (a department cannot hold a list of course codes in one column).</li>
+<li><strong>Forgetting part of a composite key:</strong> a foreign key to Section must carry all of (code, sec_no, semester).</li>
+<li><strong>Giving the M:N table only one key column</strong> as primary key: then a student could enroll in only one section.</li>
+<li><strong>Storing derived attributes</strong> without saying why.</li>
+<li><strong>Forgetting NOT NULL / UNIQUE</strong> that come from total participation and one-to-one relationships.</li>
+</ul>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+<div id="try2"></div>
+
+<h3>Exam questions</h3>
+<div class="exam">
+  <div class="exam-src">DB QB · 24-25 8d · 10 marks &nbsp;·&nbsp; BUET QBank · CSE 215 | L-2/T-1 | 2024–25 · 10 marks</div>
+  <div class="exam-q"><p>How composite attributes and multivalued attributes are handled when an ER model is transformed into relational database schema. Explain with examples.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><strong>Composite attributes are flattened.</strong> The relational model allows only atomic column values, so a composite attribute is replaced by its leaf components; the composite's own name does not appear. Example: Employee(<u>emp_id</u>, name(first, last), address(street, city)) becomes <span class="mono">Employee(<u>emp_id</u>, first, last, street, city)</span>. (If a component is itself composite, keep descending to the leaves.) Prefixing helps when two composites share component names (home_city, office_city).</p>
+    <p><strong>Multivalued attributes get their own table.</strong> One column cannot hold several values (first normal form), and phone1, phone2, … is an unstable design (slide 17). So a multivalued attribute M of entity set E becomes a table <span class="mono">E_M(<u>key of E</u>, <u>M</u>)</span>: one row per value, the owner's key as a foreign key (usually ON DELETE CASCADE), primary key = all columns. Example: {phone} of Employee becomes <span class="mono">Employee_Phone(<u>emp_id</u>, <u>phone</u>)</span>. If the multivalued attribute is composite (several {address(street, city)}), the new table has all its components, and the key is the owner key plus enough components to be unique.</p>
+    <figure class="wide"><div id="exCM"></div></figure>
+    <div id="exCMplay"></div>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 21-22 2c · 10 marks &nbsp;·&nbsp; BUET QBank · CSE 215 | L-2/T-2 | 2021–22 · 5 marks</div>
+  <div class="exam-q"><p>Convert the E/R diagram of following figure into a relational database schema.</p><figure><div id="q40"></div><figcaption>Figure 2(c), redrawn: Courses is a weak entity set (double rectangle) identified through GivenBy (double diamond) by Depts; Lab Courses isa Courses.</figcaption></figure></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <ol>
+    <li><strong>Depts</strong> is strong: <span class="mono">Depts(<u>name</u>, chair)</span>.</li>
+    <li><strong>Courses</strong> is weak with partial key number; its owner Depts contributes its key name, renamed deptName: <span class="mono">Courses(<u>deptName</u>, <u>number</u>, room)</span>, deptName → Depts(name). GivenBy gets no table.</li>
+    <li><strong>LabCourses isa Courses</strong>, E/R style (Chapter 12): the subclass table has the full key of Courses plus its own attribute: <span class="mono">LabCourses(<u>deptName</u>, <u>number</u>, computerAllocation)</span>, (deptName, number) → Courses(deptName, number).</li>
+    </ol>
+    <div id="q40rel"></div>
+    <p>Three relations. (With the null strategy it would be two: Courses(deptName, number, room, computerAllocation) with NULL for non-lab courses; with the object-oriented strategy, Courses(deptName, number, room) holding only non-lab courses and LabCourses(deptName, number, room, computerAllocation).) The question bank's answer is correct.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 19-20 6b · 10 marks &nbsp;·&nbsp; BUET QBank · CSE 215 | L-2/T-2 | 2019–20 · 10 marks</div>
+  <div class="exam-q"><p>Reduce the given ERD to the minimum relational schemas (mention schema names and their attributes).</p><figure class="wide"><div id="q47"></div><figcaption>The figure as printed: the arrowheads sit at the diamond end of the lines from B (to R1, R5, R4) and from C (to R3). Keys a1, b1, c1, d1 are underlined.</figcaption></figure></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><strong>Reading the arrows.</strong> Each arrowhead is drawn on the line belonging to one entity set (B for R1, R4, R5; C for R3), so we read it as marking that entity set as the "one" side, as in Chen's "1" label. (The printed arrowheads touch the diamonds instead of the entity sets; that is a drawing quirk. State this assumption in the exam.)</p>
+    <div class="tbl"><table><tr><th>Relationship</th><th>Type</th><th>Treatment</th></tr>
+    <tr><td>R1 (A, B)</td><td>many A : one B</td><td>b1 goes into A</td></tr>
+    <tr><td>R2 (A, C)</td><td>many-to-many</td><td>own table R2(a1, c1)</td></tr>
+    <tr><td>R3 (C, D)</td><td>many D : one C</td><td>c1 goes into D</td></tr>
+    <tr><td>R4 (B, D)</td><td>many D : one B</td><td>b1 goes into D</td></tr>
+    <tr><td>R5 (B, C)</td><td>many C : one B</td><td>b1 goes into C</td></tr></table></div>
+    <div id="q47rel"></div>
+    <p><strong>Minimum: 5 relations</strong>: B(<u>b1</u>, b2); A(<u>a1</u>, a2, b1); C(<u>c1</u>, c2, b1); D(<u>d1</u>, d2, c1, b1); R2(<u>a1</u>, <u>c1</u>). The question bank's answer is the same.</p>
+    <p><strong>The other possible reading.</strong> In Ramakrishnan–Gehrke's notation an arrow drawn <em>from an entity set to a diamond</em> is a key constraint: each entity of that set takes part in at most one instance. Read that way, each B has at most one A, one C and one D, and each C at most one D, so the foreign keys go the other way: A(<u>a1</u>, a2); B(<u>b1</u>, b2, a1, c1, d1); C(<u>c1</u>, c2, d1); D(<u>d1</u>, d2); R2(<u>a1</u>, <u>c1</u>). It is also 5 relations. Either answer earns full marks if the reading is stated; the first matches the question bank.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">DB QB · Jan 20 12 · 10 marks &nbsp;·&nbsp; BUET QBank · CSE 215 | L-2/T-2 | 2018–19 · 10 marks</div>
+  <div class="exam-q"><p>Production tracking is important in many manufacturing environments (e.g., the pharmaceuticals industry, children's toys, etc.). The ER diagram of Figure 3 captures important information of production tracking. Specifically, the ER diagram captures the relationships among production lots (or batches), individual production units, and raw materials. Now your task is to convert the Entity Relationship Diagram given in the following figure into a Relationship Schema. Be certain to indicate primary keys and referential integrity constraints.</p>
+  <figure class="wide"><div id="q48"></div><figcaption>Figure 3 redrawn in Chen notation. The original uses crow's feet: on Includes, "||" at Lot (exactly one) and "|<" at Production Units (one or many); on Relationship, "o<" at Lot (zero or many) and "|<" at Raw Materials (one or many).</figcaption></figure></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><strong>Reading the crow's feet</strong> (Chapter 10): Includes is one-to-many from Lot to Production Units; every unit belongs to exactly one lot, every lot has at least one unit. Relationship is many-to-many between Lot and Raw Materials with attribute units (quantity of the material used in the lot); a lot uses one or more materials, a material is used in zero or more lots.</p>
+    <div id="q48rel"></div>
+    <ul>
+    <li><span class="mono">Lot(<u>lot_no</u>, create_date, lot_cost)</span></li>
+    <li><span class="mono">Production_Unit(<u>serial_no</u>, exact_weight, is_quality_tested, product_desc, product_type, unit_price, <i>lot_no</i>)</span>; lot_no NOT NULL references Lot (rule 6; NOT NULL because each unit has exactly one lot).</li>
+    <li><span class="mono">Raw_Material(<u>material_id</u>, material_type, unit_cost)</span></li>
+    <li><span class="mono">Lot_Material(<u>lot_no</u>, <u>material_id</u>, units)</span>; lot_no references Lot, material_id references Raw_Material (rule 8).</li>
+    </ul>
+    <p>"Every lot has at least one unit / one material" cannot be enforced by keys; it needs a check in the application or a trigger. Oracle DDL:</p>
+    <div id="q48play"></div>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 18 CT1 1 · 10 marks</div>
+  <div class="exam-q"><p>Reduce the given ERD to the minimum relational schemas (mention schema names and their attributes).</p><figure class="wide"><div id="q55"></div><figcaption>The figure redrawn: double lines from Account and Loan; arrows into Branch.</figcaption></figure></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>Account branch and Loan branch are many-to-one into Branch with total participation of Account and Loan: each account (loan) belongs to exactly one branch. Depositor and Borrower have no arrows: many-to-many.</p>
+    <div id="q55rel"></div>
+    <p><strong>Minimum: 6 relations.</strong> Branch(<u>b_name</u>, b_city, assets); Account(<u>ac_no</u>, balance, <i>b_name</i>) with b_name NOT NULL; Loan(<u>l_no</u>, amt, <i>b_name</i>) with b_name NOT NULL; Customer(<u>c_name</u>, c_street, c_city); Depositor(<u>c_name</u>, <u>ac_no</u>); Borrower(<u>c_name</u>, <u>l_no</u>). The two many-to-one relationships are absorbed (rule 6); the two many-to-many ones need their own tables (rule 8).</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2015–16 · 6 marks</div>
+  <div class="exam-q"><p>Convert the following E-R diagram into a relational schema:</p><figure><div id="q22"></div></figure></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>makes: many-to-one from Product to Company (arrow into Company). employs: many-to-one from Person to Company. buys: many-to-many.</p>
+    <div id="q22rel"></div>
+    <p>Company(<u>name</u>, stockprice); Product(<u>name</u>, price, category, <i>company_name</i>); Person(<u>ssn</u>, name, address, <i>company_name</i>); Buys(<u>ssn</u>, <u>product_name</u>). Product's own name and the company's name clash, so the foreign key is renamed company_name. The question bank's answer agrees.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2011–12 · 5 marks</div>
+  <div class="exam-q"><p>A database schema consists of four relations: Product(maker, model, type), PC(model, speed, ram, hd, price), Laptop(model, speed, ram, hd, screen, price), Printer(model, color, type, price). Suggest suitable keys and foreign keys of the above relations.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>This is the textbook's (Garcia-Molina et al. Exercise 2.4.1) schema, which is the E/R-style conversion of an isA hierarchy: Product is the superclass and PC, Laptop, Printer are subclasses (Chapter 12). A maker makes many models, so maker is not a key; model numbers are unique across all products.</p>
+    <ul>
+    <li>Product: primary key <u>model</u>.</li>
+    <li>PC, Laptop, Printer: primary key <u>model</u>; and model is a foreign key referencing Product(model), so every PC/laptop/printer is listed as a product.</li>
+    <li>Optionally a CHECK on Product.type ∈ {'pc', 'laptop', 'printer'}. (Printer.type, e.g. 'laser', is a different attribute from Product.type.)</li>
+    </ul>
+    <div id="q26rel"></div>
+  </div></details>
+</div>
+
+<div class="key">
+<p><strong>Summary:</strong> entity sets become tables keyed by their keys; composites flatten; multivalued attributes get a table keyed by owner key + value; derived ones are computed. Weak entities borrow the owner key into their primary key. Many-to-one relationships add the "one" side's key to the "many" side (NOT NULL if total); one-to-one adds a UNIQUE foreign key; many-to-many and multi-way relationships become tables keyed by the participants' keys (minus those with arrows). Rename columns by role in recursive relationships.</p>
+</div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/sqlplay.js"></script>
+<script src="lecture.js"></script>
+<script>
+const U = {
+  n: [['Department', 'E', 0, 0], ['heads', 'R', 270, 0], ['Instructor', 'E', 540, 0], ['offeredBy', 'R', 0, 120, 'offered\nBy'], ['Course', 'E', 0, 240], ['has', 'I', 0, 360], ['Section', 'W', 0, 480],
+      ['enrolls', 'R', -280, 480], ['Student', 'E', -560, 480], ['mentors', 'R', -560, 630]],
+  a: [['Department', '_dept_id', -80, -55], ['Department', 'dname', 75, -55], ['Instructor', '_iid', -50, -55], ['Instructor', 'iname', 60, -55],
+      ['Course', '_code', 120, -30], ['Course', 'title', 130, 15], ['Course', 'credits', -120, 0],
+      ['Section', '~sec_no', 120, -30], ['Section', '~semester', 135, 15], ['Section', 'room', 90, 55],
+      ['enrolls', 'grade', 0, 65], ['Student', '_sid', -50, -105], ['Student', 'name', 60, -105], ['Student.name', 'first', 20, -50], ['Student.name', 'last', 105, -45],
+      ['Student', '{phone}', -140, -50], ['Student', 'dob', -150, 10], ['Student', '/age', -150, 60]],
+  l: [['Course', 'offeredBy', { total: true }], ['Department', 'offeredBy', { one: true }], ['Department', 'heads', { one: true, total: true }], ['Instructor', 'heads', { one: true }],
+      ['Course', 'has', { one: true }], ['Section', 'has', { total: true }], ['Student', 'enrolls'], ['Section', 'enrolls'],
+      ['Student', 'mentors', { bend: -70, role: 'mentor', one: true, at: 0.6 }], ['Student', 'mentors', { bend: 70, role: 'mentee', at: 0.6 }]],
+};
+const T = {
+  Department: ['*dept_id', 'dname'], Instructor: ['*iid', 'iname'], Course: ['*code', 'title', 'credits'],
+  Student: ['*sid', 'first', 'last', 'dob'], Student_Phone: ['*sid>Student(sid)^', '*phone'],
+  Section: ['*code>Course(code)^', '*sec_no:NUMBER(2)', '*semester:VARCHAR2(12)', 'room'],
+};
+const st = (order, extra = {}, isNew = []) => order.map(n => ({ n, c: [...T[n] || [], ...(extra[n] || [])], cls: isNew.includes(n) ? 'new' : '' }));
+const X1 = { Course: ['dept_id!>Department(dept_id)'] }, X2 = { ...X1, Department: ['head_iid!?>Instructor(iid)'] }, X3 = { ...X2, Student: ['mentor_sid>Student(sid)'] };
+T.Enrolls = ['*sid>Student(sid)', '*code>Section(code)@s', '*sec_no>Section(sec_no)@s', '*semester>Section(semester)@s', 'grade:VARCHAR2(2)'];
+const O1 = ['Department', 'Instructor', 'Course'], O2 = [...O1, 'Student'], O3 = [...O2, 'Student_Phone'], O4 = [...O3, 'Section'], O5 = [...O4, 'Enrolls'];
+const fr = erdBox(U);
+const F = (hl, rels, cap, dim) => ({ html: erd(U, { frame: fr, hl, scale: 0.78, dim }) + '<div style="margin-top:14px">' + relSchema(rels) + '</div>', cap });
+stepper('#conv', [
+  F([], [], 'The diagram to convert. Nothing is a table yet.'),
+  F(['Department', 'Instructor', 'Course'], st(O1, {}, O1), '<b>Rule 1, strong entity sets.</b> Department, Instructor and Course each become a table; simple attributes are columns; keys (underlined) are primary keys.'),
+  F(['Student', 'Student.name', 'Student.age'], st(O2, {}, ['Student']), '<b>Rules 1, 2, 4.</b> Student becomes a table. The <b>composite</b> name is flattened to first, last. The <b>derived</b> age is not stored (a view computes it from dob). phone is not a column: it is multivalued.'),
+  F(['Student.phone'], st(O3, {}, ['Student_Phone']), '<b>Rule 3, multivalued attribute.</b> {phone} becomes Student_Phone(sid, phone), one row per number. sid is a foreign key to Student; the key is both columns.'),
+  F(['Section', 'has'], st(O4, {}, ['Section']), '<b>Rule 5, weak entity set.</b> Section borrows Course\'s key code. Its primary key is (code, sec_no, semester): owner key + partial key. The identifying relationship has gets no table.'),
+  F(['offeredBy'], st(O4, X1, ['Course']), '<b>Rule 6, many-to-one.</b> offeredBy: each course has one department. No new table: dept_id is added to <b>Course</b> (the many side) as a foreign key. Course\'s participation is total (double line), so dept_id is NOT NULL.'),
+  F(['heads'], st(O4, X2, ['Department']), '<b>Rule 7, one-to-one.</b> heads: arrows both ways. Put the key of Instructor into Department, the side with total participation (every department has a head): head_iid, NOT NULL and UNIQUE (an instructor heads at most one department).'),
+  F(['enrolls'], st(O5, X2, ['Enrolls']), '<b>Rule 8, many-to-many.</b> enrolls becomes its own table holding Student\'s key and Section\'s full key (code, sec_no, semester) plus grade. Primary key: all four key columns.'),
+  F(['mentors'], st(O5, X3, ['Student']), '<b>Rule 9, recursive.</b> mentors is many-to-one (each student has at most one mentor). Like rule 6: add the mentor\'s key to Student, renamed by role: mentor_sid → Student(sid). Nullable, since participation is partial.'),
+  F([], st(O5, X3), 'Done: <b>7 tables</b> for 5 entity sets and 5 relationships. Only enrolls (M:N) and phone (multivalued) needed extra tables.'),
+]);
+const FINAL = st(O5, X3);
+$('#final').innerHTML = FINAL.map(relLine).join('<br>');
+sqlPlay('#ddl', { setup: ddl(FINAL) + `
+INSERT INTO Instructor VALUES ('I1', 'Rahman');
+INSERT INTO Instructor VALUES ('I2', 'Ishrak');
+INSERT INTO Department VALUES ('CSE', 'Computer Sci. and Engg.', 'I2');
+INSERT INTO Department VALUES ('EEE', 'Electrical and Electronic Engg.', 'I1');
+INSERT INTO Course VALUES ('CSE215', 'Database', 3, 'CSE');
+INSERT INTO Course VALUES ('EEE163', 'Electrical Circuits', 3, 'EEE');
+INSERT INTO Student VALUES ('2105001', 'Amina', 'Haque', DATE '2003-02-11', NULL);
+INSERT INTO Student VALUES ('2105002', 'Rahim', 'Ali', DATE '2003-07-30', '2105001');
+INSERT INTO Student_Phone VALUES ('2105001', '01711000001');
+INSERT INTO Student_Phone VALUES ('2105001', '01911000001');
+INSERT INTO Section VALUES ('CSE215', 1, 'Jan 2025', 'ECE 101');
+INSERT INTO Section VALUES ('EEE163', 1, 'Jan 2025', 'ECE 305');
+INSERT INTO Enrolls VALUES ('2105001', 'CSE215', 1, 'Jan 2025', 'A');
+INSERT INTO Enrolls VALUES ('2105001', 'EEE163', 1, 'Jan 2025', 'B+');
+INSERT INTO Enrolls VALUES ('2105002', 'CSE215', 1, 'Jan 2025', 'A-');`,
+  query: `SELECT s.first, e.code, c.title, d.dname, e.grade
+FROM Student s
+JOIN Enrolls e    ON e.sid = s.sid
+JOIN Section sec  ON sec.code = e.code AND sec.sec_no = e.sec_no AND sec.semester = e.semester
+JOIN Course c     ON c.code = sec.code
+JOIN Department d ON d.dept_id = c.dept_id
+ORDER BY s.first, e.code;`,
+  note: 'Setup = the generated DDL plus invented sample rows (Show tables to see them). The DDL lists every referenced table before the tables that point to it, because Oracle checks REFERENCES at CREATE time.' });
+// rule 10
+const C3 = { n: [['Actor', 'E', 0, 0], ['Film', 'E', 320, 0], ['contract', 'R', 160, 75], ['Studio', 'E', 160, 180]],
+  a: [['Actor', '_actor_id', -40, -55], ['Film', '_title', -10, -60], ['Film', '_year', 75, -50], ['Studio', '_sname', 110, 0], ['contract', 'salary', -95, 30]],
+  l: [['Actor', 'contract'], ['Film', 'contract'], ['Studio', 'contract', { one: true }]] };
+const CR = [{ n: 'Actor', c: ['*actor_id', 'aname'] }, { n: 'Film', c: ['*title', '*year:NUMBER(4)'] }, { n: 'Studio', c: ['*sname', 'address'] }];
+const CT = { n: 'Contract', c: ['*actor_id>Actor(actor_id)', '*title>Film(title)@f', '*year>Film(year)@f', 'sname!>Studio(sname)', 'salary'], cls: 'new' };
+stepper('#tern', [
+  { html: erd(C3) + relSchema(CR), cap: 'Actor, Film (key title + year) and Studio become tables by rule 1.' },
+  { html: erd(C3, { hl: ['contract'] }) + relSchema([...CR, { ...CT, c: CT.c.map(c => c.replace('*', '')) }]), cap: 'contract becomes a table with the keys of all three participants and its attribute salary.' },
+  { html: erd(C3, { hl: ['Studio-contract'] }) + relSchema([...CR, CT]), cap: 'The arrow into Studio means (actor, film) determines the studio, so the primary key is (actor_id, title, year); sname is an ordinary foreign key. Without the arrow the key would include sname too.' },
+]);
+const TERN = ddl([...CR, CT]) + `
+INSERT INTO Actor VALUES ('A1', 'Shakib');
+INSERT INTO Film VALUES ('Monpura', 2009);
+INSERT INTO Studio VALUES ('Impress', 'Dhaka');
+INSERT INTO Studio VALUES ('Jaaz', 'Dhaka');
+INSERT INTO Contract VALUES ('A1', 'Monpura', 2009, 'Impress', 500000);`;
+sqlPlay('#ternPlay', { setup: TERN, query: `-- a second studio for the same (actor, film) breaks the arrow constraint:
+INSERT INTO Contract VALUES ('A1', 'Monpura', 2009, 'Jaaz', 700000);`, note: 'Run it: the primary key (actor_id, title, year) rejects the row, exactly as the arrow demands.' });
+// exam figures
+$('#exCM').innerHTML = `<div class="figrow"><div>${erd({ n: [['Employee', 'E', 0, 0]], a: [['Employee', '_emp_id', -130, 0], ['Employee', 'name', -40, -65], ['Employee.name', 'first', -60, -45], ['Employee.name', 'last', 40, -45], ['Employee', 'address', 100, -50], ['Employee.address', 'street', 30, -50], ['Employee.address', 'city', 110, -20], ['Employee', '{phone}', 40, 65]] })}</div><div>${relSchema([{ n: 'Employee', c: ['*emp_id', 'first', 'last', 'street', 'city'] }, { n: 'Employee_Phone', c: ['*emp_id>Employee', '*phone'], cls: 'new' }])}</div></div>`;
+sqlPlay('#exCMplay', { setup: `CREATE TABLE Employee (
+  emp_id NUMBER(5) PRIMARY KEY, first VARCHAR2(20), last VARCHAR2(20), street VARCHAR2(30), city VARCHAR2(20));
+CREATE TABLE Employee_Phone (
+  emp_id NUMBER(5) REFERENCES Employee(emp_id) ON DELETE CASCADE,
+  phone  VARCHAR2(15),
+  PRIMARY KEY (emp_id, phone));
+INSERT INTO Employee VALUES (1, 'Rahim', 'Ali', '12 Lake Rd', 'Dhaka');
+INSERT INTO Employee_Phone VALUES (1, '01711000001');
+INSERT INTO Employee_Phone VALUES (1, '01911000002');`, query: `SELECT e.emp_id, e.first || ' ' || e.last AS name, e.city, p.phone
+FROM Employee e JOIN Employee_Phone p ON p.emp_id = e.emp_id;`, note: 'One employee, two phone numbers: two rows in Employee_Phone, one in Employee.' });
+$('#q40').innerHTML = erd({ n: [['Courses', 'W', 0, 0], ['GivenBy', 'I', 190, 0], ['Depts', 'E', 380, 0], ['isa', 'T', 0, 90], ['LabCourses', 'E', 0, 180, 'Lab\nCourses']],
+  a: [['Courses', '~number', 0, -60], ['Courses', 'room', -130, 0], ['Depts', '_name', -40, -60], ['Depts', 'chair', 50, -60], ['LabCourses', 'computer allocation', 170, 0]],
+  l: [['Courses', 'GivenBy'], ['Depts', 'GivenBy', { one: true }], ['Courses', 'isa'], ['LabCourses', 'isa']] });
+relInto('#q40rel', [{ n: 'Depts', c: ['*name', 'chair'] }, { n: 'Courses', c: ['*deptName>Depts(name)', '*number', 'room'] }, { n: 'LabCourses', c: ['*deptName>Courses', '*number>Courses', 'computerAllocation'] }]);
+$('#q47').innerHTML = erd({ n: [['A', 'E', 0, 0], ['R1', 'R', 220, 0], ['B', 'E', 440, 0], ['R2', 'R', 0, 110], ['R5', 'R', 220, 100], ['R4', 'R', 440, 110], ['C', 'E', 0, 220], ['R3', 'R', 220, 220], ['D', 'E', 440, 220]],
+  a: [['A', '_a1', -45, -50], ['A', 'a2', 45, -50], ['B', '_b1', -45, -50], ['B', 'b2', 45, -50], ['C', '_c1', -45, 50], ['C', 'c2', 45, 50], ['D', '_d1', -45, 50], ['D', 'd2', 45, 50]],
+  l: [['A', 'R1'], ['B', 'R1', { rev: true }], ['A', 'R2'], ['C', 'R2'], ['B', 'R5', { rev: true }], ['C', 'R5'], ['B', 'R4', { rev: true }], ['D', 'R4'], ['C', 'R3', { rev: true }], ['D', 'R3']] });
+relInto('#q47rel', [{ n: 'B', c: ['*b1', 'b2'] }, { n: 'A', c: ['*a1', 'a2', 'b1>B'] }, { n: 'C', c: ['*c1', 'c2', 'b1>B'] }, { n: 'D', c: ['*d1', 'd2', 'c1>C', 'b1>B'] }, { n: 'R2', c: ['*a1>A', '*c1>C'] }]);
+$('#q48').innerHTML = erd({ n: [['PU', 'E', 0, 0, 'Production\nUnits'], ['Includes', 'R', 220, 0], ['Lot', 'E', 440, 0], ['Rel', 'R', 440, 140, 'Relationship'], ['RM', 'E', 440, 280, 'Raw\nMaterials']],
+  a: [['PU', '_serial_no', -90, -60], ['PU', 'exact_weight', 40, -70], ['PU', 'is_quality_tested', -170, -10], ['PU', 'product_desc', -150, 45], ['PU', 'product_type', -50, 75], ['PU', 'unit_price', 70, 70],
+      ['Lot', 'create_date', 120, -45], ['Lot', '_lot_no', 125, 0], ['Lot', 'lot_cost', 120, 45], ['Rel', 'units', -150, 0], ['RM', 'material_type', 140, -40], ['RM', '_material_id', 145, 5], ['RM', 'unit_cost', 120, 50]],
+  l: [['PU', 'Includes', { total: true, card: 'N' }], ['Lot', 'Includes', { one: true, total: true, card: '1' }], ['Lot', 'Rel', { total: true, card: 'M' }], ['RM', 'Rel', { card: 'N' }]] });
+relInto('#q48rel', [{ n: 'Lot', c: ['*lot_no', 'create_date', 'lot_cost'] }, { n: 'Production_Unit', c: ['*serial_no', 'exact_weight', 'is_quality_tested', 'product_desc', 'product_type', 'unit_price', 'lot_no!>Lot'] }, { n: 'Raw_Material', c: ['*material_id', 'material_type', 'unit_cost'] }, { n: 'Lot_Material', c: ['*lot_no>Lot', '*material_id>Raw_Material', 'units'] }]);
+sqlPlay('#q48play', { setup: '', query: ddl([{ n: 'Lot', c: ['*lot_no:NUMBER(8)', 'create_date', 'lot_cost'] }, { n: 'Production_Unit', c: ['*serial_no:VARCHAR2(20)', 'exact_weight', 'is_quality_tested:CHAR(1)', 'product_desc', 'product_type', 'unit_price', 'lot_no!>Lot'] }, { n: 'Raw_Material', c: ['*material_id:VARCHAR2(10)', 'material_type', 'unit_cost'] }, { n: 'Lot_Material', c: ['*lot_no>Lot', '*material_id>Raw_Material', 'units'] }]) + "\nSELECT name FROM sqlite_master WHERE type = 'table';", note: 'Runs the DDL and lists the created tables (the last line is SQLite\'s catalogue, used here only to show the result).' });
+$('#q55').innerHTML = erd({ n: [['Account', 'E', 0, 0], ['AB', 'R', 210, 0, 'Account\nbranch'], ['Branch', 'E', 420, 0], ['Depositor', 'R', 0, 120], ['LB', 'R', 420, 120, 'Loan\nbranch'], ['Customer', 'E', 0, 240], ['Borrower', 'R', 210, 240], ['Loan', 'E', 420, 240]],
+  a: [['Account', '_Ac_no', -50, -55], ['Account', 'Balance', 60, -55], ['Branch', '_b_name', -75, -50], ['Branch', 'b_city', 10, -65], ['Branch', 'Assets', 95, -50], ['Customer', 'C_city', -95, 45], ['Customer', '_C_name', 0, 75], ['Customer', 'C_street', 95, 45], ['Loan', '_L_no', -50, 55], ['Loan', 'Amt', 50, 55]],
+  l: [['Account', 'AB', { total: true }], ['Branch', 'AB', { one: true }], ['Account', 'Depositor'], ['Customer', 'Depositor'], ['Customer', 'Borrower'], ['Loan', 'Borrower'], ['Loan', 'LB', { total: true }], ['Branch', 'LB', { one: true }]] });
+relInto('#q55rel', [{ n: 'Branch', c: ['*b_name', 'b_city', 'assets'] }, { n: 'Account', c: ['*ac_no', 'balance', 'b_name!>Branch'] }, { n: 'Loan', c: ['*l_no', 'amt', 'b_name!>Branch'] }, { n: 'Customer', c: ['*c_name', 'c_street', 'c_city'] }, { n: 'Depositor', c: ['*c_name>Customer', '*ac_no>Account'] }, { n: 'Borrower', c: ['*c_name>Customer', '*l_no>Loan'] }]);
+$('#q22').innerHTML = erd({ n: [['Product', 'E', 0, 0], ['makes', 'R', 200, 0], ['Company', 'E', 400, 0], ['buys', 'R', 0, 120], ['employs', 'R', 400, 120], ['Person', 'E', 200, 220]],
+  a: [['Product', 'price', -110, -35], ['Product', '_name', -20, -60], ['Product', 'category', 90, -50], ['Company', '_name', -20, -60], ['Company', 'stockprice', 100, -40], ['Person', 'address', -110, 40], ['Person', 'name', 0, 65], ['Person', '_ssn', 110, 40]],
+  l: [['Product', 'makes'], ['Company', 'makes', { one: true }], ['Product', 'buys'], ['Person', 'buys'], ['Person', 'employs'], ['Company', 'employs', { one: true }]] });
+relInto('#q22rel', [{ n: 'Company', c: ['*name', 'stockprice'] }, { n: 'Product', c: ['*name', 'price', 'category', 'company_name>Company(name)'] }, { n: 'Person', c: ['*ssn', 'name', 'address', 'company_name>Company(name)'] }, { n: 'Buys', c: ['*ssn>Person', '*product_name>Product(name)'] }]);
+relInto('#q26rel', [{ n: 'Product', c: ['maker', '*model', 'type'] }, { n: 'PC', c: ['*model>Product', 'speed', 'ram', 'hd', 'price'] }, { n: 'Laptop', c: ['*model>Product', 'speed', 'ram', 'hd', 'screen', 'price'] }, { n: 'Printer', c: ['*model>Product', 'color', 'type', 'price'] }]);
+flashcards('#cards', [
+  { f: 'Strong entity set →', b: 'Table; key → primary key.' },
+  { f: 'Composite attribute →', b: 'Its components become columns.' },
+  { f: 'Multivalued attribute →', b: 'Table (owner key, value); PK = both.' },
+  { f: 'Weak entity set →', b: 'Table with owner key; PK = owner key + partial key.' },
+  { f: 'Many-to-one →', b: 'FK in the many side\'s table (NOT NULL if total).' },
+  { f: 'One-to-one →', b: 'UNIQUE FK on one side (prefer the total side).' },
+  { f: 'Many-to-many →', b: 'Own table; PK = both keys.' },
+  { f: 'Multi-way →', b: 'Own table; PK = keys of participants without arrows.' },
+]);
+quiz('#quiz', [
+  { q: 'Course —offeredBy→ Department (many-to-one). Where does the foreign key go?', opts: ['dept_id in Course', 'code in Department', 'A new table', 'Both'], a: 0, why: 'The many side receives the key of the one side.' },
+  { q: 'Student enrolls Course (M:N, attribute grade). Primary key of Enrolls?', opts: ['sid', 'code', '(sid, code)', '(sid, code, grade)'], a: 2, why: 'Both participants\' keys; grade is not part of the key.' },
+  { q: 'Weak entity Room (partial key room_no) of Building (key name). Primary key of Room?', opts: ['room_no', 'name', '(building_name, room_no)', 'a new id'], a: 2, why: 'Owner key + partial key.' },
+  { q: 'Composite attribute address(street, city). Columns?', opts: ['address', 'street, city', 'address, street, city', 'a separate table'], a: 1, why: 'Flatten to the components.' },
+  { q: 'Ternary contract(Actor, Film, Studio) with an arrow into Studio. Primary key of Contract?', opts: ['(actor, film, studio)', '(actor, film)', 'studio', 'actor'], a: 1, why: 'The arrowed participant is determined by the others.' },
+  { q: 'Minimum number of tables for: A —R1→ B (many-to-one), B — R2 — C (many-to-many)?', opts: ['3', '4', '5', '2'], a: 1, why: 'A, B, C, and R2. R1 is absorbed into A.' },
+]);
+ask('#try1', { q: 'An ERD has 4 strong entity sets, 2 many-to-many relationships, 3 many-to-one relationships and one multivalued attribute. How many tables in the minimum schema?', a: 7, hint: 'Entities + M:N + multivalued; many-to-one adds none.', why: '4 + 2 + 1 = 7.' });
+ask('#try2', { q: 'Student has key sid; a recursive many-to-one relationship "mentors" (mentor, mentee). What is the name of the column added to Student in this chapter\'s example?', a: ['mentor_sid'], hint: 'Rename the borrowed key by the role of the "one" side.', why: 'mentor_sid → Student(sid).' });
+</script>
+</body>
+</html>

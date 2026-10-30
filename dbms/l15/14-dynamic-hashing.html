@@ -1,0 +1,658 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dynamic Hashing · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<style>
+.hx-form label { display: inline-flex; gap: 6px; align-items: center; }
+.hx-form input.sm { width: 4.5em; }
+.hx-form input.keys { width: min(30em, 100%); }
+.hx-form select { font: 14px var(--mono); padding: 5px 6px; border: 1.5px solid var(--fg); border-radius: 5px; background: var(--bg); color: var(--fg); }
+.hx-pre { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 10px; font-size: .9rem; color: var(--muted); align-items: center; }
+.hx-pre button { font: 600 12px var(--mono); padding: 4px 9px; border-radius: 5px; border: 1.5px solid var(--line); background: var(--bg); color: var(--fg); cursor: pointer; }
+.hx-pre button:hover { border-color: var(--accent); }
+.hx-msg { color: var(--red); font-weight: 600; min-height: 1.2em; margin-bottom: 6px; }
+</style>
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 15 · Chapter 14 · Beyond the slides (asked in exams)</div>
+<h1>Dynamic Hashing: Extendible and Linear Hashing</h1>
+<p class="lede">A static hash file has a fixed number of buckets, so it degrades as the file grows. Extendible hashing and linear hashing let the number of buckets grow with the data. This chapter teaches both (Silberschatz §14.5 and Garcia-Molina §14.3.5–14.3.8), animates every insertion, gives you two interactive tools, and answers every hashing question from the question banks.</p>
+
+<h2>1. Why the bucket count must change</h2>
+
+<p>The previous chapter built a <b class="term">static hash file</b>: a fixed set of <i>B</i> buckets and a hash function <i>h</i> that sends each search key to one of them. When the file grows past what <i>B</i> buckets can hold, every bucket grows an overflow chain and lookups get slower. Choosing a huge <i>B</i> up front wastes space, and rebuilding the whole file with a new hash function stops the database while it runs.</p>
+
+<p><b class="term">Dynamic hashing</b> solves this by letting the number of buckets change one split at a time while the database keeps running. The trick in both methods below is the same: compute a long bit string <i>h</i>(<i>K</i>) once, and use only a few of its bits to choose a bucket. When the file grows, use one more bit. A bucket whose records agree on <i>j</i> bits can be split in two by looking at bit <i>j</i> + 1, without touching any other bucket.</p>
+
+<dl class="def">
+<dt>Hash value as a bit string</dt><dd>The hash function produces a <i>b</i>-bit binary number (Silberschatz assumes <i>b</i> = 32; exam questions use 3, 4 or 16 bits). Example: with h(x) = x mod 7 the values are 0 to 6, so 3 bits suffice, and h(19) = 5 = 101.</dd>
+<dt>Dynamic hashing</dt><dd>A hash organization whose number of buckets grows (and shrinks) gradually as records are inserted (and deleted). The two standard methods are extendible hashing and linear hashing.</dd>
+</dl>
+
+<h2>2. Extendible hashing</h2>
+
+<h3>2.1 The structure</h3>
+
+<p>An <b class="term">extendible hash table</b> (Garcia-Molina calls it <em>extensible</em>) has two parts: a <b class="term">directory</b> (also called the <b class="term">bucket address table</b>) of 2<sup><i>i</i></sup> pointers, and the buckets themselves. To find the bucket for key <i>K</i>, take the first <i>i</i> bits of <i>h</i>(<i>K</i>), read them as a binary number, and follow that directory entry.</p>
+
+<dl class="def">
+<dt>Global depth <i>i</i></dt><dd>The number of hash bits the directory currently uses. The directory has exactly 2<sup><i>i</i></sup> entries.</dd>
+<dt>Local depth <i>i<sub>j</sub></i></dt><dd>Stored in the header of bucket <i>j</i> (Garcia-Molina's "nub"): the number of bits that all records in that bucket are guaranteed to share. Always <i>i<sub>j</sub></i> ≤ <i>i</i>.</dd>
+<dt>Sharing rule</dt><dd>Exactly 2<sup><i>i</i> − <i>i<sub>j</sub></i></sup> directory entries point to bucket <i>j</i>. A bucket with local depth 1 in a directory of depth 3 is shared by 2<sup>2</sup> = 4 entries.</dd>
+</dl>
+
+<p><strong>Which bits?</strong> Silberschatz (§14.5.1) and Garcia-Molina (§14.3.5) both take the <em>first</em> (high-order, leftmost) <i>i</i> bits. With first bits, the 2<sup><i>i</i> − <i>i<sub>j</sub></i></sup> entries that share a bucket sit next to each other in the directory. Many web tutorials and the CSE215 question-bank answers take the <em>last</em> (low-order) bits instead. The algorithm is identical with either choice; only the final picture differs, because different keys end up together. In an exam, state which bits you use in the first line of your answer. This book uses first bits unless a question only makes sense with last bits (Question 2 below explains such a case).</p>
+
+<h3>2.2 Lookup</h3>
+<p>Compute <i>h</i>(<i>K</i>), take its first <i>i</i> bits, follow that directory entry, and search the one bucket it points to. If the directory fits in memory, a lookup costs a single block read, however large the file grows. That is the main attraction of extendible hashing.</p>
+
+<h3>2.3 Insertion (the algorithm to learn)</h3>
+<p>To insert a record with key <i>K</i>, find its bucket <i>j</i> as for a lookup. If bucket <i>j</i> has room, put the record there and stop. If it is full, split it:</p>
+<ol>
+<li><strong>If <i>i<sub>j</sub></i> = <i>i</i></strong> (only one directory entry points to the bucket): first <b class="term">double the directory</b>. Increase <i>i</i> by 1. Each old entry <i>w</i> becomes two entries <i>w</i>0 and <i>w</i>1, both pointing to the bucket <i>w</i> pointed to. No bucket changes yet, and now <i>i<sub>j</sub></i> &lt; <i>i</i>, so continue with case 2.</li>
+<li><strong>If <i>i<sub>j</sub></i> &lt; <i>i</i></strong> (several entries share the bucket): <b class="term">split the bucket</b> without touching the directory size. Create a new bucket, set both local depths to <i>i<sub>j</sub></i> + 1, and move every record whose bit number <i>i<sub>j</sub></i> + 1 is 1 into the new bucket. Re-point the half of the sharing entries whose bit <i>i<sub>j</sub></i> + 1 is 1 to the new bucket.</li>
+<li><strong>Retry the insertion.</strong> If all the old records and the new one had the same next bit, one half is still full, so the split repeats (possibly doubling again).</li>
+</ol>
+<p>One exception: if every record in the full bucket has the <em>same</em> hash value as the new record, no number of extra bits can ever separate them. Then the new record goes into an <b class="term">overflow bucket</b> chained to the full one. This happens with duplicate search keys (Question 6 below).</p>
+
+<h3>2.4 Deletion</h3>
+<p>Find the record and remove it. If its bucket becomes empty, the bucket can be removed: its directory entries are pointed at its <b class="term">buddy</b> (the bucket whose first <i>i<sub>j</sub></i> − 1 bits are the same), and that buddy's local depth drops by 1. Buckets may also be coalesced when two buddies together fit in one bucket. When no bucket has local depth equal to <i>i</i> any more, the directory can be halved. Real systems often skip halving, because files rarely shrink for long.</p>
+
+<h3>2.5 Garcia-Molina's example, step by step</h3>
+<p>The textbook's running example (Examples 14.22 and 14.23) uses 4-bit hash values and buckets that hold 2 records. Starting empty, insert 0001, 1001, 1100 (this reaches the textbook's Figure 14.23), then 1010, 0000, 0111 and 1000 (Figures 14.24 and 14.25). In each frame the directory is on the left; each bucket shows its local depth in the small box, then its records with their hash bits underneath. The red arrow is the entry being followed; a green record is the one just inserted; orange records are the ones that moved during a split.</p>
+
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="gmExt"></div>
+<figcaption><b>Figure 1.</b> Extendible hashing with first bits, bucket capacity 2 (Garcia-Molina Examples 14.22–14.23). The final frame matches the textbook's Figure 14.25: global depth 3, and only the bucket for prefix 10 needed local depth 3.</figcaption>
+</figure>
+
+<h3>2.6 Try it yourself: extendible hashing animator</h3>
+<p>Type keys separated by spaces or commas. Choose <em>x mod M</em> for integer keys, or <em>bit strings</em> when the question gives the hash values directly (you may write <code>Name:0101</code> to label a value). Choose the hash width in bits, the bucket capacity, and whether the directory uses the first or the last bits. Every insertion, doubling and split is a separate step.</p>
+<figure class="wide">
+<span class="anim-tag">Interactive</span>
+<div id="extTool"></div>
+<figcaption><b>Figure 2.</b> Extendible hashing animator. When the directory has more than 16 entries it is drawn grouped: one row per bucket, where x means "either bit".</figcaption>
+</figure>
+
+<h2>3. Linear hashing</h2>
+
+<p>Extendible hashing has three weaknesses (Garcia-Molina §14.3.7). Doubling a large directory is a lot of work at one moment. A doubled directory may stop fitting in memory. And with small buckets, a few unlucky keys that share a long prefix can force a huge directory while most buckets are nearly empty (you will see this in Question 2: six keys produce a 256-entry directory). <b class="term">Linear hashing</b> has no directory at all and adds buckets one at a time, in a fixed order.</p>
+
+<h3>3.1 The structure (Garcia-Molina's version)</h3>
+<dl class="def">
+<dt><i>n</i></dt><dd>The current number of buckets, numbered 0 to <i>n</i> − 1. The buckets are stored in an array, so bucket <i>m</i> can be found directly.</dd>
+<dt><i>i</i></dt><dd>The number of hash bits in use: <i>i</i> = ⌈log<sub>2</sub> <i>n</i>⌉. Linear hashing always uses the <em>last</em> (low-order) <i>i</i> bits.</dd>
+<dt><i>r</i></dt><dd>The current number of records. The policy keeps the ratio <i>r</i>/<i>n</i> below a fixed threshold. The textbook (and the exam questions) use <i>r</i> ≤ 1.7<i>n</i> with 2 records per block, so a bucket is about 85% full on average.</dd>
+<dt>Overflow blocks</dt><dd>Allowed. A full bucket simply grows a chain; the chain disappears later when that bucket is split.</dd>
+</dl>
+
+<h3>3.2 Where does a record go?</h3>
+<p>Let <i>m</i> be the last <i>i</i> bits of <i>h</i>(<i>K</i>), read as a number. If <i>m</i> &lt; <i>n</i>, bucket <i>m</i> exists and the record belongs there. If <i>m</i> ≥ <i>n</i>, bucket <i>m</i> has not been created yet, so the record goes to bucket <i>m</i> − 2<sup><i>i</i>−1</sup>: the bucket you get by changing the first of the <i>i</i> bits from 1 to 0. Lookups use exactly the same rule.</p>
+<div class="formula">bucket(K) = m if m &lt; n, otherwise m − 2<sup>i−1</sup></div>
+
+<h3>3.3 Insertion</h3>
+<ol>
+<li>Put the record in its bucket (in an overflow block if the bucket is full). Increase <i>r</i>.</li>
+<li>If now <i>r</i> &gt; 1.7<i>n</i>, add one bucket. Its number is the old <i>n</i>, written in binary as 1<i>a</i><sub>2</sub>…<i>a</i><sub><i>i</i></sub>. Increase <i>n</i>; if <i>n</i> now exceeds 2<sup><i>i</i></sup>, increase <i>i</i> by 1 first (no data moves when <i>i</i> grows: the old bucket numbers just gain a leading 0).</li>
+<li>Split the bucket numbered 0<i>a</i><sub>2</sub>…<i>a</i><sub><i>i</i></sub>. Its records all end in <i>a</i><sub>2</sub>…<i>a</i><sub><i>i</i></sub>, so they differ only in bit <i>i</i> from the right. Those with a 1 there move to the new bucket.</li>
+</ol>
+<p>Notice the surprise: the bucket that gets split is decided by <i>n</i>, <em>not</em> by where the insertion happened. A bucket with a long overflow chain may have to wait its turn. Over a full round every bucket gets split once, and then <i>i</i> grows by one.</p>
+
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="gmLin"></div>
+<figcaption><b>Figure 3.</b> Linear hashing, Garcia-Molina Examples 14.24–14.25 (capacity 2, r ≤ 1.7n). The first frames build the starting table of Figure 14.26 (0000, 1010, 1111). Then 0101 forces bucket 2 to be added; 0001 overflows bucket 1; 0111 forces bucket 3, which splits bucket 1 and empties its overflow block.</figcaption>
+</figure>
+
+<h3>3.4 The other version: split on overflow (Litwin)</h3>
+<p>Many courses and the CSE215 question-bank answers use Litwin's original rule instead of a load threshold. There is a <b class="term">split pointer</b> <i>s</i>, starting at 0, and a <b class="term">level</b> ℓ. With <i>N</i><sub>0</sub> = 2 starting buckets, <i>h</i><sub>ℓ</sub>(<i>K</i>) is the last ℓ + 1 bits of <i>h</i>(<i>K</i>).</p>
+<ul>
+<li><strong>Address:</strong> compute <i>a</i> = <i>h</i><sub>ℓ</sub>(<i>K</i>). If <i>a</i> &lt; <i>s</i>, bucket <i>a</i> has already been split in this round, so use <i>h</i><sub>ℓ+1</sub>(<i>K</i>) (one more bit).</li>
+<li><strong>Split:</strong> whenever an insertion has to use an overflow block (anywhere), split bucket <i>s</i> with <i>h</i><sub>ℓ+1</sub> into <i>s</i> and the new bucket <i>s</i> + 2<sup>ℓ+1</sup>, then increase <i>s</i>.</li>
+<li><strong>End of round:</strong> when <i>s</i> reaches 2<sup>ℓ+1</sup>, every bucket of the round has been split: set <i>s</i> = 0 and increase ℓ.</li>
+</ul>
+<p>Both versions share the essential ideas (no directory, buckets split in a fixed linear order, overflow chains as a temporary buffer). They differ only in <em>when</em> a split happens, so they give different pictures for the same input. If a question states the 1.7<i>n</i> rule, use Garcia-Molina's version. If it says nothing, say which rule you use. The animator below does both.</p>
+
+<h3>3.5 Try it yourself: linear hashing animator</h3>
+<figure class="wide">
+<span class="anim-tag">Interactive</span>
+<div id="linTool"></div>
+<figcaption><b>Figure 4.</b> Linear hashing animator. Bucket numbers are shown in decimal and in binary. Dashed blocks are overflow blocks. Both versions start from 2 empty buckets.</figcaption>
+</figure>
+
+<h2>4. Extendible versus linear hashing</h2>
+<div class="tbl"><table>
+<tr><th></th><th>Extendible hashing</th><th>Linear hashing</th></tr>
+<tr><td>Directory</td><td>Yes, 2<sup><i>i</i></sup> pointers</td><td>None; buckets live in an array</td></tr>
+<tr><td>Bits used</td><td>First <i>i</i> bits (textbooks); last bits in some courses</td><td>Last <i>i</i> bits</td></tr>
+<tr><td>Which bucket splits</td><td>The one that overflowed</td><td>The next one in order (bucket 0<i>a</i><sub>2</sub>…<i>a</i><sub><i>i</i></sub>, or bucket <i>s</i>)</td></tr>
+<tr><td>When</td><td>Immediately, when an insertion finds its bucket full</td><td>When <i>r</i>/<i>n</i> passes the threshold (GM) or any overflow occurs (Litwin)</td></tr>
+<tr><td>Growth</td><td>Directory doubles in one step</td><td>One bucket at a time, smoothly</td></tr>
+<tr><td>Overflow blocks</td><td>Only for identical hash values</td><td>Normal and temporary</td></tr>
+<tr><td>Lookup cost</td><td>One bucket read (plus the directory entry, usually in memory)</td><td>One bucket read plus its overflow chain, usually short</td></tr>
+<tr><td>Weak point</td><td>Directory can explode for skewed keys</td><td>A crowded bucket may wait a long time for its turn to split</td></tr>
+</table></div>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+<div id="try2"></div>
+<div id="try3"></div>
+
+<h3>Exam questions</h3>
+
+<div class="exam">
+<div class="exam-src">DB QB · 21-22 6a · 15 marks &nbsp;/&nbsp; BUET QBank · CSE 215 | L-2/T-2 | 2021–22 · 15 marks</div>
+<div class="exam-q"><p>Suppose that extendable hashing is being used on a database file that contains records with the following search key values: 2, 3, 5, 7, 11, 17, 19, and 23. Construct the extendable hash structure for this file if the hash function is h(x) = x mod 7 and each bucket can hold at most three records.</p></div>
+<details><summary>Show worked answer</summary><div class="exam-a">
+<p><strong>Hash values.</strong> x mod 7 is between 0 and 6, so 3 bits hold every hash value.</p>
+<div class="tbl"><table>
+<tr><th>x</th><td>2</td><td>3</td><td>5</td><td>7</td><td>11</td><td>17</td><td>19</td><td>23</td></tr>
+<tr><th>h(x) = x mod 7</th><td>2</td><td>3</td><td>5</td><td>0</td><td>4</td><td>3</td><td>5</td><td>2</td></tr>
+<tr><th>3-bit binary</th><td>010</td><td>011</td><td>101</td><td>000</td><td>100</td><td>011</td><td>101</td><td>010</td></tr>
+</table></div>
+<p><strong>Convention:</strong> the directory uses the <em>first</em> bits of the hash value, as in the textbooks. Keys are inserted in the given order into an initially empty structure (global depth 0, one bucket).</p>
+<ol>
+<li>2, 3, 5 fill the single bucket.</li>
+<li>7 finds it full with local depth 0 = global depth 0: double (i = 1), then split on the first bit. 2 (0..), 3 (0..) stay; 5 (1..) moves. 7 (000) joins bucket 0: [2, 3, 7].</li>
+<li>11 (100) goes to bucket 1: [5, 11].</li>
+<li>17 (011) finds bucket 0 full with local depth 1 = i: double (i = 2), split on bit 2: 7 (00) stays in bucket 00; 2 and 3 (01) move to bucket 01. 17 joins bucket 01: [2, 3, 17].</li>
+<li>19 (101) follows entry 10 to the shared bucket [5, 11] (local depth 1): [5, 11, 19].</li>
+<li>23 (010) finds bucket 01 full with local depth 2 = i: double (i = 3), split on bit 3: 2 (010) stays; 3 and 17 (011) move. 23 joins 2.</li>
+</ol>
+<figure><div id="q1final"></div><figcaption><b>Final structure (first bits).</b> Global depth 3. Entries 000, 001 → [7] (local depth 2); 010 → [2, 23] (3); 011 → [3, 17] (3); 100–111 → [5, 11, 19] (1).</figcaption></figure>
+<figure><span class="anim-tag">Animation</span><div id="q1anim"></div><figcaption>Every step of the construction above.</figcaption></figure>
+<p><strong>With last bits</strong> (the convention of the question-bank answer) the same algorithm gives global depth 2 and four buckets of local depth 2: 00 → [7, 11], 01 → [5, 19], 10 → [2, 23], 11 → [3, 17]. The steps: 7 causes the first split (keys ending 0: 2, 7; ending 1: 3, 5); 19 overflows [3, 5, 17] and forces the directory to depth 2 (3, 17 end in 11; 5, 19 end in 01); 23 overflows [2, 7, 11], which splits without doubling (7, 11 end in 00; 2, 23 end in 10).</p>
+<figure><div id="q1low"></div><figcaption>Final structure with last bits, matching the question-bank answer.</figcaption></figure>
+<p>Note: the question-bank answer is correct for the last-bits convention. Either convention earns the marks if you state it; the textbooks use first bits.</p>
+</div></details>
+</div>
+
+<div class="exam">
+<div class="exam-src">DB QB · 17-18 3a · 21 marks &nbsp;/&nbsp; BUET QBank · CSE 215 | L-2/T-2 | 2017–18 · 9 + 12 marks</div>
+<div class="exam-q"><p>Astronomer Neil has landed up in unknown BNARY planet instead of moon due to rocket malfunction and abducted by the people of BNARY. They will only let Neil go if he can solve some hashing problems. In the game of life or death, Neil has been given the following DBMS table:</p>
+<div class="tbl"><table><tr><th>Product Id</th><th>Quantity</th><th>Price per Quantity</th></tr>
+<tr><td>03</td><td>10</td><td>5</td></tr><tr><td>05</td><td>5</td><td>90</td></tr><tr><td>09</td><td>10</td><td>1200</td></tr><tr><td>11</td><td>12</td><td>50</td></tr><tr><td>13</td><td>11</td><td>89</td></tr><tr><td>18</td><td>2</td><td>65</td></tr></table></div>
+<p>Neil has been asked by BNARY people to use the hash function h(x) = x mod 1024 for answering the following questions. Now considering yourself in the place of Neil, write down the correct answer of each of the following questions:<br>(i) Insert all the given data incrementally using the Product Id of the table in an initially empty extensible hashing system. Show the state on the system after each insertion.<br>(ii) Insert all the given data incrementally using the Product Id of the table in an initially empty linear hashing system. Show the state of the system after each insertion.</p></div>
+<details><summary>Show worked answer</summary><div class="exam-a">
+<p><strong>Assumptions.</strong> h(x) = x mod 1024 gives a 10-bit value, and here h(x) = x for every key: 3 = 0000000011, 5 = 0000000101, 9 = 0000001001, 11 = 0000001011, 13 = 0000001101, 18 = 0000010010. The bucket capacity is not given; we take <strong>2 records per bucket</strong> (with 3 or more the extendible structure barely splits, and the question clearly wants splits).</p>
+<p><strong>Which bits?</strong> All six keys are below 32, so their first five bits are 00000. Using first bits, the directory would have to grow to global depth 8 (256 entries) just to separate six records: try it in the animator with "first bits" selected, or see the grouped figure below. The examiner chose h(x) = x mod 1024 so that the low-order bits of the Product Id do the work, so this answer uses the <strong>last bits</strong> for extendible hashing. Linear hashing always uses last bits.</p>
+<figure><div id="q2high"></div><figcaption>For comparison only: first bits, capacity 2. Global depth 8, a 256-entry directory (drawn grouped) for six keys. This is exactly the weakness of extendible hashing described in Section 3.</figcaption></figure>
+<p><strong>(i) Extendible hashing, last bits, capacity 2.</strong></p>
+<div class="tbl"><table id="q2tab"></table></div>
+<figure><span class="anim-tag">Animation</span><div id="q2ext"></div><figcaption>Insertion of 3, 5, 9, 11, 13, 18. Inserting 9 needs two doublings in a row, because 3, 5 and 9 all end in 1.</figcaption></figure>
+<p><strong>(ii) Linear hashing (Garcia-Molina rule: capacity 2, keep r ≤ 1.7n, start with n = 2, i = 1).</strong></p>
+<div class="tbl"><table id="q2lin"></table></div>
+<figure><span class="anim-tag">Animation</span><div id="q2gm"></div><figcaption>Linear hashing with the 1.7n threshold. Bucket 1 collects an overflow chain (9, 11, then 13) until it is finally split when n becomes 4.</figcaption></figure>
+<p>Final state: i = 2, n = 4, r = 6. Bucket 0 (00): empty. Bucket 1 (01): 5, 9 with 13 in an overflow block. Bucket 2 (10): 18. Bucket 3 (11): 3, 11.</p>
+<p>Note: the question-bank answer uses the split-on-overflow (Litwin) rule and gets, after 18: level 1, s = 1, five buckets: 0 empty, 1 = [5, 9] + overflow [13], 2 = [18], 3 = [3, 11], 4 empty. That is correct under that rule (the animator's "split on overflow" option reproduces it). Its extendible answer is correct for last bits, though its final diagram's directory-to-bucket arrows are hard to read: entries 000, 010, 100, 110 → [18] (local depth 1); 001 → [9] (3); 011, 111 → [3, 11] (2); 101 → [5, 13] (3).</p>
+</div></details>
+</div>
+
+<div class="exam">
+<div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2016–17 · 15 marks</div>
+<div class="exam-q"><p>The following figure shows a linear hash table with 3 records. We assume hash function h produces 4 bits and we represent records by the value produced by h when applied to the search key of the record. Here, i is the number of lower order bits of the hash function currently used and n is the current number of buckets. Each bucket can hold maximum of 2 records. We shall adopt the policy of choosing n, so that there are no more than 1.7n records in the file.</p>
+<figure><div id="q4fig"></div></figure>
+<p>Now, show (step by step) what happens after successive insertion of 0101, 0001 and 0111. Show the necessary calculation whenever a new bucket is required. Overflow blocks can be used if necessary.</p></div>
+<details><summary>Show worked answer</summary><div class="exam-a">
+<p>This is exactly Garcia-Molina's Example 14.25 (Figures 14.26–14.29). Start: i = 1, n = 2, r = 3; bucket 0 = [0000, 1010], bucket 1 = [1111].</p>
+<ol>
+<li><strong>Insert 0101.</strong> Last bit 1, m = 1 &lt; n, so bucket 1 = [1111, 0101]. r = 4 &gt; 1.7 × 2 = 3.4, so add a bucket: n = 3 &gt; 2<sup>1</sup>, so i = 2. The new bucket is 2 = <b>10</b>; split bucket <b>00</b>. 0000 ends in 00 and stays; 1010 ends in 10 and moves to bucket 2.</li>
+<li><strong>Insert 0001.</strong> Last two bits 01, m = 1 &lt; 3: bucket 1, which is full, so 0001 goes to an overflow block. r = 5 ≤ 1.7 × 3 = 5.1: no new bucket.</li>
+<li><strong>Insert 0111.</strong> Last two bits 11, m = 3 ≥ n = 3, so bucket 3 does not exist: use 3 − 2<sup>1</sup> = 1. Bucket 1 is full, so 0111 joins the overflow block. r = 6 &gt; 5.1: add bucket 3 = <b>11</b>; n = 4 = 2<sup>2</sup>, so i stays 2. Split bucket <b>01</b>: 1111 and 0111 end in 11 and move to bucket 3; 0101 and 0001 stay. The overflow block is no longer needed.</li>
+</ol>
+<figure><span class="anim-tag">Animation</span><div id="q4anim"></div><figcaption>The three insertions. Final: i = 2, n = 4, r = 6; buckets 00 = [0000], 01 = [0101, 0001], 10 = [1010], 11 = [1111, 0111].</figcaption></figure>
+<p>The question-bank answer is correct.</p>
+</div></details>
+</div>
+
+<div class="exam">
+<div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2015–16 · 20 marks</div>
+<div class="exam-q"><p>Construct the dynamic hash index structure on the balance attribute for the customer relation (records C0001–C0010, balances 1000–10000). The binary representation of the most significant digit of balance is the hash code. Insert records in descending order of balance.</p>
+<div class="tbl"><table><tr><th>Record</th><th>CustID</th><th>Name</th><th>Street</th><th>City</th><th>Balance</th></tr>
+<tr><td>0</td><td>C0001</td><td>N1</td><td>North</td><td>Dhaka</td><td>1000</td></tr><tr><td>1</td><td>C0002</td><td>N2</td><td>North</td><td>Dhaka</td><td>2000</td></tr><tr><td>2</td><td>C0003</td><td>N3</td><td>North</td><td>Dhaka</td><td>3000</td></tr><tr><td>3</td><td>C0004</td><td>N4</td><td>North</td><td>Dhaka</td><td>4000</td></tr><tr><td>4</td><td>C0005</td><td>N5</td><td>North</td><td>Dhaka</td><td>5000</td></tr><tr><td>5</td><td>C0006</td><td>N6</td><td>South</td><td>Dhaka</td><td>6000</td></tr><tr><td>6</td><td>C0007</td><td>N7</td><td>South</td><td>Dhaka</td><td>7000</td></tr><tr><td>7</td><td>C0008</td><td>N8</td><td>South</td><td>Dhaka</td><td>8000</td></tr><tr><td>8</td><td>C0009</td><td>N9</td><td>South</td><td>Dhaka</td><td>9000</td></tr><tr><td>9</td><td>C0010</td><td>N10</td><td>South</td><td>Dhaka</td><td>10000</td></tr></table></div></div>
+<details><summary>Show worked answer</summary><div class="exam-a">
+<p><strong>Setup.</strong> "Dynamic hash index" here means extendible hashing, the dynamic hashing technique Silberschatz teaches (he spells it "extendable"). The most significant digit is at most 9, so a 4-bit code suffices. Bucket capacity is not given; take 2 entries per bucket. Directory uses the first bits. Insertion order (descending balance) and hash codes:</p>
+<div class="tbl"><table><tr><th>Balance</th><td>10000</td><td>9000</td><td>8000</td><td>7000</td><td>6000</td><td>5000</td><td>4000</td><td>3000</td><td>2000</td><td>1000</td></tr>
+<tr><th>MSD</th><td>1</td><td>9</td><td>8</td><td>7</td><td>6</td><td>5</td><td>4</td><td>3</td><td>2</td><td>1</td></tr>
+<tr><th>Hash code</th><td>0001</td><td>1001</td><td>1000</td><td>0111</td><td>0110</td><td>0101</td><td>0100</td><td>0011</td><td>0010</td><td>0001</td></tr></table></div>
+<ol>
+<li>10000, 9000 fill the first bucket. 8000 overflows it: double to i = 1 and split on the first bit: 10000 (0…) in bucket 0; 9000, 8000 (1…) in bucket 1.</li>
+<li>7000 (0111) joins bucket 0. 6000 (0110) overflows it: local depth 1 = i, so double to i = 2 and split: 10000 (00) in bucket 00; 7000, 6000 (01) in bucket 01. Bucket 1 stays shared by 10 and 11.</li>
+<li>5000 (0101) overflows bucket 01: double to i = 3 and split on bit 3: 5000 (010) and 7000, 6000 (011).</li>
+<li>4000 (0100) joins 5000. 3000 (0011) joins 10000 in the bucket for 00 (local depth 2, shared by 000 and 001).</li>
+<li>2000 (0010) overflows that bucket: local depth 2 &lt; 3, so split without doubling: 10000 (000) stays; 3000, 2000 (001) move.</li>
+<li>1000 (0001) joins 10000.</li>
+</ol>
+<figure><div id="q5final"></div><figcaption><b>Final structure.</b> Global depth 3: 000 → [10000, 1000], 001 → [3000, 2000], 010 → [5000, 4000], 011 → [7000, 6000], 100–111 → [9000, 8000] (local depth 1). Each entry stands for the index entry (balance, pointer to the customer record).</figcaption></figure>
+<figure><span class="anim-tag">Animation</span><div id="q5anim"></div></figure>
+<p>The question-bank answer is correct.</p>
+</div></details>
+</div>
+
+<div class="exam">
+<div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2014–15 · 15 marks</div>
+<div class="exam-q"><p>Given the employee(emp_id, name, gender, status) relation with hash values on name, create step by step a dynamic hash index structure for name. Assume a bucket can contain only one record and an overflow bucket can be used.</p>
+<div class="figrow"><div class="tbl"><table><tr><th>emp_id</th><th>name</th><th>gender</th><th>status</th></tr>
+<tr><td>E001</td><td>Abid</td><td>Male</td><td>Full Time</td></tr><tr><td>E002</td><td>Arif</td><td>Male</td><td>Full Time</td></tr><tr><td>E003</td><td>Sajid</td><td>Male</td><td>Full Time</td></tr><tr><td>E004</td><td>Rafiq</td><td>Male</td><td>Part Time</td></tr><tr><td>E005</td><td>Shahid</td><td>Male</td><td>Full Time</td></tr><tr><td>E006</td><td>Sajid</td><td>Male</td><td>Full Time</td></tr><tr><td>E007</td><td>Karim</td><td>Male</td><td>Part Time</td></tr><tr><td>E008</td><td>Zahid</td><td>Male</td><td>Full Time</td></tr></table></div>
+<div class="tbl"><table><tr><th>Name</th><th>16 bit hash code h(Name)</th></tr>
+<tr><td>Abid</td><td><code>0001111100001111</code></td></tr><tr><td>Arif</td><td><code>0010111100001111</code></td></tr><tr><td>Sajid</td><td><code>0011111100001111</code></td></tr><tr><td>Rafiq</td><td><code>0100111100001111</code></td></tr><tr><td>Shahid</td><td><code>0101111100001111</code></td></tr><tr><td>Karim</td><td><code>1001111100001111</code></td></tr><tr><td>Zahid</td><td><code>0111111100001111</code></td></tr></table></div></div></div>
+<details><summary>Show worked answer</summary><div class="exam-a">
+<p><strong>Setup.</strong> Extendible hashing on the first bits of the 16-bit code, capacity 1. All codes end in the same 12 bits (111100001111), so only the first 4 bits can ever separate names; last bits would be useless here, which confirms first bits are intended.</p>
+<ol>
+<li><strong>Abid</strong> (0001) goes into the single empty bucket.</li>
+<li><strong>Arif</strong> (0010): bucket full. Double to i = 1: both start with 0, still together. Double to i = 2: both start with 00. Double to i = 3: Abid 000, Arif 001, separated. Buckets 01 (local depth 2) and 1 (local depth 1) are empty.</li>
+<li><strong>Sajid</strong> (0011) goes to 001, which holds Arif: double to i = 4 and split: Arif 0010, Sajid 0011.</li>
+<li><strong>Rafiq</strong> (0100) goes to the empty bucket for prefix 01.</li>
+<li><strong>Shahid</strong> (0101) collides with Rafiq: split that bucket to local depth 3 (both 010, still together, prefix 011 gets a new empty bucket), then to local depth 4: Rafiq 0100, Shahid 0101.</li>
+<li><strong>Sajid</strong> (E006) has exactly the same code as E003. Splitting can never separate equal codes, so E006 goes to an <strong>overflow bucket</strong> chained to bucket 0011.</li>
+<li><strong>Karim</strong> (1001) goes to the empty bucket for prefix 1 (local depth 1).</li>
+<li><strong>Zahid</strong> (0111) goes to the empty bucket for prefix 011 (local depth 3).</li>
+</ol>
+<figure><div id="q6final"></div><figcaption><b>Final structure.</b> Global depth 4 (16 entries). 0000, 0001 → Abid (3); 0010 → Arif (4); 0011 → Sajid E003, overflow Sajid E006 (4); 0100 → Rafiq (4); 0101 → Shahid (4); 0110, 0111 → Zahid (3); 1000–1111 → Karim (1).</figcaption></figure>
+<figure><span class="anim-tag">Animation</span><div id="q6anim"></div></figure>
+<p>The question-bank answer is correct.</p>
+</div></details>
+</div>
+
+<div class="exam">
+<div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2013–14 · 14 marks</div>
+<div class="exam-q"><p>Show the state of the linear hashing after inserting items: 0000, 0011, 0010, 0101, 1010, 1011, 1110, and 1111. Then show the state after inserting 1101 and 0111 into the hash table.</p></div>
+<details><summary>Show worked answer</summary><div class="exam-a">
+<p><strong>Assumptions.</strong> The items are 4-bit hash values. The question gives no capacity or growth rule, so use the textbook's (the same as in the previous linear hashing question from this course): 2 records per bucket, keep r ≤ 1.7n, start with n = 2 empty buckets and i = 1.</p>
+<div class="tbl"><table id="q7tab"></table></div>
+<p><strong>State after the first eight items:</strong> i = 3, n = 5, r = 8. Bucket 000 = [0000]; 001 = [0101]; 010 = [0010, 1010] + overflow [1110]; 011 = [0011, 1011] + overflow [1111]; 100 = empty.</p>
+<p><strong>Then 1101:</strong> last 3 bits 101 = 5 ≥ n = 5, so bucket 5 − 4 = 1: [0101, 1101]. r = 9 &gt; 1.7 × 5 = 8.5, so add bucket 5 = 101 and split bucket 001: both 0101 and 1101 end in 101 and move. <strong>Then 0111:</strong> 111 = 7 ≥ 6, so bucket 3, into its overflow block. r = 10 ≤ 10.2, no new bucket.</p>
+<p><strong>Final state:</strong> i = 3, n = 6, r = 10. Bucket 000 = [0000]; 001 = empty; 010 = [0010, 1010] + [1110]; 011 = [0011, 1011] + [1111, 0111]; 100 = empty; 101 = [0101, 1101].</p>
+<figure><span class="anim-tag">Animation</span><div id="q7anim"></div></figure>
+<p>Note: the question-bank answer instead splits bucket s whenever any insertion overflows (Litwin's rule). Under that rule its states are correct: after eight items, level 1 (h uses 2 bits), s = 2, six buckets: 0 = [0000], 1 = empty, 2 = [0010, 1010] + [1110], 3 = [0011, 1011] + [1111], 4 = empty, 5 = [0101]; after 1101 and 0111, s = 3, seven buckets, with 1110 moved to bucket 6 and 1101 in bucket 5. Pick one rule, say so, and apply it consistently.</p>
+</div></details>
+</div>
+
+<div class="exam">
+<div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2012–13 · 13 marks</div>
+<div class="exam-q"><p>Discuss Linear Hashing and Extensible Hashing with examples. How do they differ from each other?</p></div>
+<details><summary>Show worked answer</summary><div class="exam-a">
+<p><strong>Extensible hashing</strong> keeps a directory of 2<sup><i>i</i></sup> bucket pointers indexed by the first <i>i</i> bits of h(K) (global depth). Each bucket records its local depth <i>j</i> ≤ <i>i</i>, and 2<sup><i>i</i>−<i>j</i></sup> entries point to it. When an insertion finds its bucket full: if <i>j</i> &lt; <i>i</i>, split the bucket on bit <i>j</i> + 1 and re-point half its entries; if <i>j</i> = <i>i</i>, first double the directory. Example: Figure 1 above (Garcia-Molina's example): with capacity 2, inserting 1010 into the bucket [1001, 1100] (local depth 1 = i) doubles the directory to i = 2 and splits it into [1001, 1010] (prefix 10) and [1100] (prefix 11).</p>
+<p><strong>Linear hashing</strong> has no directory. It keeps n buckets, uses the last i = ⌈log<sub>2</sub> n⌉ bits, and sends a record to bucket m (the last i bits) or, if m ≥ n, to m − 2<sup>i−1</sup>. When the load r/n passes a threshold (1.7 records per bucket for 2-record blocks), it adds bucket n and splits the bucket whose number differs from it only in the leading bit. Overflow blocks are allowed. Example: Figure 3 above: inserting 0101 into a table with r = 3, n = 2 makes r = 4 &gt; 3.4, so bucket 10 is added and bucket 00 is split (1010 moves).</p>
+<div class="tbl"><table>
+<tr><th>Difference</th><th>Extensible</th><th>Linear</th></tr>
+<tr><td>Directory</td><td>Needed; doubles in size</td><td>None</td></tr>
+<tr><td>Bucket split</td><td>The overflowing bucket, at once</td><td>Next bucket in a fixed order, when the load factor demands it</td></tr>
+<tr><td>Growth</td><td>Sudden (directory doubling)</td><td>One bucket per step</td></tr>
+<tr><td>Overflow chains</td><td>Only for equal hash values</td><td>Normal, temporary</td></tr>
+<tr><td>Bits</td><td>First (high-order) i bits</td><td>Last (low-order) i bits</td></tr>
+<tr><td>Lookup</td><td>Directory entry + exactly one bucket</td><td>Computed bucket + its (short) overflow chain</td></tr>
+<tr><td>Space</td><td>Directory may be huge for skewed keys</td><td>Average occupancy controlled by the threshold</td></tr>
+</table></div>
+<p>Note: the question-bank answer says linear hashing splits whenever any bucket overflows. That is Litwin's variant; Garcia-Molina's version (the course textbook) splits when r/n exceeds the threshold. Both are linear hashing.</p>
+</div></details>
+</div>
+
+<div class="key"><p><strong>Summary:</strong> Dynamic hashing uses a growing number of bits of a fixed hash value. Extendible hashing keeps a directory of 2<sup>i</sup> pointers (global depth i) to buckets with local depths; a full bucket splits on its next bit, and the directory doubles only when the bucket's local depth equals i. Lookups read one bucket. Linear hashing has no directory: it uses the last i bits, sends m ≥ n to m − 2<sup>i−1</sup>, and adds one bucket at a time in a fixed order when r/n passes a threshold (Garcia-Molina) or on any overflow (Litwin), using overflow blocks in between. Always state which bits and which split rule you use.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script>
+/* ENGINE-START */
+// Pure hashing engines (no DOM). Records: {lab, h} where h is a B-bit integer hash value.
+const HX = {
+  bin: (h, B) => h.toString(2).padStart(B, '0'),
+  clone: o => JSON.parse(JSON.stringify(o)),
+};
+// Parse the student's input. mode 'mod': integer keys, h = key mod M. mode 'bin': tokens like 0101 or Name:0101.
+HX.parse = (text, mode, M, B) => {
+  const toks = text.split(/[\s,;]+/).filter(Boolean);
+  if (!toks.length) return { err: 'Type at least one key.' };
+  if (!(B >= 1 && B <= 16)) return { err: 'Hash width must be between 1 and 16 bits.' };
+  const recs = [];
+  for (const t of toks) {
+    if (mode === 'mod') {
+      if (!/^\d+$/.test(t)) return { err: `"${t}" is not a non-negative whole number.` };
+      const h = Number(BigInt(t) % BigInt(M));
+      if (h >= 2 ** B) return { err: `h(${t}) = ${h} needs more than ${B} bits. Increase the hash width.` };
+      recs.push({ n: recs.length, lab: t, h, hb: `h(${t}) = ${t} mod ${M} = ${h} = <b>${HX.bin(h, B)}</b>` });
+    } else {
+      const m = t.match(/^(?:([^:]+):)?([01]+)$/);
+      if (!m) return { err: `"${t}" is not a bit string (or Name:bits).` };
+      if (m[2].length !== B) return { err: `"${m[2]}" has ${m[2].length} bits; every hash value must have exactly ${B} bits.` };
+      recs.push({ n: recs.length, lab: m[1] || m[2], h: parseInt(m[2], 2), hb: m[1] ? `h(${m[1]}) = <b>${m[2]}</b>` : `Hash value <b>${m[2]}</b>` });
+    }
+  }
+  if (recs.length > 40) return { err: 'Please use at most 40 keys.' };
+  return { recs };
+};
+
+// ---------- extendible hashing ----------
+// o = {B, cap, high: true for first (high-order) bits}. Returns {events, st}; every event has a deep snapshot.
+HX.extendible = (recs, { B, cap, high }) => {
+  const st = { gd: 0, dir: [0], bk: [{ id: 0, ld: 0, recs: [] }], nextId: 1 };
+  const events = [];
+  const bitOfHash = (h, k) => high ? (h >> (B - 1 - k)) & 1 : (h >> k) & 1;      // k-th bit used (0-based)
+  const entryOf = h => st.gd === 0 ? 0 : high ? h >> (B - st.gd) : h & ((1 << st.gd) - 1);
+  // bit number k (0-based, in "bits used" order) of directory index j when the directory uses gd bits
+  const bitOfEntry = (j, k) => high ? (j >> (st.gd - 1 - k)) & 1 : (j >> k) & 1;
+  const bits = (h, n) => n === 0 ? '(no bits)' : high ? HX.bin(h, B).slice(0, n) : HX.bin(h, B).slice(B - n);
+  const snap = (cap_, hl = {}) => events.push({ st: HX.clone(st), cap: cap_, hl });
+  snap(`Empty structure: global depth i = 0, so the directory has 2⁰ = 1 entry, pointing to one empty bucket with local depth 0. Bucket capacity ${cap}.`);
+  for (const r of recs) {
+    let tries = 0;
+    for (;;) {
+      if (++tries > 40) throw new Error('loop');
+      const e = entryOf(r.h), b = st.bk.find(x => x.id === st.dir[e]);
+      const ehead = `${r.hb}. Global depth ${st.gd}: use the ${high ? 'first' : 'last'} ${st.gd} bit${st.gd === 1 ? '' : 's'} <b>${bits(r.h, st.gd)}</b> → directory entry ${st.gd ? bits(r.h, st.gd) : '(the only one)'} → bucket with local depth ${b.ld}.`;
+      const prim = b.recs.length - (b.over || 0);
+      if (b.recs.length < cap) {
+        b.recs.push(r);
+        snap(`Insert <b>${r.lab}</b>. ${ehead} It has room, so ${r.lab} goes there.`, { entry: e, bucket: b.id, rec: r.n });
+        break;
+      }
+      // full: can splitting help?
+      const all = [...b.recs, r];
+      const same = all.every(x => x.h === all[0].h);
+      if (same || b.ld === B) {
+        b.recs.push(r);
+        snap(`Insert <b>${r.lab}</b>. ${ehead} The bucket is full, and ${same ? 'every record in it has the same hash value as ' + r.lab + ', so no split can ever separate them' : 'it already uses all ' + B + ' bits'}. ${r.lab} goes into an <b>overflow block</b> chained to the bucket.`, { entry: e, bucket: b.id, rec: r.n });
+        break;
+      }
+      if (b.ld === st.gd) {
+        // double the directory
+        const old = st.dir, n = old.length;
+        st.dir = Array.from({ length: 2 * n }, (_, j) => high ? old[j >> 1] : old[j & (n - 1)]);
+        st.gd++;
+        snap(`Insert <b>${r.lab}</b>. ${ehead} The bucket is <b>full</b> and its local depth ${b.ld} equals the global depth ${st.gd - 1}, so first <b>double the directory</b>: global depth becomes ${st.gd} (${2 * n} entries). Each old entry w becomes ${high ? 'w0 and w1' : '0w and 1w'}, both pointing to the bucket w pointed to. No bucket changes yet.`, { bucket: b.id, rec: r.n, doubled: true });
+        continue;
+      }
+      // split b (ld < gd)
+      const k = b.ld, nb = { id: st.nextId++, ld: k + 1, recs: [] };
+      b.ld = k + 1;
+      const keep = [], move = [];
+      for (const x of b.recs) (bitOfHash(x.h, k) ? move : keep).push(x);
+      b.recs = keep; nb.recs = move;
+      st.bk.push(nb);
+      st.dir = st.dir.map((id, j) => id === b.id && bitOfEntry(j, k) ? nb.id : id);
+      const pat = x => bits(x.h, k + 1);
+      snap(`Insert <b>${r.lab}</b> still pending. The full bucket has local depth ${k} &lt; global depth ${st.gd}, so <b>split it</b>: both halves get local depth ${k + 1}. Records are divided on bit ${k + 1} (${high ? 'from the left' : 'from the right'}). Bit 0 stays: ` +
+        (keep.length ? keep.map(x => `${x.lab} (${pat(x)})`).join(', ') : 'none') + '. Bit 1 goes to the new bucket: ' +
+        (move.length ? move.map(x => `${x.lab} (${pat(x)})`).join(', ') : 'none') + '. Directory entries are re-pointed by the same bit. Now retry the insert.',
+        { bucket: b.id, nbucket: nb.id, moved: move.map(x => x.n) });
+    }
+  }
+  return { events, st };
+};
+
+// ---------- linear hashing ----------
+// rule 'gm': Garcia-Molina, add a bucket whenever r > t·n. rule 'litwin': split bucket s whenever an insert overflows a bucket.
+// Starts with n = 2 empty buckets and i = 1. Each bucket = array of records; slots beyond cap are overflow blocks.
+HX.linear = (recs, { B, cap, rule, t }) => {
+  const st = { i: 1, n: 2, r: 0, s: 0, lvl: 0, bk: [[], []] };
+  const events = [];
+  const low = (h, i) => h & ((1 << i) - 1);
+  const snap = (c, hl = {}) => events.push({ st: HX.clone(st), cap: c, hl });
+  snap(rule === 'gm'
+    ? `Start: n = 2 buckets, i = 1 bit (the last bit of h), r = 0 records. Policy: keep r ≤ ${t}·n. Bucket capacity ${cap}; extra records go to overflow blocks.`
+    : `Start: N = 2 buckets, level 0 (h₀ = last 1 bit), split pointer s = 0. Rule: whenever an insert lands in a full bucket, split bucket s. Bucket capacity ${cap}.`);
+  for (const r of recs) {
+    let m, how;
+    if (rule === 'gm') {
+      m = low(r.h, st.i);
+      how = `${r.hb}. Last i = ${st.i} bit${st.i > 1 ? 's' : ''}: ${HX.bin(m, st.i)} = ${m}. ` +
+        (m < st.n ? `${m} &lt; n = ${st.n}, so bucket ${m}.` : `${m} ≥ n = ${st.n}: bucket ${m} does not exist yet, so use ${m} − 2^${st.i - 1} = ${m - 2 ** (st.i - 1)}.`);
+      if (m >= st.n) m -= 2 ** (st.i - 1);
+    } else {
+      const L = st.lvl + 1;            // bits used by h_level
+      m = low(r.h, L);
+      how = `${r.hb}. h${st.lvl} (last ${L} bit${L > 1 ? 's' : ''}) = ${m}` +
+        (m < st.s ? `, which is &lt; s = ${st.s} (already split this round), so use h${st.lvl + 1} (last ${L + 1} bits) = ${low(r.h, L + 1)}.` : ` ≥ s = ${st.s}, so bucket ${m}.`);
+      if (m < st.s) m = low(r.h, L + 1);
+    }
+    const b = st.bk[m], full = b.length >= cap;
+    b.push(r); st.r++;
+    snap(`Insert <b>${r.lab}</b>. ${how} ${full ? 'That bucket is full, so the record goes to an <b>overflow block</b>.' : 'It has room.'}` +
+      (rule === 'gm' ? ` Now r = ${st.r}, and ${t}·n = ${+(t * st.n).toFixed(2)}: ${st.r > t * st.n ? '<b>r is too large, add a bucket</b>.' : 'within the limit, no new bucket.'}` : full ? ' An overflow happened, so <b>split bucket s</b>.' : ''),
+      { bucket: m, rec: r.n });
+    if (rule === 'gm' && st.r > t * st.n) {
+      st.n++;
+      let bumped = false;
+      if (st.n > 2 ** st.i) { st.i++; bumped = true; }
+      const nw = st.n - 1, old = nw - 2 ** (st.i - 1);
+      st.bk.push([]);
+      const keep = [], move = [];
+      for (const x of st.bk[old]) (low(x.h, st.i) === nw ? move : keep).push(x);
+      st.bk[old] = keep; st.bk[nw] = move;
+      snap(`n becomes ${st.n}${bumped ? `, which exceeds 2^${st.i - 1}, so i becomes ${st.i}` : ''}. The new bucket is number ${nw} = <b>${HX.bin(nw, st.i)}</b>; split the bucket that differs only in the first of those bits, <b>${HX.bin(old, st.i)}</b> = ${old}. Its records are re-placed by their last ${st.i} bits: ` +
+        `moving to bucket ${nw} (last bits ${HX.bin(nw, st.i)}): ${move.length ? move.map(x => x.lab).join(', ') : 'none'}; staying in bucket ${old}: ${keep.length ? keep.map(x => x.lab).join(', ') : 'none'}.`, { bucket: old, nbucket: nw, moved: move.map(x => x.n) });
+    } else if (rule === 'litwin' && full) {
+      const L = st.lvl + 1, sp = st.s, nw = sp + 2 ** L;
+      st.bk.push([]);
+      const keep = [], move = [];
+      for (const x of st.bk[sp]) (low(x.h, L + 1) === nw ? move : keep).push(x);
+      st.bk[sp] = keep; st.bk[nw] = move;
+      st.s++; st.n++;
+      let wrap = '';
+      if (st.s === 2 ** L) { st.s = 0; st.lvl++; wrap = ` s reached 2^${L} = ${2 ** L}, so the round ends: level becomes ${st.lvl}, s = 0.`; }
+      snap(`Split bucket s = ${sp} using h${L} (last ${L + 1} bits) into buckets ${sp} and new bucket ${nw}: ` +
+        `moving: ${move.length ? move.map(x => x.lab).join(', ') : 'none'}; staying: ${keep.length ? keep.map(x => x.lab).join(', ') : 'none'}` +
+        `. s becomes ${sp + 1}.${wrap}` + (m !== sp ? ` Bucket ${m}, which overflowed, keeps its overflow block until the split pointer reaches it.` : ' The bucket that overflowed was the one split, so its overflow is resolved.'), { bucket: sp, nbucket: nw, moved: move.map(x => x.n) });
+    }
+  }
+  return { events, st };
+};
+/* ENGINE-END */
+
+// ---------- drawing ----------
+const hxBits = (h, B) => { const s = HX.bin(h, B); return B <= 8 ? s : s.slice(0, 4) + '…' + s.slice(-4); };
+function hxSlot(r, x, y, o, hl, dashed) {
+  const SW = 66, SH = 34;
+  const cls = !r ? 'cell-plain' : hl.rec === r.n ? 'cell-new' : (hl.moved || []).includes(r.n) ? 'cell-hl' : 'cell';
+  let s = `<rect class="${cls}" x="${x}" y="${y}" width="${SW}" height="${SH}"${dashed ? ' style="stroke-dasharray:4 3"' : ''}/>`;
+  if (r) {
+    const fit = r.lab.length * 7.2 > SW - 6 ? ` textLength="${SW - 8}" lengthAdjust="spacingAndGlyphs"` : '';
+    s += `<text x="${x + SW / 2}" y="${y + 15}" text-anchor="middle" style="font-size:12px;font-weight:600"${fit}>${r.lab}</text>`;
+    s += `<text x="${x + SW / 2}" y="${y + 29}" text-anchor="middle" class="lbl">${hxBits(r.h, o.B)}</text>`;
+  }
+  return s;
+}
+// a bucket = record array; first cap slots are the primary block, the rest overflow blocks
+function hxBucket(recs, x, y, o, hl) {
+  const SW = 66, SH = 34, cap = o.cap, nblk = Math.max(1, Math.ceil(recs.length / cap));
+  let s = '', bx = x;
+  for (let b = 0; b < nblk; b++) {
+    if (b) { s += `<path d="M${bx - 26} ${y + SH / 2} H${bx - 3}" class="s-fg" marker-end="url(#m-fg)"/>`; }
+    for (let q = 0; q < cap; q++) s += hxSlot(recs[b * cap + q], bx + q * SW, y, o, hl, b > 0);
+    bx += cap * SW + 26;
+  }
+  if (nblk > 1) s += `<text x="${x + cap * SW + 30}" y="${y - 4}" class="lbl">overflow</text>`;
+  return { s, right: bx - 26 };
+}
+function extSVG(st, o) {
+  const hl = o.hl || {}, SH = 34, BH = 50, ER = 26, DX = 10, y0 = 46;
+  const order = []; st.dir.forEach(id => order.includes(id) || order.push(id));
+  const bk = id => st.bk.find(b => b.id === id);
+  const grouped = st.dir.length > 16;
+  const rows = grouped ? order.map(id => {
+      const b = bk(id), w = HX.bin(st.dir.indexOf(id), st.gd), x = 'x'.repeat(st.gd - b.ld);
+      return { lab: o.high ? w.slice(0, b.ld) + x : x + w.slice(st.gd - b.ld), id, hot: hl.entry != null && st.dir[hl.entry] === id };
+    }) : st.dir.map((id, j) => ({ lab: st.gd ? HX.bin(j, st.gd) : '(all)', id, hot: hl.entry === j }));
+  const dirW = Math.max(52, 14 + 8 * Math.max(...rows.map(r => r.lab.length)));
+  const BX = DX + dirW + 90, by = k => y0 + k * BH, ry = k => y0 + k * ER;
+  let s = `<text x="${DX}" y="16" class="big">global depth i = ${st.gd} (${st.dir.length} director${st.dir.length === 1 ? 'y entry' : 'y entries'}${grouped ? ', drawn grouped: x = either bit' : ''})</text><text x="${DX}" y="38" class="lbl">directory</text>`;
+  s += `<text x="${BX}" y="38" class="lbl">buckets (box on the left = local depth)</text>`;
+  let right = BX + 300;
+  rows.forEach((r, k) => {
+    s += `<rect class="${r.hot ? 'cell-hl' : 'cell-plain'}" x="${DX}" y="${ry(k)}" width="${dirW}" height="${ER}"/><text x="${DX + dirW / 2}" y="${ry(k) + 17}" text-anchor="middle" style="font-size:12px">${r.lab}</text>`;
+  });
+  rows.forEach((r, k) => {
+    const ty = by(order.indexOf(r.id)) + SH / 2;
+    s += `<path d="M${DX + dirW} ${ry(k) + ER / 2} L${BX - 3} ${ty}" class="${r.hot ? 's-red' : 's-fg'}"${r.hot ? ' style="stroke-width:2.5"' : ''} marker-end="url(#${r.hot ? 'm-red' : 'm-fg'})"/>`;
+  });
+  order.forEach((id, k) => {
+    const b = bk(id), y = by(k);
+    s += `<rect class="cell-plain" x="${BX}" y="${y}" width="24" height="${SH}"/><text x="${BX + 12}" y="${y + 22}" text-anchor="middle" class="big">${b.ld}</text>`;
+    const r = hxBucket(b.recs, BX + 24, y, o, hl);
+    s += r.s; right = Math.max(right, r.right);
+    if (hl.bucket === id || hl.nbucket === id) {
+      s += `<rect x="${BX - 4}" y="${y - 4}" width="${Math.min(r.right, BX + 24 + o.cap * 66) - BX + 8}" height="${SH + 8}" rx="3" class="${hl.nbucket === id ? 's-grn' : 's-acc'}" style="stroke-width:2.5;fill:none"/>`;
+      if (hl.nbucket === id) s += `<text x="${BX + 24 + o.cap * 66 + 10}" y="${y + 22}" class="lbl grn" style="font-weight:600">new bucket</text>`;
+    }
+  });
+  const W = Math.max(right + 90, grouped ? 560 : 330), H = y0 + Math.max(rows.length * ER, order.length * BH) + 8;
+  return `<svg viewBox="0 0 ${W} ${H}" width="${W}" role="img" aria-label="extendible hash structure">${s}</svg>`;
+}
+function linSVG(st, o) {
+  const hl = o.hl || {}, SH = 34, RH = 48, X = 110, y0 = 52, nb = st.bk.length;
+  const ib = o.rule === 'gm' ? st.i : Math.max(1, Math.ceil(Math.log2(nb)));
+  let s = o.rule === 'gm'
+    ? `<text x="10" y="18" class="big">i = ${st.i} · n = ${st.n} · r = ${st.r} · limit ${o.t}·n = ${+(o.t * st.n).toFixed(2)}</text>`
+    : `<text x="10" y="18" class="big">level ${st.lvl}: h${st.lvl} = last ${st.lvl + 1} bit${st.lvl ? 's' : ''} · split pointer s = ${st.s} · N = ${st.n}</text>`;
+  s += `<text x="10" y="38" class="lbl">bucket</text><text x="${X}" y="38" class="lbl">primary block, then overflow blocks (dashed)</text>`;
+  let right = X + 300;
+  st.bk.forEach((b, k) => {
+    const y = y0 + k * RH;
+    if (o.rule !== 'gm' && k === st.s) s += `<text x="8" y="${y + 22}" class="big red">s →</text>`;
+    s += `<text x="${o.rule === 'gm' ? 14 : 44}" y="${y + 16}" class="big">${k}</text><text x="${o.rule === 'gm' ? 14 : 44}" y="${y + 30}" class="lbl">${HX.bin(k, Math.max(ib, Math.ceil(Math.log2(k + 1)) || 1))}</text>`;
+    const r = hxBucket(b, X, y, o, hl);
+    s += r.s; right = Math.max(right, r.right);
+    if (hl.bucket === k || hl.nbucket === k) {
+      s += `<rect x="${X - 4}" y="${y - 4}" width="${o.cap * 66 + 8}" height="${SH + 8}" rx="3" class="${hl.nbucket === k ? 's-grn' : 's-acc'}" style="stroke-width:2.5;fill:none"/>`;
+      if (hl.nbucket === k) s += `<text x="${right + 10}" y="${y + 22}" class="lbl grn" style="font-weight:600">new bucket</text>`;
+    }
+  });
+  const W = Math.max(right + 100, 560), H = y0 + nb * RH;
+  return `<svg viewBox="0 0 ${W} ${H}" width="${W}" role="img" aria-label="linear hash table">${s}</svg>`;
+}
+const extSteps = (recs, o) => HX.extendible(recs, o).events.map(e => ({ html: extSVG(e.st, { ...o, hl: e.hl }), cap: e.cap }));
+const linSteps = (recs, o) => HX.linear(recs, o).events.map(e => ({ html: linSVG(e.st, { ...o, hl: e.hl }), cap: e.cap }));
+const P = (t, mode, M, B) => HX.parse(t, mode, M, B).recs;
+
+// ---------- interactive tools ----------
+function hxTool(sel, kind, presets) {
+  const host = $(sel);
+  host.innerHTML = `<div class="hx-pre">Load a question: ${presets.map((p, k) => `<button type="button" data-k="${k}">${p.name}</button>`).join('')}</div>
+  <form class="bp-form hx-form">
+    <label>Keys <input class="keys" name="keys" autocomplete="off" spellcheck="false"></label>
+    <label>Hash <select name="mode"><option value="mod">h(x) = x mod M</option><option value="bin">keys are bit strings</option></select></label>
+    <label>M <input class="sm" name="M"></label>
+    <label>Hash bits <input class="sm" name="B"></label>
+    <label>Capacity <input class="sm" name="cap"></label>
+    ${kind === 'ext' ? '<label>Directory uses <select name="high"><option value="1">first bits</option><option value="0">last bits</option></select></label>'
+      : '<label>Rule <select name="rule"><option value="gm">r ≤ t·n (Garcia-Molina)</option><option value="litwin">split on overflow (Litwin)</option></select></label><label>t <input class="sm" name="t"></label>'}
+    <button type="submit">Animate</button>
+  </form><div class="hx-msg" aria-live="polite"></div><div class="hx-st"></div>`;
+  const f = host.querySelector('form'), msg = host.querySelector('.hx-msg');
+  const load = p => { for (const [k, v] of Object.entries(p)) if (f.elements[k]) f.elements[k].value = v; run(); };
+  const run = () => {
+    const v = n => f.elements[n].value.trim(), mode = v('mode');
+    const M = +v('M'), B = +v('B'), cap = +v('cap');
+    msg.textContent = '';
+    if (mode === 'mod' && !(Number.isInteger(M) && M >= 2)) return msg.textContent = 'M must be a whole number of at least 2.';
+    if (!(Number.isInteger(B) && B >= 1 && B <= 16)) return msg.textContent = 'Hash bits must be a whole number from 1 to 16.' + (mode === 'mod' && M >= 2 ? ` For x mod ${M} you need ${Math.ceil(Math.log2(M))}.` : '');
+    if (!(Number.isInteger(cap) && cap >= 1 && cap <= 6)) return msg.textContent = 'Capacity must be a whole number from 1 to 6.';
+    const p = HX.parse(v('keys'), mode, M, B);
+    if (p.err) return msg.textContent = p.err;
+    let steps;
+    if (kind === 'ext') steps = extSteps(p.recs, { B, cap, high: v('high') === '1' });
+    else {
+      const t = +v('t');
+      if (v('rule') === 'gm' && !(t > 0 && t <= 6)) return msg.textContent = 't must be a number between 0 and 6, for example 1.7.';
+      steps = linSteps(p.recs, { B, cap, rule: v('rule'), t });
+    }
+    stepper(host.querySelector('.hx-st'), steps, { interval: 2400 });
+  };
+  host.querySelector('.hx-pre').addEventListener('click', e => { const b = e.target.closest('button'); if (b) load(presets[+b.dataset.k]); });
+  f.addEventListener('submit', e => { e.preventDefault(); run(); });
+  load(presets[0]);
+}
+hxTool('#extTool', 'ext', [
+  { name: 'Q1: x mod 7', keys: '2 3 5 7 11 17 19 23', mode: 'mod', M: 7, B: 3, cap: 3, high: '1' },
+  { name: 'Q2: x mod 1024', keys: '3 5 9 11 13 18', mode: 'mod', M: 1024, B: 10, cap: 2, high: '0' },
+  { name: 'Q5: balances', keys: '10000:0001 9000:1001 8000:1000 7000:0111 6000:0110 5000:0101 4000:0100 3000:0011 2000:0010 1000:0001', mode: 'bin', M: 2, B: 4, cap: 2, high: '1' },
+  { name: 'Q6: names', keys: 'Abid:0001111100001111 Arif:0010111100001111 Sajid:0011111100001111 Rafiq:0100111100001111 Shahid:0101111100001111 Sajid:0011111100001111 Karim:1001111100001111 Zahid:0111111100001111', mode: 'bin', M: 2, B: 16, cap: 1, high: '1' },
+  { name: 'Textbook example', keys: '0001 1001 1100 1010 0000 0111 1000', mode: 'bin', M: 2, B: 4, cap: 2, high: '1' },
+]);
+hxTool('#linTool', 'lin', [
+  { name: 'Q4 (textbook)', keys: '0000 1010 1111 0101 0001 0111', mode: 'bin', M: 2, B: 4, cap: 2, rule: 'gm', t: 1.7 },
+  { name: 'Q7', keys: '0000 0011 0010 0101 1010 1011 1110 1111 1101 0111', mode: 'bin', M: 2, B: 4, cap: 2, rule: 'gm', t: 1.7 },
+  { name: 'Q7, Litwin rule', keys: '0000 0011 0010 0101 1010 1011 1110 1111 1101 0111', mode: 'bin', M: 2, B: 4, cap: 2, rule: 'litwin', t: 1.7 },
+  { name: 'Q2: x mod 1024', keys: '3 5 9 11 13 18', mode: 'mod', M: 1024, B: 10, cap: 2, rule: 'gm', t: 1.7 },
+]);
+
+// ---------- chapter figures ----------
+const GMX = { B: 4, cap: 2, high: true };
+stepper('#gmExt', extSteps(P('0001 1001 1100 1010 0000 0111 1000', 'bin', 0, 4), GMX), { interval: 2400 });
+const GML = { B: 4, cap: 2, rule: 'gm', t: 1.7 };
+stepper('#gmLin', linSteps(P('0000 1010 1111 0101 0001 0111', 'bin', 0, 4), GML), { interval: 2400 });
+
+// exam figures
+const fin = (sel, recs, o) => { $(sel).innerHTML = extSVG(HX.extendible(recs, o).st, o); };
+const Q1 = P('2 3 5 7 11 17 19 23', 'mod', 7, 3);
+fin('#q1final', Q1, { B: 3, cap: 3, high: true });
+fin('#q1low', Q1, { B: 3, cap: 3, high: false });
+stepper('#q1anim', extSteps(Q1, { B: 3, cap: 3, high: true }), { interval: 2400 });
+const Q2 = P('3 5 9 11 13 18', 'mod', 1024, 10);
+fin('#q2high', Q2, { B: 10, cap: 2, high: true });
+stepper('#q2ext', extSteps(Q2, { B: 10, cap: 2, high: false }), { interval: 2400 });
+stepper('#q2gm', linSteps(Q2, { B: 10, cap: 2, rule: 'gm', t: 1.7 }), { interval: 2400 });
+// "state after each insertion" tables
+const extText = (st, o) => `i = ${st.gd}; ` + (() => { const order = []; st.dir.forEach(id => order.includes(id) || order.push(id));
+  return order.map(id => { const b = st.bk.find(x => x.id === id), ents = st.dir.map((d, j) => d === id ? (st.gd ? HX.bin(j, st.gd) : '·') : null).filter(Boolean);
+    return `{${ents.join(', ')}} → [${b.recs.map(r => r.lab).join(', ')}] (local ${b.ld})`; }).join('; '); })();
+const linText = (st, o) => (o.rule === 'gm' ? `i = ${st.i}, n = ${st.n}, r = ${st.r}: ` : `level ${st.lvl}, s = ${st.s}: `) +
+  st.bk.map((b, k) => `${k}: [${b.slice(0, o.cap).map(r => r.lab).join(', ')}]${b.length > o.cap ? ' + overflow [' + b.slice(o.cap).map(r => r.lab).join(', ') + ']' : ''}`).join('; ');
+function stateTable(sel, recs, o, kind) {
+  let h = '<tr><th>After inserting</th><th>State</th></tr>';
+  for (let k = 1; k <= recs.length; k++) {
+    const st = kind === 'ext' ? HX.extendible(recs.slice(0, k), o).st : HX.linear(recs.slice(0, k), o).st;
+    h += `<tr><td class="num">${recs[k - 1].lab}</td><td>${kind === 'ext' ? extText(st, o) : linText(st, o)}</td></tr>`;
+  }
+  $(sel).innerHTML = h;
+}
+stateTable('#q2tab', Q2, { B: 10, cap: 2, high: false }, 'ext');
+stateTable('#q2lin', Q2, { B: 10, cap: 2, rule: 'gm', t: 1.7 }, 'lin');
+// Q4: start from the given 3-record table
+const Q4 = P('0000 1010 1111 0101 0001 0111', 'bin', 0, 4);
+$('#q4fig').innerHTML = linSVG(HX.linear(Q4.slice(0, 3), GML).st, GML);
+const q4s = linSteps(Q4, GML).slice(3);
+q4s[0].cap = 'The given table: i = 1, n = 2, r = 3. Bucket 0 holds 0000 and 1010 (last bit 0); bucket 1 holds 1111.';
+stepper('#q4anim', q4s, { interval: 2600 });
+const Q5 = P('10000:0001 9000:1001 8000:1000 7000:0111 6000:0110 5000:0101 4000:0100 3000:0011 2000:0010 1000:0001', 'bin', 0, 4);
+fin('#q5final', Q5, GMX);
+stepper('#q5anim', extSteps(Q5, GMX), { interval: 2400 });
+const Q6 = P('Abid:0001111100001111 Arif:0010111100001111 Sajid:0011111100001111 Rafiq:0100111100001111 Shahid:0101111100001111 Sajid:0011111100001111 Karim:1001111100001111 Zahid:0111111100001111', 'bin', 0, 16);
+fin('#q6final', Q6, { B: 16, cap: 1, high: true });
+stepper('#q6anim', extSteps(Q6, { B: 16, cap: 1, high: true }), { interval: 2400 });
+const Q7 = P('0000 0011 0010 0101 1010 1011 1110 1111 1101 0111', 'bin', 0, 4);
+stateTable('#q7tab', Q7, GML, 'lin');
+stepper('#q7anim', linSteps(Q7, GML), { interval: 2400 });
+
+// ---------- practice ----------
+flashcards('#cards', [
+  { f: 'Global depth i', b: 'Number of hash bits the extendible-hashing directory uses. The directory has 2<sup>i</sup> entries.' },
+  { f: 'Local depth i<sub>j</sub>', b: 'Number of bits all records of bucket j share. 2<sup>i − i<sub>j</sub></sup> directory entries point to the bucket.' },
+  { f: 'Directory doubling', b: 'Needed when a full bucket has local depth = global depth. i grows by 1; entries w0 and w1 both copy entry w.' },
+  { f: 'Bucket split (extendible)', b: 'Full bucket with i<sub>j</sub> &lt; i: make a new bucket, both get depth i<sub>j</sub> + 1, records move by bit i<sub>j</sub> + 1, half the entries re-point.' },
+  { f: 'Linear hashing bucket rule', b: 'm = last i bits of h(K). Bucket m if m &lt; n, else bucket m − 2<sup>i−1</sup>.' },
+  { f: 'When linear hashing grows (GM)', b: 'When r &gt; t·n (t = 1.7 in the textbook). Add bucket n = 1a₂…aᵢ and split bucket 0a₂…aᵢ.' },
+  { f: 'Split pointer s (Litwin)', b: 'The next bucket to split. Any overflow splits bucket s; when s reaches the end of the round it returns to 0 and the level grows.' },
+  { f: 'Why overflow blocks in extendible hashing?', b: 'Only when all records in a full bucket have the same hash value (duplicate keys): no extra bit can separate them.' },
+]);
+quiz('#quiz', [
+  { q: 'Global depth 3, a bucket has local depth 1. How many directory entries point to it?', opts: ['1', '2', '4', '8'], a: 2, why: '2<sup>3 − 1</sup> = 4 entries share the bucket.' },
+  { q: 'An insertion finds its bucket full and the bucket\'s local depth equals the global depth. What happens first?', opts: ['The bucket gets an overflow block', 'The directory doubles', 'The bucket splits without touching the directory', 'The whole file is rehashed'], a: 1, why: 'Only one directory entry points to the bucket, so there is no spare entry for the new half. Doubling makes two entries, then the bucket splits.' },
+  { q: 'In Garcia-Molina\'s linear hashing with n = 3 and i = 2, where does a record with hash 1011 go?', opts: ['Bucket 3', 'Bucket 1', 'Bucket 2', 'An overflow block of bucket 0'], a: 1, why: 'Last 2 bits 11 = 3 ≥ n = 3, so use 3 − 2<sup>1</sup> = 1.' },
+  { q: 'In linear hashing, which bucket is split when a new bucket is added?', opts: ['The bucket that just overflowed', 'The fullest bucket', 'The bucket whose number differs from the new bucket only in the leading bit', 'Bucket 0 always'], a: 2, why: 'New bucket 1a₂…aᵢ splits bucket 0a₂…aᵢ, independent of where the insertion went.' },
+  { q: 'Why can a lookup in extendible hashing be done with one disk read?', opts: ['Buckets never overflow', 'The directory (usually in memory) points straight to the one bucket that can hold the key', 'Records are sorted', 'The hash function is perfect'], a: 1, why: 'Follow the directory entry for the first i bits; only that bucket can contain the key.' },
+  { q: 'Which is a real drawback of extendible hashing?', opts: ['It cannot handle insertions', 'A few keys with a long common prefix can force a huge directory', 'It needs the file sorted', 'Lookups must scan every bucket'], a: 1, why: 'Q2 shows six small keys forcing a 256-entry directory when first bits are used.' },
+]);
+ask('#try1', { q: 'Extendible hashing, first bits, capacity 2, 4-bit hashes. Insert 0000, 0001, 0010 into an empty structure. What is the global depth at the end?', a: 3, hint: '0000 and 0001 agree on their first three bits.', why: 'The third key overflows the only bucket. The first bit separates nothing (all 0), nor does the second; the third bit puts 0010 apart from 0000 and 0001. So the directory doubles three times: i = 3.' });
+ask('#try2', { q: 'Linear hashing (GM), capacity 2, threshold 1.7. Currently n = 5, i = 3, r = 8. One more record is inserted. How many buckets are there afterwards?', a: 6, hint: 'Compare r = 9 with 1.7 × 5.', why: '9 &gt; 8.5, so one bucket is added: n = 6 (bucket 101 splits bucket 001).' });
+ask('#try3', { q: 'With h(x) = x mod 7 written in 3 bits and first-bit extendible hashing, which directory entry does key 25 follow when the global depth is 2? (type the two bits)', a: ['10'], hint: '25 mod 7 = 4.', why: '4 = 100, first two bits 10.' });
+</script>
+</body>
+</html>

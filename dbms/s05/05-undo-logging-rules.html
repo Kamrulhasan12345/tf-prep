@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Undo Logging: Rules U1 and U2 · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 05 (Sukarna) · Chapter 5 · Slides 22–24 · Book §17.2.2</div>
+<h1>Undo Logging: Rules U1 and U2</h1>
+<p class="lede">Undo logging keeps old values in the log and repairs crashes by undoing incomplete transactions. For that to work, log records, data and the COMMIT record must reach disk in a fixed order. This chapter states the two rules, walks through the slide's 12-step table, and answers the slide's questions about synchronous and asynchronous commit.</p>
+
+<h2>1. The two rules (slide 22)</h2>
+
+<dl class="def">
+  <dt>U1</dt><dd>If transaction T modifies database element X, then the log record &lt;T, X, v&gt; (v = old value) must be written to disk <em>before</em> the updated X is written to disk.</dd>
+  <dt>U2</dt><dd>If T commits, its &lt;COMMIT T&gt; log record must be written to disk only <em>after</em> all elements updated by T have been written to disk (and, the textbook adds, as soon as possible after that).</dd>
+</dl>
+
+<p>Together, for one transaction, things reach disk in this order:</p>
+<div class="key"><p class="formula">(a) update log records → (b) updated elements → (c) &lt;COMMIT T&gt;</p></div>
+<p>The order between (a) and (b) applies <em>to each element individually</em>. &lt;T,A,…&gt; must precede A on disk and &lt;T,B,…&gt; must precede B, but B's log record may reach disk after A's new value (the slide: “order is not necessary for all database elements combinedly changed by a transaction”). Rule U1 is write-ahead logging; rule U2 is what makes the COMMIT record trustworthy: if it is on disk, so is everything T changed.</p>
+
+<figure>
+<svg id="order" viewBox="0 0 640 150" width="640" role="img" aria-label="Order constraints of undo logging"></svg>
+<figcaption><b>Figure 1.</b> Undo logging order for a transaction that changes A and B. An arrow means “must reach disk before”. Log records reach disk in log order, so &lt;T,A&gt; precedes &lt;T,B&gt;; nothing forces A's new value to wait for &lt;T,B&gt;.</figcaption>
+</figure>
+
+<h2>2. The slide's example, step by step (slide 23)</h2>
+
+<p>The same transaction as before, A := A*2; B := B*2, with A = B = 8, now with undo logging (textbook Fig. 17.3, Example 17.2):</p>
+<div class="tbl"><table>
+<tr><th>Step</th><th>Action</th><th>t</th><th>M-A</th><th>M-B</th><th>D-A</th><th>D-B</th><th>Log</th></tr>
+<tr><td>1</td><td></td><td></td><td></td><td></td><td></td><td></td><td><code>&lt;START T&gt;</code></td></tr>
+<tr><td>2</td><td><code>READ(A,t)</code></td><td>8</td><td>8</td><td></td><td>8</td><td>8</td><td></td></tr>
+<tr><td>3</td><td><code>t := t*2</code></td><td>16</td><td>8</td><td></td><td>8</td><td>8</td><td></td></tr>
+<tr><td>4</td><td><code>WRITE(A,t)</code></td><td>16</td><td>16</td><td></td><td>8</td><td>8</td><td><code>&lt;T,A,8&gt;</code></td></tr>
+<tr><td>5</td><td><code>READ(B,t)</code></td><td>8</td><td>16</td><td>8</td><td>8</td><td>8</td><td></td></tr>
+<tr><td>6</td><td><code>t := t*2</code></td><td>16</td><td>16</td><td>8</td><td>8</td><td>8</td><td></td></tr>
+<tr><td>7</td><td><code>WRITE(B,t)</code></td><td>16</td><td>16</td><td>16</td><td>8</td><td>8</td><td><code>&lt;T,B,8&gt;</code></td></tr>
+<tr><td>8</td><td><code>FLUSH LOG</code></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+<tr><td>9</td><td><code>OUTPUT(A)</code></td><td>16</td><td>16</td><td>16</td><td>16</td><td>8</td><td></td></tr>
+<tr><td>10</td><td><code>OUTPUT(B)</code></td><td>16</td><td>16</td><td>16</td><td>16</td><td>16</td><td></td></tr>
+<tr><td>11</td><td></td><td></td><td></td><td></td><td></td><td></td><td><code>&lt;COMMIT T&gt;</code></td></tr>
+<tr><td>12</td><td><code>FLUSH LOG</code></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+</table></div>
+
+<p>Step by step, as the slide narrates it:</p>
+<ul>
+  <li><strong>(1)</strong> &lt;START T&gt; is written to the log (buffer).</li>
+  <li><strong>(2–3)</strong> READ and the local computation change nothing in the database, so they need no log record.</li>
+  <li><strong>(4)</strong> WRITE(A,t) changes A in memory, so &lt;T,A,8&gt; is logged. 8 is the old value; the new value 16 does not appear in an undo log.</li>
+  <li><strong>(7)</strong> Likewise &lt;T,B,8&gt; is logged for B.</li>
+  <li><strong>(8)</strong> FLUSH LOG puts both update records on disk. Only now may A and B be written (U1).</li>
+  <li><strong>(9–10)</strong> The updated A and B are written to disk.</li>
+  <li><strong>(11)</strong> Only now may T commit: &lt;COMMIT T&gt; is appended to the log (U2).</li>
+  <li><strong>(12)</strong> FLUSH LOG puts &lt;COMMIT T&gt; on disk.</li>
+</ul>
+
+<p><strong class="bad">Slide typo:</strong> the slide's text list says “(4) &lt;T,B,8&gt; is written to log”. The table on the same slide is right: step 4 writes <code>&lt;T,A,8&gt;</code>, step 7 writes <code>&lt;T,B,8&gt;</code>.</p>
+
+<p>Why flush the log again at step 12? Without it, T might have committed from the user's point of view while the log on disk does not say so. If a crash came much later, recovery would see no COMMIT and undo a transaction the user was told had finished long ago (textbook Example 17.2).</p>
+
+<h3>Run it, change it, break it</h3>
+<p>The animator is set to undo logging. The colour of each log record shows whether it is still only in the memory buffer or already on disk. Try moving <code>OUTPUT(A)</code> above <code>FLUSH LOG</code>, or <code>COMMIT</code> + <code>FLUSH LOG</code> above the OUTPUTs, and press <b>Run</b>: the tool flags the broken rule. Set a crash step to see the recovery result.</p>
+<figure class="wide">
+<span class="anim-tag">Interactive animation</span>
+<div id="xt"></div>
+</figure>
+
+<h2>3. Commit of transactions (slide 24)</h2>
+
+<dl class="def">
+  <dt>Synchronous (durable) commit</dt><dd>The COMMIT (or ABORT) record is written to the log <em>and flushed to disk</em> before the user is told that the transaction is complete.</dd>
+  <dt>Asynchronous commit</dt><dd>The user is told the transaction is complete as soon as the COMMIT record is in the <em>log buffer</em>; the flush to disk happens later.</dd>
+</dl>
+
+<div class="q">
+<h4>Slide 24 questions (worked answers)</h4>
+<p><strong>Synchronous commit prevents data loss during a crash. How?</strong> The confirmation reaches the user only after &lt;COMMIT T&gt; is on disk, and by U2 all of T's changes reached disk even earlier. After any crash, recovery finds &lt;COMMIT T&gt; on disk and leaves T alone, and T's changes are already on disk. Everything the user was told about survives.</p>
+<p><strong>Asynchronous commit can lose updates. How?</strong> The user is told “committed”, but &lt;COMMIT T&gt; is only in memory. If the system crashes before the next log flush, the record is lost. Recovery sees &lt;START T&gt; and T's update records but no COMMIT, so it treats T as incomplete and <em>undoes</em> it, writing the old values back. A transaction the user believes finished has vanished. (The gain is speed: commits do not wait for a disk write.)</p>
+<p><strong>In both cases the database remains consistent. How?</strong> Recovery either finds the COMMIT record on disk, and then by U2 every change of T is on disk, or it does not find it, and then it undoes every change of T that reached disk (U1 guarantees the old values are in the log). Either way T is applied entirely or not at all, so atomicity, and hence consistency, holds. Asynchronous commit only weakens <em>durability</em>: a confirmed transaction can be lost, but never half-applied.</p>
+</div>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+<div id="try2"></div>
+
+<div class="key"><p><strong>Summary:</strong> U1: an element's update record reaches disk before the element does. U2: the COMMIT record reaches disk only after all the transaction's elements have. So the disk order is log records → data → COMMIT, per element. Synchronous commit confirms after the COMMIT is flushed (durable); asynchronous commit confirms earlier and can lose a confirmed transaction, but never breaks atomicity.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="lecture.js"></script>
+<script>
+(() => {
+  const n = (x, y, t, cls, w = 120) => `<rect x="${x}" y="${y}" width="${w}" height="34" rx="4" class="${cls}"/><text x="${x + w / 2}" y="${y + 22}" text-anchor="middle" style="font-size:12.5px">${t}</text>`;
+  let s = n(10, 20, '&lt;T,A,8&gt; on disk', 'cell') + n(10, 96, '&lt;T,B,8&gt; on disk', 'cell') + n(250, 20, 'A = 16 on disk', 'cell-hl') + n(250, 96, 'B = 16 on disk', 'cell-hl') + n(490, 58, '&lt;COMMIT T&gt; on disk', 'cell-new', 146);
+  s += `<path d="M130 37 H246" class="s-red" marker-end="url(#m-red)"/><text x="188" y="31" text-anchor="middle" class="lbl red">U1</text>`;
+  s += `<path d="M130 113 H246" class="s-red" marker-end="url(#m-red)"/><text x="188" y="107" text-anchor="middle" class="lbl red">U1</text>`;
+  s += `<path d="M70 54 V92" class="s-fg dash" marker-end="url(#m-fg)"/><text x="78" y="78" class="lbl">log order</text>`;
+  s += `<path d="M370 37 L486 70" class="s-grn" marker-end="url(#m-grn)"/><path d="M370 113 L486 80" class="s-grn" marker-end="url(#m-grn)"/><text x="430" y="40" class="lbl grn">U2</text><text x="430" y="122" class="lbl grn">U2</text>`;
+  document.querySelector('#order').innerHTML = s;
+
+  xactTool('#xt', { mode: 'undo' });
+
+  flashcards('#cards', [
+    { f: 'Rule U1', b: '&lt;T,X,v&gt; must be on disk before the new value of X is written to disk.' },
+    { f: 'Rule U2', b: '&lt;COMMIT T&gt; may be written to disk only after all elements T changed are on disk.' },
+    { f: 'Undo-logging disk order', b: 'update records → changed elements → COMMIT record (per element for the first two).' },
+    { f: 'Synchronous commit', b: 'User is told “committed” only after the COMMIT record is flushed to disk.' },
+    { f: 'Asynchronous commit', b: 'User is told “committed” when the COMMIT record is only in the log buffer; a crash can lose it.' },
+  ]);
+  quiz('#quiz', [
+    { q: 'Under undo logging, which must reach disk first?', opts: ['A = 16', '&lt;T,A,8&gt;', '&lt;COMMIT T&gt;', 'Any order'], a: 1, why: 'U1: the update record precedes the changed element.' },
+    { q: 'Under undo logging, can &lt;COMMIT T&gt; reach disk before B = 16 does?', opts: ['Yes', 'No, U2 forbids it', 'Only with a checkpoint', 'Only if B is small'], a: 1, why: 'U2: all changed elements first, then the COMMIT.' },
+    { q: 'May A = 16 reach disk before &lt;T,B,8&gt; does?', opts: ['Yes: the U1 order is per element', 'No', 'Only after COMMIT', 'Only with FLUSH LOG'], a: 0, why: 'U1 links each element only to its own log record.' },
+    { q: 'With asynchronous commit and undo logging, a crash right after the user\'s confirmation leads to…', opts: ['T being redone', 'T being undone although the user saw “committed”', 'an inconsistent database', 'nothing'], a: 1, why: 'The COMMIT record never reached disk, so recovery treats T as incomplete and undoes it. Consistent, but not durable.' },
+  ]);
+  ask('#try1', { q: 'Log records of T: &lt;START T&gt;; &lt;T,A,10&gt;; &lt;T,B,20&gt;; &lt;COMMIT T&gt;. Under undo logging, how many different orders are allowed for the 5 disk events (writing &lt;T,A,10&gt;, &lt;T,B,20&gt;, &lt;COMMIT T&gt;, new A, new B)? (Log records reach disk in log order.)', a: 3, hint: '&lt;T,A,10&gt; must be first and &lt;COMMIT T&gt; last. Count orders of the three in between with &lt;T,B,20&gt; before new B.', why: 'The middle three events are &lt;T,B,20&gt;, A, B with &lt;T,B,20&gt; before B: (TB, A, B), (TB, B, A), (A, TB, B).' });
+  ask('#try2', { q: 'In the slide\'s 12-step table, after which step is it first legal to write A to disk?', a: 8, why: 'Step 8 (FLUSH LOG) puts &lt;T,A,8&gt; on disk, so OUTPUT(A) at step 9 is the earliest legal write.' });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Disk Access Time · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 13 · Chapter 3 · Slides 8–10 · Book §13.2.3</div>
+<h1>Disk Performance: Access Time, Blocks and IOPS</h1>
+<p class="lede">How long one disk read takes, where each millisecond goes, why databases read whole blocks, and why sequential access is so much faster than random access. A calculator lets you plug in any disk. Includes the Megatron disk exam questions.</p>
+
+<h2>1. Access time = seek time + rotational latency (slide 8)</h2>
+
+<p>Chapter 2 showed the three physical steps of a read. Slide 8 gives them names and numbers.</p>
+
+<dl class="def">
+  <dt>Access time</dt><dd>The time from when a read or write request is issued to when data transfer <em>begins</em>. <span class="formula" style="display:block;margin:.4em 0">access time = seek time + rotational latency</span></dd>
+  <dt>Seek time</dt><dd>The time to reposition the arm over the correct track. Typical disks: 4 to 10 ms on average.</dd>
+  <dt>Rotational latency</dt><dd>The time for the sector to be accessed to appear under the head, once the head is on the right track.</dd>
+  <dt>Transfer time</dt><dd>The time to actually read or write the data once it starts passing under the head: <i>block size ÷ transfer rate</i>. The <b class="term">data-transfer rate</b> is how many bytes per second the disk delivers once positioned.</dd>
+</dl>
+
+<p>So the total time to read one block is</p>
+<div class="key"><p class="formula">time for one block = seek time + rotational latency + transfer time</p></div>
+<p>The textbook (§13.2.3) calls this whole sum the <em>latency</em> of the disk; the slide reserves “access time” for the first two parts. In exam answers, write the formula out so the reader sees which parts you include.</p>
+
+<h3>Average seek time</h3>
+<p>The seek time depends on how far the arm moves. Moving to the next track takes about a millisecond (mostly starting and stopping the arm); moving across the whole disk takes the <b class="term">worst-case seek time</b>, perhaps 10–20 ms. Requests land on random tracks, so what matters is the average.</p>
+<ul>
+  <li><strong>The slide's rule:</strong> <em>average seek time is ½ the worst-case seek time.</em> Use it when you are given only the worst-case (maximum) seek time.</li>
+  <li><strong>The textbook's rule:</strong> if the head goes from a random track to another random track, the average <em>distance</em> is ⅓ of the way across the disk. When a question gives a seek formula such as “1 ms to start and stop plus 1 ms per 500 cylinders”, plug in one third of the cylinders.</li>
+</ul>
+<p>The two rules do not contradict each other: the textbook's is about distance, the slide's is a rule of thumb about time that already allows for the fixed start/stop cost. Question 17-18 1d below shows both.</p>
+
+<h3>Rotational latency</h3>
+<p>One full rotation takes <i>60,000 ms ÷ rpm</i>. If the head arrives just after the sector passed, the wait is a full rotation; if just before, almost nothing. On average the sector is half a rotation away:</p>
+<div class="key"><p class="formula">average rotational latency = ½ × (60,000 ÷ rpm) ms</p></div>
+<p>The slide's “4 to 11 milliseconds on typical disks (5400 to 15,000 rpm)” is the time of one full rotation: 60,000 ÷ 15,000 = 4 ms and 60,000 ÷ 5400 ≈ 11.1 ms. The average latency is half of that, 2 to 5.6 ms. Adding seek and latency, the slide's <em>overall latency</em> is 5 to 20 ms depending on the disk model.</p>
+
+<div class="tbl"><table>
+<tr><th>rpm</th><th>One rotation</th><th>Average rotational latency</th></tr>
+<tr><td class="num">5400</td><td class="num">11.11 ms</td><td class="num">5.56 ms</td></tr>
+<tr><td class="num">7200</td><td class="num">8.33 ms</td><td class="num">4.17 ms</td></tr>
+<tr><td class="num">10,000</td><td class="num">6.00 ms</td><td class="num">3.00 ms</td></tr>
+<tr><td class="num">15,000</td><td class="num">4.00 ms</td><td class="num">2.00 ms</td></tr>
+</table></div>
+
+<h2>2. Disk blocks (slide 9)</h2>
+
+<dl class="def">
+  <dt>Disk block</dt><dd>A logical unit for storage allocation and retrieval: a run of consecutive sectors that the database always reads or writes as a whole. Typically 4 to 16 kilobytes. A block is also called a <b class="term">page</b>.</dd>
+</dl>
+<p>Why not read single sectors, or huge chunks? The block size is a trade-off, and the slide names both sides:</p>
+<ul>
+  <li><strong>Smaller blocks: more transfers from disk.</strong> Every request pays a seek and a rotational latency of several milliseconds, while transferring 4&nbsp;KB takes only a few hundredths of a millisecond. Reading a relation in tiny pieces pays that fixed cost far too many times.</li>
+  <li><strong>Larger blocks: more space wasted due to partially filled blocks.</strong> The last block of a file, and blocks that lost records to deletions, are only partly used. The bigger the block, the more bytes such holes waste, and the more useless bytes are read when only one record is needed.</li>
+</ul>
+
+<h2>3. Sequential and random access (slides 9–10)</h2>
+
+<dl class="def">
+  <dt>Sequential access pattern</dt><dd>Successive requests are for successive disk blocks, for example a full scan of a relation stored contiguously. A disk seek is required only for the first block; after that the blocks arrive one after another as the disk turns.</dd>
+  <dt>Random access pattern</dt><dd>Successive requests are for blocks that can be anywhere on the disk, for example looking up individual records through an index. Each access requires a seek and a rotational latency, so the effective transfer rate is low: most of the time is wasted in seeks.</dd>
+  <dt>IOPS (I/O operations per second)</dt><dd>The number of random block reads a disk can support per second. With <i>t</i> ms per random block, IOPS = 1000 ÷ <i>t</i>. Current magnetic disks manage 50 to 200 IOPS.</dd>
+</dl>
+
+<figure>
+<svg id="seqrnd" viewBox="0 0 700 150" width="700" role="img" aria-label="Timeline: four random reads versus four sequential reads"></svg>
+<figcaption><b>Figure 1.</b> Reading 4 blocks of 4&nbsp;KB on a 7200 rpm disk with a 4 ms average seek and 100 MB/s transfer. Random: every block pays seek (orange) and latency (blue) again. Sequential: one seek and one latency, then the transfers (green slivers) follow each other.</figcaption>
+</figure>
+
+<p>The difference is enormous for large reads. With the numbers of Figure 1, 1000 random blocks take 1000 × 8.21 ms ≈ 8.2 seconds, but 1000 sequential blocks take 8.17 + 1000 × 0.039 ≈ 47 ms. This is why database systems try hard to store related data contiguously and why query algorithms prefer scans of whole files to many scattered lookups when a large fraction of the file is needed.</p>
+
+<h2>4. Calculator: your own disk</h2>
+<p>Type a disk's numbers and press <b>Calculate</b>. The table shows every formula with your values, and the animation replays one block read with your times. (1 MB is taken as 1024 KB.)</p>
+<figure class="wide">
+<span class="anim-tag">Interactive tool</span>
+<div id="calc"></div>
+</figure>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+<div id="try2"></div>
+
+<h3>Exam questions</h3>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 19-20 1a · 5 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-2 | 2019–20 · 5 marks</div>
+  <div class="exam-q"><p>Explain disk access time and its implication in DBMS.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><strong>Disk access time</strong> is the time from issuing a read or write request until data transfer begins: access time = seek time + rotational latency. To read a block we also pay the transfer time, so one block costs seek + rotational latency + transfer.</p>
+    <ul>
+      <li><strong>Seek time:</strong> moving the arm to the right track/cylinder; 4–10 ms on average (average ≈ ½ of the worst case).</li>
+      <li><strong>Rotational latency:</strong> waiting for the sector to come under the head; on average half a rotation, e.g. 4.17 ms at 7200 rpm.</li>
+      <li><strong>Transfer time:</strong> block size ÷ transfer rate; e.g. 4&nbsp;KB at 100 MB/s ≈ 0.04 ms.</li>
+    </ul>
+    <p>Example: 4 ms + 4.17 ms + 0.04 ms ≈ 8.2 ms per random block, about 120 IOPS. Main memory answers in about 100 ns, so one disk access costs as much time as roughly 100,000 memory accesses.</p>
+    <p><strong>Implications for a DBMS:</strong></p>
+    <ol>
+      <li><strong>Cost is measured in block I/Os.</strong> CPU work on a block in memory is negligible next to fetching it, so query plans are compared by the number of disk blocks they read and write.</li>
+      <li><strong>Data is moved in blocks (4–16 KB),</strong> so one seek and one latency are shared by many records.</li>
+      <li><strong>Sequential access is preferred.</strong> Only the first block of a sequential run needs a seek, so related records are stored together (clustering, files sorted on a key, a relation on adjacent cylinders).</li>
+      <li><strong>Indexes are shallow and wide.</strong> A B+ tree has a large fan-out so a lookup needs only 3–4 block reads.</li>
+      <li><strong>Buffering:</strong> frequently used blocks are kept in a main-memory buffer to avoid repeated disk reads.</li>
+      <li><strong>Parallel disks</strong> (striping, RAID) and good disk-arm scheduling reduce the waiting time further (Chapters 5–9).</li>
+    </ol>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2016–17 · 2 marks</div>
+  <div class="exam-q"><p>What are the components of disk latency?</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>Disk latency (the time to read or write one block) = <strong>seek time + rotational latency + transfer time</strong>.</p>
+    <ol>
+      <li><strong>Seek time:</strong> moving the head assembly to the cylinder holding the block.</li>
+      <li><strong>Rotational latency:</strong> waiting for the first sector of the block to rotate under the head (on average half a rotation).</li>
+      <li><strong>Transfer time:</strong> reading or writing the block's sectors (and the gaps between them) as they pass under the head.</li>
+    </ol>
+    <p>A small amount of disk-controller processing time may be added, but it is negligible compared with the mechanical delays.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 17-18 1d · 8 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-2 | 2017–18 · 8 marks</div>
+  <div class="exam-q"><p>Calculate average time (with explanation) to read one block of data from a Megatron 747 disk. Megatron 747 disk has 8192 tracks and maximum and minimum time to read one block of data is given below:</p>
+  <div class="tbl"><table><tr><th></th><th>Seek time (ms)</th><th>Rotational latency (ms)</th><th>Transfer time (ms)</th><th>Total time (ms)</th></tr>
+  <tr><td>Minimum</td><td class="num">0</td><td class="num">0</td><td class="num">0.5</td><td class="num">0.5</td></tr>
+  <tr><td>Maximum</td><td class="num">17.4</td><td class="num">15.6</td><td class="num">0.5</td><td class="num">33.5</td></tr></table></div></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>Average time = average seek + average rotational latency + transfer time. Take each part in turn.</p>
+    <p><strong>Transfer time.</strong> The block size does not change, so the transfer time is always <strong>0.5 ms</strong>.</p>
+    <p><strong>Rotational latency.</strong> It ranges from 0 (the block is just arriving) to 15.6 ms (a full rotation: the block has just passed). Every position is equally likely, so the average is half a rotation: 15.6 ÷ 2 = <strong>7.8 ms</strong>.</p>
+    <p><strong>Seek time.</strong> The minimum is 0 (already on the right cylinder) and the maximum 17.4 ms (across all 8192 cylinders). The Megatron 747's seek rule, given in the companion question 17-18 3b, is 1 ms to start and stop plus 1 ms per 500 cylinders: 1 + 8191/500 = 17.38 ≈ 17.4 ms, which matches the table. A random seek moves on average ⅓ of the way across the disk:</p>
+    <p class="formula">average seek = 1 + (8192 ÷ 3) ÷ 500 = 1 + 5.46 = 6.46 ms</p>
+    <p class="formula">average time = 6.46 + 7.8 + 0.5 ≈ 14.76 ms</p>
+    <p>If only the table is used with the slide's rule of thumb (average seek ≈ ½ of the worst case = 8.7 ms), the estimate is 8.7 + 7.8 + 0.5 = 17.0 ms. State which rule you use; the first one uses all the data of the disk.</p>
+    <p>Note: the question bank's answer takes the average seek as 17.4 ÷ 3 = 5.8 ms (total 14.1 ms). That is wrong: the ⅓ applies to the <em>distance</em>, and the 1 ms start/stop cost is paid on every seek however short, so it must not be divided by 3.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2016–17 · 5 marks</div>
+  <div class="exam-q"><p>The Megatron 777 disk has the following characteristics: ten surfaces with 10,000 tracks each; tracks hold an average of 1000 sectors of 512 bytes each; the disk rotates at 10,000 rpm; the time to move the head n tracks is 1 + 0.001n milliseconds. (a) What is the capacity of the disk? (b) What is the maximum seek time? (c) What is the average rotational latency?</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><strong>(a)</strong> capacity = surfaces × tracks × sectors × bytes = 10 × 10,000 × 1000 × 512 = 51,200,000,000 bytes = <strong>51.2 GB</strong> (47.68 GB if 1 GB = 2<sup>30</sup> bytes).</p>
+    <p><strong>(b)</strong> The longest move is from the outermost to the innermost track, 9999 tracks: 1 + 0.001 × 9999 = <strong>10.999 ≈ 11 ms</strong>.</p>
+    <p><strong>(c)</strong> One rotation = 60,000 ÷ 10,000 = 6 ms, so the average rotational latency = 6 ÷ 2 = <strong>3 ms</strong> (the maximum is 6 ms).</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2013–14 · 7 marks</div>
+  <div class="exam-q"><p>The Megatron 747 disk has the following characteristics: 4 platters providing 8 surfaces; 8192 tracks per surface, 256 sectors per track, 512 bytes per sector; the disk rotates at 3840 rpm (one rotation every 15.6 ms); average seek time 6.5 ms; transfer rate 10 MB/s. (a) What is the capacity of a single track and what is the size of the entire disk? (b) What is the average read time of 4096 bytes of data?</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><strong>(a)</strong> One track = 256 sectors × 512 bytes = <strong>131,072 bytes = 128 KB</strong>. The disk = 8 surfaces × 8192 tracks × 131,072 bytes = 8,589,934,592 bytes = <strong>8 GB</strong> (2<sup>33</sup> bytes; 8.59 × 10<sup>9</sup> bytes).</p>
+    <p><strong>(b)</strong> average read time = average seek + average rotational latency + transfer time:</p>
+    <ul>
+      <li>average seek = 6.5 ms (given);</li>
+      <li>average rotational latency = 15.6 ÷ 2 = 7.8 ms;</li>
+      <li>transfer = 4096 bytes ÷ 10 MB/s = 4096 ÷ 10,485,760 s ≈ 0.39 ms (0.41 ms if 1 MB = 10<sup>6</sup> bytes).</li>
+    </ul>
+    <p class="formula">6.5 + 7.8 + 0.39 ≈ 14.7 ms</p>
+    <p>Check with the calculator above: 3840 rpm, seek 6.5, block 4 KB, 10 MB/s gives 14.703 ms.</p>
+  </div></details>
+</div>
+
+<div class="key"><p><strong>Summary:</strong> Access time = seek time + rotational latency; reading a block adds the transfer time (block size ÷ transfer rate). Average rotational latency is half a rotation, ½ × 60,000/rpm ms. Average seek is about ½ the worst case (slide), or the time to move ⅓ of the way across (textbook formula). Data moves in blocks of 4–16 KB: small blocks mean more transfers, large blocks waste space. Sequential access pays one seek for many blocks; random access pays a seek per block, so a magnetic disk manages only 50–200 IOPS.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="lecture.js"></script>
+<script>
+// Figure 1: random vs sequential timelines
+(() => {
+  const seek = 4, lat = 4.167, xf = 0.039, sc = 16, x0 = 100;
+  let s = '', x = x0;
+  const seg = (y, w, cls) => { s += `<rect x="${x}" y="${y}" width="${Math.max(w * sc, 2)}" height="22" class="${cls}"/>`; x += Math.max(w * sc, 2); };
+  s += `<text x="10" y="40" class="big" style="font-size:12px">random</text>`;
+  for (let i = 0; i < 4; i++) { seg(25, seek, 'cell-hl'); seg(25, lat, 'cell'); seg(25, xf, 'cell-new'); }
+  s += `<text x="${x + 6}" y="40" class="lbl">${(4 * (seek + lat + xf)).toFixed(2)} ms</text>`;
+  x = x0; s += `<text x="10" y="90" class="big" style="font-size:12px">sequential</text>`;
+  seg(75, seek, 'cell-hl'); seg(75, lat, 'cell'); for (let i = 0; i < 4; i++) seg(75, xf, 'cell-new');
+  s += `<text x="${x + 6}" y="90" class="lbl">${(seek + lat + 4 * xf).toFixed(2)} ms</text>`;
+  for (let t = 0; t <= 32; t += 8) s += `<text x="${x0 + t * sc}" y="130" text-anchor="middle" class="lbl">${t} ms</text><line x1="${x0 + t * sc}" x2="${x0 + t * sc}" y1="108" y2="116" class="s-fg"/>`;
+  document.querySelector('#seqrnd').innerHTML = s;
+})();
+accessTool('#calc');
+
+flashcards('#cards', [
+  { f: 'Access time', b: 'Time from request to the start of transfer = seek time + rotational latency.' },
+  { f: 'Seek time', b: 'Time to move the arm over the correct track; 4–10 ms average; average ≈ ½ worst case.' },
+  { f: 'Average rotational latency', b: 'Half a rotation: ½ × 60,000 / rpm ms (4.17 ms at 7200 rpm).' },
+  { f: 'Transfer time', b: 'Block size ÷ transfer rate.' },
+  { f: 'Disk block', b: 'Logical unit of allocation and retrieval, 4–16 KB, made of consecutive sectors.' },
+  { f: 'Sequential access', b: 'Successive requests for successive blocks: only the first needs a seek.' },
+  { f: 'Random access', b: 'Requests for blocks anywhere: every access needs a seek and a latency.' },
+  { f: 'IOPS', b: 'Random block reads per second = 1000 / (ms per random block); 50–200 for magnetic disks.' },
+]);
+quiz('#quiz', [
+  { q: 'According to slide 8, access time equals…', opts: ['seek + transfer', 'seek + rotational latency', 'rotational latency + transfer', 'seek + rotational latency + transfer + queueing'], a: 1, why: 'Access time ends when transfer begins.' },
+  { q: 'A disk spins at 6000 rpm. What is the average rotational latency?', opts: ['10 ms', '5 ms', '6 ms', '3 ms'], a: 1, why: 'One rotation = 60,000 / 6000 = 10 ms; average = half = 5 ms.' },
+  { q: 'The worst-case seek is 16 ms. Using the slide\'s rule, the average seek is…', opts: ['16 ms', '8 ms', '5.33 ms', '4 ms'], a: 1, why: 'Slide 8: average seek time is ½ the worst-case seek time.' },
+  { q: 'Why are blocks not made very large, say 1 MB?', opts: ['Seeks get slower', 'More space is wasted in partially filled blocks', 'Rotational latency doubles', 'Disks cannot read more than one sector'], a: 1, why: 'Slide 9: larger blocks waste more space when partly filled, and read many unneeded bytes.' },
+  { q: 'In a sequential access pattern, how many seeks are needed?', opts: ['One per block', 'One for the first block only', 'None', 'One per sector'], a: 1, why: 'Slide 9: a disk seek is required only for the first block.' },
+  { q: 'A random block read takes 10 ms in total. How many IOPS?', opts: ['10', '100', '1000', '50'], a: 1, why: '1000 ms ÷ 10 ms = 100 random reads per second.' },
+]);
+ask('#try1', { q: 'A 15,000 rpm disk has an average seek of 3.5 ms; ignore transfer time. How many IOPS can it support?', a: 181.82, tol: 0.05, hint: 'Average latency = ½ × 60,000/15,000 ms.', why: 'Latency 2 ms, so 5.5 ms per random block; 1000 / 5.5 = 181.82 IOPS.' });
+ask('#try2', { q: 'A 7200 rpm disk, 8 ms average seek, 100 MB/s, 16 KB blocks. Time (ms) to read ONE random block? (1 MB = 1024 KB)', a: 12.323, tol: 0.002, hint: 'Transfer = 16 / (100 × 1024) s.', why: '8 + 4.167 + 0.156 = 12.323 ms.' });
+</script>
+</body>
+</html>

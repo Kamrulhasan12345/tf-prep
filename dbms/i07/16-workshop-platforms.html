@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ER Design Workshop III: YouTube, Cricket, Hospital · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 07 (Ishrak) · Chapter 16 · ER design workshop (exam questions)</div>
+<h1>ER Design Workshop III: YouTube, the BPL and a Hospital</h1>
+<p class="lede">Three large modern scenarios: a video platform designed feature by feature, a cricket league with two roles of one team in every game, and a hospital's drug treatment and payroll system. Each with assumptions, diagrams and schema.</p>
+
+<h2>1. Two techniques used here</h2>
+<p><strong>Designing in portions.</strong> A big system is easier to draw as several small diagrams, one per feature, that share entity sets. The YouTube question asks for exactly that. Draw each shared entity set (User, Channel, Video) with its key in every portion, and its other attributes once.</p>
+<p><strong>Two relationships between the same pair of entity sets.</strong> A game has a host team and a guest team; a patient has a ward and also staff who attend. When the same two entity sets are related in two different ways, draw two relationships (or two role-labelled lines), never one relationship with a "type" attribute.</p>
+
+<h2>Practice</h2>
+<h3>Quick check</h3><div id="quiz"></div>
+<h3>Exam questions</h3>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 22-23 5a, 5b · 20 + 15 marks · Compulsory &nbsp;·&nbsp; BUET QBank · CSE 215 | L-2/T-1 | 2022–23 · 20 + 15 marks</div>
+  <div class="exam-q"><p>YouTube is a very popular platform for hosting videos. People create channels and upload videos on that. Sometimes the creators can batch up the videos into playlists. Videos can be free to view or behind paywall which requires subscription to YouTube Premium. A free video can be watched with or without signing into YouTube. However, only signed-in users' views are considered when counting the number of viewers for a video. A signed-in account may or may not have corresponding channels. Each video has a comment section where a signed-in user can comment; and comment to other people's comments. Also, videos contain some tags (given by the uploader or YouTube itself) that help to filter videos. Signed-in users can subscribe to other channels. Now, for each of the mentioned features below, design the corresponding portion of ERD for YouTube only. Add attributes as you see fit and mark primary keys.</p>
+  <p>(i) User management: Users should be able to create accounts, create channels on top of the accounts (one user can create at most one channel), and subscribe to different channels.<br>(ii) Video hosting: Creators should be able to upload videos with different tags, and create playlists by batching up multiple videos. Users should be able to view the videos, find them in their history when needed and, also, check the number of viewers to the videos.<br>(iii) Commenting: Users should be able to comment on any video any number of times, They should also be able to comment on other peoples comments.<br>(iv) Subscription system: Creators should be able to mark some videos as premium (i.e., only subscribed users can view). Users should be able to buy subscriptions up to some end date.</p>
+  <p>(5b) Implement relational schemas for each ERD you designed in Question 5a.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><strong>Only signed-in users are stored</strong>: anonymous views of free videos are not counted, so the database needs no "guest" entity.</p>
+    <h4>(i) User management</h4>
+    <p>User(<u>user_id</u>, name, email, joined_on). Channel(<u>channel_id</u>, name, created_on). <em>owns</em> is one-to-one: a user creates at most one channel and a channel belongs to exactly one user (total for Channel; partial for User, since "an account may or may not have channels"). <em>subscribesTo</em>: User – Channel, many-to-many, attribute subscribed_on. Design note: a user does not subscribe to their own channel.</p>
+    <figure class="wide"><div id="yt1"></div></figure>
+    <div id="yt1r"></div>
+    <h4>(ii) Video hosting</h4>
+    <p>Video(<u>video_id</u>, title, description, upload_time, is_premium, /viewer_count). <em>uploads</em>: Video → Channel, many-to-one, total for Video. Tag(<u>tag_name</u>) is an entity set (tags are shared by many videos and used to filter); <em>taggedWith</em>: Video – Tag, many-to-many, attribute given_by ('uploader' or 'youtube'). Playlist(<u>playlist_id</u>, title) with <em>creates</em>: Playlist → Channel (many-to-one, total) and <em>contains</em>: Playlist – Video, many-to-many with position. <em>watches</em>: User – Video, many-to-many, attribute last_watched; this is the history, and viewer_count is derived as the number of distinct users who watched (so it is a dashed oval and not stored).</p>
+    <figure class="wide"><div id="yt2"></div></figure>
+    <div id="yt2r"></div>
+    <h4>(iii) Commenting</h4>
+    <p>"Any number of times" means a user may comment on the same video repeatedly, so Comment must be an entity set (a relationship would allow one comment per (user, video) pair). Comment(<u>comment_id</u>, text, posted_at). <em>writes</em>: Comment → User and <em>on</em>: Comment → Video, both many-to-one and total. Replies: recursive <em>replyTo</em> on Comment, many-to-one into the role <em>parent</em> (each reply has one parent; a comment has many replies; top-level comments have none). Design note: a reply is on the same video as its parent.</p>
+    <figure class="wide"><div id="yt3"></div></figure>
+    <div id="yt3r"></div>
+    <h4>(iv) Subscription system</h4>
+    <p>Premium is a flag on Video (is_premium, already in (ii)). A premium subscription is bought by a user and has its own facts and history (a user buys again when it ends), so Subscription(<u>sub_id</u>, start_date, end_date, amount) is an entity with <em>buys</em>: Subscription → User (many-to-one, total). Design note (business rule): a user may watch a premium video only if they have a subscription with start_date ≤ today ≤ end_date; this is checked by the application or a trigger on watches.</p>
+    <figure class="wide"><div id="yt4"></div></figure>
+    <div id="yt4r"></div>
+    <p><strong>5b, complete schema in one place</strong> (Oracle):</p>
+    <div id="ytPlay"></div>
+    <p>The question bank's answer is close to this one; it models Views with a timestamp key and Tags as a multivalued attribute (which loses "who gave the tag" and makes tag-based filtering across videos clumsier) and omits the one-to-one constraint on Channel.user_id (it must be UNIQUE).</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 21-22 2a · 10 marks &nbsp;·&nbsp; BUET QBank · CSE 215 | L-2/T-2 | 2021–22 · 10 marks</div>
+  <div class="exam-q"><p>Suppose you are given the following requirements for a simple database for the Bangladesh premier League (BPL) in a season: The BPL has many teams. Each team has a name, a city, a coach, a captain, and a set of players. Each player belongs to only one team; a player may not be hired by any team. Each player has a name, a position during fielding (such as slip, mid-wicket, long on, long off etc), a ranking and a set of injury records. A team captain is also a player. Injury records must have an id, period (start and end), and a short description. A game is played between two teams (referred to as host_team and guest_team) and has a date (such as May 11th, 2023) and scores (winning and losing team scores such as 143/10 and 148/6). Construct a clean and concise E/R diagram for the BPL database using the notation as in your textbook. List your assumptions and clearly indicate the cardinality mappings as well as any role indicators in your E/R diagram.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><strong>Assumptions.</strong></p>
+    <ol>
+    <li>Team names are unique (key name). The coach is just a name (an attribute); if coaches had their own facts, Coach would be an entity set.</li>
+    <li>Player(<u>player_id</u>, name, position, ranking): players can share names, so an id is assumed.</li>
+    <li><em>playsFor</em>: Player → Team, many-to-one ("belongs to only one team"), <strong>partial</strong> for Player ("may not be hired by any team"); total for Team ("a set of players").</li>
+    <li><em>captain</em>: Team → Player, one-to-one with roles (a team has one captain; a player captains at most one team), total for Team. Design note: the captain must play for that team.</li>
+    <li>Injury records exist only for a player and their id is unique only per player, so InjuryRecord is <strong>weak</strong>, owned by Player: InjuryRecord(injury_id, start_date, end_date, description) with partial key injury_id, identifying relationship <em>suffered</em>. (If injury ids are unique league-wide, make it a strong entity with a many-to-one relationship; the tables are almost the same.)</li>
+    <li>A game involves the same entity set Team twice, in two <strong>roles</strong>, host_team and guest_team. Two teams can meet more than once in a season, so Game is an entity set Game(<u>game_id</u>, game_date, host_score, guest_score) with two many-to-one relationships, <em>hosts</em> and <em>visits</em>, both total for Game. Scores like "143/10" are stored as text per team; the winner is derived by comparing them.</li>
+    </ol>
+    <figure class="wide"><div id="bpl"></div><figcaption>Roles: captain (Team–Player via captain), host_team and guest_team (Game–Team via hosts and visits). 1/N labels give the cardinality mappings; double lines show total participation.</figcaption></figure>
+    <p>Schema (for reference): Team(<u>name</u>, city, coach, <i>captain_id</i> UNIQUE NOT NULL); Player(<u>player_id</u>, name, position, ranking, <i>team_name</i> NULL allowed); Injury_Record(<u>player_id</u>, <u>injury_id</u>, start_date, end_date, description); Game(<u>game_id</u>, game_date, host_score, guest_score, <i>host_team</i> NOT NULL, <i>guest_team</i> NOT NULL) with CHECK (host_team &lt;&gt; guest_team). The circular reference Team ↔ Player is created with ALTER TABLE in Oracle.</p>
+    <p>The question bank's answer models a game as a recursive relationship Team–Team; that cannot store two games between the same host and guest (a relationship holds a pair once), which is why an entity set Game is used here.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2010–11 · 10 marks</div>
+  <div class="exam-q"><p>Consider the following scenario of a hospital: Patients are treated in a single ward by the doctors assigned to them. Usually each patient will be assigned a single doctor, but in rare cases he/she will be assigned two doctors. Healthcare assistants also attend to the patients; a number of these are associated with each ward. Initially the system will be concerned solely with drug treatment. Each patient is required to take a variety of drugs a certain number of times per day and for varying lengths of time. The system must record details concerning patient treatment and staff payment. Some staffs are paid on a part time basis and doctors and care assistants work varying amounts of overtime at varying rates (subject to grade). The system will also need to track what treatments are required for which patients and when, and it should be capable of calculating the cost of treatment per week for each patient. Define entities and their attributes for the hospital management system described above.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <div class="tbl"><table><tr><th>Entity set</th><th>Attributes (key underlined)</th><th>Why</th></tr>
+    <tr><td>Ward</td><td><u>ward_no</u>, ward_name, capacity</td><td>"treated in a single ward"</td></tr>
+    <tr><td>Patient</td><td><u>patient_id</u>, name, address, date_of_birth, admit_date, /weekly_cost</td><td>weekly treatment cost is derived from the treatments</td></tr>
+    <tr><td>Staff (superclass)</td><td><u>staff_id</u>, name, address, employment_type (full/part time), contracted_hours</td><td>both doctors and assistants are paid and do overtime</td></tr>
+    <tr><td>Doctor isA Staff</td><td>specialty</td><td>assigned to patients</td></tr>
+    <tr><td>CareAssistant isA Staff</td><td>(none extra; e.g. qualification)</td><td>attend patients, belong to a ward</td></tr>
+    <tr><td>Grade</td><td><u>grade_code</u>, basic_rate, overtime_rate</td><td>"overtime at varying rates (subject to grade)"</td></tr>
+    <tr><td>Overtime (weak, owner Staff)</td><td>work_date (partial key), hours</td><td>"varying amounts of overtime"; one record per staff per day</td></tr>
+    <tr><td>Drug</td><td><u>drug_code</u>, drug_name, unit_cost</td><td>needed to cost treatments</td></tr>
+    <tr><td>Treatment</td><td><u>treatment_id</u>, times_per_day, dose_units, start_date, end_date</td><td>"a variety of drugs a certain number of times per day and for varying lengths of time"; "which patients and when"</td></tr></table></div>
+    <p>The relationships that connect them are drawn in the next question. Weekly cost of a patient = Σ over the patient's treatments active in that week of unit_cost × dose_units × times_per_day × (days of the week the treatment covers).</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2010–11 · 25 marks</div>
+  <div class="exam-q"><p>Consider the following scenario of a hospital: (same scenario as above). Draw ER diagrams to show the relationships among entities of the hospital management system.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>With the entity sets of the previous answer, the relationships are:</p>
+    <ul>
+    <li><em>admittedTo</em>: Patient → Ward, many-to-one, total for Patient ("treated in a single ward").</li>
+    <li><em>assigned</em>: Patient – Doctor, many-to-many, total for Patient. Design note: a patient has 1 or 2 doctors (in (min,max) notation: (1,2) next to Patient).</li>
+    <li><em>worksIn</em>: CareAssistant → Ward, many-to-one ("a number of these are associated with each ward"), total for CareAssistant.</li>
+    <li><em>attends</em>: CareAssistant – Patient, many-to-many.</li>
+    <li><em>receives</em>: Treatment → Patient, <em>uses</em>: Treatment → Drug, <em>prescribedBy</em>: Treatment → Doctor; all many-to-one, total for Treatment. Treatment is an entity (not a Patient–Drug relationship) because the same drug can be given to the same patient again later, with different times and dates.</li>
+    <li><em>hasGrade</em>: Staff → Grade, many-to-one, total for Staff.</li>
+    <li><em>worked</em>: identifying relationship Overtime → Staff.</li>
+    <li>Staff isA {Doctor, CareAssistant}: disjoint, total.</li>
+    </ul>
+    <p>Diagram 1, patient care and drug treatment:</p>
+    <figure class="wide"><div id="hos1"></div></figure>
+    <p>Diagram 2, staff and payment:</p>
+    <figure class="wide"><div id="hos2"></div></figure>
+    <p>Pay for a period = basic_rate × contracted_hours (prorated for part-time staff) + Σ overtime hours × overtime_rate of the staff member's grade; both rates come from Grade, so changing a grade's rate changes everyone's pay consistently. The question bank's answer is similar; it adds a Payment weak entity, which is fine if pay slips must be stored.</p>
+  </div></details>
+</div>
+
+<div class="key">
+<p><strong>Summary:</strong> split a large system into feature-sized diagrams that share entity sets. If the same pair can be associated many times (repeated comments, repeated games, repeated treatments), the association must be an entity set. Roles name the two ends of a relationship between one entity set and itself, or the two parts a team plays in a game. Derived counts (viewers, weekly cost) are dashed ovals computed by queries.</p>
+</div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/sqlplay.js"></script>
+<script src="lecture.js"></script>
+<script>
+$('#yt1').innerHTML = erd({ n: [['User', 'E', 0, 0], ['owns', 'R', 230, -60], ['subscribesTo', 'R', 230, 70, 'subscribes\nTo'], ['Channel', 'E', 460, 0]],
+  a: [['User', '_user_id', -120, -40], ['User', 'name', -130, 10], ['User', 'email', -110, 55], ['User', 'joined_on', -30, 75], ['Channel', '_channel_id', 110, -45], ['Channel', 'name', 130, 5], ['Channel', 'created_on', 110, 50], ['subscribesTo', 'subscribed_on', 0, 70]],
+  l: [['User', 'owns', { one: true, card: '1' }], ['Channel', 'owns', { one: true, total: true, card: '1' }], ['User', 'subscribesTo', { card: 'M' }], ['Channel', 'subscribesTo', { card: 'N' }]] });
+const R1 = [{ n: 'Users', c: ['*user_id', 'name', 'email', 'joined_on'] }, { n: 'Channel', c: ['*channel_id', 'name', 'created_on', 'user_id!?>Users'] }, { n: 'Subscribes', c: ['*user_id>Users', '*channel_id>Channel', 'subscribed_on'] }];
+relInto('#yt1r', R1);
+$('#yt2').innerHTML = erd({ n: [['Channel', 'E', 0, 0], ['uploads', 'R', 230, 0], ['Video', 'E', 460, 0], ['creates', 'R', 0, 150], ['Playlist', 'E', 0, 300], ['contains', 'R', 230, 300], ['taggedWith', 'R', 700, 0, 'tagged\nWith'], ['Tag', 'E', 920, 0], ['watches', 'R', 460, 180], ['User', 'E', 460, 330]],
+  a: [['Channel', '_channel_id', -60, -55], ['Video', '_video_id', -100, -60], ['Video', 'title', -10, -75], ['Video', 'upload_time', 95, -65], ['Video', 'is_premium', 110, 45], ['Video', '/viewer_count', -110, 55],
+      ['Playlist', '_playlist_id', -80, 55], ['Playlist', 'title', 70, 55], ['contains', 'position', 0, 60], ['taggedWith', 'given_by', 0, 60], ['Tag', '_tag_name', 0, 55], ['watches', 'last_watched', 120, 0], ['User', '_user_id', 0, 55]],
+  l: [['Video', 'uploads', { total: true, card: 'N' }], ['Channel', 'uploads', { one: true, card: '1' }], ['Playlist', 'creates', { total: true, card: 'N' }], ['Channel', 'creates', { one: true, card: '1' }],
+      ['Playlist', 'contains', { card: 'M' }], ['Video', 'contains', { card: 'N' }], ['Video', 'taggedWith', { card: 'M' }], ['Tag', 'taggedWith', { card: 'N' }], ['Video', 'watches', { card: 'N' }], ['User', 'watches', { card: 'M' }]] });
+const R2 = [{ n: 'Video', c: ['*video_id', 'title', 'description', 'upload_time', 'is_premium:CHAR(1)', 'channel_id!>Channel'] }, { n: 'Tag', c: ['*tag_name'] }, { n: 'Video_Tag', c: ['*video_id>Video', '*tag_name>Tag', 'given_by'] },
+  { n: 'Playlist', c: ['*playlist_id', 'title', 'channel_id!>Channel'] }, { n: 'Playlist_Video', c: ['*playlist_id>Playlist', '*video_id>Video', 'position'] }, { n: 'Watches', c: ['*user_id>Users', '*video_id>Video', 'last_watched'] }];
+relInto('#yt2r', R2);
+$('#yt3').innerHTML = erd({ n: [['User', 'E', 0, 0], ['writes', 'R', 220, 0], ['Comment', 'E', 440, 0], ['on', 'R', 660, 0], ['Video', 'E', 880, 0], ['replyTo', 'R', 440, 150, 'reply\nTo']],
+  a: [['Comment', '_comment_id', -80, -60], ['Comment', 'text', 10, -70], ['Comment', 'posted_at', 100, -55], ['User', '_user_id', 0, -55], ['Video', '_video_id', 0, -55]],
+  l: [['Comment', 'writes', { total: true, card: 'N' }], ['User', 'writes', { one: true, card: '1' }], ['Comment', 'on', { total: true, card: 'N' }], ['Video', 'on', { one: true, card: '1' }],
+      ['Comment', 'replyTo', { bend: -60, role: 'parent', one: true }], ['Comment', 'replyTo', { bend: 60, role: 'reply' }]] });
+const R3 = [{ n: 'Comment', c: ['*comment_id', 'text', 'posted_at', 'user_id!>Users', 'video_id!>Video', 'parent_id>Comment(comment_id)'] }];
+relInto('#yt3r', R3);
+$('#yt4').innerHTML = erd({ n: [['User', 'E', 0, 0], ['buys', 'R', 220, 0], ['Subscription', 'E', 460, 0], ['Video', 'E', 0, 120]],
+  a: [['User', '_user_id', 0, -55], ['Subscription', '_sub_id', -60, -55], ['Subscription', 'start_date', 60, -60], ['Subscription', 'end_date', 130, 30], ['Subscription', 'amount', 30, 60], ['Video', '_video_id', -100, 0], ['Video', 'is_premium', 120, 0]],
+  l: [['Subscription', 'buys', { total: true, card: 'N' }], ['User', 'buys', { one: true, card: '1' }]] });
+const R4 = [{ n: 'Subscription', c: ['*sub_id', 'start_date', 'end_date', 'amount', 'user_id!>Users'] }];
+relInto('#yt4r', R4);
+sqlPlay('#ytPlay', { setup: ddl([...R1, ...R2, ...R3, ...R4]) + `
+INSERT INTO Users VALUES (1, 'Amina', 'a@x.com', DATE '2024-01-01');
+INSERT INTO Users VALUES (2, 'Rahim', 'r@x.com', DATE '2024-02-01');
+INSERT INTO Users VALUES (3, 'Nabila', 'n@x.com', DATE '2024-03-01');
+INSERT INTO Channel VALUES (10, 'Amina Cooks', DATE '2024-01-05', 1);
+INSERT INTO Video VALUES (100, 'Khichuri', 'easy recipe', DATE '2024-04-01', 'N', 10);
+INSERT INTO Video VALUES (101, 'Biryani masterclass', 'premium', DATE '2024-05-01', 'Y', 10);
+INSERT INTO Watches VALUES (2, 100, DATE '2024-06-01');
+INSERT INTO Watches VALUES (3, 100, DATE '2024-06-02');
+INSERT INTO Watches VALUES (3, 101, DATE '2024-06-02');
+INSERT INTO Comment VALUES (1000, 'Looks great', DATE '2024-06-01', 2, 100, NULL);
+INSERT INTO Comment VALUES (1001, 'Thanks!', DATE '2024-06-01', 1, 100, 1000);`, query: `-- viewer_count is derived: distinct signed-in viewers per video
+SELECT v.video_id, v.title, COUNT(w.user_id) AS viewer_count
+FROM Video v LEFT JOIN Watches w ON w.video_id = v.video_id
+GROUP BY v.video_id, v.title
+ORDER BY v.video_id;`, note: 'All four portions\' tables (generated DDL) with invented rows. Users is used instead of User, a reserved word in Oracle.' });
+$('#bpl').innerHTML = erd({ n: [['Team', 'E', 0, 0], ['playsFor', 'R', 0, 160, 'plays\nFor'], ['Player', 'E', 0, 320], ['captain', 'R', 240, 160], ['suffered', 'I', 0, 460], ['Injury', 'W', 0, 600, 'InjuryRecord'],
+      ['hosts', 'R', -280, -70], ['visits', 'R', -280, 70], ['Game', 'E', -540, 0]],
+  a: [['Team', '_name', -20, -65], ['Team', 'city', 80, -60], ['Team', 'coach', 140, -15], ['Player', '_player_id', -130, -20], ['Player', 'name', -140, 30], ['Player', 'position', 140, 10], ['Player', 'ranking', 120, 55],
+      ['Injury', '~injury_id', -140, -20], ['Injury', 'start_date', -130, 40], ['Injury', 'end_date', 130, 40], ['Injury', 'description', 140, -20],
+      ['Game', '_game_id', -70, -60], ['Game', 'game_date', 60, -65], ['Game', 'host_score', -90, 60], ['Game', 'guest_score', 60, 65]],
+  l: [['Player', 'playsFor', { card: 'N' }], ['Team', 'playsFor', { one: true, total: true, card: '1' }], ['Team', 'captain', { one: true, total: true, card: '1', role: 'team' }], ['Player', 'captain', { one: true, card: '1', role: 'captain' }],
+      ['Injury', 'suffered', { total: true, card: 'N' }], ['Player', 'suffered', { one: true, card: '1' }],
+      ['Game', 'hosts', { total: true, card: 'N' }], ['Team', 'hosts', { one: true, card: '1', role: 'host_team' }], ['Game', 'visits', { total: true, card: 'N' }], ['Team', 'visits', { one: true, card: '1', role: 'guest_team', roleSide: -1 }]] });
+$('#hos1').innerHTML = erd({ n: [['Ward', 'E', 0, 0], ['admittedTo', 'R', 0, 140, 'admitted\nTo'], ['Patient', 'E', 0, 290], ['worksIn', 'R', 330, 0, 'works\nIn'], ['CareAssistant', 'E', 560, 0, 'Care\nAssistant'],
+      ['attends', 'R', 330, 220], ['assigned', 'R', -320, 290], ['Doctor', 'E', -560, 290], ['receives', 'R', 0, 430], ['Treatment', 'E', 0, 570], ['uses', 'R', 280, 570], ['Drug', 'E', 540, 570], ['prescribedBy', 'R', -320, 570, 'prescribed\nBy']],
+  a: [['Ward', '_ward_no', -80, -55], ['Ward', 'ward_name', 30, -65], ['Ward', 'capacity', -140, 10], ['Patient', '_patient_id', 130, -10], ['Patient', 'name', 130, 35], ['Patient', 'admit_date', 120, 80], ['Patient', '/weekly_cost', -150, -50],
+      ['Doctor', '_staff_id', -40, -60], ['Doctor', 'specialty', 70, -60], ['CareAssistant', '_staff_id', 0, -65],
+      ['Treatment', '_treatment_id', -150, 50], ['Treatment', 'times_per_day', -50, 75], ['Treatment', 'dose_units', 60, 80], ['Treatment', 'start_date', 160, 45], ['Treatment', 'end_date', 120, -50],
+      ['Drug', '_drug_code', -40, -60], ['Drug', 'drug_name', 70, -60], ['Drug', 'unit_cost', 40, 60]],
+  l: [['Patient', 'admittedTo', { total: true, card: 'N' }], ['Ward', 'admittedTo', { one: true, card: '1' }], ['CareAssistant', 'worksIn', { total: true, card: 'N' }], ['Ward', 'worksIn', { one: true, card: '1' }],
+      ['CareAssistant', 'attends', { card: 'M' }], ['Patient', 'attends', { card: 'N' }], ['Patient', 'assigned', { total: true, card: '(1,2)' }], ['Doctor', 'assigned', { card: 'M' }],
+      ['Treatment', 'receives', { total: true, card: 'N' }], ['Patient', 'receives', { one: true, card: '1' }], ['Treatment', 'uses', { total: true, card: 'N' }], ['Drug', 'uses', { one: true, card: '1' }],
+      ['Treatment', 'prescribedBy', { total: true, card: 'N' }], ['Doctor', 'prescribedBy', { one: true, card: '1' }]] });
+$('#hos2').innerHTML = erd({ n: [['Staff', 'E', 0, 0], ['hasGrade', 'R', 260, 0, 'has\nGrade'], ['Grade', 'E', 520, 0], ['worked', 'I', -260, 0], ['Overtime', 'W', -520, 0], ['isA', 'D', 0, 130, 'isA'], ['Doctor', 'E', -130, 240], ['CareAssistant', 'E', 130, 240, 'Care\nAssistant']],
+  a: [['Staff', '_staff_id', -80, -60], ['Staff', 'name', 0, -75], ['Staff', 'employment_type', 100, -65], ['Staff', 'contracted_hours', 120, 55], ['Grade', '_grade_code', -40, -60], ['Grade', 'basic_rate', 80, -50], ['Grade', 'overtime_rate', 60, 55],
+      ['Overtime', '~work_date', -40, -60], ['Overtime', 'hours', 60, -60], ['Doctor', 'specialty', 0, 60]],
+  l: [['Staff', 'hasGrade', { total: true, card: 'N' }], ['Grade', 'hasGrade', { one: true, card: '1' }], ['Overtime', 'worked', { total: true, card: 'N' }], ['Staff', 'worked', { one: true, card: '1' }], ['Staff', 'isA', { total: true }], ['Doctor', 'isA'], ['CareAssistant', 'isA']],
+  t: [[110, 132, 'disjoint, total', 'acc']] });
+quiz('#quiz', [
+  { q: 'Users may comment on the same video any number of times. Comment should be…', opts: ['a relationship User–Video', 'an entity set with its own id', 'a multivalued attribute of Video', 'a weak entity of Tag'], a: 1, why: 'A relationship holds each (user, video) pair once.' },
+  { q: 'A user can create at most one channel; every channel belongs to one user. Multiplicity of owns?', opts: ['one-to-one', 'one-to-many', 'many-to-many', 'many-to-one from User'], a: 0, why: 'At most one each way. In tables: a UNIQUE user_id in Channel.' },
+  { q: 'Number of viewers of a video is best modeled as…', opts: ['a stored attribute', 'a derived attribute computed from watches', 'an entity set', 'a relationship'], a: 1, why: 'COUNT of distinct watchers.' },
+  { q: 'A game has a host team and a guest team. The two lines from Game\'s relationships to Team carry…', opts: ['keys', 'role names', 'double lines', 'nothing'], a: 1, why: 'host_team and guest_team are roles.' },
+]);
+</script>
+</body>
+</html>

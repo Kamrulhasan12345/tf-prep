@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GROUP BY and HAVING · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 10 (Ishrak) · Chapter 3 · Slides 19–27</div>
+<h1>GROUP BY and HAVING</h1>
+<p class="lede">Aggregates over the whole table answer "how much in total?". GROUP BY answers "how much <em>per</em> product, per department, per maker?". This chapter follows the slides' Purchase example step by step (FROM–WHERE, grouping, SELECT), adds HAVING, answers slide 26's "Why?", gives the full evaluation order including ORDER BY, and works a question-bank "find the fault" question on a self-join with GROUP BY.</p>
+
+<h2>1. The problem: totals per product (slides 19–20)</h2>
+<p><em>Find total sales after 10/04/2005 per product.</em> The desired output (slide 19) has one row per product: Bagel 50, Banana 10. A single SUM over the table would give one number for everything; we need one SUM <em>per product</em>. Slide 20's query:</p>
+<pre>SELECT   product, SUM(price*quantity) AS "Total Sales"
+FROM     Purchase
+WHERE    day &gt; '04-OCT-05'
+GROUP BY product;</pre>
+<dl class="def">
+<dt>GROUP BY a1, …, ak</dt>
+<dd>Partitions the rows that survive WHERE into <b class="term">groups</b>: rows with equal values in all of a1, …, ak go into the same group. Every aggregate in SELECT (and HAVING) is then computed once per group, and each group produces exactly one output row.</dd>
+</dl>
+<p>A note on the date. <code>day &gt; '04-OCT-05'</code> compares a DATE column with a string. Oracle converts the string to a date using the session's date format (by default DD-MON-RR, so '04-OCT-05' is 4 October 2005) and the query works. It is safer not to rely on the session setting and to write the date explicitly: <code>day &gt; DATE '2005-10-04'</code> or <code>day &gt; TO_DATE('04-OCT-2005', 'DD-MON-YYYY')</code>. The playground accepts all three forms.</p>
+
+<h2>2. What the query does, step by step (slides 21–24)</h2>
+<p>Slide 21 gives the recipe: (1) compute the FROM and WHERE clauses; (2) group by the attributes in GROUP BY; (3) compute the SELECT clause on the grouped attributes and aggregates.</p>
+<ol>
+<li><strong>FROM–WHERE</strong> (slide 22): of the 4 purchases, the Banana of 10/03/2005 is not after 10/04/2005 and is removed. Three rows remain.</li>
+<li><strong>GROUP BY product</strong> (slide 23): the two Bagel rows form one group, the remaining Banana row another.</li>
+<li><strong>SELECT</strong> (slide 24): each group becomes one row: the product and SUM(price*quantity) over the group's rows. Bagel: 1 · 20 + 1.50 · 20 = 50. Banana: 1 · 10 = 10.</li>
+</ol>
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="g1"></div>
+</figure>
+<div id="p20"></div>
+
+<h2>3. HAVING: conditions on groups (slide 25)</h2>
+<p><em>Find all products and their total sales which were sold at least 30 pieces after 10/04/2005.</em> "At least 30 pieces" is a condition on the <em>total</em> quantity of a product, which exists only after grouping. That is what HAVING is for:</p>
+<pre>SELECT   product, SUM(price * quantity)
+FROM     Purchase
+WHERE    day &gt; '04-OCT-05'
+GROUP BY product
+HAVING   SUM(quantity) &gt;= 30;</pre>
+<dl class="def">
+<dt>HAVING condition</dt>
+<dd>A condition tested once per group, after grouping. It may use aggregates and grouping attributes. Groups for which it is not TRUE are discarded. (Slide 25: "HAVING clause contains conditions on aggregates.")</dd>
+</dl>
+<p>Bagel's group has quantities 20 + 20 = 40 ≥ 30, so it stays; Banana's has 10, so it goes. Result: <strong>Bagel, 50</strong>. Note that HAVING tests SUM(quantity), an aggregate that is not even in the SELECT list; that is allowed.</p>
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="g2"></div>
+</figure>
+<div id="p25"></div>
+
+<h3>WHERE or HAVING?</h3>
+<div class="tbl"><table>
+<tr><th></th><th>WHERE</th><th>HAVING</th></tr>
+<tr><td>Tests</td><td>individual rows</td><td>whole groups</td></tr>
+<tr><td>When</td><td>before grouping</td><td>after grouping</td></tr>
+<tr><td>May use aggregates?</td><td>no (ORA-00934)</td><td>yes</td></tr>
+<tr><td>Example</td><td>day &gt; DATE '2005-10-04'</td><td>SUM(quantity) &gt;= 30</td></tr>
+</table></div>
+<p>A condition on a grouping attribute (e.g. <code>product &lt;&gt; 'Banana'</code>) could go in either place and give the same answer, but WHERE is better: it removes rows before the expensive grouping.</p>
+
+<h2>4. The general form, and slide 26's "Why?"</h2>
+<pre>SELECT   S
+FROM     R1, …, Rn
+WHERE    C1
+GROUP BY a1, …, ak
+HAVING   C2</pre>
+<p>Slide 26: S may contain the grouping attributes a1, …, ak and/or aggregates, but <strong>no other attributes</strong>; C1 is any condition on the attributes of R1, …, Rn; C2 is any condition on aggregate expressions (and grouping attributes).</p>
+<div class="q">
+<h4>Question (worked answer): slide 26, "Why?" may S contain no other attributes?</h4>
+<p>Because each group becomes <em>one</em> output row, and a non-grouping attribute can have <em>several different values</em> inside one group. In the Purchase example, the Bagel group contains two rows with day = 10/21/2005 and day = 10/25/2005. If we wrote <code>SELECT product, day, SUM(price*quantity) … GROUP BY product</code>, which day should the single Bagel row show? There is no correct answer, so SQL forbids it; Oracle reports <code>ORA-00979: not a GROUP BY expression</code>. A grouping attribute is safe because it has one value per group by definition, and an aggregate is safe because it turns the group's many values into one. (If you want the day too, either group by it as well, or aggregate it: <code>MAX(day)</code> is "the last day the product was sold".)</p>
+</div>
+
+<h3>The full evaluation order (slide 27, plus ORDER BY)</h3>
+<p>Slide 27 lists the evaluation steps: (1) evaluate FROM–WHERE, applying C1; (2) group by a1, …, ak; (3) apply C2 to each group; (4) compute the aggregates in S and return the result. Adding the ORDER BY clause (which the slide does not show), the logical order of a complete query is</p>
+<p class="formula">FROM → WHERE → GROUP BY → HAVING → SELECT → ORDER BY</p>
+<p>This order explains several rules at once. WHERE cannot use aggregates (they do not exist yet). In Oracle, a column alias defined in SELECT (like "Total Sales") cannot be used in WHERE, GROUP BY or HAVING (they run before SELECT), but it can be used in ORDER BY (which runs after). And ORDER BY may sort by an aggregate.</p>
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="g3"></div>
+</figure>
+<div id="p27"></div>
+
+<h3>Grouping details</h3>
+<ul>
+<li><strong>Several grouping columns:</strong> <code>GROUP BY DEPARTMENTID, JOBID</code> makes one group per <em>combination</em>, e.g. (80, SA_MAN) and (80, SA_REP) are different groups.</li>
+<li><strong>NULL forms its own group:</strong> for grouping, all NULLs are treated as equal. Employee Grant has no department, so <code>GROUP BY DEPARTMENTID</code> has a group with DEPARTMENTID NULL.</li>
+<li><strong>Groups only exist if rows exist:</strong> a department with no employees has no rows in EMPLOYEE and so no group. To report it with a count of 0, start from DEPARTMENT with a left outer join (Lecture 09) and count a column of EMPLOYEE: <code>COUNT(e.EMPLOYEEID)</code>, not <code>COUNT(*)</code>, which would count the NULL-padded row as 1.</li>
+<li><strong>GROUP BY without aggregates</strong> just returns one row per group, like SELECT DISTINCT.</li>
+</ul>
+<div id="p-grp"></div>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+<h3>Try it in SQL</h3>
+<p>Exercises 1–2 use Purchase; 3–6 the HR schema.</p>
+<div id="c1"></div><div id="c2"></div><div id="c3"></div><div id="c4"></div><div id="c5"></div><div id="c6"></div>
+
+<h3>Exam questions</h3>
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 215 | L-2/T-2 | 2018–19 · 10 marks</div>
+  <div class="exam-q"><p>(a) The following SQL query intended to show the last name of each manager along with the number of employees he is managing is not giving the correct result. Find the fault and rewrite it correctly:</p>
+<pre>SELECT E1.LAST_NAME, COUNT(*) AS "TOTAL MANAGED EMPLOYEES"
+FROM EMPLOYEE E1 JOIN E2
+ON (E1.MANAGER_ID = E2.EMPLOYEE_ID)
+GROUP BY E1.MANAGER_ID
+ORDER BY "TOTAL MANAGED EMPLOYEES" ASC;</pre>
+  <p>(b) Write an SQL query to show the department id, job id, first hiring date, last hiring date and average salary of employees for each combination of department id and job id, where the average salary is more than 3000. Ensure no null values are printed and order the result by department id.</p>
+  <p>(The question shows Oracle's HR schema: employees(employee_id, first_name, last_name, email, phone_number, hire_date, job_id, salary, commission_pct, manager_id, department_id), jobs, job_history, departments, locations, countries, regions.)</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><strong>(a) Three faults.</strong></p>
+    <ol>
+      <li><strong>Missing table name.</strong> <code>JOIN E2</code> names no table; E2 is meant to be a second alias of the employee table. It must be <code>JOIN employees E2</code> (the schema's table is <code>employees</code>; the query also calls it EMPLOYEE). As written, Oracle reports <code>ORA-00942: table or view does not exist</code>.</li>
+      <li><strong>Roles swapped.</strong> The condition <code>E1.MANAGER_ID = E2.EMPLOYEE_ID</code> says "E2 is E1's manager". So E1 is the subordinate and E2 the manager, but the query prints <code>E1.LAST_NAME</code>, a subordinate's name.</li>
+      <li><strong>Invalid grouping.</strong> It groups by <code>E1.MANAGER_ID</code> but selects <code>E1.LAST_NAME</code>, which is not a grouping attribute and has many values per group (all the subordinates' names): <code>ORA-00979: not a GROUP BY expression</code> (slide 26's rule).</li>
+    </ol>
+    <p>Corrected (group by the manager's id as well as the name, because two managers may share a last name):</p>
+<pre>SELECT E2.last_name, COUNT(*) AS "TOTAL MANAGED EMPLOYEES"
+FROM   employees E1 JOIN employees E2
+       ON (E1.manager_id = E2.employee_id)     -- E2 is E1's manager
+GROUP BY E2.employee_id, E2.last_name
+ORDER BY "TOTAL MANAGED EMPLOYEES" ASC;</pre>
+    <p>COUNT(*) is correct here: each row of the join is one (employee, manager) pair. Employees who manage nobody do not appear, which matches "each manager". The ORDER BY may use the alias because ORDER BY runs after SELECT. On our HR data King manages 6, Zlotkey 3, Weiss 3, Hunold 2, Kochhar 2, and De Haan, Hartstein and Higgins 1 each.</p>
+    <div id="ex13a"></div>
+    <p><strong>(b)</strong></p>
+<pre>SELECT   department_id, job_id,
+         MIN(hire_date) AS first_hired, MAX(hire_date) AS last_hired,
+         AVG(salary)    AS avg_salary
+FROM     employees
+WHERE    department_id IS NOT NULL AND job_id IS NOT NULL
+GROUP BY department_id, job_id
+HAVING   AVG(salary) &gt; 3000
+ORDER BY department_id;</pre>
+    <p>WHERE removes rows with a NULL department or job <em>before</em> grouping, so no NULL group is printed (on our data, Grant has no department). MIN and MAX of the hire dates give the first and last hiring dates of each group, and HAVING keeps the groups whose average salary exceeds 3000. Hire dates and salaries are never NULL in HR, so the aggregates cannot be NULL either. The question bank's answers to (a) and (b) agree with this.</p>
+    <div id="ex13b"></div>
+  </div></details>
+</div>
+
+<div class="key"><p><strong>Summary:</strong> GROUP BY partitions the rows that pass WHERE into groups of equal grouping values; each group yields one row with the grouping attributes and the aggregates computed over the group. HAVING then filters groups with conditions that may use aggregates. The SELECT list may contain only grouping attributes and aggregates, because any other attribute could have several values in a group. Logical order: FROM, WHERE, GROUP BY, HAVING, SELECT, ORDER BY.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/sqlplay.js"></script>
+<script src="../i08/lecture.js"></script>
+<script>
+const PU = [['Bagel', '10/21/2005', 1, 20], ['Banana', '10/03/2005', 0.5, 10], ['Banana', '10/10/2005', 1, 10], ['Bagel', '10/25/2005', 1.5, 20]];
+const after = r => { const [m, d] = r[1].split('/').map(Number); return m > 10 || (m === 10 && d > 4); };
+const sum = (rs, f) => +rs.reduce((s, r) => s + f(r), 0).toFixed(2);
+const base = { head: ['product', 'day', 'price', 'quantity'], rows: PU, where: after, whereText: 'day &gt; \'04-OCT-05\'', key: r => r[0], keyText: 'product' };
+stepper('#g1', groupSteps({ ...base, aggs: [{ name: 'Total Sales', f: rs => sum(rs, r => r[2] * r[3]) }], intro: 'Slide 22, step 1: FROM Purchase gives the 4 rows.' }));
+stepper('#g2', groupSteps({ ...base, aggs: [{ name: 'SUM(price*quantity)', f: rs => sum(rs, r => r[2] * r[3]) }, { name: 'SUM(quantity)', f: rs => sum(rs, r => r[3]) }],
+  having: r => r[2] >= 30, havingText: 'SUM(quantity) &gt;= 30', intro: 'Slide 25: same FROM, WHERE and GROUP BY as before, then HAVING. (SUM(quantity) is shown so you can see what HAVING tests.)' }));
+// HR example with ORDER BY
+const E = [['King', 90, 24000], ['Kochhar', 90, 17000], ['De Haan', 90, 17000], ['Hunold', 60, 9000], ['Ernst', 60, 6000], ['Lorentz', 60, 4200], ['Weiss', 50, 8000], ['Rajs', 50, 3500], ['Davies', 50, 3100], ['Matos', 50, 2600], ['Russell', 80, 14000], ['Zlotkey', 80, 10500], ['Abel', 80, 11000], ['Taylor', 80, 8600], ['Grant', null, 7000], ['Whalen', 10, 4400], ['Hartstein', 20, 13000], ['Fay', 20, 6000], ['Higgins', 110, 12008], ['Gietz', 110, 8300]];
+stepper('#g3', groupSteps({ head: ['LASTNAME', 'DEPARTMENTID', 'SALARY'], rows: E, key: r => r[1] === null ? 'NULL' : r[1], keyText: 'DEPARTMENTID',
+  aggs: [{ name: 'COUNT(*)', f: rs => rs.length }, { name: 'AVG(SALARY)', f: rs => Math.round(rs.reduce((s, r) => s + r[2], 0) / rs.length) }],
+  having: r => r[1] >= 2, havingText: 'COUNT(*) &gt;= 2', order: (a, b) => b[2] - a[2], orderText: 'AVG(SALARY) DESC',
+  intro: 'HR: SELECT DEPARTMENTID, COUNT(*), AVG(SALARY) FROM EMPLOYEE GROUP BY DEPARTMENTID HAVING COUNT(*) &gt;= 2 ORDER BY AVG(SALARY) DESC. No WHERE clause, so all 20 rows go to GROUP BY.' }));
+sqlPlay('#p20', { setup: AGG, query: 'SELECT   product, SUM(price*quantity) AS "Total Sales"\nFROM     Purchase\nWHERE    day > \'04-OCT-05\'\nGROUP BY product;', note: 'Slides 20–24. Try adding day to the SELECT list: Oracle would reject it (ORA-00979); SQLite quietly picks one day, which is exactly the problem.' });
+sqlPlay('#p25', { setup: AGG, query: "SELECT   product, SUM(price * quantity)\nFROM     Purchase\nWHERE    day > '04-OCT-05'\nGROUP BY product\nHAVING   SUM(quantity) >= 30;", note: 'Slide 25.' });
+sqlPlay('#p27', { setup: HR, query: 'SELECT   DEPARTMENTID, COUNT(*), ROUND(AVG(SALARY)) AS avg_sal\nFROM     EMPLOYEE\nGROUP BY DEPARTMENTID\nHAVING   COUNT(*) >= 2\nORDER BY avg_sal DESC;', note: 'The alias avg_sal works in ORDER BY but would not work in HAVING.' });
+sqlPlay('#p-grp', { setup: HR, query: '-- every department with its number of employees (0 for Contracting)\nSELECT   d.DEPARTMENTNAME, COUNT(e.EMPLOYEEID) AS num_emp\nFROM     DEPARTMENT d LEFT JOIN EMPLOYEE e ON e.DEPARTMENTID = d.DEPARTMENTID\nGROUP BY d.DEPARTMENTID, d.DEPARTMENTNAME\nORDER BY num_emp DESC;', note: 'Change COUNT(e.EMPLOYEEID) to COUNT(*) and Contracting wrongly shows 1.' });
+flashcards('#cards', [
+  { f: 'GROUP BY', b: 'Partition the rows (after WHERE) by equal grouping values; one output row per group.' },
+  { f: 'HAVING', b: 'Condition on groups, may use aggregates; tested after grouping.' },
+  { f: 'WHERE vs HAVING', b: 'WHERE: rows, before grouping, no aggregates. HAVING: groups, after grouping, aggregates allowed.' },
+  { f: 'What may the SELECT list of a grouped query contain?', b: 'Grouping attributes, aggregates, and formulas of those; nothing else (ORA-00979).' },
+  { f: 'Logical evaluation order', b: 'FROM → WHERE → GROUP BY → HAVING → SELECT → ORDER BY.' },
+  { f: 'NULL in a grouping column', b: 'All NULLs form one group.' },
+  { f: 'Counting with a left join', b: 'COUNT(child.key) gives 0 for parents without children; COUNT(*) gives 1.' },
+]);
+quiz('#quiz', [
+  { q: 'Which clause filters groups?', opts: ['WHERE', 'HAVING', 'GROUP BY', 'ORDER BY'], a: 1, why: 'HAVING is evaluated after grouping.' },
+  { q: 'SELECT product, day, SUM(quantity) FROM Purchase GROUP BY product is…', opts: ['fine', 'an error in Oracle: day is not grouped', 'fine if day is a DATE', 'an error: SUM needs HAVING'], a: 1, why: 'A group can contain several days.' },
+  { q: 'Slide 25 without the WHERE clause. Banana\'s SUM(quantity) is…', opts: ['10', '20', '30', '40'], a: 1, why: 'Both Banana purchases count: 10 + 10 = 20, still below 30.' },
+  { q: 'Can HAVING use an aggregate that is not in the SELECT list?', opts: ['Yes', 'No'], a: 0, why: 'Slide 25 tests SUM(quantity) but selects SUM(price*quantity).' },
+  { q: 'In Oracle, where can a SELECT-list alias be used?', opts: ['WHERE', 'GROUP BY', 'HAVING', 'ORDER BY'], a: 3, why: 'Only ORDER BY runs after SELECT.' },
+  { q: 'GROUP BY DEPARTMENTID, JOBID on HR: how many groups contain department 80?', opts: ['1', '2', '4', '5'], a: 1, why: '(80, SA_MAN) and (80, SA_REP).' },
+]);
+ask('#try1', { q: 'On the HR data, how many groups does GROUP BY DEPARTMENTID produce? (7 departments have employees, and one employee has no department.)', a: 8, why: '7 department groups + 1 NULL group.' });
+sqlCheck('#c1', { setup: AGG, task: '1. (Easy) For each product, return the product and its total quantity sold (all days).', solution: 'SELECT product, SUM(quantity) FROM Purchase GROUP BY product;' });
+sqlCheck('#c2', { setup: AGG, task: '2. For each product, return the product, the number of purchases and the average price paid, but only for products bought at least twice.', solution: 'SELECT product, COUNT(*), AVG(price) FROM Purchase GROUP BY product HAVING COUNT(*) >= 2;' });
+sqlCheck('#c3', { setup: HR, task: '3. For each job id, return the job id and the number of employees holding it.', solution: 'SELECT JOBID, COUNT(*) FROM EMPLOYEE GROUP BY JOBID;' });
+sqlCheck('#c4', { setup: HR, task: '4. For each department name, return the name and the highest salary in it, sorted by that highest salary, largest first (ties by name).', solution: 'SELECT d.DEPARTMENTNAME, MAX(e.SALARY) FROM EMPLOYEE e, DEPARTMENT d WHERE e.DEPARTMENTID = d.DEPARTMENTID GROUP BY d.DEPARTMENTNAME ORDER BY MAX(e.SALARY) DESC, d.DEPARTMENTNAME;', ordered: true });
+sqlCheck('#c5', { setup: HR, task: '5. Return the department ids (not NULL) whose employees\' total salary exceeds 30000, with that total.', solution: 'SELECT DEPARTMENTID, SUM(SALARY) FROM EMPLOYEE WHERE DEPARTMENTID IS NOT NULL GROUP BY DEPARTMENTID HAVING SUM(SALARY) > 30000;' });
+sqlCheck('#c6', { setup: HR, task: '6. (Exam style) For each manager (by EMPLOYEEID), return the manager\'s last name and the average salary of the employees he or she manages, only for managers of at least 2 employees.', solution: 'SELECT m.EMPLOYEEID, m.LASTNAME, AVG(e.SALARY) FROM EMPLOYEE e JOIN EMPLOYEE m ON e.MANAGERID = m.EMPLOYEEID GROUP BY m.EMPLOYEEID, m.LASTNAME HAVING COUNT(*) >= 2;', hint: 'Self-join; group by the manager\'s id and name. Return three columns: id, last name, average.' });
+sqlCheck('#ex13a', { setup: HR, task: 'Exam (a), corrected query (HR sample data; the view <code>employees</code> has the Oracle-HR column names).', solution: 'SELECT E2.last_name, COUNT(*) AS "TOTAL MANAGED EMPLOYEES" FROM employees E1 JOIN employees E2 ON (E1.manager_id = E2.employee_id) GROUP BY E2.employee_id, E2.last_name ORDER BY "TOTAL MANAGED EMPLOYEES" ASC;' });
+sqlCheck('#ex13b', { setup: HR, task: 'Exam (b) (HR sample data). Order by department id, then job id.', solution: 'SELECT department_id, job_id, MIN(hire_date), MAX(hire_date), AVG(salary) FROM employees WHERE department_id IS NOT NULL AND job_id IS NOT NULL GROUP BY department_id, job_id HAVING AVG(salary) > 3000 ORDER BY department_id, job_id;', ordered: true });
+</script>
+</body>
+</html>

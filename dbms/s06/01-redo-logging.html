@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Redo Logging · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="../s05/lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 06 (Sukarna) · Chapter 1 · Slides 2–6 · Book §17.3.1–17.3.2</div>
+<h1>Redo Logging and Recovery</h1>
+<p class="lede">Undo logging forces every change to disk before a transaction may commit. Redo logging turns this around: it logs new values, commits first, and writes data later. This chapter gives the redo rule, the slide's step table, the forward-scanning recovery algorithm, the slide's three crash points, and two exam questions that compare undo and redo logging.</p>
+
+<h2>1. What is wrong with undo logging? (slide 2)</h2>
+
+<p>Under rule U2, a transaction <em>cannot commit</em> until all its changed elements have been written to disk. That costs disk I/Os at the worst moment, at every commit. It is often more efficient to keep updated blocks in memory for a while:</p>
+<ul>
+  <li>other transactions may be updating the same blocks,</li>
+  <li>so it is better to write a block once, after several transactions have changed it,</li>
+  <li>instead of writing it again for each transaction's commit.</li>
+</ul>
+<p>The solution is <b class="term">redo logging</b>, which lets changes stay in memory after the commit, as long as the log can recreate them.</p>
+
+<h2>2. The redo rules (slide 3)</h2>
+
+<dl class="def">
+  <dt>&lt;T, X, v&gt; in a redo log</dt><dd>Transaction T wrote the <em>new</em> value v into element X. The old value is not recorded.</dd>
+  <dt>R1 (slide)</dt><dd>Before any update of X reaches disk, the log record &lt;T, X, v&gt; must be on disk.</dd>
+  <dt>R2 (slide)</dt><dd>The COMMIT log record must be written to disk (i) <em>before</em> any updated X is written to disk and (ii) <em>after</em> all &lt;T, X, v&gt; records are written to disk.</dd>
+</dl>
+
+<p>The textbook states this as a single rule, which it calls <b class="term">R1</b> (the write-ahead logging rule for redo): <em>before modifying any database element X on disk, all log records pertaining to this modification of X, including both the update record &lt;T,X,v&gt; and the &lt;COMMIT T&gt; record, must appear on disk.</em> The slide's R1 + R2 say the same thing. (Part (ii) of R2 is automatic: the COMMIT record is created only after the transaction's last write, so it comes after all update records in the log, and the log reaches disk in order.) Either way, the order for one transaction is:</p>
+
+<div class="key"><p class="formula">(1) update records &lt;T,X,v&gt; → (2) &lt;COMMIT T&gt; → (3) the changed elements X</p></div>
+
+<p>Compare undo logging: there the data went to disk <em>before</em> the COMMIT record, here <em>after</em>. The three differences, from the textbook:</p>
+<div class="tbl"><table>
+<tr><th></th><th>Undo logging</th><th>Redo logging</th></tr>
+<tr><td>Update record holds</td><td>old value</td><td>new value</td></tr>
+<tr><td>Data vs COMMIT on disk</td><td>data first, then COMMIT</td><td>COMMIT first, then data</td></tr>
+<tr><td>Recovery</td><td>undo incomplete transactions, ignore committed ones</td><td>redo committed transactions, ignore incomplete ones</td></tr>
+<tr><td>Scan direction</td><td>backward</td><td>forward</td></tr>
+</table></div>
+
+<h2>3. The slide's example (slide 4)</h2>
+
+<p>The same transaction (A := A*2; B := B*2, A = B = 8) under redo logging (textbook Fig. 17.7, Example 17.6):</p>
+<div class="tbl"><table>
+<tr><th>Step</th><th>Action</th><th>t</th><th>M-A</th><th>M-B</th><th>D-A</th><th>D-B</th><th>Log</th></tr>
+<tr><td>1</td><td></td><td></td><td></td><td></td><td></td><td></td><td><code>&lt;START T&gt;</code></td></tr>
+<tr><td>2</td><td><code>READ(A,t)</code></td><td>8</td><td>8</td><td></td><td>8</td><td>8</td><td></td></tr>
+<tr><td>3</td><td><code>t := t*2</code></td><td>16</td><td>8</td><td></td><td>8</td><td>8</td><td></td></tr>
+<tr><td>4</td><td><code>WRITE(A,t)</code></td><td>16</td><td>16</td><td></td><td>8</td><td>8</td><td><code>&lt;T,A,16&gt;</code></td></tr>
+<tr><td>5</td><td><code>READ(B,t)</code></td><td>8</td><td>16</td><td>8</td><td>8</td><td>8</td><td></td></tr>
+<tr><td>6</td><td><code>t := t*2</code></td><td>16</td><td>16</td><td>8</td><td>8</td><td>8</td><td></td></tr>
+<tr><td>7</td><td><code>WRITE(B,t)</code></td><td>16</td><td>16</td><td>16</td><td>8</td><td>8</td><td><code>&lt;T,B,16&gt;</code></td></tr>
+<tr><td>8</td><td></td><td></td><td></td><td></td><td></td><td></td><td><code>&lt;COMMIT T&gt;</code></td></tr>
+<tr><td>9</td><td><code>FLUSH LOG</code></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+<tr><td>10</td><td><code>OUTPUT(A)</code></td><td>16</td><td>16</td><td>16</td><td>16</td><td>8</td><td></td></tr>
+<tr><td>11</td><td><code>OUTPUT(B)</code></td><td>16</td><td>16</td><td>16</td><td>16</td><td>16</td><td></td></tr>
+</table></div>
+<p>As the slide notes: the update records &lt;T,A,16&gt; and &lt;T,B,16&gt; carry the <em>new</em> values and come before &lt;COMMIT T&gt;; and the update records and the COMMIT are flushed to disk (step 9) before A and B are. Steps 10 and 11 could happen much later; the buffer manager may wait until other transactions have also changed A and B.</p>
+
+<figure class="wide">
+<span class="anim-tag">Interactive animation</span>
+<div id="xt"></div>
+</figure>
+<p>Try moving <code>OUTPUT(A)</code> above <code>COMMIT</code>: the tool reports a violation of R1, because A would reach disk while recovery might still decide T never happened, and a redo log has no old value to put back.</p>
+
+<h2>4. Recovery with redo logging (slide 5)</h2>
+
+<p><strong>Committed or not?</strong> If &lt;COMMIT T&gt; is on the log on disk, T is committed; otherwise it is uncommitted.</p>
+
+<div class="q">
+<h4>Slide 5 question: why does nothing need to be done for uncommitted transactions?</h4>
+<p>By the redo rule, no change of T may reach disk until &lt;COMMIT T&gt; is on disk. If recovery finds no &lt;COMMIT T&gt;, then T's COMMIT never reached disk, so none of T's changes did either. The disk still has the values from before T, exactly as if T had never run. There is nothing to undo (and the log has no old values to undo with anyway). Incomplete transactions are treated as if they never occurred; they only get an &lt;ABORT T&gt; record.</p>
+</div>
+
+<p>Committed transactions are the problem: we do not know which of their changes reached disk. But the log has the new values, so we write them all again:</p>
+<pre>1. Identify the committed transactions (those with &lt;COMMIT T&gt; on the log).
+2. Scan the log FORWARD from the beginning. For each record &lt;T, X, v&gt;:
+      if T is committed:   write X = v on disk
+      if T is uncommitted: do nothing
+3. For each incomplete transaction T, write &lt;ABORT T&gt; to the log; flush the log.</pre>
+
+<p><strong>Why forward?</strong> Several committed transactions may have written the same element X at different times. That is perfectly normal (they ran one after another). Scanning earliest to latest makes the last value written the final one, as it should be. (Undo scanned latest to earliest for the mirror-image reason.) Writing a value that is already on disk is harmless, so redo is idempotent too.</p>
+
+<h2>5. Analysing crash points (slide 6)</h2>
+
+<div class="q">
+<h4>Slide 6 (worked answers)</h4>
+<p><strong>Crash after &lt;START T&gt; is written to disk</strong> (and nothing after it). No COMMIT on disk: T is incomplete. By R1 no change of T reached disk, so A = B = 8 on disk. Recovery does nothing to the data and writes &lt;ABORT T&gt;.</p>
+<p><strong>Crash after &lt;COMMIT T&gt; is written to disk</strong> (step 9 or later). T is committed. Forward scan: &lt;T,A,16&gt; → write A = 16; &lt;T,B,16&gt; → write B = 16. If the crash came before step 10, both writes are essential; between steps 10 and 11, the write of A is redundant and the write of B essential; after step 11, both are redundant but harmless. Result: A = B = 16.</p>
+<p><strong>Crash after &lt;T,A,16&gt; is written to disk</strong> but before the COMMIT is. (In Fig. 17.7 this can only happen if some other transaction flushes the log after step 4.) T has no COMMIT on disk, so it is incomplete. &lt;T,A,16&gt; is ignored; by R1, A = 8 is still on disk. Recovery writes &lt;ABORT T&gt;. Result: A = B = 8.</p>
+<p>(The textbook's Example 17.7 adds: a crash between steps 8 and 9 is one of the two cases, depending on whether the COMMIT record happened to reach disk.)</p>
+</div>
+
+<p>The second case, with the crash between steps 10 and 11 (disk: A = 16, B = 8):</p>
+<figure>
+<span class="anim-tag">Animation</span>
+<div id="case2"></div>
+</figure>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+
+<h3>Exam questions</h3>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 22-23 2d · 7 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-1 | 2022–23 · 7 marks</div>
+  <div class="exam-q"><p>Suppose you are given the following sequence of log records representing the actions of a transaction T: &lt;START T&gt;; &lt;T, A, 10&gt;; &lt;T, B, 20&gt;; &lt;COMMIT T&gt;. Answer the following questions:</p>
+  <p>(i) For undo logging, what is the last log record that must be sent to disk before updated A is sent to disk?<br>(ii) For undo logging, what is the last log record that must be sent to disk before updated B is sent to disk?<br>(iii) For redo logging, what is the last log record that must be sent to disk before updated A and B are sent to disk?</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+  <p><strong>(i) &lt;T, A, 10&gt;.</strong> Rule U1: the update record for A must reach disk before the new A. Log records reach disk in order, so &lt;START T&gt; goes before it. Nothing later is required: &lt;T,B,20&gt; may still be in memory when A is written (U1 is per element), and &lt;COMMIT T&gt; must not be on disk yet (U2).</p>
+  <p><strong>(ii) &lt;T, B, 20&gt;.</strong> Same reasoning for B. &lt;COMMIT T&gt; must not precede B under undo logging, because U2 requires all data on disk first.</p>
+  <p><strong>(iii) &lt;COMMIT T&gt;.</strong> Under redo logging, both update records <em>and</em> the COMMIT record must be on disk before any changed element is written. Since &lt;COMMIT T&gt; is the last of them, it is the last record that must be sent before A and B.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 23-24 6c · 12 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-1 | 2023–24 · 12 marks</div>
+  <div class="exam-q"><p>Consider the following sequence of log records:</p>
+  <pre>&lt;START S&gt;; &lt;S, A, 60&gt;; &lt;COMMIT S&gt;; &lt;START T&gt;; &lt;T, A, 10&gt;; &lt;START U&gt;;
+&lt;U, B, 20&gt;; &lt;T, C, 30&gt;; &lt;START V&gt;; &lt;U, D, 40&gt;; &lt;V, F, 70&gt;; &lt;COMMIT U&gt;;
+&lt;T, E, 50&gt;; &lt;COMMIT T&gt;; &lt;V, B, 80&gt;; &lt;COMMIT V&gt;.</pre>
+  <p>(i) Assume a system crash happens before &lt;COMMIT T&gt; is recorded in the log. Considering that "undo logging" is used, describe the actions the recovery manager will perform after the crash. Your answer should list each action in the format &lt;X, A&gt; where database element X is written with the value A.<br>(ii) Answer the question (i) above for "redo logging".<br>(iii) Why is it necessary to write an &lt;ABORT T&gt; log record in the logfile for every uncommitted transaction T after the completion of the recovery operation?</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+  <p>The log on disk ends with &lt;T, E, 50&gt;. Committed: <strong>S, U</strong>. Uncommitted: <strong>T, V</strong>.</p>
+  <p><strong>(i) Undo logging</strong> (values are old values; scan backward; undo T and V):</p>
+  <ul>
+    <li>&lt;T,E,50&gt; → <strong>&lt;E, 50&gt;</strong></li>
+    <li>&lt;COMMIT U&gt; → U committed</li>
+    <li>&lt;V,F,70&gt; → <strong>&lt;F, 70&gt;</strong></li>
+    <li>&lt;U,D,40&gt; → ignore; &lt;START V&gt;</li>
+    <li>&lt;T,C,30&gt; → <strong>&lt;C, 30&gt;</strong></li>
+    <li>&lt;U,B,20&gt; → ignore; &lt;START U&gt;</li>
+    <li>&lt;T,A,10&gt; → <strong>&lt;A, 10&gt;</strong>; &lt;START T&gt;</li>
+    <li>&lt;COMMIT S&gt;, &lt;S,A,60&gt; → ignore</li>
+  </ul>
+  <p>Actions: <strong>&lt;E,50&gt;, &lt;F,70&gt;, &lt;C,30&gt;, &lt;A,10&gt;</strong>; then &lt;ABORT T&gt; and &lt;ABORT V&gt; are logged and flushed.</p>
+  <p><strong>(ii) Redo logging</strong> (values are new values; scan forward; redo S and U):</p>
+  <ul>
+    <li>&lt;S,A,60&gt; → <strong>&lt;A, 60&gt;</strong></li>
+    <li>&lt;T,A,10&gt; → ignore (T uncommitted)</li>
+    <li>&lt;U,B,20&gt; → <strong>&lt;B, 20&gt;</strong></li>
+    <li>&lt;T,C,30&gt; → ignore</li>
+    <li>&lt;U,D,40&gt; → <strong>&lt;D, 40&gt;</strong></li>
+    <li>&lt;V,F,70&gt;, &lt;T,E,50&gt; → ignore</li>
+  </ul>
+  <p>Actions: <strong>&lt;A,60&gt;, &lt;B,20&gt;, &lt;D,40&gt;</strong>; then &lt;ABORT T&gt; and &lt;ABORT V&gt; are logged and flushed.</p>
+  <p><strong>(iii)</strong> The ABORT record tells every future recovery that T has been dealt with. Without it, T would look incomplete forever:</p>
+  <ul>
+    <li>Under undo logging, a later recovery would undo T's records again. If, meanwhile, a committed transaction changed one of those elements (say E), the stale undo would overwrite the committed value, destroying a committed update.</li>
+    <li>T would look active forever, so no checkpoint could ever cover it (a quiescent checkpoint waits for all transactions to have COMMIT or ABORT; a nonquiescent one would list T and never end), and the log before T's START could never be deleted.</li>
+  </ul>
+  <p>The log is flushed after writing the ABORT records so that they themselves survive the next crash.</p>
+  <div id="ex113"></div>
+  <p><em>Note:</em> the CSE215 bank prints this log with &lt;COMMIT V&gt; and &lt;COMMIT T&gt; swapped and asks about a crash “before &lt;COMMIT V&gt;”. In its version too the crash comes right after &lt;T, E, 50&gt;, so the log on disk and the answers are the same as above (its answers agree).</p>
+  </div></details>
+</div>
+
+<div class="key"><p><strong>Summary:</strong> redo logging logs new values and requires update records and &lt;COMMIT T&gt; on disk before any changed element (slides: R1 + R2; textbook: one rule R1). Data may stay in memory after the commit. Recovery identifies committed transactions, scans forward and rewrites their new values; uncommitted transactions changed nothing on disk and just get &lt;ABORT T&gt;.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../s05/lecture.js"></script>
+<script>
+xactTool('#xt', { mode: 'redo' });
+recoveryAnim('#case2', '<START T> <T,A,16> <T,B,16> <COMMIT T>', 'redo', { A: 16, B: 8 });
+recoveryTool('#ex113', { log: '<START S>; <S, A,60>; <COMMIT S>; <START T>; <T, A, 10>; <START U>;\n<U, B, 20>; <T, C, 30>; <START V>; <U, D, 40>; <V, F, 70>; <COMMIT U>;\n<T, E, 50>', mode: 'redo' });
+flashcards('#cards', [
+  { f: '&lt;T,X,v&gt; in a redo log', b: 'T wrote the NEW value v into X.' },
+  { f: 'Redo rule (textbook R1)', b: 'Before X is changed on disk, &lt;T,X,v&gt; and &lt;COMMIT T&gt; must both be on disk.' },
+  { f: 'Redo disk order', b: 'update records → COMMIT record → changed elements.' },
+  { f: 'Redo recovery', b: 'Find committed transactions; scan forward; write the new value of each of their updates; ABORT the rest.' },
+  { f: 'Why forward?', b: 'Several committed transactions may write the same X; the latest value must win.' },
+  { f: 'Disadvantage of undo logging', b: 'A transaction cannot commit until all its changes are written to disk (many I/Os).' },
+]);
+quiz('#quiz', [
+  { q: 'Under redo logging, which reaches disk last?', opts: ['&lt;T,A,16&gt;', '&lt;COMMIT T&gt;', 'A = 16', 'Any order'], a: 2, why: 'Data goes after the COMMIT record.' },
+  { q: 'Redo recovery finds <START T> and <T,A,16> but no COMMIT. It…', opts: ['writes A = 16', 'writes the old A', 'does nothing to A and logs <ABORT T>', 'stops recovery'], a: 2, why: 'By R1, A = 16 never reached disk; there is nothing to fix.' },
+  { q: 'Which direction does redo recovery scan?', opts: ['Backward', 'Forward', 'Either', 'From the checkpoint backward'], a: 1, why: 'Earliest to latest, so the last committed write of each element wins.' },
+  { q: 'Main advantage of redo over undo logging?', opts: ['Smaller log records', 'Commit does not wait for data to be written to disk', 'No log flush is needed', 'No COMMIT records'], a: 1, why: 'Data can stay in buffers after the commit, saving I/O.' },
+  { q: 'Main cost of redo logging?', opts: ['Blocks must stay in memory until the transaction commits', 'Recovery must scan backward', 'Old values must be logged', 'Checkpoints are impossible'], a: 0, why: 'A changed block may not be written before the COMMIT is on disk, so buffers stay occupied longer.' },
+]);
+ask('#try1', { q: 'Redo log on disk: <START T1> <T1,X,5> <COMMIT T1> <START T2> <T2,X,9> <COMMIT T2> <START T3> <T3,X,12>. After recovery, X = ?', a: 9, why: 'Forward: X = 5 (T1), X = 9 (T2); T3 is uncommitted and ignored.' });
+</script>
+</body>
+</html>

@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Weak Entity Sets · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 07 (Ishrak) · Chapter 8 · Slides 78–85</div>
+<h1>Weak Entity Sets</h1>
+<p class="lede">Room 201 means nothing until we say which building. This chapter explains weak entity sets, their identifying owner and partial key, the notation (double rectangle, double diamond, dashed underline), the programming-team and building-room examples, and how a weak entity becomes an Oracle table.</p>
+
+<h2>1. What a weak entity set is (slide 78)</h2>
+<dl class="def">
+<dt>Weak entity set</dt><dd>An entity set that <strong>cannot be identified by its own attributes alone</strong>. Its entities are identified only together with an entity of another set.</dd>
+<dt>Identifying owner</dt><dd>The entity set (or sets) that supplies the missing part of the identity. Building owns Room.</dd>
+<dt>Identifying relationship</dt><dd>The relationship from the weak entity set to its owner. It is many-to-one toward the owner, and every weak entity must take part in it (total participation): a room belongs to exactly one building.</dd>
+<dt>Partial key (discriminator)</dt><dd>The weak entity's own attributes that distinguish it <em>among the entities of the same owner</em>: room_no distinguishes the rooms of one building.</dd>
+<dt>Strong entity set</dt><dd>An ordinary entity set with a key of its own.</dd>
+</dl>
+<p>The slide's intuition: a room number may identify a room only inside a particular building. Room 201 in one building is different from Room 201 in another building. The full identity is</p>
+<div class="formula">identity of a Room = key of its Building + room_no</div>
+
+<h2>2. Strong or weak? (slide 79)</h2>
+<div class="tbl"><table>
+<tr><th>Weak (identity depends on an owner)</th><th>Not necessarily weak</th></tr>
+<tr><td>A <strong>Room</strong> may require a <strong>Building</strong>.<br>An <strong>Answer</strong> may require a <strong>Question</strong> (answer 1, 2, 3 of question 17).<br>A <strong>Team</strong> may require a <strong>University</strong>.</td>
+<td>A <strong>Tire</strong> can be treated as strong if the system tracks tires independently, even before they are attached to a car (each tire has a serial number).</td></tr>
+</table></div>
+<p><strong>Weakness is a modeling decision based on how the domain identifies things.</strong> If the tire shop numbers tires "front-left, front-right, …" of a car, Tire is weak with owner Car and partial key position. If every tire carries a factory serial number and is stocked before it is fitted, Tire is strong with key serial_no, and "fitted to" is an ordinary relationship.</p>
+
+<h2>3. Notation (slide 80)</h2>
+<ul>
+<li><strong>Weak entity set:</strong> double rectangle.</li>
+<li><strong>Identifying relationship:</strong> double diamond, with the arrow toward the owner (many-to-one).</li>
+<li><strong>Partial key:</strong> dashed underline.</li>
+</ul>
+<figure><div id="note"></div><figcaption>Slide 80. Chen-style papers also draw a double line between the weak entity set and the identifying relationship (total participation, Chapter 10); the textbook uses a rounded arrow toward the owner for "exactly one". All mean: every weak entity has exactly one owner.</figcaption></figure>
+
+<h2>4. Example: programming contest teams (slides 81–83)</h2>
+<blockquote class="q" style="border-color:var(--line)"><p><em>Universities have programming contest teams. A team has a number, team name, and coach. The same team number may be used by different universities.</em></p></blockquote>
+<p>Team is weak if number is unique only inside one University. University is the identifying owner, and number is the partial key.</p>
+<figure class="wide"><span class="anim-tag">Animation</span><div id="team"></div></figure>
+<p><strong>Why Team is weak here (slide 83).</strong> "Programming contest team 1" is not specific enough: BUET has a team 1, and so does every other university. "BUET programming contest team 1" is specific. The owner entity gives the missing context:</p>
+<div class="formula">Team identity = University identity + Team partial key = (University.name, number)</div>
+<p>The slide also puts <em>totalTeam</em> on University. That value can be computed by counting the university's teams, so it is a <em>derived</em> attribute (Chapter 10 draws such attributes with a dashed oval). If it is stored, it must be kept consistent with the actual teams.</p>
+
+<h2>5. Example: rooms in buildings (slides 84–85)</h2>
+<blockquote class="q" style="border-color:var(--line)"><p><em>A university has many buildings. Each building has rooms. A room number is unique inside a building, but the same room number may appear in different buildings.</em></p></blockquote>
+<figure><div id="room"></div><figcaption>Slide 85: Building is the owner, Room is weak, room_no is the partial key.</figcaption></figure>
+<p>The instance view makes the key obvious:</p>
+<div class="figrow">
+<div><div class="figlabel">Building</div><table class="rec"><tr><th>name</th><th>location</th></tr><tr><td>ECE</td><td>West</td></tr><tr><td>Civil</td><td>East</td></tr></table></div>
+<div><div class="figlabel">Room</div><table class="rec"><tr><th>building</th><th>room_no</th><th>capacity</th></tr><tr><td>ECE</td><td>201</td><td>60</td></tr><tr><td>ECE</td><td>202</td><td>40</td></tr><tr class="hl"><td>Civil</td><td>201</td><td>120</td></tr></table></div>
+</div>
+<p>room_no 201 appears twice, so it is not a key by itself; (building, room_no) is.</p>
+
+<h2>6. From weak entity to table</h2>
+<p>Chapter 11 treats all conversion rules; the weak-entity rule is short enough to state now because exam questions on weak entities always ask for it:</p>
+<ol>
+<li>The weak entity set becomes a table with its own attributes.</li>
+<li>Add the <strong>key of the owner</strong> as columns; they form a foreign key to the owner's table.</li>
+<li>The <strong>primary key</strong> is owner key + partial key.</li>
+<li>The identifying relationship needs <strong>no table</strong>: the foreign key already records which owner each weak entity belongs to.</li>
+<li>Usually <code>ON DELETE CASCADE</code>: a room cannot exist without its building, so deleting the building deletes its rooms.</li>
+</ol>
+<figure><span class="anim-tag">Animation</span><div id="conv"></div></figure>
+<p>Run the Oracle DDL below, then try the experiments in the comments: the same room number in two buildings is accepted, the same (building, room_no) twice is rejected, and deleting a building removes its rooms.</p>
+<div id="play"></div>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+<div id="chk1"></div>
+
+<h3>Exam questions</h3>
+<div class="exam">
+  <div class="exam-src">DB QB · Jan 20 11, 23 CT1 3 · 10, 8 marks &nbsp;·&nbsp; BUET QBank · CSE 215 | L-2/T-2 | 2018–19 · 10 marks</div>
+  <div class="exam-q"><p>Differentiate between strong entity and weak entity by showing appropriate examples. How do you design them in a relational schema?</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <div class="tbl"><table><tr><th></th><th>Strong entity set</th><th>Weak entity set</th></tr>
+    <tr><td>Key</td><td>Has a key of its own (primary key)</td><td>Has only a partial key; identified by owner key + partial key</td></tr>
+    <tr><td>Existence</td><td>Independent</td><td>Depends on its owner; deleting the owner deletes it</td></tr>
+    <tr><td>Relationship to owner</td><td>Ordinary relationships</td><td>An identifying relationship, many-to-one toward the owner, total on the weak side</td></tr>
+    <tr><td>Notation</td><td>Single rectangle, key underlined</td><td>Double rectangle, double diamond, partial key with dashed underline</td></tr>
+    <tr><td>Example</td><td>Building(<u>name</u>, location)</td><td>Room(room_no, capacity), partial key room_no, owned by Building</td></tr></table></div>
+    <figure class="wide"><div id="exSW"></div></figure>
+    <p><strong>Relational design.</strong> Strong entity set → a table with its attributes, primary key = its key: <span class="mono">Building(<u>name</u>, location)</span>. Weak entity set → a table with its attributes plus the owner's key as a foreign key; primary key = owner key + partial key; no table for the identifying relationship: <span class="mono">Room(<u>building_name</u>, <u>room_no</u>, capacity)</span>, <code>FOREIGN KEY (building_name) REFERENCES Building(name) ON DELETE CASCADE</code>. Second example: <span class="mono">Employee(<u>emp_id</u>, name)</span>, <span class="mono">Dependent(<u>emp_id</u>, <u>dep_name</u>, relation)</span>, where a dependent's name is unique only within one employee's family.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 17-18 5c · 5 marks &nbsp;·&nbsp; BUET QBank · CSE 215 | L-2/T-2 | 2017–18 · 5 marks</div>
+  <div class="exam-q"><p>Define weak entity set. Also give an example of weak entity set.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>A <strong>weak entity set</strong> is an entity set whose own attributes cannot identify its entities. Each entity is identified by the key of a related <em>owner</em> (identifying) entity set together with the weak entity's <em>partial key</em>, through an <em>identifying relationship</em> that is many-to-one toward the owner and total on the weak side. It is drawn as a double rectangle, the identifying relationship as a double diamond, and the partial key with a dashed underline.</p>
+    <p><strong>Example (slides 81–82):</strong> programming contest teams. Team(number, tname, coach) is weak with owner University(<u>name</u>, address): team number 1 exists at many universities, so a team is identified by (University.name, number). Diagram:</p>
+    <figure><div id="exTeam"></div></figure>
+    <p>As a table: <span class="mono">Team(<u>univ_name</u>, <u>number</u>, tname, coach)</span> with univ_name a foreign key to University.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2012–13 · 10 marks</div>
+  <div class="exam-q"><p>What is a weak entity set? What is the requirement of a weak entity set?</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>A weak entity set is one that cannot be identified by its own attributes; it is identified through an owner entity set (definition and example as above: Room in Building).</p>
+    <p><strong>Requirements</strong> (for E to be a legal weak entity set, Garcia-Molina et al. §4.4.2):</p>
+    <ol>
+    <li><strong>An identifying owner exists.</strong> E is connected to one or more entity sets F by identifying relationships R.</li>
+    <li><strong>R is many-to-one from E to F</strong> (arrow into F) <strong>with total participation of E</strong>: every weak entity has exactly one owner through R. (If R were many-to-many, "the owner's key" would not be one value.)</li>
+    <li><strong>The key of E</strong> is its partial key (zero or more of its own attributes, dashed underline) plus the key attributes of every owner F. F may itself be weak; then its key is taken recursively from its own owner.</li>
+    <li><strong>Existence dependency:</strong> a weak entity cannot exist without its owner, so deleting an owner deletes its weak entities (ON DELETE CASCADE in tables).</li>
+    <li>In the diagram, E is a double rectangle and R a double diamond.</li>
+    </ol>
+    <figure><div id="exReq"></div><figcaption>Every element of the requirements in one picture. The double line is total participation.</figcaption></figure>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2014–15 · 10 marks</div>
+  <div class="exam-q"><p>Discuss with example the difference between strong and weak relationships in the context of relational database modelling. How does security concern arise by the choice of primary key?</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>In relational modelling (and design tools such as Oracle SQL Developer Data Modeler or MySQL Workbench) a <strong>strong relationship</strong> is an <em>identifying</em> one: the parent's primary key becomes <em>part of the child's primary key</em>, which is exactly how a weak entity set is attached to its owner. A <strong>weak relationship</strong> is <em>non-identifying</em>: the parent's key appears in the child only as an ordinary foreign key, and the child has its own primary key. (The names are confusing: a strong, identifying relationship is the one that creates a weak entity.)</p>
+    <figure class="wide"><div id="exRel"></div></figure>
+    <p><strong>Example.</strong> Department–Employee via worksIn is non-identifying (weak): <span class="mono">Employee(<u>emp_id</u>, name, <i>dept_id</i>)</span>; an employee exists and is identified independently of the department, and dept_id may even be NULL or change. Employee–Dependent via has is identifying (strong): <span class="mono">Dependent(<u>emp_id</u>, <u>dep_name</u>, relation)</span>; the dependent cannot be identified or exist without the employee.</p>
+    <p><strong>Security and the choice of primary key.</strong> A primary key is copied into every table that references it (as a foreign key), and into every child key along identifying relationships. If the primary key is a sensitive natural value, such as a national ID, SSN, phone number or email, that value spreads to every related table, index, log, URL and report, and anyone allowed to read any of those tables sees it. Problems:</p>
+    <ul>
+    <li><strong>Exposure:</strong> users who need only Dependent or Payroll data also learn the employee's national ID.</li>
+    <li><strong>Hard to change or erase:</strong> if a person's ID or email must change or be removed (privacy law), every referencing row must be updated.</li>
+    <li><strong>Guessable keys:</strong> sequential or meaningful keys in application URLs (…/student/2105001) let an attacker enumerate other records if access checks are weak.</li>
+    </ul>
+    <p><strong>Mitigation:</strong> use a meaningless surrogate key (an Oracle identity column or sequence number) as the primary key, keep the sensitive natural key as a <code>UNIQUE NOT NULL</code> attribute in one well-protected table, and grant access to it separately (views, column privileges). Identifying relationships are then built on the surrogate key.</p>
+  </div></details>
+</div>
+
+<div class="key">
+<p><strong>Summary:</strong> a weak entity set cannot be identified by its own attributes; its key is the owner's key plus its partial key. It is drawn as a double rectangle joined by a double diamond (many-to-one, total) to its owner, with the partial key dashed-underlined. Weakness is a modeling decision. In tables, the weak entity gets the owner's key as a foreign key that is also part of its primary key, usually with ON DELETE CASCADE, and the identifying relationship gets no table.</p>
+</div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/sqlplay.js"></script>
+<script src="lecture.js"></script>
+<script>
+$('#note').innerHTML = erd({ n: [['Owner', 'E', 0, 0], ['has', 'I', 150, 0], ['Weak', 'W', 300, 0, 'Weak\nEntity']], a: [['Weak', '~partial key', 0, -65]], l: [['Owner', 'has', { one: true }], ['Weak', 'has']] });
+const TEAM = { n: [['Team', 'W', 0, 0], ['affiliation', 'I', 190, 0], ['University', 'E', 380, 0]],
+  a: [['Team', 'coach', -100, -50], ['Team', 'tname', -20, -70], ['Team', '~number', 75, -55], ['University', '_name', -40, -60], ['University', 'address', 70, -55], ['University', 'totalTeam', 50, 55]],
+  l: [['Team', 'affiliation'], ['University', 'affiliation', { one: true }]] };
+erdSteps('#team', TEAM, [
+  { set: ['University', 'University.name', 'University.address', 'University.totalTeam'], cap: 'University is a strong entity set with key name.' },
+  { add: ['Team', 'Team.coach', 'Team.tname', 'Team.number'], mult: false, cap: 'Team has number, tname and coach, but number repeats across universities, and names and coaches can repeat too. No key of its own: double rectangle.' },
+  { add: ['affiliation'], cap: 'The identifying relationship affiliation (double diamond), many-to-one into University: every team belongs to one university.' },
+  { add: [], hl: ['Team.number', 'University.name'], cap: 'number is the partial key (dashed underline). Team\'s full key: (University.name, number). This is slide 82.' },
+]);
+$('#room').innerHTML = erd({ n: [['Building', 'E', 0, 0], ['contains', 'I', 190, 0], ['Room', 'W', 380, 0]],
+  a: [['Building', '_name', 0, -60], ['Building', 'location', 0, 60], ['Room', '~room_no', 0, -60], ['Room', 'capacity', 0, 60]], l: [['Building', 'contains', { one: true }], ['Room', 'contains']] });
+stepper('#conv', [
+  { html: relSchema([{ n: 'Building', c: ['*name', 'location'] }]), cap: 'Building, a strong entity set, becomes a table with primary key name.' },
+  { html: relSchema([{ n: 'Building', c: ['*name', 'location'] }, { n: 'Room', c: ['room_no', 'capacity'], cls: 'hl' }]), cap: 'Room starts with its own attributes. room_no alone cannot be the primary key.' },
+  { html: relSchema([{ n: 'Building', c: ['*name', 'location'] }, { n: 'Room', c: ['*building_name>Building(name)', '*room_no', 'capacity'], cls: 'new' }]), cap: 'Add the owner\'s key as building_name (foreign key to Building). Primary key = (building_name, room_no). The relationship contains needs no table.' },
+]);
+const BLD = `CREATE TABLE Building (
+  name     VARCHAR2(20) PRIMARY KEY,
+  location VARCHAR2(20)
+);
+CREATE TABLE Room (
+  building_name VARCHAR2(20) REFERENCES Building(name) ON DELETE CASCADE,
+  room_no       NUMBER(4),
+  capacity      NUMBER(4),
+  CONSTRAINT room_pk PRIMARY KEY (building_name, room_no)
+);
+INSERT INTO Building VALUES ('ECE', 'West');
+INSERT INTO Building VALUES ('Civil', 'East');
+INSERT INTO Room VALUES ('ECE', 201, 60);
+INSERT INTO Room VALUES ('ECE', 202, 40);
+INSERT INTO Room VALUES ('Civil', 201, 120);`;
+sqlPlay('#play', { setup: BLD, query: `-- Room 201 exists in two buildings: allowed
+SELECT * FROM Room ORDER BY building_name, room_no;
+
+-- Try these one at a time:
+-- INSERT INTO Room VALUES ('ECE', 201, 30);      -- rejected: (ECE, 201) already exists
+-- INSERT INTO Room VALUES ('Mech', 101, 30);     -- rejected: no building Mech
+-- DELETE FROM Building WHERE name = 'ECE';       -- also deletes ECE's rooms`, note: 'Setup: the two tables of the animation with three rooms.' });
+sqlCheck('#chk1', { setup: BLD, task: 'Write the query that lists the room numbers and capacities of the rooms in building <b>ECE</b>, using the composite key\'s first column.', solution: "SELECT room_no, capacity FROM Room WHERE building_name = 'ECE'", hint: 'Filter Room on building_name.' });
+$('#exSW').innerHTML = erd({ n: [['Building', 'E', 0, 0], ['contains', 'I', 190, 0], ['Room', 'W', 380, 0], ['Employee', 'E', 0, 140], ['has', 'I', 190, 140], ['Dependent', 'W', 380, 140]],
+  a: [['Building', '_name', -60, -50], ['Building', 'location', 60, -50], ['Room', '~room_no', -50, -50], ['Room', 'capacity', 60, -50],
+      ['Employee', '_emp_id', -60, 50], ['Employee', 'name', 60, 50], ['Dependent', '~dep_name', -50, 50], ['Dependent', 'relation', 60, 50]],
+  l: [['Building', 'contains', { one: true }], ['Room', 'contains', { total: true }], ['Employee', 'has', { one: true }], ['Dependent', 'has', { total: true }]] });
+$('#exTeam').innerHTML = erd(TEAM);
+$('#exReq').innerHTML = erd({ n: [['Owner', 'E', 0, 0, 'Question'], ['has', 'I', 180, 0, 'answers'], ['Weak', 'W', 360, 0, 'Answer']],
+  a: [['Owner', '_q_no', 0, -60], ['Owner', 'text', 0, 60], ['Weak', '~ans_no', 0, -60], ['Weak', 'body', 0, 60]], l: [['Owner', 'has', { one: true, card: '1' }], ['Weak', 'has', { total: true, card: 'N' }]] });
+$('#exRel').innerHTML = erd({ n: [['Department', 'E', 0, 0], ['worksIn', 'R', 190, 0], ['Employee', 'E', 380, 0], ['has', 'I', 560, 0], ['Dependent', 'W', 740, 0]],
+  a: [['Department', '_dept_id', -50, -55], ['Department', 'dname', 60, -55], ['Employee', '_emp_id', -45, -55], ['Employee', 'name', 60, -55], ['Dependent', '~dep_name', -45, -55], ['Dependent', 'relation', 60, -55]],
+  l: [['Department', 'worksIn', { one: true }], ['Employee', 'worksIn'], ['Employee', 'has', { one: true }], ['Dependent', 'has', { total: true }]],
+  t: [[190, 60, 'non-identifying ("weak")', 'acc'], [560, 60, 'identifying ("strong")', 'red']] });
+flashcards('#cards', [
+  { f: 'Weak entity set', b: 'Cannot be identified by its own attributes; identified by owner key + partial key.' },
+  { f: 'Identifying owner', b: 'The entity set whose key completes the weak entity\'s identity (Building for Room).' },
+  { f: 'Partial key', b: 'Distinguishes weak entities of the same owner; dashed underline (room_no).' },
+  { f: 'Identifying relationship', b: 'Double diamond; many-to-one toward the owner, total on the weak side.' },
+  { f: 'Weak entity → table', b: 'Own attributes + owner key (FK); PK = owner key + partial key; no table for the identifying relationship; ON DELETE CASCADE.' },
+  { f: 'Is Tire weak?', b: 'Only if the domain identifies tires by their car; with serial numbers it is strong (slide 79).' },
+]);
+quiz('#quiz', [
+  { q: 'What is the key of Team in slide 82?', opts: ['number', 'tname', '(University.name, number)', '(tname, coach)'], a: 2, why: 'Owner key + partial key.' },
+  { q: 'How is a partial key drawn?', opts: ['Underlined', 'Dashed underline', 'Double oval', 'Dashed oval'], a: 1, why: 'Slide 80.' },
+  { q: 'The identifying relationship of a weak entity set is…', opts: ['many-to-many', 'many-to-one toward the owner', 'one-to-one always', 'never drawn'], a: 1, why: 'Each weak entity has exactly one owner.' },
+  { q: 'How many tables does Building–contains–Room need?', opts: ['1', '2', '3', '4'], a: 1, why: 'Building and Room; contains is absorbed by Room\'s foreign key.' },
+  { q: 'Deleting building ECE with ON DELETE CASCADE on Room\'s foreign key…', opts: ['fails', 'deletes ECE\'s rooms too', 'sets building_name to NULL', 'leaves orphan rooms'], a: 1, why: 'A weak entity cannot outlive its owner.' },
+  { q: 'Which is most naturally weak?', opts: ['Student with roll number', 'Answer numbered 1, 2, 3 within each Question', 'Book with ISBN', 'Car with registration number'], a: 1, why: 'Answer numbers repeat across questions (slide 79).' },
+]);
+ask('#try1', { q: 'A university has 5 buildings, each with rooms numbered 101–120. How many rows of Room share room_no = 101?', a: 5, hint: 'One per building.', why: 'room_no repeats once per building, which is exactly why it is only a partial key.' });
+</script>
+</body>
+</html>

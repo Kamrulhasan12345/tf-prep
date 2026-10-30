@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Two-Pass Algorithms Based on Hashing · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="../s07/lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 08 (Sukarna) · Chapter 5 · Slides 29–35 · Book §15.5.1–15.5.5, 15.5.7</div>
+<h1>Two-Pass Algorithms Based on Hashing</h1>
+<p class="lede">Hashing reaches the same goal as sorting by a different road: split the data into M − 1 buckets so that everything that must be compared ends up in the same bucket, then run a one-pass algorithm on each bucket. This chapter gives hash partitioning, hash-based δ, γ, ∪, ∩, −, and the hash join, with costs, memory rules, two slide corrections and a worked exam question.</p>
+
+<h2>1. Partitioning a relation by hashing (slides 29–30)</h2>
+<dl class="def">
+<dt>Hash partitioning</dt>
+<dd>Splitting R into <b>M − 1 buckets</b> of roughly equal size with a hash function h: tuple t goes to bucket h(t). Each bucket is written to disk as its own set of blocks.</dd>
+</dl>
+<p>Memory: one buffer per bucket (M − 1) plus one buffer to read R. The algorithm (textbook Fig. 15.12):</p>
+<pre>initialize M-1 buckets using M-1 empty buffers;
+FOR each block b of relation R DO BEGIN
+    read block b into the Mth buffer;
+    FOR each tuple t in b DO BEGIN
+        IF the buffer for bucket h(t) has no room for t THEN BEGIN
+            copy the buffer to disk;
+            initialize a new empty block in that buffer;
+        END;
+        copy t to the buffer for bucket h(t);
+    END;
+END;
+FOR each bucket DO
+    IF the buffer for this bucket is not empty THEN
+        write the buffer to disk;</pre>
+<p>Cost of partitioning: read R once (B(R)) and write every bucket block once (about B(R)): <b>≈ 2B(R)</b>. (Each bucket's last block may be partly empty, so the writes can exceed B(R) by up to M − 1 blocks; we ignore that.) The <b>key idea</b>: two tuples that are equal on the hash key always go to the same bucket.</p>
+<p>Try it: tuples are numbers, h(t) = t mod (M − 1).</p>
+<figure class="wide">
+<span class="anim-tag">Interactive animation</span>
+<div id="part"></div>
+</figure>
+
+<h2>2. Duplicate elimination δ(R) using hashing (slide 31)</h2>
+<ul>
+  <li><b>Phase 1:</b> hash R into M − 1 buckets (h on the whole tuple). Identical tuples hash to the same bucket.</li>
+  <li><b>Phase 2:</b> read one bucket at a time into main memory and run the <b>one-pass duplicate-elimination algorithm</b> (Lec 07, Ch. 6) on it. The union of the per-bucket results is δ(R), because no duplicate pair is ever split across buckets.</li>
+</ul>
+<p><b>Memory:</b> each bucket is about B(R)/(M − 1) blocks, and for phase 2 a bucket must fit in memory: B(R)/(M − 1) ≤ M ⟹ B(R) ≤ M(M − 1) ⟹ <b>B(R) ≤ M²</b> (simplified). (Strictly only the distinct tuples of a bucket must fit.)</p>
+<p><b>I/O:</b> phase 1 partitioning 2B(R) + phase 2 reading each bucket B(R) = <b>3B(R)</b>.</p>
+
+<h2>3. Grouping and aggregation γ<sub>L</sub>(R) using hashing (textbook §15.5.3)</h2>
+<p>The slides list γ in their summary table; the algorithm is the same as for δ with one change: <b>hash only on the grouping attributes of L</b>, so that all tuples of a group land in the same bucket. Then run the one-pass γ (one entry per group) on each bucket. Cost <b>3B(R)</b>; memory B(R) ≤ M² is a safe estimate (a bucket can be larger than M as long as its group entries fit).</p>
+
+<h2>4. Union, intersection and difference using hashing (slides 32–33)</h2>
+<ul>
+  <li><b>Phase 1:</b> hash R and S with the <b>same hash function</b> into buckets R<sub>1</sub>, …, R<sub>M−1</sub> and S<sub>1</sub>, …, S<sub>M−1</sub>. A tuple t that is in both R and S lands in R<sub>i</sub> and S<sub>i</sub> for the same i.</li>
+  <li><b>Phase 2:</b> for each i, run the one-pass algorithm on R<sub>i</sub> and S<sub>i</sub>. For union (slide 32): read S<sub>i</sub> into M − 1 buffers with a main-memory search structure; copy all tuples of S<sub>i</sub> to the output; read R<sub>i</sub> a block at a time, and for each tuple, copy it to the output if it does not appear in S<sub>i</sub>, otherwise discard it. Intersection and difference use their one-pass rules (Lec 07, Ch. 7) in the same way.</li>
+</ul>
+<div class="key">
+<p class="formula">I/O: 2(B(R) + B(S)) to hash + (B(R) + B(S)) for phase 2 = 3(B(R) + B(S))</p>
+<p class="formula">Memory: the smaller of R<sub>i</sub>, S<sub>i</sub> must fit in M − 1 buffers ⟹ min(B(R), B(S)) ≤ M² ⟹ M ≥ √min(B(R), B(S))</p>
+</div>
+<p>(Bucket sizes are about B(R)/(M − 1) and B(S)/(M − 1); slide 33 writes B(R)/M, which is the same approximation.)</p>
+
+<h2>5. Hash join (slide 34)</h2>
+<p>To compute R(X, Y) ⋈ S(Y, Z): the same as the set operations, except the hash key is <b>just the join attributes Y</b>. Then if r ∈ R and s ∈ S join, they agree on Y, so they land in corresponding buckets R<sub>i</sub> and S<sub>i</sub>.</p>
+<ul>
+  <li><b>Phase 1:</b> hash R and S on Y with the same hash function into M − 1 buckets each.</li>
+  <li><b>Phase 2:</b> for each pair (R<sub>i</sub>, S<sub>i</sub>), use the one-pass join: read the smaller bucket into memory with a search structure on Y, stream the other.</li>
+</ul>
+<div class="key">
+<p class="formula">Hash join: 3(B(R) + B(S)) disk I/Os · Memory: min(B(R), B(S)) ≤ M² ⟹ M ≥ √min(B(R), B(S))</p>
+</div>
+<p><em>Slide correction:</em> slide 34 gives the I/O cost as "3B(R) [same as before for set union, intersection, etc.]". As its own bracket says, it is the same as for the set operations: <b>3(B(R) + B(S))</b>; both relations are hashed and written, and both are read again.</p>
+<p><b>Example (textbook Example 15.8):</b> B(R) = 1000, B(S) = 500, M = 101. Hash each into 100 buckets: on average 10 blocks per R bucket and 5 per S bucket, far below the 100 buffers available, so each pair joins easily in one pass. I/Os: 1500 to read R and S while hashing, 1500 to write the buckets, 1500 to read them again: <b>4500</b>, the same as the efficient sort-merge-join.</p>
+<figure class="wide">
+<svg viewBox="0 0 720 230" width="720" role="img" aria-label="hash join phases">
+  <g style="font-size:11.5px">
+  <text x="10" y="18" class="lbl">phase 1: hash R and S on Y with the same h</text>
+  <rect x="10" y="30" width="90" height="34" rx="4" class="cell"/><text x="55" y="51" text-anchor="middle">R (1000)</text>
+  <rect x="10" y="150" width="90" height="34" rx="4" class="cell-hl"/><text x="55" y="171" text-anchor="middle">S (500)</text>
+  <g id="hjb"></g>
+  <text x="470" y="18" class="lbl">phase 2: one-pass join of each bucket pair</text>
+  <rect x="470" y="80" width="230" height="70" rx="6" class="cell-plain" style="stroke:var(--accent);stroke-width:2"/>
+  <text x="585" y="100" text-anchor="middle">memory: S<tspan dy="3" style="font-size:9px">i</tspan><tspan dy="-3"> (≈5 blocks) + search</tspan></text>
+  <text x="585" y="116" text-anchor="middle">structure on Y; stream R</text><text x="585" y="132" text-anchor="middle"><tspan>R</tspan><tspan dy="3" style="font-size:9px">i</tspan><tspan dy="-3"> (≈10 blocks) past it</tspan></text>
+  <text x="585" y="200" text-anchor="middle" class="lbl">4500 I/Os = 3(1000 + 500)</text>
+  </g>
+</svg>
+<figcaption><b>Figure 1.</b> Hash join with M = 101: 100 bucket pairs; joining tuples always share a bucket index.</figcaption>
+</figure>
+
+<h2>6. Summary of hash-based algorithms (slide 35, textbook Fig. 15.13)</h2>
+<div class="tbl"><table>
+<tr><th>Operators</th><th>Approximate M required</th><th>Disk I/O</th></tr>
+<tr><td>γ, δ</td><td class="num">√B</td><td class="num">3B</td></tr>
+<tr><td>∪, ∩, −</td><td class="num">√B(S)</td><td class="num">3(B(R) + B(S))</td></tr>
+<tr><td>⋈</td><td class="num">√B(S)</td><td class="num">3(B(R) + B(S))</td></tr>
+</table></div>
+<p>For binary operations, S is the <b>smaller</b> relation. Compare the sort-based table (Chapter 4): the costs are the same, but the hash-based memory requirement depends only on the smaller argument, while sort-based ∪, ∩, − and sort-merge-join need √(B(R) + B(S)).</p>
+
+<h3>Sorting or hashing? (textbook §15.5.7)</h3>
+<ul>
+  <li><b>Memory:</b> hash-based binary operations need √min(B(R), B(S)); sort-based ones need √(B(R) + B(S)). Hashing wins when one relation is much smaller.</li>
+  <li><b>Sorted output:</b> sort-based algorithms produce their result in sorted order, which a later operator (ORDER BY, another sort-based operator, a merge join) can use for free.</li>
+  <li><b>Skew:</b> hash algorithms depend on buckets of equal size. With few distinct key values, or a skewed hash, some buckets overflow memory, so buckets must be planned somewhat smaller than M blocks.</li>
+  <li><b>Disk layout:</b> sorted sublists can be written to consecutive blocks and read several blocks at a time, saving seeks; hash buckets can get the same benefit only if fewer than M buckets are used so each has several output buffers.</li>
+</ul>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+<div id="try2"></div>
+
+<h3>Exam questions</h3>
+<div class="exam">
+  <div class="exam-src">DB QB · 22-23 2b · 10 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-1 | 2022–23 · 10 marks</div>
+  <div class="exam-q"><p>Give a two-pass hash-based algorithm for computing the set difference R − S. Analyze the memory and disk I/O requirements of your algorithm.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+  <p><b>Algorithm.</b></p>
+  <ol>
+    <li><b>Phase 1 (partition).</b> With M buffers (M − 1 bucket buffers + 1 input buffer), hash every tuple of R with a hash function h on the <b>whole tuple</b> into buckets R<sub>1</sub>, …, R<sub>M−1</sub>, writing them to disk. Do the same for S with the <b>same h</b>, giving S<sub>1</sub>, …, S<sub>M−1</sub>.</li>
+    <li><b>Phase 2 (one-pass difference per bucket).</b> For i = 1 to M − 1:
+      <ul>
+        <li>If S<sub>i</sub> is the smaller bucket: read S<sub>i</sub> into M − 1 buffers and build an in-memory hash table on the whole tuple (with a different hash function from h). Read R<sub>i</sub> one block at a time; output each tuple t of R<sub>i</sub> that is <b>not</b> in the table; discard the others.</li>
+        <li>If R<sub>i</sub> is the smaller bucket: read R<sub>i</sub> into memory; read S<sub>i</sub> block by block and delete from memory every tuple that occurs in S<sub>i</sub>; then output the tuples of R<sub>i</sub> that remain.</li>
+      </ul></li>
+  </ol>
+  <p><b>Correctness.</b> A tuple t of R must be excluded exactly when t is also in S. Equal tuples hash to the same bucket index, so if t ∈ R<sub>i</sub> is in S at all, it is in S<sub>i</sub>. Hence checking only the matching bucket is enough, and R − S = ⋃<sub>i</sub>(R<sub>i</sub> − S<sub>i</sub>).</p>
+  <p><b>Disk I/O.</b> Phase 1 reads R and S and writes their buckets: 2(B(R) + B(S)). Phase 2 reads every bucket once: B(R) + B(S). Total <b>3(B(R) + B(S))</b> (plus the output write if stored).</p>
+  <p><b>Memory.</b> Buckets are about B(R)/(M − 1) and B(S)/(M − 1) blocks. In phase 2 the smaller bucket of each pair must fit in M − 1 buffers: min(B(R), B(S))/(M − 1) ≤ M − 1, i.e. approximately <b>min(B(R), B(S)) ≤ M²</b>, or M ≥ √min(B(R), B(S)). Example: B(R) = 10,000, B(S) = 2,500 needs M ≈ 50 and costs 37,500 I/Os.</p>
+  </div></details>
+</div>
+
+<div class="key"><p><strong>Summary:</strong> hash-based two-pass algorithms partition R (and S) into M − 1 buckets with one hash function, so all tuples that must meet share a bucket index, then run a one-pass algorithm per bucket (pair). δ and γ: 3B, M ≥ √B (γ hashes on the grouping attributes). ∪, ∩, − and ⋈ (hash on Y): 3(B(R) + B(S)), M ≥ √min(B(R), B(S)). Slide 34's "3B(R)" for hash join should read 3(B(R) + B(S)).</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../s07/lecture.js"></script>
+<script>
+QE.form('#part', [
+  { id: 'R', label: 'R: whole numbers, comma-separated', value: '5, 12, 7, 3, 10, 8, 1, 6, 9, 4', cls: 'wide' },
+  { id: 'tpb', label: 'Tuples per block', value: '2' },
+  { id: 'M', label: 'M', value: '4' },
+], 'Animate partitioning', (v, out) => {
+  const R = QE.list(v.R, 'R', 1, 16), tpb = QE.int(v.tpb, 'Tuples per block', 1, 4), M = QE.int(v.M, 'M', 3, 6);
+  R.forEach(t => { if (!/^-?\d+$/.test(t)) throw new Error('Use whole numbers so that t mod (M − 1) is defined.'); });
+  out.innerHTML = '<div></div>';
+  QE.hashAnim(out.firstChild, R, tpb, M);
+});
+// hash join figure: bucket pairs
+(() => {
+  let s = '';
+  const ys = [40, 64, 88, 112];
+  ['R₁', 'R₂', '…', 'R₁₀₀'].forEach((n, i) => {
+    s += `<rect x="190" y="${28 + i * 22}" width="70" height="18" rx="3" class="cell"/><text x="225" y="${41 + i * 22}" text-anchor="middle">${n}</text>`;
+    s += `<rect x="290" y="${118 + i * 22}" width="70" height="18" rx="3" class="cell-hl"/><text x="325" y="${131 + i * 22}" text-anchor="middle">${n.replace('R', 'S')}</text>`;
+  });
+  s += `<path d="M100 47 L188 47" class="s-fg" marker-end="url(#m-fg)"/><path d="M100 167 L288 167" class="s-fg" marker-end="url(#m-fg)"/>`;
+  s += `<text x="140" y="40" text-anchor="middle" class="lbl">h(Y)</text><text x="190" y="160" text-anchor="middle" class="lbl">h(Y)</text>`;
+  s += `<path d="M262 37 C 380 37, 380 120, 468 110" class="s-acc" marker-end="url(#m-acc)"/><path d="M362 127 C 410 127, 420 118, 468 116" class="s-acc" marker-end="url(#m-acc)"/>`;
+  document.querySelector('#hjb').innerHTML = s;
+})();
+
+flashcards('#cards', [
+  { f: 'Hash partitioning', b: 'M − 1 bucket buffers + 1 input buffer; t goes to bucket h(t); full buffers are written out. ≈ 2B(R) I/Os.' },
+  { f: 'Hash-based δ', b: 'Hash on the whole tuple; one-pass δ per bucket. 3B, M ≥ √B.' },
+  { f: 'Hash-based γ', b: 'Hash on the grouping attributes only; one-pass γ per bucket. 3B.' },
+  { f: 'Hash-based ∪, ∩, −', b: 'Same h for R and S; one-pass algorithm on each (R_i, S_i). 3(B(R)+B(S)), M ≥ √min.' },
+  { f: 'Hash join', b: 'Hash on Y; one-pass join per bucket pair. 3(B(R)+B(S)), M ≥ √min(B(R),B(S)).' },
+  { f: 'Sort vs hash', b: 'Same I/O; hashing needs memory for the smaller relation only; sorting gives sorted output and is skew-proof.' },
+]);
+quiz('#quiz', [
+  { q: 'Why must R and S be hashed with the same function for hash-based R ∩ S?', opts: ['To save I/Os', 'So a tuple in both lands in buckets with the same index', 'To sort them', 'It is not required'], a: 1, why: 'Phase 2 compares only R_i with S_i; equal tuples must share i.' },
+  { q: 'For hash-based γ<sub>dept, SUM(salary)</sub>(R), the hash key is…', opts: ['the whole tuple', 'salary', 'dept', 'a random number'], a: 2, why: 'All tuples of one group must reach the same bucket.' },
+  { q: 'B(R) = 10,000, B(S) = 400. Approximate M for a two-pass hash join?', opts: ['20', '100', '102', '400'], a: 0, why: '√min = √400 = 20. Sort-merge-join would need √10,400 ≈ 102.' },
+  { q: 'Hash join cost for B(R) = 1000, B(S) = 500 (M = 101)?', opts: ['1500', '3000', '4500', '5500'], a: 2, why: 'Example 15.8: 3 × 1500.' },
+  { q: 'Which advantage belongs to sort-based algorithms?', opts: ['Smaller memory for binary operations', 'Output in sorted order', 'Fewer I/Os', 'Works without memory'], a: 1, why: 'Sorted output can feed ORDER BY or later sort-based steps.' },
+]);
+ask('#try1', { q: 'M = 51. Into how many buckets does phase 1 partition R?', a: 50, why: 'M − 1 buckets: one buffer is reserved for reading R.' });
+ask('#try2', { q: 'B(R) = 4000, B(S) = 6000. Disk I/Os of hash-based R ∪ S?', a: 30000, why: '3(4000 + 6000).' });
+</script>
+</body>
+</html>

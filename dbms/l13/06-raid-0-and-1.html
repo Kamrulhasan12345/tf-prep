@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RAID 0 and RAID 1 · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 13 · Chapter 6 · Slides 15–16 · Book §13.3.4, §13.4.6</div>
+<h1>RAID Levels 0 and 1: Striping and Mirroring</h1>
+<p class="lede">What a RAID level is, RAID 0 (striping with no redundancy) and RAID 1 (mirroring): their layouts, how many disks they need, what a failure does, and why RAID 1 writes fast. Includes Question w1-3 and a RAID simulator.</p>
+
+<h2>1. RAID levels (slide 15)</h2>
+
+<p>Striping makes an array fast but also fragile. If a relation is spread over 4 disks and any one dies, a quarter of its blocks are gone, which makes the whole relation useless. The more disks, the more likely one of them fails. So RAID adds <b class="term">redundancy</b>, and there are several recipes for doing it.</p>
+
+<dl class="def">
+  <dt>RAID level</dt><dd>One particular organisation of data and redundancy across the disks. Different RAID levels have differing <b class="term">cost</b>, <b class="term">performance</b> and <b class="term">reliability</b> characteristics. The levels are alternative designs, not better and worse versions.</dd>
+  <dt>Usable (effective) capacity</dt><dd>The space left for real data after subtracting the space used for redundancy.</dd>
+</dl>
+
+<h2>2. RAID 0: block striping, non-redundant</h2>
+
+<dl class="def">
+  <dt>RAID level 0</dt><dd>Block-level striping (Chapter 5) and nothing else: block <i>i</i> goes to disk <i>i</i> mod <i>n</i>. No copies and no parity, which the slide calls <b class="term">non-redundant</b>. Used in high-performance applications where data loss is not critical.</dd>
+</dl>
+
+<div class="q">
+<h4>Slide 15 example: how many disks for RAID 0? How is the student file stored?</h4>
+<p><em>You need 8 TB of storage and have 2 TB disks. How many disks are needed in RAID 0?</em> RAID 0 spends nothing on redundancy, so divide: 8 ÷ 2 = <strong>4 disks</strong> (D0–D3).</p>
+<p><em>Store the student relation file (B0, B1, …, B9) in this RAID 0 system. How?</em> Block <i>i</i> goes to disk <i>i</i> mod 4: B0 → D0, B1 → D1, B2 → D2, B3 → D3, then wrap around: B4 → D0, B5 → D1, …, B8 → D0, B9 → D1.</p>
+<figure>
+<svg id="r0"></svg>
+<figcaption><b>Figure 1.</b> RAID 0 with 4 disks, B0–B9. Each row is one stripe. (The slide's text list skips B5, a typo; its picture includes B5 on D1, as here.)</figcaption>
+</figure>
+</div>
+
+<p><strong>The catch.</strong> If any one disk fails, the blocks on it are simply gone; there is nothing to rebuild them from. A 4-disk RAID 0 is about 4 times as likely to lose data as a single disk, because any of the 4 can be the one that breaks. That is why RAID 0 is used only when data safety is not important, for example a scratch area for temporary results, or data that can be recovered quickly from other sources (slide 21).</p>
+
+<h2>3. RAID 1: mirrored disks with block striping (slide 16)</h2>
+
+<dl class="def">
+  <dt>Mirroring</dt><dd>Keeping an exact second copy of every disk on another disk, its <b class="term">mirror</b>.</dd>
+  <dt>RAID level 1</dt><dd>Mirrored disks with block striping: the data is striped over half of the disks exactly as in RAID 0, and the other half hold exact copies. Every block exists twice, on two different disks. It offers the best write performance among the redundant levels and is popular for storing the <b class="term">log files</b> of a database system (the log records every change as it happens, a constant stream of small writes that must be fast and safe).</dd>
+</dl>
+
+<div class="q">
+<h4>Slide 16 example: how many disks for RAID 1? How is the student file stored?</h4>
+<p><em>8 TB of storage with 2 TB disks in RAID 1?</em> The data needs 4 disks, as in RAID 0, and the mirror another 4: <strong>8 disks</strong>. Half of what you buy holds copies, so usable capacity is always half of the raw capacity.</p>
+<p><em>Store B0–B9.</em> Stripe over D0–D3 (block <i>i</i> → disk <i>i</i> mod 4) and copy: D4 = D0, D5 = D1, D6 = D2, D7 = D3.</p>
+<figure>
+<svg id="r1"></svg>
+<figcaption><b>Figure 2.</b> RAID 1 with 8 disks: D0–D3 hold the data (DATA on the slide), D4–D7 are the MIRROR DISKs. Green labels mark the mirror copies.</figcaption>
+</figure>
+</div>
+
+<h3>What happens when a disk fails</h3>
+<p>If D1 dies, its twin D5 still holds B1, B5 and B9. Reads are served from D5 at full speed, and when a replacement disk is installed, D5 is copied onto it. Recovery is a plain copy with no arithmetic. RAID 1 even survives two failures, as long as they are not a mirror pair (D1 and D5 together would lose B1, B5 and B9).</p>
+
+<h3>Why RAID 1 has the best write performance</h3>
+<p>Writing one block means writing it to its disk and to its mirror: <strong>2 block writes</strong>, done at the same time on two disks, with nothing to read or compute first. RAID 5 needs 2 reads and 2 writes for the same job (Chapter 7). Reads can even be faster than on one disk, because either copy can serve a read, so two reads of different blocks on a mirror pair can run in parallel (textbook §13.3.4).</p>
+
+<h2>4. RAID simulator</h2>
+<p>Choose a level, a number of disks and blocks. The simulator draws the layout (with made-up 8-bit contents), lists the usable capacity, animates the recovery of the disks you fail, and animates a one-block update. Try RAID 1 with disks 1 and 5 failed, then with 1 and 6.</p>
+<figure class="wide">
+<span class="anim-tag">Interactive tool</span>
+<div id="sim"></div>
+</figure>
+
+<div class="q">
+<h4>Question w1-3 (worked answer)</h4>
+<p><em>You have been given 6 disks of 4 TB each, and the customer relation has 6 blocks (B0, B1, B2, B3, B4, B5). Show the storage of the customer relation using (a) RAID level 0, (b) RAID level 1, (c) compare the performance of the two systems.</em></p>
+<p><strong>(a) RAID 0.</strong> All 6 disks hold data. Block <i>i</i> goes to disk <i>i</i> mod 6, so each disk gets exactly one block, and the whole relation is one stripe.</p>
+<figure><svg id="w13a"></svg></figure>
+<p><strong>(b) RAID 1.</strong> Use 3 disks for data and 3 as their mirrors. Stripe over D0–D2 (block <i>i</i> → disk <i>i</i> mod 3), then copy: D3 = D0, D4 = D1, D5 = D2.</p>
+<figure><svg id="w13b"></svg></figure>
+<p><strong>(c) Comparison.</strong></p>
+<div class="tbl"><table>
+<tr><th></th><th>RAID 0 (6 data disks)</th><th>RAID 1 (3 data + 3 mirror)</th></tr>
+<tr><th>Read the whole relation</th><td>All 6 blocks in one round, one per disk.</td><td>Also one round: B0–B2 from D0–D2 and B3–B5 from the mirrors D3–D5, since either copy can be read.</td></tr>
+<tr><th>Read one block</th><td>One disk.</td><td>One disk, and either copy can serve it, so two reads of the same pair can run in parallel.</td></tr>
+<tr><th>Write one block</th><td>1 write.</td><td>2 writes (block + mirror), in parallel, so about the same time but twice the disk work.</td></tr>
+<tr><th>Usable capacity</th><td>6 × 4 = <strong>24 TB</strong></td><td>3 × 4 = <strong>12 TB</strong></td></tr>
+<tr><th>Disk failure</th><td>Any single failure loses data.</td><td>Survives any single failure (and two, unless they are a mirror pair); recovery is a copy.</td></tr>
+</table></div>
+<p>RAID 0 is faster for writes and has twice the capacity; RAID 1 costs half the space but keeps the relation safe and gives the same read performance.</p>
+</div>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+<div id="try2"></div>
+
+<div class="key"><p><strong>Summary:</strong> A RAID level is one design trading cost, performance and reliability. RAID 0 stripes blocks (block i → disk i mod n) with no redundancy: all space usable, fastest, but any failure loses data, so it is used only when data can be recovered elsewhere. RAID 1 stripes over half the disks and mirrors them on the other half: half the space, 2 writes per block (the best write performance of the redundant levels), recovery by copying; it is popular for database log files.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="lecture.js"></script>
+<script>
+const put = (id, level, n, m, title) => { const el = document.getElementById(id); el.outerHTML = raidSVG({ rows: raidLayout(level, n, m).rows, n, title }); };
+put('r0', 0, 4, 10);
+put('r1', 1, 8, 10, 'D0–D3: DATA · D4–D7: MIRROR DISK');
+put('w13a', 0, 6, 6);
+put('w13b', 1, 6, 6, 'D0–D2: data · D3–D5: mirror');
+raidTool('#sim', { level: 1, n: 8, m: 10, size: 2, fail: '1', upd: 5 });
+
+flashcards('#cards', [
+  { f: 'RAID level', b: 'One organisation of data and redundancy over the disks, with its own cost, performance and reliability.' },
+  { f: 'RAID 0', b: 'Block striping, non-redundant. All capacity usable; any disk failure loses data.' },
+  { f: 'RAID 1', b: 'Mirrored disks with block striping. Half the capacity; 2 writes per block; recovery by copying the mirror.' },
+  { f: 'Mirror', b: 'An exact copy of a disk kept on another disk.' },
+  { f: 'Disks for D TB with S TB disks', b: 'RAID 0: ⌈D/S⌉. RAID 1: 2⌈D/S⌉.' },
+]);
+quiz('#quiz', [
+  { q: 'You need 12 TB with 3 TB disks. How many disks for RAID 1?', opts: ['4', '6', '8', '5'], a: 2, why: '4 disks of data plus 4 mirrors.' },
+  { q: 'In a 4-disk RAID 0, D2 fails. What is lost?', opts: ['Nothing', 'Every block on D2', 'Only parity', 'Every block on the array'], a: 1, why: 'There is no redundant copy, so B2, B6, … are gone (and so, in practice, are the files they belong to).' },
+  { q: 'How many block writes does RAID 1 need to update one block?', opts: ['1', '2', '4', '2 reads + 2 writes'], a: 1, why: 'The block and its mirror.' },
+  { q: 'Why is RAID 1 popular for database log files?', opts: ['Logs are read-only', 'Logs get many small writes that must be fast and safe', 'Logs are huge', 'RAID 1 compresses data'], a: 1, why: 'Mirroring gives fast small writes and survives a disk failure.' },
+  { q: 'In an 8-disk RAID 1 (D0–D3 data, D4–D7 mirrors), which pair of failures loses data?', opts: ['D1 and D2', 'D1 and D5', 'D0 and D7', 'D4 and D6'], a: 1, why: 'D5 is the mirror of D1; losing both loses B1, B5, B9.' },
+]);
+ask('#try1', { q: 'Six 4 TB disks in RAID 0: usable capacity in TB?', a: 24, why: '6 × 4 = 24 TB.' });
+ask('#try2', { q: 'In the slide\'s 4-disk RAID 0 layout, which disk holds B7? (Answer like D2)', a: ['D3', '3'], why: '7 mod 4 = 3, so D3.' });
+</script>
+</body>
+</html>

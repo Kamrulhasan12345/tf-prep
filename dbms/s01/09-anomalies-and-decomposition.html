@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Anomalies and Decomposition · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 01 (Sukarna) · Chapter 9 · Slides 37–42 · Book §3.3.1–3.3.2</div>
+<h1>Anomalies, and Removing Them by Decomposition</h1>
+<p class="lede">Redundancy is not just wasted space: it makes updates, deletions and insertions go wrong. This chapter animates each anomaly on the Movies1 table, then decomposes Movies1 into Movies2 and Movies3 and shows which anomalies disappear.</p>
+
+<h2>1. Four problems with Movies1 (slides 37–39)</h2>
+<p>The textbook calls the problems that arise from cramming too much into one relation <b class="term">anomalies</b>. Using Movies1 (title, year, length, genre, studioName, starName), with key {title, year, starName}:</p>
+<dl class="def">
+  <dt>Redundancy</dt><dd>Information is repeated unnecessarily in several tuples. The length and genre of Star Wars (124, SciFi) are stored three times, once per star.</dd>
+  <dt>Update anomaly</dt><dd>We change information in one tuple but forget the other copies, leaving the database inconsistent.</dd>
+  <dt>Deletion anomaly</dt><dd>When a set of values becomes empty, we lose other information as a side effect.</dd>
+  <dt>Insertion anomaly</dt><dd>We cannot insert a fact without also supplying unrelated (or unknown) information.</dd>
+</dl>
+
+<h3>Update anomaly (slide 37)</h3>
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="upd"></div>
+</figure>
+
+<h3>Deletion anomaly (slide 38)</h3>
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="del"></div>
+</figure>
+
+<h3>Insertion anomaly (slide 39)</h3>
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="ins"></div>
+</figure>
+<p>Two cases on slide 39. <strong>A new movie with no stars yet cannot be inserted</strong>: starName is part of the key, and a key attribute cannot be null, so there is no legal tuple to store. <strong>Adding a star to an existing movie</strong> forces us to repeat the movie's year, length, genre and studio, which is more redundancy and another chance to type a value inconsistently.</p>
+
+<h2>2. Decomposition (slide 40)</h2>
+<p>The standard cure is to <b class="term">decompose</b> the relation. Given R(A₁, …, Aₙ), decompose it into S(B₁, …, Bₘ) and T(C₁, …, Cₖ) where</p>
+<ol>
+  <li>{A₁, …, Aₙ} = {B₁, …, Bₘ} ∪ {C₁, …, Cₖ} (every attribute is kept somewhere; the two sets may overlap),</li>
+  <li>S = π<sub>B₁,…,Bₘ</sub>(R): the tuples of S are the projections of R's tuples onto the B's,</li>
+  <li>T = π<sub>C₁,…,Cₖ</sub>(R).</li>
+</ol>
+<p>Replacing a relation that is not in “good form” by smaller relations, each in an appropriate <b class="term">normal form</b> (BCNF, 3NF: Chapters 11 and 14), is called <b class="term">normalization</b>. The decomposition must be lossless (Chapter 1, Chapter 12).</p>
+
+<h2>3. Movies1 → Movies2 + Movies3 (slides 41–42)</h2>
+<p>Movies2 has every attribute except starName; Movies3 has title, year and starName.</p>
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="dec"></div>
+</figure>
+<p>What this fixes (slide 42):</p>
+<ul>
+  <li><strong>Redundancy</strong> of length, genre (and studio) is gone: each movie's facts appear once, in Movies2.</li>
+  <li><strong>Update anomaly</strong> resolved: changing the length of Star Wars touches one tuple.</li>
+  <li><strong>Deletion anomaly</strong> resolved: deleting Vivien Leigh from Movies3 removes a star, while Gone With the Wind stays in Movies2.</li>
+  <li><strong>Insertion anomaly</strong> resolved too: a movie without stars is a Movies2 tuple with no Movies3 tuples.</li>
+</ul>
+<div class="q">
+<h4>Slide 42: “update anomaly is still present in Movies3 for year update”?</h4>
+<p>Title and year still repeat in Movies3 (Star Wars, 1977 appears three times). The slide says we cannot remove the year from Movies3 because {title, year} is what identifies a movie: it is the link to Movies2. The textbook goes further: this is <em>not really</em> an anomaly. If someone changes the year in one Star Wars tuple of Movies3 to 2008, the result is a statement that Carrie Fisher starred in a (different) Star Wars made in 2008, which is legal. No FD says the three Star Wars tuples must share a year. Repeating a key to link tables is unavoidable and harmless. Movies2 and Movies3 are both in BCNF (Chapter 11).</p>
+</div>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+
+<h3>Exam questions</h3>
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2012–13 · 10 marks (same question 2013–14)</div>
+  <div class="exam-q"><p>What are the three anomalies in relational database schemas? Discuss them.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>Anomalies arise when a relation stores facts about several things together, so some facts are repeated. Example: Movies1(title, year, length, genre, studioName, starName) with key {title, year, starName}; the length and genre of a movie are repeated once per star.</p>
+    <ol>
+      <li><strong>Update anomaly.</strong> A fact stored in several tuples must be changed in all of them. If Star Wars is found to be 125 minutes and only the first of its three tuples is updated, the database says Star Wars has two different lengths.</li>
+      <li><strong>Deletion anomaly.</strong> Deleting one fact deletes others with it. Removing Vivien Leigh from Gone With the Wind deletes the only tuple for that movie, so its year, length, genre and studio vanish.</li>
+      <li><strong>Insertion anomaly.</strong> A fact cannot be stored without unrelated facts. A new movie with no stars cannot be inserted, since starName is part of the key and cannot be null; adding a star to a movie forces re-entering the movie's details.</li>
+    </ol>
+    <p>All three are caused by redundancy and are removed by decomposing into relations in BCNF (or 3NF): Movies2(title, year, length, genre, studioName) and Movies3(title, year, starName).</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2011–12 · 10 marks</div>
+  <div class="exam-q"><p>What are redundancy, deletion and update anomalies?</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>Take teacher_in_dept(ID, name, salary, dept_name, building, budget) from Chapter 1, where dept_name → building budget.</p>
+    <p><strong>Redundancy:</strong> the same fact stored in several tuples. CSE's building (ECE Building) and budget (5,000,000) appear in the row of every CSE teacher.</p>
+    <p><strong>Update anomaly:</strong> because of the copies, changing the fact requires changing every copy. If CSE's budget is raised and only Rahim Ahmed's row is updated, Tanvir Islam's row still shows the old budget, and the database contradicts itself.</p>
+    <p><strong>Deletion anomaly:</strong> deleting a tuple to remove one fact also removes another. If Ayesha Khan, the only EEE teacher, leaves and her row is deleted, the database no longer knows that EEE is in Main Building with budget 4,000,000.</p>
+    <p><strong>Fix:</strong> decompose into teacher(ID, name, salary, dept_name) and department(dept_name, building, budget). Each department fact is stored once, and departments exist independently of teachers.</p>
+  </div></details>
+</div>
+
+<div class="key"><p><strong>Summary:</strong> redundancy causes update anomalies (copies disagree after a partial update), deletion anomalies (deleting one fact loses another) and insertion anomalies (a fact cannot be stored without unrelated data). Decomposing Movies1 into Movies2(title, year, length, genre, studioName) and Movies3(title, year, starName) stores each movie fact once and removes all three. The repeated title and year in Movies3 are the link between the tables and are not an anomaly.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="lecture.js"></script>
+<script>
+const H = MOVIES1_H, M = MOVIES1.map(r => r.slice());
+const M125 = M.map((r, i) => i === 0 ? [r[0], r[1], '125', ...r.slice(3)] : r);
+stepper('#upd', [
+  { html: inst(H, M, { cell: { '0,2': 'hl', '1,2': 'hl', '2,2': 'hl' } }), cap: 'Star Wars\'s length 124 is stored three times (orange). Suppose we learn it is really 125.' },
+  { html: inst(H, M125, { cell: { '0,2': 'good', '1,2': 'bad', '2,2': 'bad' } }), cap: 'A careless update changes only the first tuple. Now the table says Star Wars is both 125 and 124 minutes long: <b>update anomaly</b>.' },
+  { html: inst(H, M125, { cell: { '0,2': 'good', '1,2': 'bad', '2,2': 'bad' } }) + '<p class="tbl-note">SELECT length FROM Movies1 WHERE title = \'Star Wars\' AND year = 1977 → returns 125 and 124</p>', cap: 'Queries now get contradictory answers. The design allowed this; the user only made one small mistake.' },
+]);
+stepper('#del', [
+  { html: inst(H, M, { rowCls: { 3: 'hl' } }), cap: 'We want to remove Vivien Leigh from the cast of Gone With the Wind.' },
+  { html: inst(H, M, { rowCls: { 3: 'del' } }), cap: 'Delete her tuple. It was the only tuple for that movie…' },
+  { html: inst(H, M.filter((_, i) => i !== 3)), cap: '…so the movie\'s year (1939), length (231), genre and studio are gone too: <b>deletion anomaly</b>.' },
+]);
+stepper('#ins', [
+  { html: inst(H, [...M, ['Avatar', '2009', '162', 'SciFi', 'Fox', '???']], { rowCls: { 6: 'del' }, cell: { '6,5': 'bad' } }), cap: 'New movie, no stars known yet. starName is part of the key and cannot be null: <b>the tuple cannot be inserted</b>.' },
+  { html: inst(H, [...M, ['Star Wars', '1977', '124', 'SciFi', 'Fox', 'Alec Guinness']], { rowCls: { 6: 'new' }, cell: { '6,1': 'hl', '6,2': 'hl', '6,3': 'hl', '6,4': 'hl' } }), cap: 'Adding a fourth star to Star Wars forces us to repeat year, length, genre and studio (orange): more redundancy, and a chance to mistype one of them.' },
+]);
+const M2H = ['title', 'year', 'length', 'genre', 'studioName'], M2 = [M[0], M[3], M[4]].map(r => r.slice(0, 5));
+const M3 = M.map(r => [r[0], r[1], r[5]]);
+const row2 = (a, b) => `<div class="figrow"><div>${a}</div><div>${b}</div></div>`;
+stepper('#dec', [
+  { html: inst(H, M, { cap: 'Movies1' }), cap: 'Movies1: key {title, year, starName}; FD title year → length genre studioName.' },
+  { html: row2(inst(M2H, M2, { cap: 'Movies2 = π title,year,length,genre,studioName' }), inst(['title', 'year', 'starName'], M3, { cap: 'Movies3 = π title,year,starName' })), cap: 'Project. Movies2 keeps one tuple per movie (duplicates disappear in a projection). Movies3 keeps one tuple per (movie, star).' },
+  { html: row2(inst(M2H, M2, { cap: 'Movies2', cell: { '0,2': 'good' } }), inst(['title', 'year', 'starName'], M3, { cap: 'Movies3' })), cap: 'Update: Star Wars\'s length now lives in <b>one</b> tuple. No inconsistency possible.' },
+  { html: row2(inst(M2H, M2, { cap: 'Movies2', rowCls: { 1: 'new' } }), inst(['title', 'year', 'starName'], M3, { cap: 'Movies3', rowCls: { 3: 'del' } })), cap: 'Deleting Vivien Leigh removes only her Movies3 tuple; Gone With the Wind survives in Movies2 (green).' },
+  { html: row2(inst(M2H, [...M2, ['Avatar', '2009', '162', 'SciFi', 'Fox']], { cap: 'Movies2', rowCls: { 3: 'new' } }), inst(['title', 'year', 'starName'], M3, { cap: 'Movies3' })), cap: 'A movie with no stars yet is just a Movies2 tuple. Insertion anomaly gone.' },
+]);
+flashcards('#cards', [
+  { f: 'Update anomaly', b: 'Changing one copy of a repeated fact but not the others leaves contradictions.' },
+  { f: 'Deletion anomaly', b: 'Deleting a tuple to remove one fact also loses other facts.' },
+  { f: 'Insertion anomaly', b: 'A fact cannot be added without unrelated or unknown data (e.g. a movie with no star).' },
+  { f: 'Normalization', b: 'Decomposing relations that are not in good form into relations that are in a normal form.' },
+  { f: 'Movies2 / Movies3', b: 'Movies2(title, year, length, genre, studioName), Movies3(title, year, starName).' },
+]);
+quiz('#quiz', [
+  { q: 'Deleting the last star of a movie from Movies1 loses the movie\'s length. This is a…', opts: ['update anomaly', 'deletion anomaly', 'insertion anomaly', 'lossy join'], a: 1, why: 'A deletion removed unrelated information.' },
+  { q: 'Why can\'t a starless movie be inserted into Movies1?', opts: ['length is unknown', 'starName is part of the key and cannot be null', 'the table is full', 'genre is required'], a: 1, why: 'Every key attribute needs a value.' },
+  { q: 'After decomposition, where is Star Wars\'s length stored?', opts: ['3 times in Movies3', 'once in Movies2', 'in both', 'nowhere'], a: 1, why: 'Movies2 has one tuple per movie.' },
+  { q: 'Is the repeated (title, year) in Movies3 an update anomaly?', opts: ['Yes, a serious one', 'No: it is the link to Movies2 and no FD forces the repeated years to match'], a: 1, why: 'Changing one year just describes a different movie, which is legal (book §3.3.2).' },
+]);
+ask('#try1', { q: 'In Movies1, how many tuples must change if Wayne\'s World\'s studio is corrected?', a: 2, why: 'It has two stars, so two tuples. In Movies2 it would be 1.' });
+</script>
+</body>
+</html>

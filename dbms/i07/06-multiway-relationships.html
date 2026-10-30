@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Multi-Way Relationships · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 07 (Ishrak) · Chapter 6 · Slides 61–71</div>
+<h1>Multi-Way Relationships and Converting Them to Binary</h1>
+<p class="lede">A contract involves an actor, a film and a studio at once. This chapter defines n-ary relationships, explains what an arrow means when three entity sets meet, decides where the salary goes, and converts the three-way relationship into an entity set with binary relationships, as slides 69–70 do.</p>
+
+<h2>1. Why the ER model matters (slide 62)</h2>
+<p>The Entity-Relationship model was introduced by <strong>Peter Chen in 1976</strong>. It gave database design a visual, conceptual notation, and it separates <em>what the data means</em> from <em>how a DBMS later stores it</em>. The same diagram can be implemented in Oracle, in PostgreSQL or even in a non-relational system. ER diagrams are still used because both technical and non-technical people can read them. (Chen's original notation writes 1, N, M on the lines; the slides use the arrow notation of the Garcia-Molina–Ullman–Widom textbook. Both describe the same model.)</p>
+
+<h2>2. Multi-way relationships (slides 63–64)</h2>
+<dl class="def">
+<dt>Multi-way (n-ary) relationship</dt><dd>A relationship that connects three or more entity sets at once. One recorded association chooses <strong>one entity from each</strong> participating entity set. If the entity sets are E<sub>1</sub>, E<sub>2</sub>, …, E<sub>n</sub>, then formally R ⊆ E<sub>1</sub> × E<sub>2</sub> × ⋯ × E<sub>n</sub>, a set of n-tuples. A relationship with three participants is <b class="term">ternary</b>; the number of participants is the <b class="term">degree</b>.</dd>
+</dl>
+<figure><div class="figrow"><div id="mw"></div><div id="nary"></div></div>
+<figcaption><b>Left:</b> slide 63, contract connects Actor, Film and Studio. <b>Right:</b> slide 64, the general n-ary relationship.</figcaption></figure>
+<p>The key point of slide 63: a multi-way relationship <em>represents one combined fact, not separate pairwise facts</em>. "Shakib signed with Studio X to act in Film Y" is a single fact. <strong>Splitting it into binary relationships can lose information</strong>, as the animation shows.</p>
+<figure class="wide"><span class="anim-tag">Animation</span><div id="loss"></div></figure>
+
+<h2>3. Arrows in multi-way relationships (slide 65)</h2>
+<p>In a multi-way relationship, <strong>an arrow toward an entity set means uniqueness after fixing the other entity choices</strong>. With an arrow into Studio:</p>
+<div class="formula">for each (actor, film) there is at most one studio in contract</div>
+<p>In functional-dependency language (Sukarna sir's Lec 01), Actor, Film → Studio. The animation tests this on a small instance of contract.</p>
+<figure class="wide"><span class="anim-tag">Animation</span><div id="arrow"></div></figure>
+<p><strong>A correction to slide 65.</strong> The slide says this constraint is "stronger than simply saying each actor has one studio". It is the other way round. "Each actor has one studio" (Actor → Studio) <em>implies</em> "each (actor, film) has one studio", because fixing the film as well cannot add studios. The arrow allows an actor to work with Studio X on one film and Studio Y on another, which "each actor has one studio" forbids. So the arrow is the <em>weaker</em> (less restrictive) and <em>more precise</em> statement; what the slide means is that it is <em>different</em> from a per-actor rule and should not be confused with it.</p>
+<p>Lines without arrows (Actor, Film) mean "many": for a given (film, studio) there can be many actors, and for a given (actor, studio) many films.</p>
+
+<h2>4. Where should the salary go? (slides 66–68)</h2>
+<figure><span class="anim-tag">Animation</span><div id="salary"></div></figure>
+<p>Salary is not a property of only the actor, only the film or only the studio. It describes the whole association, so it is an attribute of <em>contract</em>. Slide 68 gives the reasons and the test:</p>
+<ul>
+<li>The salary is determined by the complete three-way fact.</li>
+<li>Same actor, different film: the salary may differ.</li>
+<li>Same actor and film, different studio: the salary may differ.</li>
+</ul>
+<div class="q" style="border-color:var(--accent)"><h4 style="color:var(--accent)">Test (slide 68)</h4><p>After fixing all entities connected by the relationship, is there one value for this attribute? For salary: fix actor, film and studio, and there is exactly one contract salary. So salary belongs on contract.</p></div>
+<p>(With the arrow into Studio, the pair (actor, film) already determines the studio, so in practice salary is also fixed by (actor, film). That does not move salary onto any one entity set; it only means the table for contract will have the key (actor, film), Chapter 11.)</p>
+
+<h2>5. Converting a multi-way relationship to binary (slides 69–71)</h2>
+<p>Some notations and tools allow only binary relationships (UML, many CASE tools, the ODL language). The standard conversion:</p>
+<ol>
+<li>Replace the multi-way relationship by a <strong>new entity set</strong> (here <em>Contracts</em>). Each entity of it represents one occurrence of the association: one contract.</li>
+<li>Move the relationship's attributes (salary) to the new entity set.</li>
+<li>Connect the new entity set to each original entity set by a <strong>binary relationship</strong>: <em>signedBy</em> (Actor), <em>forMaking</em> (Film), <em>ownerOf</em> (Studio).</li>
+<li><strong>Multiplicity (slide 70):</strong> each contract is for one actor, one film and one studio, while an actor, film or studio may appear in many contracts. So every new relationship is many-to-one from Contracts, with the arrow pointing from the diamond toward the original entity set.</li>
+</ol>
+<figure class="wide"><span class="anim-tag">Animation</span><div id="conv"></div></figure>
+<p><strong>Why create a new entity (slide 71)?</strong> The new entity can have its own attributes (salary, signing date, duration, cancellation status); it can connect to other relationships later (a contract may be approved by a lawyer); and it makes constraints easier to state when the association itself becomes important. Slide 71's example: a contract with salary, signing date, duration and cancellation status has enough structure to be an entity set.</p>
+<p>One thing is lost: the arrow "for each (actor, film) at most one studio" cannot be drawn in the binary version, because no single binary relationship sees both the actor and the film. It must be written as a design note (and later enforced by a UNIQUE (actor, film) constraint on the Contracts table). The textbook (§4.1.10 of Garcia-Molina et al.) gives the same construction and calls the new entity set a <em>connecting entity set</em>.</p>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+
+<h3>Exam questions</h3>
+<div class="exam">
+  <div class="exam-src">DB QB · 24-25 7b · 8 marks &nbsp;·&nbsp; BUET QBank · CSE 215 | L-2/T-1 | 2024–25 · 8 marks</div>
+  <div class="exam-q"><p>Write the general procedure to convert ternary relationship to binary relationships.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>Let R be a ternary relationship among entity sets A, B and C (keys a, b, c), possibly with attributes.</p>
+    <ol>
+    <li><strong>Create a connecting entity set E</strong> to stand for R. Each tuple (a<sub>i</sub>, b<sub>j</sub>, c<sub>k</sub>) of R becomes one entity e of E. Give E an identifying attribute: either a new surrogate key (e.g. contract_id), or treat E as a weak entity identified through its three relationships, whose key is then (a, b, c).</li>
+    <li><strong>Move R's attributes to E</strong> (e.g. salary).</li>
+    <li><strong>Create three binary relationships</strong> R<sub>A</sub> (E–A), R<sub>B</sub> (E–B), R<sub>C</sub> (E–C). For each e created from (a<sub>i</sub>, b<sub>j</sub>, c<sub>k</sub>), add (e, a<sub>i</sub>) to R<sub>A</sub>, (e, b<sub>j</sub>) to R<sub>B</sub>, (e, c<sub>k</sub>) to R<sub>C</sub>.</li>
+    <li><strong>Multiplicities:</strong> each R<sub>X</sub> is many-to-one from E to X (arrow into A, B and C), and E participates <em>totally</em> in all three, because every occurrence involves exactly one entity of each set. A, B and C may appear in many E's.</li>
+    <li><strong>Carry over constraints.</strong> A constraint of R that involves several participants, such as an arrow into C (A, B → C), cannot be drawn on the binary relationships; record it as a design note, and enforce it later as a UNIQUE (a, b) constraint on E's table. If E uses a surrogate key, also declare (a, b, c) UNIQUE so the same triple is not stored twice.</li>
+    </ol>
+    <p><strong>Do not</strong> replace R by the three pairwise relationships A–B, B–C, A–C: that loses information (the pairs can be recombined into triples that never happened; see the animation in section 2).</p>
+    <figure class="wide"><div id="exTern"></div><figcaption>Before (left) and after (right) for the slides' contract example.</figcaption></figure>
+    <p>In tables (Chapter 11) both designs give <span class="mono">Contracts(<u>actor_id</u>, <u>film_title</u>, <u>film_year</u>, studio_name, salary)</span> with three foreign keys, or, with a surrogate key, <span class="mono">Contracts(<u>contract_id</u>, actor_id, film_title, film_year, studio_name, salary)</span>.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 22-23 6b · 5 marks &nbsp;·&nbsp; BUET QBank · CSE 215 | L-2/T-1 | 2022–23 · 5 marks</div>
+  <div class="exam-q"><p>Give an example of a Non-Binary Relationship. What issues arise for Non-Binary Relationships?</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><strong>Example.</strong> Supplier S supplies part P to project J, with a quantity: a ternary relationship <em>supplies</em> among Supplier, Part and Project. One fact names all three; "S1 supplies P1" and "P1 is used in J1" do not tell us that S1 supplied P1 <em>to J1</em>.</p>
+    <figure><div id="exSup"></div></figure>
+    <p><strong>Issues.</strong></p>
+    <ol>
+    <li><strong>Cannot be split into binary relationships without losing information.</strong> Store {(S1,P1,J2), (S1,P2,J1), (S2,P1,J1)}. The pairwise projections are SP = {(S1,P1),(S1,P2),(S2,P1)}, PJ = {(P1,J2),(P2,J1),(P1,J1)}, SJ = {(S1,J2),(S1,J1),(S2,J1)}. Recombining them gives also (S1,P1,J1), which never happened. (Checked by joining the three projections.)</li>
+    <li><strong>Multiplicity is harder to read and to state.</strong> An arrow into one entity set means "the others together determine it", not "each of the others determines it" (slide 65). Several arrows on one multi-way relationship are ambiguous, which is why Silberschatz allows at most one arrow. Constraints between only two of the participants cannot be drawn at all.</li>
+    <li><strong>Many notations and tools support only binary relationships</strong> (UML class diagrams, ODL, many design tools), so the relationship must be converted to a connecting entity set with binary relationships (slides 69–70). The conversion cannot draw arrows like (S, P) → J; they become design notes.</li>
+    <li><strong>Every tuple needs all participants.</strong> We cannot record that a supplier <em>can</em> supply a part before any project needs it, because a tuple needs a project. If that fact matters, add a separate binary relationship (Supplier–Part "canSupply"), which is a different fact.</li>
+    <li><strong>Wider keys in tables.</strong> The relationship's table has a composite key of all (or all but the "one") participants' keys, and queries join several tables.</li>
+    </ol>
+    <p>The question bank's answer covers the same points; its claim that a NULL project must be stored for a not-yet-assigned part describes a bad workaround, not a requirement. The correct design is a separate binary relationship, as in point 4.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 20-21 6c · 5 marks &nbsp;·&nbsp; BUET QBank · CSE 215 | L-2/T-2 | 2020–21 · 5 marks</div>
+  <div class="exam-q"><p>Consider the following multi-way relation between Actor, Film and Studio. Answer the following questions based on this relationship: (i) There is an arrow pointing to entity set Studios. What is its interpretation? (ii) There are no arrows pointing to entity sets Actor or Film. What are their interpretations?</p>
+  <figure><div id="q43"></div></figure></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><strong>(i)</strong> The arrow into Studio means: <strong>once an actor and a film are fixed, there is at most one studio</strong> with which that actor has a contract for that film. In FD form, (Actor, Film) → Studio. It does <em>not</em> say an actor works with only one studio overall: the same actor may have contracts with different studios for different films.</p>
+    <p><strong>(ii)</strong> No arrow into Actor: for a fixed film and studio there may be <strong>many actors</strong> (a studio signs the whole cast of a film). No arrow into Film: for a fixed actor and studio there may be <strong>many films</strong> (an actor makes several films for the same studio). Consequently a contract is identified by (actor, film); in a table its key is (actor_id, film_id) and studio_name is an ordinary foreign-key column.</p>
+  </div></details>
+</div>
+
+<div class="key">
+<p><strong>Summary:</strong> a multi-way relationship records one combined fact over three or more entity sets, R ⊆ E<sub>1</sub> × ⋯ × E<sub>n</sub>; splitting it into pairs loses information. An arrow into an entity set means the other participants together determine it. Attributes that depend on all participants (salary) go on the relationship. To convert to binary, make a connecting entity set, move the attributes to it, and connect it by many-to-one relationships to each original entity set; multi-participant constraints become design notes.</p>
+</div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="lecture.js"></script>
+<script>
+const TRI = (o = {}) => ({ n: [['Actor', 'E', 0, 0], ['Film', 'E', 300, 0], ['contract', 'R', 150, 70], ['Studio', 'E', 150, 170]],
+  a: o.a || [], l: [['Actor', 'contract'], ['Film', 'contract'], ['Studio', 'contract', { one: !!o.arrow }]] });
+$('#mw').innerHTML = erd(TRI());
+$('#nary').innerHTML = erd({ n: [['E1', 'E', 0, 0], ['En', 'E', 300, 0], ['R', 'R', 150, 70], ['E2', 'E', 150, 170]], l: [['E1', 'R'], ['En', 'R'], ['E2', 'R']], t: [[70, 120, '···'], [230, 120, '···']] });
+// information loss animation
+const tbl = (head, rows, cls = {}) => `<table class="rec"><tr>${head.map(h => `<th>${h}</th>`).join('')}</tr>${rows.map((r, i) => `<tr class="${cls[i] || ''}">${r.map(c => `<td>${c}</td>`).join('')}</tr>`).join('')}</table>`;
+const T3 = [['S1', 'P1', 'J2'], ['S1', 'P2', 'J1'], ['S2', 'P1', 'J1']];
+const row = (...xs) => `<div class="figrow">${xs.map(([l, h]) => `<div><div class="figlabel">${l}</div>${h}</div>`).join('')}</div>`;
+stepper('#loss', [
+  { html: row(['supplies (ternary)', tbl(['supplier', 'part', 'project'], T3)]), cap: 'Three facts: S1 supplied P1 to J2, S1 supplied P2 to J1, S2 supplied P1 to J1.' },
+  { html: row(['supplies (ternary)', tbl(['supplier', 'part', 'project'], T3)], ['S–P', tbl(['supplier', 'part'], [['S1', 'P1'], ['S1', 'P2'], ['S2', 'P1']])], ['P–J', tbl(['part', 'project'], [['P1', 'J2'], ['P2', 'J1'], ['P1', 'J1']])], ['S–J', tbl(['supplier', 'project'], [['S1', 'J2'], ['S1', 'J1'], ['S2', 'J1']])]),
+    cap: 'Try to replace it by three binary relationships: keep only the pairs.' },
+  { html: row(['recombined from the pairs', tbl(['supplier', 'part', 'project'], [...T3, ['S1', 'P1', 'J1']], { 3: 'del' })]),
+    cap: 'Recombine: S1–P1 ✓, P1–J1 ✓, S1–J1 ✓, so the pairs also "say" <b>S1 supplied P1 to J1</b>, which never happened. The binary design has lost information.' },
+]);
+// arrow animation
+const C0 = [['Shakib', 'Monpura', 'Impress'], ['Shakib', 'Aynabaji', 'Jaaz'], ['Bidya', 'Monpura', 'Impress']];
+const side = (rows, cls, msg) => `<div class="figrow"><div>${erd(TRI({ arrow: true }), { hl: ['Studio-contract'] })}</div><div><div class="figlabel">contract</div>${tbl(['actor', 'film', 'studio'], rows, cls)}${msg ? `<p style="max-width:16em;font-size:.9rem">${msg}</p>` : ''}</div></div>`;
+stepper('#arrow', [
+  { html: side(C0, {}), cap: 'Arrow into Studio. Three contracts. Shakib works with two different studios, on two different films.' },
+  { html: side(C0, { 0: 'hl', 1: 'hl' }), cap: 'Is that allowed? Fix (Shakib, Monpura): one studio. Fix (Shakib, Aynabaji): one studio. Each (actor, film) pair has at most one studio, so <b>yes</b>.' },
+  { html: side([...C0, ['Shakib', 'Monpura', 'Jaaz']], { 0: 'hl', 3: 'del' }), cap: 'Adding (Shakib, Monpura, Jaaz) would give the pair (Shakib, Monpura) two studios: <b>forbidden</b> by the arrow.' },
+  { html: side([...C0, ['Chanchal', 'Monpura', 'Impress']], { 3: 'new' }), cap: 'Adding another actor to the same (film, studio) is fine: no arrow into Actor, so many actors per (film, studio).' },
+]);
+const SAL = { n: [['Actor', 'E', 0, 0], ['Film', 'E', 300, 0], ['contract', 'R', 150, 70], ['Studio', 'E', 150, 170]],
+  a: [['Actor', 'salary', -60, 45], ['Film', 'salary2', 60, 45], ['Studio', 'salary3', 85, 35], ['contract', 'salary4', 0, -65]],
+  l: [['Actor', 'contract'], ['Film', 'contract'], ['Studio', 'contract', { one: true }]] };
+SAL.a = SAL.a.map(a => a);
+const salFig = show => erd({ ...SAL, a: SAL.a.filter(a => show.includes(a[1])).map(a => [a[0], 'salary', a[2], a[3]]) }, { frame: erdBox({ ...SAL, a: SAL.a.map(a => [a[0], 'salary', a[2], a[3]]) }) });
+stepper('#salary', [
+  { html: salFig(['salary', 'salary2', 'salary3']), cap: 'Slide 66: three candidate places on the entity sets. None works: one actor has many salaries, one film pays many actors, one studio pays many people.' },
+  { html: salFig(['salary4']), cap: 'Slide 67: salary describes the whole association, so it goes on <b>contract</b>.' },
+]);
+const CONV = { n: [['Actor', 'E', 0, 50], ['signedBy', 'R', 160, 50, 'signedBy'], ['forMaking', 'R', 300, -20, 'forMaking'], ['Film', 'E', 470, -20], ['Contracts', 'E', 300, 110], ['ownerOf', 'R', 450, 190], ['Studio', 'E', 620, 190],
+  ['A0', 'E', 0, 400, 'Actor'], ['F0', 'E', 300, 400, 'Film'], ['k0', 'R', 150, 470, 'contract'], ['S0', 'E', 150, 570, 'Studio']],
+  a: [['Contracts', 'salary', -90, 60], ['k0', 'salary', 0, -60]],
+  l: [['Contracts', 'signedBy'], ['Actor', 'signedBy', { one: true }], ['Contracts', 'forMaking'], ['Film', 'forMaking', { one: true }], ['Contracts', 'ownerOf'], ['Studio', 'ownerOf', { one: true }],
+      ['A0', 'k0'], ['F0', 'k0'], ['S0', 'k0', { one: true }]] };
+const CV2 = { n: CONV.n.slice(0, 7), a: [CONV.a[0]], l: CONV.l.slice(0, 6) };
+const CV1 = { n: CONV.n.slice(7).map(n => [n[0], n[1], n[2] + 160, n[3] - 400, n[4]]), a: [CONV.a[1]], l: CONV.l.slice(6) };
+const cfr = erdBox(CV2);
+stepper('#conv', [
+  { html: erd(CV1, { frame: cfr }), cap: 'Start: the three-way relationship contract with attribute salary.' },
+  { html: erd(CV2, { frame: cfr, show: ['Actor', 'Film', 'Studio', 'Contracts', 'Contracts.salary'], hl: ['Contracts'] }), cap: 'Replace it by a new entity set <b>Contracts</b>; each entity is one contract. Salary moves to it.' },
+  { html: erd(CV2, { frame: cfr, show: ['Actor', 'Film', 'Studio', 'Contracts', 'Contracts.salary', 'signedBy', 'forMaking', 'ownerOf'], mult: false }), cap: 'Slide 69: connect Contracts to each original entity set with a binary relationship: signedBy, forMaking, ownerOf.' },
+  { html: erd(CV2, { frame: cfr, hl: ['Actor-signedBy', 'Film-forMaking', 'Studio-ownerOf'] }), cap: 'Slide 70: each contract has one actor, one film, one studio, so the arrows point from the diamonds toward Actor, Film and Studio. An actor, film or studio may appear in many contracts.' },
+]);
+$('#exTern').innerHTML = `<div class="figrow"><div>${erd({ ...TRI({ arrow: true }), a: [['contract', 'salary', 0, -60]] })}</div><div>${erd(CV2)}</div></div>`;
+$('#exSup').innerHTML = erd({ n: [['Supplier', 'E', 0, 0], ['Part', 'E', 320, 0], ['supplies', 'R', 160, 75], ['Project', 'E', 160, 180]],
+  a: [['Supplier', '_sup_id', -40, -55], ['Part', '_part_id', 40, -55], ['Project', '_proj_id', 110, 0], ['supplies', 'quantity', 0, -65]],
+  l: [['Supplier', 'supplies'], ['Part', 'supplies'], ['Project', 'supplies']] });
+$('#q43').innerHTML = erd(TRI({ arrow: true }));
+flashcards('#cards', [
+  { f: 'n-ary relationship', b: 'Connects n entity sets; R ⊆ E1 × ⋯ × En; one tuple picks one entity from each.' },
+  { f: 'Arrow into Studio in contract', b: 'For each (actor, film) at most one studio: Actor, Film → Studio.' },
+  { f: 'Where does salary go?', b: 'On contract: it is fixed only when actor, film and studio are all fixed.' },
+  { f: 'Convert multi-way to binary', b: 'New connecting entity set + one many-to-one relationship to each original entity set; move the attributes.' },
+  { f: 'Why not three pairwise relationships?', b: 'Recombining the pairs creates triples that never happened: information is lost.' },
+  { f: 'Peter Chen, 1976', b: 'Introduced the ER model.' },
+]);
+quiz('#quiz', [
+  { q: 'contract(Actor, Film, Studio) has an arrow into Studio. Which is allowed?', opts: ['(Ann, F1, X) and (Ann, F1, Y)', '(Ann, F1, X) and (Ann, F2, Y)', 'Neither', 'Both'], a: 1, why: 'The pair (Ann, F1) may have only one studio; different films may have different studios.' },
+  { q: 'After converting contract to binary, where do the arrows point?', opts: ['Into Contracts', 'From the new diamonds into Actor, Film, Studio', 'Nowhere', 'Only into Studio'], a: 1, why: 'Each contract has one actor, one film and one studio (slide 70).' },
+  { q: 'Which constraint is lost in the binary version?', opts: ['Each contract has one actor', '(actor, film) determines the studio', 'Salary is an attribute', 'Actors can have many contracts'], a: 1, why: 'No binary relationship sees both actor and film; write it as a design note.' },
+  { q: 'Which statement is weaker (allows more data)?', opts: ['Each actor has one studio', 'Each (actor, film) has one studio', 'They are equal', 'Neither restricts anything'], a: 1, why: 'Actor → Studio implies Actor, Film → Studio, not conversely. (Slide 65 says "stronger"; it is weaker.)' },
+  { q: 'What is the degree of contract?', opts: ['1', '2', '3', '4'], a: 2, why: 'Three participating entity sets.' },
+]);
+ask('#try1', { q: 'supplies(Supplier, Part, Project) holds (S1,P1,J1), (S1,P2,J2), (S2,P1,J2). Projecting to the three pairs and recombining them, how many triples do you get?', a: 4, hint: 'List SP, PJ and SJ, then find every (s, p, j) whose three pairs all appear.', why: 'SP={S1P1,S1P2,S2P1}, PJ={P1J1,P2J2,P1J2}, SJ={S1J1,S1J2,S2J2}. Triples: S1P1J1, S1P1J2 (spurious), S1P2J2, S2P1J2. Four, one of them false.' });
+</script>
+</body>
+</html>

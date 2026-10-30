@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lock Upgrades and Update Locks · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="../s02/lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 03 (Sukarna) · Chapter 2 · Slides 6–9 · Book §18.4.3–18.4.4</div>
+<h1>Lock Upgrades and Update Locks</h1>
+<p class="lede">A transaction that reads X and only later writes it can take a shared lock first and upgrade it. That allows more concurrency, but two transactions upgrading the same element deadlock. The update lock, a third mode, removes that deadlock. Includes the asymmetric S/X/U compatibility matrix and three exam questions.</p>
+
+<h2>1. Upgrading a lock (slide 6)</h2>
+<dl class="def">
+  <dt>Lock upgrade</dt><dd>A transaction T that holds a shared lock on X later requests an exclusive lock on X as well. The request is granted only when no other transaction holds a lock on X; until then T waits. (u<sub>i</sub>(X) releases all of T<sub>i</sub>'s locks on X.)</dd>
+</dl>
+<p>Slide 6's example (textbook Example 18.15): T₁ reads A and B, does a possibly long computation with them, and finally writes B. T₂ only reads A and B.</p>
+<pre>T₁: sl₁(A); r₁(A); sl₁(B); r₁(B); xl₁(B); w₁(B); u₁(A); u₁(B);
+T₂: sl₂(A); r₂(A); sl₂(B); r₂(B); u₂(A); u₂(B);</pre>
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="f17"></div>
+<figcaption><b>Figure 1.</b> Upgrading allows more concurrent operation (textbook Fig. 18.17). The slide's last line reads “u₁(A); u₂(B)”; it should be u₁(A); u₁(B), since T₂ has already unlocked B. (The same misprint is in the textbook figure.)</figcaption>
+</figure>
+
+<div class="q">
+<h4>Slide 6 question: why does upgrading allow more concurrency?</h4>
+<p>With upgrading, T₁ gets a <em>shared</em> lock on B even though T₂ is also reading B, so T₁ can read B and do its whole computation <em>while</em> T₂ is running. Only the final write has to wait for T₂ to release B. If T₁ had asked for an exclusive lock on B up front, that request would have been denied (T₂ holds S on B), and T₁ could not even read B until T₂ finished; all of its computation would then happen after T₂, and T₁ would finish later. Upgrading keeps the exclusive period as short as possible. The schedule is still conflict-serializable (order (T₂, T₁): T₂ unlocks first).</p>
+</div>
+
+<h2>2. Upgrades can deadlock (slide 7)</h2>
+<p>Indiscriminate upgrading is a new source of deadlock (textbook Example 18.16). Let both transactions read A and then write it, both using the upgrade approach:</p>
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="f18"></div>
+<figcaption><b>Figure 2.</b> Two upgrades deadlock (textbook Fig. 18.18).</figcaption>
+</figure>
+<p>Both get shared locks on A (compatible). Then each asks to upgrade, and each is refused because the <em>other</em> holds a shared lock on A. Each waits for the other forever, or until the system detects the deadlock, aborts one, and gives the other its exclusive lock. This happens whenever two such transactions start at about the same time, which in a busy system is often.</p>
+
+<h2>3. Update locks (slides 8–9)</h2>
+<dl class="def">
+  <dt>Update lock (U), ul<sub>i</sub>(X)</dt><dd>A lock that gives T<sub>i</sub> the right to <em>read</em> X (not write it), with the extra property that <strong>only an update lock can later be upgraded to an exclusive lock</strong>; a shared lock cannot. A transaction takes an update lock on X when it intends to write X later.</dd>
+</dl>
+<p>The slide's wording has a slip: it says “an exclusive lock can be upgraded to an exclusive lock later”. The intended rule is “an <em>update</em> lock can be upgraded to an exclusive lock later; a shared lock cannot”.</p>
+<p><strong>Granting rule.</strong> An update lock can be granted on X when others hold only shared locks on X. But once someone holds an update lock on X, <em>no other lock of any kind</em> (S, U or X) is granted on X. The reason: if new shared locks kept being granted, the updater might never get its chance to upgrade, because there would always be some reader holding X.</p>
+<p>So a U lock looks like a shared lock when it is <em>requested</em>, and like an exclusive lock when it is <em>held</em>. That gives an asymmetric matrix: the U column equals the S column, and the U row equals the X row.</p>
+<div class="figrow"><div><div id="cm"></div><div class="figlabel">S/X/U compatibility matrix (textbook Fig. 18.19)</div></div></div>
+<p>Slide 9's first note reads “no lock can be granted on X if another transaction is holding an update/exclusive/<em>shared</em> lock”. The word “shared” does not belong there: with a shared lock held, S and U can still be granted (the second note and the matrix say so). Correct reading: no lock can be granted if another transaction holds an update or exclusive lock; a shared or update lock can be granted while others hold shared locks.</p>
+
+<h3>Update locks remove the upgrade deadlock</h3>
+<pre>T₁: ul₁(A); r₁(A); xl₁(A); w₁(A); u₁(A);
+T₂: ul₂(A); r₂(A); xl₂(A); w₂(A); u₂(A);</pre>
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="f20"></div>
+<figcaption><b>Figure 3.</b> Correct execution with update locks (textbook Fig. 18.20).</figcaption>
+</figure>
+<p>Now T₂, the second to request an update lock on A, is denied at once, before it holds anything on A. T₁ upgrades without obstruction, writes, and unlocks; then T₂ proceeds. The two transactions effectively run one after the other, which is the only correct outcome here: any real overlap of two read-then-write transactions on the same element ends either in deadlock or in a lost update.</p>
+<p>Update locks change nothing in Figure 1's example: T₁ would take ul₁(B) instead of sl₁(B), which is granted since only shared locks are held on B, and the same sequence follows.</p>
+<p>(The textbook's §18.4.5 adds increment locks; they are outside this course's syllabus and not on the slides.)</p>
+
+<h3>Try it</h3>
+<p>Type only reads and writes and choose how the scheduler inserts locks: “S and X (upgrade)” reproduces the deadlock for <code>r1(A) r2(A) w1(A) w2(A)</code>; “S, U and X” does not.</p>
+<figure class="wide">
+<span class="anim-tag">Interactive</span>
+<div id="tool"></div>
+</figure>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+
+<h3>Exam questions</h3>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 24-25 2c · 12 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-1 | 2024–25 · 10 marks</div>
+  <div class="exam-q"><p>Consider the two transactions given below:<br>T₁: sl₁(A); xl₁(B); u₁(A); u₁(B);<br>T₂: sl₂(B); xl₂(A); u₂(B); u₂(A);<br>(i) Show a schedule that results in a deadlock but is conflict-serializable to (T₂, T₁).<br>(ii) Does introducing update lock in the transactions solves the deadlock problem? Justify your answer.<br>(iii) Show the lock compatibility matrix for shared, exclusive, and update locks, indicating in each cell whether concurrent locks are allowed ("Yes") or not allowed ("No").</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+  <p>T₁ reads A and writes B; T₂ reads B and writes A (the lock modes tell us which accesses happen).</p>
+  <p><b>(i)</b> Schedule:</p>
+  <pre>sl₂(B); r₂(B); sl₁(A); r₁(A); xl₂(A) denied; xl₁(B) denied</pre>
+  <p>T₂ waits for A (T₁ holds S on A) and T₁ waits for B (T₂ holds S on B): the waits-for graph is T₁ ⇄ T₂, a deadlock (Figure 4). The part that executed, r₂(B); r₁(A), contains no conflicting pair (no write has happened), so its precedence graph has no arcs and it is conflict-equivalent to every serial order, in particular to (T₂, T₁). Moreover, if the deadlock is broken by aborting T₁ (the usual choice, rolling back the one that has done less), T₂ completes and the restarted T₁ runs after it: the final execution is exactly the serial schedule (T₂, T₁).</p>
+  <figure><div id="q87a"></div><figcaption><b>Figure 4.</b> The deadlock in (i).</figcaption></figure>
+  <p><b>(ii) No.</b> Update locks prevent only the <em>upgrade</em> deadlock, where two transactions hold shared locks on the <em>same</em> element and both try to upgrade it. Here the transactions wait for locks on <em>different</em> elements, each holding the element the other needs. Replacing sl by ul gives ul₁(A); ul₂(B); xl₁(B) denied (U held by T₂); xl₂(A) denied (U held by T₁): still a cycle (Figure 5). (Update locks are not even the right tool: neither transaction upgrades a lock; each reads one element and writes another.) This deadlock is avoided by ordering lock requests (e.g., every transaction locks A before B) or handled by detection and abort.</p>
+  <figure><div id="q87b"></div><figcaption><b>Figure 5.</b> With update locks the cycle remains.</figcaption></figure>
+  <p><b>(iii)</b> Rows: lock held by another transaction; columns: lock requested.</p>
+  <div class="tbl"><table style="width:auto;text-align:center"><tr><th>held \ requested</th><th>S</th><th>X</th><th>U</th></tr><tr><th>S</th><td>Yes</td><td>No</td><td>Yes</td></tr><tr><th>X</th><td>No</td><td>No</td><td>No</td></tr><tr><th>U</th><td>No</td><td>No</td><td>No</td></tr></table></div>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 23-24 7b · 12 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-1 | 2023–24 · 12 marks</div>
+  <div class="exam-q"><p>Consider the following transactions T₁ and T₂ that use locks to preserve database consistency:<br>T₁: l₁(A), r₁(A), w₁(A), u₁(A)<br>T₂: l₂(A), r₂(A), w₂(A), u₂(A)<br>(i) Do the transactions cause a deadlock when they are executed concurrently? Justify your answer.<br>(ii) Use "shared" and "exclusive" locks with lock upgrades to improve concurrency. Show the resulting transactions.<br>(iii) After incorporating lock upgrades in the given transactions, show a concurrent schedule that causes a deadlock.<br>(iv) Use "update" locks to solve the deadlock problem appeared in question (iii) above. Show the resulting transactions.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+  <p><b>(i) No.</b> Each transaction needs only one lock, on A. A deadlock needs a transaction that holds a lock while waiting for another lock, so that waits form a cycle. Whichever transaction gets l(A) first runs to u(A) without waiting for anything; the other just waits for that unlock and then proceeds (e.g., l₁(A) r₁(A) l₂(A)-denied w₁(A) u₁(A) l₂(A) r₂(A) w₂(A) u₂(A)). The waits-for graph has at most one arc, never a cycle.</p>
+  <p><b>(ii)</b> Read under a shared lock and upgrade only for the write, so the two can read A at the same time:</p>
+  <pre>T₁: sl₁(A); r₁(A); xl₁(A); w₁(A); u₁(A);
+T₂: sl₂(A); r₂(A); xl₂(A); w₂(A); u₂(A);</pre>
+  <p><b>(iii)</b> sl₁(A); r₁(A); sl₂(A); r₂(A); xl₁(A) <b>denied</b> (T₂ holds S on A); xl₂(A) <b>denied</b> (T₁ holds S on A). Each waits for the other: deadlock (Figure 2 above shows this exact schedule).</p>
+  <p><b>(iv)</b> Each transaction takes an update lock for the read, because it will write later:</p>
+  <pre>T₁: ul₁(A); r₁(A); xl₁(A); w₁(A); u₁(A);
+T₂: ul₂(A); r₂(A); xl₂(A); w₂(A); u₂(A);</pre>
+  <p>Now ul₁(A); r₁(A); ul₂(A) is <b>denied</b> (U is incompatible with a held U), so T₂ waits while holding nothing; T₁ upgrades (xl₁(A) granted, since only T₁ holds A), writes, unlocks; then T₂ runs. No deadlock (Figure 3 above).</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 22-23 3c · 10 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-1 | 2022–23 · 10 marks</div>
+  <div class="exam-q"><p>Consider the following two transactions that use shared (sl<sub>i</sub>(X)) and exclusive (xl<sub>i</sub>(X)) locks:<br>T₁: sl₁(A); r₁(A); xl₁(A); w₁(A); u₁(A); c₁<br>T₂: sl₂(A); r₂(A); xl₂(A); w₂(A); u₂(A); c₂<br>(i) Construct a concurrent schedule of T₁ and T₂ that results in a deadlock due to lock upgrading.<br>(ii) Modify the given transactions using update (ul<sub>i</sub>(X)) lock to prevent deadlocks.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+  <p><b>(i)</b></p>
+  <pre>sl₁(A); r₁(A); sl₂(A); r₂(A); xl₁(A) denied; xl₂(A) denied</pre>
+  <p>Both hold shared locks on A (S is compatible with S). Each upgrade request needs every <em>other</em> transaction's lock on A to be released, but the other is itself waiting: T₁ → T₂ → T₁ in the waits-for graph. Neither reaches u(A) or c.</p>
+  <p><b>(ii)</b></p>
+  <pre>T₁: ul₁(A); r₁(A); xl₁(A); w₁(A); u₁(A); c₁
+T₂: ul₂(A); r₂(A); xl₂(A); w₂(A); u₂(A); c₂</pre>
+  <p>Only one transaction can hold U on A, so the second ul request waits <em>before</em> its transaction holds anything on A; the first upgrades to X freely, finishes and unlocks, and then the second proceeds. The S–S overlap that caused the cycle can no longer happen.</p>
+  </div></details>
+</div>
+
+<div class="key"><p><strong>Summary:</strong> a transaction can read under a shared lock and upgrade to exclusive just before writing, which lets it work concurrently with readers. Two transactions upgrading the same element deadlock. An update lock (granted only when others hold at most shared locks, and blocking all new locks once held) is the only lock that may be upgraded, so at most one transaction can be heading for an upgrade on an element, and the upgrade deadlock disappears. Update locks do not prevent deadlocks on different elements.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../s02/lecture.js"></script>
+<script>
+const S = s => CC.lockSteps(CC.parse(s).acts).steps;
+stepper('#f17', S('sl1(A) r1(A) sl2(A) r2(A) sl2(B) r2(B) sl1(B) r1(B) xl1(B) u2(A) u2(B) w1(B) u1(A) u1(B)'), { interval: 2300 });
+stepper('#f18', S('sl1(A) r1(A) sl2(A) r2(A) xl1(A) xl2(A)'), { interval: 2300 });
+stepper('#f20', S('ul1(A) r1(A) ul2(A) xl1(A) w1(A) u1(A) r2(A) xl2(A) w2(A) u2(A)'), { interval: 2300 });
+document.querySelector('#cm').innerHTML = CC.matrixHTML(['S', 'X', 'U']);
+CC.lockTool('#tool', 'r1(A) r2(A) w1(A) w2(A)', { auto: true, scheme: 'upgrade', release: 'end' });
+const wf = s => { const R = CC.lockRun(CC.parse(s).acts), f = R.frames[R.frames.length - 1]; return CC.graphSVG([1, 2], [...new Map(f.wf.map(e => [e[0] + '>' + e[1], { from: e[0], to: e[1], label: e[2], cls: 'red' }])).values()], { aria: 'waits-for graph' }); };
+document.querySelector('#q87a').innerHTML = wf('sl2(B) r2(B) sl1(A) r1(A) xl2(A) xl1(B)');
+document.querySelector('#q87b').innerHTML = wf('ul1(A) ul2(B) xl1(B) xl2(A)');
+flashcards('#cards', [
+  { f: 'Lock upgrade', b: 'Holding S on X, request X on X too; granted once no other transaction holds a lock on X.' },
+  { f: 'Why upgrade?', b: 'The transaction can read and compute concurrently with other readers; only the write waits.' },
+  { f: 'Upgrade deadlock', b: 'Two transactions hold S on the same X and both request X: each waits for the other.' },
+  { f: 'Update lock U', b: 'Read privilege that alone may be upgraded to X; granted if others hold only S; blocks all new locks once held.' },
+  { f: 'U column vs U row', b: 'Requested U behaves like S (column = S column); held U behaves like X (row = X row).' },
+  { f: 'Why does held U block new S locks?', b: 'Otherwise a stream of readers could keep the updater from ever upgrading.' },
+]);
+quiz('#quiz', [
+  { q: 'T₂ holds S on A. T₁ requests U on A. Result?', opts: ['Granted', 'Denied', 'Deadlock', 'T₂ is aborted'], a: 0, why: 'Row S, column U is Yes.' },
+  { q: 'T₁ holds U on A. T₂ requests S on A. Result?', opts: ['Granted', 'Denied', 'Granted only if T₁ commits', 'Converted to U'], a: 1, why: 'Row U is all No.' },
+  { q: 'Which pair of transactions can deadlock even with update locks?', opts: ['Both read A then write A', 'One reads A and writes B, the other reads B and writes A', 'Both only read A', 'Both only write A'], a: 1, why: 'They wait for locks on different elements; U locks only stop upgrade deadlocks on one element.' },
+  { q: 'In Fig. 18.17, what does T₁ gain from upgrading instead of locking B exclusively at the start?', opts: ['It avoids a deadlock', 'It can read B and compute while T₂ still reads B', 'It writes B before T₂ reads it', 'Nothing'], a: 1, why: 'xl₁(B) at the start would be denied while T₂ holds S on B.' },
+]);
+ask('#try1', { q: 'With update locks, sl₁(A) and ul₂(A) are held. How many of S, X, U can T₃ obtain on A?', a: 0, why: 'A U lock is held, so row U applies: nothing can be granted.' });
+</script>
+</body>
+</html>

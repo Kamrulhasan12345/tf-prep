@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Entities, Attributes, Keys, Relationships · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 07 (Ishrak) · Chapter 1 · Slides 1–14</div>
+<h1>Entities, Attributes, Keys and Relationships</h1>
+<p class="lede">Before we create a single table we decide what the data means. This chapter introduces the Entity-Relationship (ER) model and its four building blocks: entity sets, attributes, keys and relationships, and shows how to find them in a written requirement.</p>
+
+<h2>1. What ER stands for and why we use it (slides 1–3)</h2>
+
+<p>So far in this course we have worked with tables: we created them (Lec 03), queried them (Lec 04), changed them (Lec 05) and protected them with constraints (Lec 06). But somebody has to decide <em>which</em> tables to create in the first place. That step is called <b class="term">conceptual database design</b>: we describe what the data means in the real world, without yet thinking about tables, columns or data types. The tool the slides use for this step is the ER diagram.</p>
+
+<dl class="def">
+<dt>Entity</dt><dd>A real-world object or concept we want to remember: one particular student, one course, one book. "The thing we store."</dd>
+<dt>Relationship</dt><dd>An association among entities: student Amina is enrolled in course CSE101. "The association between things."</dd>
+<dt>ER diagram (ERD)</dt><dd>A visual model of the entities, their attributes, the relationships between them and the constraints on those relationships. "The visual model."</dd>
+</dl>
+
+<p>Slide 3 lists the reasons we draw an ER diagram before writing SQL:</p>
+<ul>
+<li><strong>It helps us understand the domain before implementation.</strong> We talk about students and courses, not about <code>VARCHAR2(40)</code>.</li>
+<li><strong>It is visual enough to discuss with non-technical stakeholders.</strong> A registrar can look at a box labelled Student and a diamond labelled enrolls and say "yes, but a student can enroll in the same course twice if they fail it". That kind of correction is exactly what we want early.</li>
+<li><strong>It shows entity sets, attributes, relationships, keys and multiplicity in one picture.</strong></li>
+<li><strong>It catches design mistakes early, when changes are cheap.</strong> Moving a box in a diagram costs nothing; changing a table that already holds a million rows and is used by twenty programs costs a lot.</li>
+</ul>
+<p>The slide's main idea: <em>first model what the data means; implementation details can come later.</em> In Part 2 of these notes (Chapters 10–13) we will turn diagrams into Oracle tables mechanically, so a good diagram leads straight to a good schema.</p>
+
+<h2>2. Requirements analysis: reading a requirement (slides 4–5)</h2>
+
+<p>Design starts from a written <b class="term">requirement</b>, a short description in plain language of what the system must remember. Slide 5's example:</p>
+<blockquote class="q" style="border-color:var(--line)"><p><em>The department wants to store students, courses, instructors, and course enrollments. Each student has a name and department. Each course has a title and credits. Students enroll in courses each semester and receive grades.</em></p></blockquote>
+
+<p>The slide gives three reading rules, which are really three questions we ask about every phrase:</p>
+<ol>
+<li><strong>Important nouns</strong> (students, courses, instructors) suggest <em>things the system must remember</em>: candidate entity sets.</li>
+<li><strong>Verbs or action phrases</strong> (enroll in) suggest <em>how those things are connected</em>: candidate relationships.</li>
+<li><strong>Descriptive facts</strong> (name, department, title, credits) suggest <em>what we need to store about them</em>: attributes.</li>
+</ol>
+<p>The animation applies the three rules to slide 5's requirement and builds the diagram one decision at a time.</p>
+
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="req"></div>
+</figure>
+
+<p>Two phrases need care. "Course enrollments" is a noun, but it is the noun form of the verb "enroll", so it describes the association between a student and a course rather than a separate kind of thing. And "grades" are received <em>for</em> an enrollment: a grade only makes sense once a particular student and a particular course are paired. We come back to both points in Chapter 2 (relationship attributes) and Chapter 5 (when a relationship deserves to become an entity). The requirement also mentions instructors but says nothing about what connects them to courses, so for now Instructor is a box with no lines; a real design would ask the department "who teaches what?".</p>
+
+<h2>3. The vocabulary of the ER model (slide 6)</h2>
+
+<p>Each part of the model answers one question about the data:</p>
+<div class="tbl"><table>
+<tr><th>Concept</th><th>Question it answers</th><th>Drawn as</th></tr>
+<tr><td>Entity set</td><td>What kinds of objects exist?</td><td>rectangle</td></tr>
+<tr><td>Attribute</td><td>What facts describe each object?</td><td>oval</td></tr>
+<tr><td>Relationship</td><td>How are objects associated?</td><td>diamond</td></tr>
+<tr><td>Key</td><td>How do we uniquely identify an object?</td><td>underlined attribute name</td></tr>
+<tr><td>Multiplicity</td><td>How many objects may be related?</td><td>arrowheads on the connecting lines (Chapter 3)</td></tr>
+</table></div>
+
+<h2>4. Entities and entity sets (slides 7–8)</h2>
+
+<dl class="def">
+<dt>Entity</dt><dd>A distinguishable object in the world: the student with ID 2105001, the course CSE215.</dd>
+<dt>Entity set</dt><dd>A set of similar entities, all described by the same attributes: the set of all students, the set of all courses. An entity set is drawn as a <strong>rectangle</strong> with its name inside.</dd>
+</dl>
+<p>The textbook (Garcia-Molina, Ullman and Widom) compares an entity set to a <em>class</em> in object-oriented programming and an entity to an <em>object</em> of that class. In the relational world an entity set will usually become a table and each entity a row.</p>
+
+<figure>
+<div class="figrow"><div id="ents"></div><div id="inst"></div></div>
+<figcaption><b>Left:</b> slide 7's three entity sets. <b>Right:</b> the entity set Student is a <em>set</em> of individual entities; the diagram draws the set, never the individuals.</figcaption>
+</figure>
+
+<h3>Finding entity sets (slide 8)</h3>
+<p>Look for the important nouns in the requirement: Student, Course, Instructor, Department. Two cautions from the slide:</p>
+<ul>
+<li><strong>Avoid modeling individual objects as boxes.</strong> A box called <em>Amina</em> is wrong; Amina is one member of the entity set Student.</li>
+<li><strong>Model the type, not one instance.</strong> The diagram must stay the same when Amina graduates and a thousand new students join. Only the data changes.</li>
+</ul>
+<p>A useful test: if you can say "a ___" or "each ___" in front of the name ("each student", "a course"), it is a type and can be an entity set. "Each Amina" makes no sense, so Amina is an instance.</p>
+
+<h2>5. Attributes (slide 9)</h2>
+<dl class="def">
+<dt>Attribute</dt><dd>A property that describes the entities of an entity set (or the pairs of a relationship, Chapter 2). Each entity has a value for each attribute: Amina's <em>name</em> is "Amina", her <em>dept</em> is "CSE". Attributes are drawn as <strong>ovals</strong> joined to their rectangle by a line.</dd>
+</dl>
+<p>All entities in an entity set usually share the same attributes: every student has a name, an email and a department. In the basic model of the slides an attribute value is a single atomic value such as a string or a number. Chapter 10 shows the extended kinds (composite, multivalued and derived attributes) that appear in exam questions.</p>
+
+<figure><div id="attrs"></div><figcaption>Slide 9: the entity set Student with three attributes.</figcaption></figure>
+
+<h2>6. Keys (slides 10–11)</h2>
+<dl class="def">
+<dt>Key</dt><dd>A set of attributes whose values identify an entity inside its entity set: no two entities of the set may agree on all key attributes. A key must be <strong>unique</strong> (no two entities share the value) and <strong>minimal</strong> (no attribute can be dropped without losing uniqueness).</dd>
+<dt>Primary key in an ER diagram</dt><dd>The key chosen for the entity set. Its attribute names are <strong>underlined</strong>.</dd>
+</dl>
+<figure><div id="keyfig"></div><figcaption>Slide 10: <code>course_id</code> is underlined, so it is the key of Course. Two courses may share a title or a credit value, never a course_id.</figcaption></figure>
+
+<h3>Composite keys</h3>
+<p>Sometimes one attribute is not enough, and a key contains several attributes. Slide 11's example: a <em>section</em> of a course is identified by <strong>course, semester and section number</strong> together. CSE215 has a section 1 every semester, and every course has a section 1, so none of the three alone is unique. In a diagram, every attribute of a composite key is underlined.</p>
+<p><strong>Minimality:</strong> if removing any attribute breaks uniqueness, the key is minimal. The table below has four sections. Try dropping each attribute of the key and see whether two rows collide.</p>
+<div class="tbl"><table>
+<tr><th>course</th><th>semester</th><th>sec_no</th><th>room</th></tr>
+<tr><td>CSE215</td><td>Jan 2025</td><td>1</td><td>ECE 101</td></tr>
+<tr><td>CSE215</td><td>Jan 2025</td><td>2</td><td>ECE 102</td></tr>
+<tr><td>CSE215</td><td>Jul 2025</td><td>1</td><td>ECE 101</td></tr>
+<tr><td>CSE205</td><td>Jan 2025</td><td>1</td><td>ECE 205</td></tr>
+</table></div>
+<div class="q">
+<h4>Worked check: is {course, semester, sec_no} minimal?</h4>
+<p>Drop <em>course</em>: rows 1 and 4 both have (Jan 2025, 1). Drop <em>semester</em>: rows 1 and 3 both have (CSE215, 1). Drop <em>sec_no</em>: rows 1 and 2 both have (CSE215, Jan 2025). Every smaller set fails on this data, and more importantly it fails <em>in principle</em>, since the rules of the university allow all three collisions. So the key is minimal. Note that {course, semester, sec_no, room} is also unique, but it is not minimal because room can be dropped; such a set is called a <b class="term">superkey</b>.</p>
+</div>
+
+<h2>7. Relationships (slides 12–14)</h2>
+<dl class="def">
+<dt>Relationship</dt><dd>An association among entities: "Instructor Rahman teaches CSE215".</dd>
+<dt>Relationship set</dt><dd>The set of all such associations of one kind. It is drawn as a <strong>diamond</strong> with lines to the entity sets it connects. Verbs in the requirement often indicate relationships (teaches, enrolls, borrows).</dd>
+</dl>
+<figure><div id="relfig"></div><figcaption>Slide 12: the relationship <em>teaches</em> connects Instructor and Course.</figcaption></figure>
+
+<p>The diamond <em>names</em> the association (slide 13: "Student enrolls in Course", the diamond says <em>enrolls</em>). Choose a name that reads naturally from one box through the diamond to the other: Student enrolls Course, Instructor teaches Course.</p>
+<p><strong>Important idea from slide 13:</strong> the diagram shows the <em>general</em> association, not a list of individual records. The current value of a relationship set is a set of pairs, one pair per actual association. The figure below shows the same diagram with a possible set of pairs beside it; the pairs change every semester, the diagram does not.</p>
+
+<figure>
+<div class="figrow"><div id="relinst"></div><div>
+<div class="figlabel">current value of enrolls</div>
+<table class="rec"><tr><th>Student</th><th>Course</th></tr>
+<tr><td>Amina</td><td>CSE101</td></tr><tr><td>Amina</td><td>CSE103</td></tr><tr><td>Rahim</td><td>CSE101</td></tr></table></div></div>
+<figcaption>The diagram (left) describes the possible associations; the relationship set (right) lists the actual ones. Formally, enrolls ⊆ Student × Course.</figcaption>
+</figure>
+
+<h3>Relationships can involve more entity sets (slide 14)</h3>
+<p>Most relationships in this lecture are <b class="term">binary</b>: they connect two entity sets. Later we meet relationships that connect <em>more than two</em> entity sets (multi-way relationships, Chapter 6) and relationships where an entity set connects <em>to itself</em> (recursive relationships, Chapter 3). The slide's advice: start with binary relationships; they are easier to read and to check.</p>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+<div id="try2"></div>
+
+<h3>Exam questions</h3>
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2012–13 · 15 marks</div>
+  <div class="exam-q"><p>What are the different elements of Entity-Relation Model? Briefly discuss them.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>The ER model describes a database with three kinds of elements, each with its own symbol, plus constraints that restrict them.</p>
+    <p><strong>1. Entity sets.</strong> An entity is a distinguishable real-world object (one student); an entity set is a collection of similar entities (all students), drawn as a rectangle. A <em>strong</em> entity set has a key of its own. A <em>weak</em> entity set (double rectangle) cannot be identified by its own attributes and borrows the key of an owner entity set through an <em>identifying relationship</em> (double diamond); its own identifying attribute is a <em>partial key</em> (dashed underline). (Chapter 8.)</p>
+    <p><strong>2. Attributes.</strong> Properties of entities or of relationships, drawn as ovals. Kinds: <em>simple</em> (atomic, e.g. salary); <em>composite</em> (made of parts, e.g. name = first + last; the parts hang off the composite oval); <em>single-valued</em> vs <em>multivalued</em> (several values per entity, e.g. phone numbers; double oval); <em>derived</em> (computed from other data, e.g. age from date of birth; dashed oval); <em>key</em> attributes (underlined), which identify an entity within its set. (Chapter 10.)</p>
+    <p><strong>3. Relationship sets.</strong> Associations among entities, drawn as diamonds joined to the participating entity sets. Their <em>degree</em> is the number of entity sets involved: binary, ternary (multi-way, Chapter 6) or recursive when one entity set appears twice in different <em>roles</em> (role names on the lines). A relationship may have its own attributes (e.g. grade on enrolls).</p>
+    <p><strong>4. Constraints.</strong> <em>Keys</em> (unique, minimal identifying attributes). <em>Multiplicity / cardinality ratio</em>: one-to-one, many-to-one, many-to-many, shown in the slides by an arrowhead toward the "one" side and written 1, N, M on the lines in Chen's notation (Chapter 3). <em>Participation</em>: total (every entity must take part; double line) or partial (single line) (Chapter 10). <em>Specialization (isA)</em>: subclasses that inherit the attributes of a superclass, with disjoint/overlapping and total/partial constraints (Chapter 7).</p>
+    <p>The diagram below shows every element at once.</p>
+    <figure class="wide"><div id="exElements"></div></figure>
+  </div></details>
+</div>
+
+<div class="key">
+<p><strong>Summary:</strong> conceptual design describes what the data means before choosing tables. Read the requirement for nouns (entity sets, rectangles), verbs (relationships, diamonds) and descriptive facts (attributes, ovals). Model types, never single instances. A key is a unique and minimal set of attributes and is underlined; a composite key underlines several attributes. A diagram shows the general association; the relationship set holds the actual pairs.</p>
+</div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="lecture.js"></script>
+<script>
+// slide 5 requirement → diagram
+const REQ = {
+  n: [['Student', 'E', 0, 0], ['enrolls', 'R', 210, 0], ['Course', 'E', 420, 0], ['Instructor', 'E', 640, 0]],
+  a: [['Student', 'name', -55, -62], ['Student', 'department', 60, -62], ['Course', 'title', -45, -62], ['Course', 'credits', 50, -62],
+      ['enrolls', 'semester', -50, 64], ['enrolls', 'grade', 55, 64]],
+  l: [['Student', 'enrolls'], ['Course', 'enrolls']],
+};
+const sent = (hl) => {
+  const W = [[/\bstudents\b/g, 'n'], [/\bcourses,/g, 'n'], [/\binstructors\b/g, 'n'], [/course enrollments/g, 'v'], [/\benroll in\b/g, 'v'],
+             [/\bname\b/g, 'a'], [/department\./g, 'a'], [/\btitle\b/g, 'a'], [/\bcredits\b/g, 'a'], [/\bsemester\b/g, 'a'], [/\bgrades\b/g, 'a']];
+  const col = { n: 'var(--cell)', v: 'var(--cell-del)', a: 'var(--cell-new)' };
+  let t = 'The department wants to store students, courses, instructors, and course enrollments. Each student has a name and department. Each course has a title and credits. Students enroll in courses each semester and receive grades.';
+  for (const [re, k] of W) if (hl.includes(k)) t = t.replace(re, m => `<mark style="background:${col[k]};color:var(--fg)">${m}</mark>`);
+  return `<p style="font-size:.95rem;max-width:44em;margin:0 auto 12px">${t}</p>`;
+};
+erdSteps('#req', REQ, [
+  { set: [], cap: 'Start from the requirement text. Nothing is drawn yet.', after: sent([]) },
+  { add: ['Student', 'Course', 'Instructor'], cap: 'Rule 1: the important <b>nouns</b> students, courses, instructors become candidate <b>entity sets</b> (rectangles). Names are singular: one rectangle stands for the set of all students.', after: sent(['n']) },
+  { add: ['enrolls'], cap: 'Rule 2: the <b>verb</b> "enroll in" (and its noun form "course enrollments") connects Student and Course, so it becomes the <b>relationship</b> enrolls (a diamond).', after: sent(['n', 'v']) },
+  { add: ['Student.name', 'Student.department', 'Course.title', 'Course.credits'], cap: 'Rule 3: <b>descriptive facts</b> become <b>attributes</b> (ovals). Name and department describe a student; title and credits describe a course.', after: sent(['n', 'v', 'a']) },
+  { add: ['enrolls.semester', 'enrolls.grade'], cap: 'Semester and grade describe one particular enrollment (this student in this course), so they hang off the diamond. Instructor still has no connection: the requirement never says how instructors relate to courses, so we must ask.', after: sent(['n', 'v', 'a']) },
+]);
+$('#ents').innerHTML = erd({ n: [['Student', 'E', 0, 0], ['Course', 'E', 0, 50], ['Instructor', 'E', 0, 100]] });
+$('#inst').innerHTML = (() => {
+  let s = '<svg viewBox="0 0 260 150" width="260"><ellipse cx="130" cy="75" rx="120" ry="66" class="er-att" style="fill:var(--cell);stroke:var(--fg)"/>';
+  [['Amina', 70, 55], ['Rahim', 170, 50], ['Nabila', 110, 100], ['Tanvir', 195, 95]].forEach(([n, x, y]) => s += `<circle cx="${x - 30}" cy="${y - 4}" r="3" style="fill:var(--fg)"/><text x="${x - 22}" y="${y}" style="font-size:12px">${n}</text>`);
+  return s + '<text x="130" y="148" text-anchor="middle" class="lbl">the entity set Student</text></svg>';
+})();
+$('#attrs').innerHTML = erd({ n: [['Student', 'E', 0, 0]], a: [['Student', 'email', -95, -45], ['Student', 'name', 0, -70], ['Student', 'dept', 95, -45]] });
+$('#keyfig').innerHTML = erd({ n: [['Course', 'E', 0, 0]], a: [['Course', '_course_id', -110, -45], ['Course', 'title', 0, -70], ['Course', 'credit', 105, -45]] });
+$('#relfig').innerHTML = erd({ n: [['Instructor', 'E', 0, 0], ['teaches', 'R', 170, 0], ['Course', 'E', 330, 0]], l: [['Instructor', 'teaches'], ['Course', 'teaches']] });
+$('#relinst').innerHTML = erd({ n: [['Student', 'E', 0, 0], ['enrolls', 'R', 165, 0], ['Course', 'E', 320, 0]], l: [['Student', 'enrolls'], ['Course', 'enrolls']] });
+$('#exElements').innerHTML = erd({
+  n: [['Employee', 'E', 0, 0], ['has', 'I', 220, 0], ['Dependent', 'W', 430, 0], ['worksIn', 'R', 0, 150], ['Department', 'E', 0, 290]],
+  a: [['Employee', '_emp_id', -150, -40], ['Employee', 'name', -40, -85], ['Employee.name', 'first', -95, -55], ['Employee.name', 'last', 20, -60],
+      ['Employee', '{phone}', 95, -70], ['Employee', 'dob', -150, 40], ['Employee', '/age', -120, 85],
+      ['Dependent', '~dep_name', -20, -70], ['Dependent', 'relation', 100, -55], ['worksIn', 'since', 100, 0],
+      ['Department', '_dept_no', -90, 50], ['Department', 'dname', 80, 50]],
+  l: [['Employee', 'has', { card: '1' }], ['Dependent', 'has', { total: true, card: 'N' }], ['Employee', 'worksIn', { total: true, card: 'N', cardSide: -1 }], ['Department', 'worksIn', { one: true, card: '1', cardSide: -1 }]],
+  t: [[-40, 385, 'rectangle = entity set · double rectangle = weak entity set · diamond = relationship · double diamond = identifying relationship'],
+      [-40, 405, 'oval = attribute · underlined = key · dashed underline = partial key · double oval = multivalued · dashed oval = derived'],
+      [-40, 425, 'arrow / 1 = "one" side · N = "many" side · double line = total participation']],
+}, { scale: 0.95 });
+
+flashcards('#cards', [
+  { f: 'Entity vs entity set', b: 'An entity is one object (student Amina). An entity set is the set of all similar objects (Student), drawn as a rectangle.' },
+  { f: 'Attribute', b: 'A property of the entities of a set (or of a relationship), drawn as an oval.' },
+  { f: 'Key', b: 'A unique and minimal set of attributes identifying an entity in its set; underlined in the diagram.' },
+  { f: 'Composite key', b: 'A key with several attributes, e.g. (course, semester, sec_no) for a section. All are underlined.' },
+  { f: 'Relationship set', b: 'All associations of one kind, drawn as a diamond. Its value is a set of tuples, e.g. enrolls ⊆ Student × Course.' },
+  { f: 'Nouns, verbs, facts', b: 'Nouns → entity sets, verbs → relationships, descriptive facts → attributes.' },
+  { f: 'Conceptual design', b: 'Describing what the data means before choosing tables, columns and types.' },
+]);
+quiz('#quiz', [
+  { q: 'A requirement says: "The shop sells products to customers. Each product has a name and price." Which is a candidate relationship?', opts: ['Product', 'price', 'sells', 'Customer'], a: 2, why: '"sells" is the verb that connects Product and Customer. Product and Customer are nouns (entity sets); price is a descriptive fact (attribute).' },
+  { q: 'A student draws three boxes named Amina, Rahim and Nabila. What is wrong?', opts: ['Nothing', 'They model instances; there should be one entity set Student', 'Boxes should be ovals', 'They need keys'], a: 1, why: 'Slides 8 and 89: model the type, not individual objects.' },
+  { q: 'Which symbol is an attribute?', opts: ['Rectangle', 'Diamond', 'Oval', 'Arrow'], a: 2, why: 'Ovals are attributes; rectangles are entity sets; diamonds are relationships.' },
+  { q: '{roll, name} identifies every student, and roll alone also does. Is {roll, name} a key?', opts: ['Yes', 'No: it is unique but not minimal', 'No: it is not unique', 'Only if name is unique'], a: 1, why: 'Dropping name keeps uniqueness, so {roll, name} is not minimal (it is a superkey). The key is {roll}.' },
+  { q: 'What does the diamond "enrolls" between Student and Course stand for?', opts: ['One enrollment record', 'The set of all (student, course) pairs that are enrolled', 'A table of students', 'A data flow from Student to Course'], a: 1, why: 'A relationship set is a set of tuples; the diagram shows the general association, not individual records.' },
+  { q: 'How is a primary key shown in the slides\' ER notation?', opts: ['Bold rectangle', 'Underlined attribute name', 'Double oval', 'Dashed oval'], a: 1, why: 'Slide 10: primary-key attributes are underlined.' },
+]);
+ask('#try1', { q: 'Requirement: "A hospital stores doctors and patients. Each doctor has a name and specialty. Doctors treat patients." How many entity sets does it contain?', a: 2, hint: 'Count the important nouns that are things to remember, not the descriptive facts.', why: 'Doctor and Patient. Name and specialty are attributes; treat is a relationship.' });
+ask('#try2', { q: 'In the same requirement, what is the name of the relationship? (one word)', a: ['treats', 'treat'], hint: 'Look for the verb connecting the two nouns.', why: 'Doctor <em>treats</em> Patient.' });
+</script>
+</body>
+</html>

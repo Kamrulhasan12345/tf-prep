@@ -1,0 +1,359 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Designing Triggers · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 12 (Ishrak) · Chapter 11 · Exam topics on triggers · Book §7.5.2, §8.2.3</div>
+<h1>Designing Triggers: Statement Triggers, INSTEAD OF, Mutating Tables</h1>
+<p class="lede">The slides show two simple row triggers. Exam questions ask for harder ones: a trigger that reads the table it is attached to, one that updates related rows, one that keeps an average in bounds. This chapter covers what those need in Oracle (statement-level and compound triggers, the mutating-table rule, INSTEAD OF triggers, cascading), what triggers are used for and what they may not do, and then works the bank's trigger questions.</p>
+
+<h2>1. Statement-level triggers and event predicates</h2>
+<p>A statement-level trigger (no FOR EACH ROW) suits rules about the <em>statement</em>, not about individual rows: "no changes to PC outside office hours", "log who ran a DELETE". With several events in one trigger, the predicates <code>INSERTING</code>, <code>UPDATING</code> (or <code>UPDATING('price')</code>) and <code>DELETING</code> say which event fired it:</p>
+<pre>CREATE OR REPLACE TRIGGER pc_audit
+AFTER INSERT OR UPDATE OR DELETE ON PC
+BEGIN                                   -- statement-level: once per statement
+  INSERT INTO pc_audit_log(who, what, at_time)
+  VALUES (USER,
+          CASE WHEN INSERTING THEN 'INSERT'
+               WHEN UPDATING  THEN 'UPDATE'
+               ELSE 'DELETE' END,
+          SYSDATE);
+END;
+/</pre>
+<p><code>USER</code> is the current Oracle user and <code>SYSDATE</code> the current date and time. A statement-level trigger cannot read :NEW or :OLD; if it needs the changed rows it must query the table.</p>
+
+<h2>2. The mutating-table rule (ORA-04091)</h2>
+<dl class="def">
+  <dt>Mutating table</dt>
+  <dd>A table that is being changed by the statement currently running. In Oracle, a <b>row-level</b> trigger may not query or modify the table it is defined on (nor tables being changed by ON DELETE CASCADE from it). Doing so raises <b>ORA-04091: table … is mutating, trigger/function may not see it</b> at run time.</dd>
+</dl>
+<p>The reason: a row trigger fires in the middle of the statement. After 2 of 5 rows have been updated, the table is half old, half new, so any query on it would see an inconsistent state, and the answer would depend on the order in which Oracle happened to visit the rows. Oracle forbids the read rather than return such an answer. (Statement-level triggers are allowed to read the table, because they run before the first row or after the last one.)</p>
+<p>Typical cases that hit it, both in the question bank: a row trigger on MovieExec that computes AVG(netWorth) from MovieExec, and a row trigger on works that updates other rows of works. The standard fixes:</p>
+<ol>
+  <li><b>Use a statement-level trigger</b> when the check can be made once, after the statement (for example "if the average is now too low, raise an error").</li>
+  <li><b>Use a compound trigger</b> (Oracle 11g and later) when you need both per-row information and the whole table. One trigger has sections that share variables: <code>BEFORE STATEMENT</code>, <code>BEFORE EACH ROW</code>, <code>AFTER EACH ROW</code>, <code>AFTER STATEMENT</code>. Read the table in a statement section, remember what you need in variables, and use it in the row sections (or collect rows in the row section and act on them in AFTER STATEMENT).</li>
+</ol>
+<p>SQLite, the playground's engine, has no mutating-table rule, so the SQLite versions below can read and write the same table directly; just remember that the Oracle answer needs one of the two fixes.</p>
+
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="mut"></div>
+<figcaption><b>Figure 1.</b> Why a row trigger may not read its own table: halfway through a multi-row UPDATE the table is in a mixed state.</figcaption>
+</figure>
+
+<h2>3. Cascading and recursive triggers</h2>
+<p>A trigger's action can change another table, which fires that table's triggers, and so on: <b>cascading</b>. Slide 52's trigger is one (deleting a PC deletes a Product row, which would fire any delete trigger on Product). If a chain comes back to the table it started from, the triggers are <b>recursive</b>, which can loop forever. Oracle stops a chain after 32 nested trigger levels with an error. Design rule: give every trigger a condition that eventually becomes false (for example <code>WHEN (new.salary &lt;&gt; old.salary)</code>), and prefer foreign keys with ON DELETE CASCADE over hand-written cascading triggers when they express the rule.</p>
+
+<h2>4. INSTEAD OF triggers on views</h2>
+<dl class="def">
+  <dt>INSTEAD OF trigger</dt>
+  <dd>A row-level trigger defined on a <b>view</b>. When someone runs INSERT, UPDATE or DELETE on the view, Oracle does not try to change the view; it runs the trigger body <em>instead</em>, which changes the underlying base tables (textbook §8.2.3). It makes views updatable that Oracle could not update by itself, such as join views.</dd>
+</dl>
+<pre>CREATE OR REPLACE VIEW pc_catalog AS
+  SELECT p.maker, c.model, c.speed, c.price
+  FROM Product p JOIN PC c ON p.model = c.model;
+
+CREATE OR REPLACE TRIGGER pc_catalog_ins
+INSTEAD OF INSERT ON pc_catalog
+FOR EACH ROW
+BEGIN
+  INSERT INTO Product(maker, model, type) VALUES (:NEW.maker, :NEW.model, 'pc');
+  INSERT INTO PC(model, speed, ram, hd, price)
+    VALUES (:NEW.model, :NEW.speed, NULL, NULL, :NEW.price);
+END;
+/</pre>
+<p>An INSERT into the view now adds one row to each table. INSTEAD OF triggers are always row-level, have no BEFORE/AFTER, and can only be defined on views. <b>SQLite version (syntax differs from Oracle)</b> to try:</p>
+<div id="sqView"></div>
+
+<h2>5. What triggers are used for, and their restrictions</h2>
+<p>Typical uses:</p>
+<ol>
+  <li><b>Integrity rules that constraints cannot express</b>: rules involving several rows or tables (a prerequisite check at registration, an average that must stay above a bound), or rules that should repair instead of reject.</li>
+  <li><b>Maintaining derived data</b>: keep a total, a count or a summary table up to date (a hand-made materialized view), or denormalized copies of a value.</li>
+  <li><b>Auditing and logging</b>: record who changed what and when, with old and new values.</li>
+  <li><b>Propagating changes</b>: cascades that foreign keys cannot do (slide 52 deletes the <em>parent</em> when a child is deleted), or replication to another table.</li>
+  <li><b>Making views updatable</b> with INSTEAD OF triggers.</li>
+  <li><b>Security and business-hour rules</b>: reject changes at certain times or by certain users.</li>
+</ol>
+<p>Restrictions in Oracle:</p>
+<ul>
+  <li>No transaction control: COMMIT, ROLLBACK and SAVEPOINT are not allowed in a trigger (the trigger is part of the triggering statement's transaction). The exception is a trigger declared as an autonomous transaction, typically for logging.</li>
+  <li>The mutating-table rule for row-level triggers (section 2).</li>
+  <li>WHEN only for row-level triggers, and it cannot contain a subquery or call a PL/SQL function.</li>
+  <li>:NEW and :OLD only in row-level triggers; :NEW may be assigned only in BEFORE row triggers; INSERT has no :OLD values and DELETE no :NEW values.</li>
+  <li>INSTEAD OF only on views, always row-level; BEFORE/AFTER triggers cannot be defined on views.</li>
+  <li>A trigger body is limited to 32 KB (put long logic in a procedure and call it), and at most 32 triggers can cascade.</li>
+  <li>DDL statements (CREATE, ALTER, DROP) cannot be issued directly in a DML trigger.</li>
+</ul>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+<h3>Write it yourself (SQLite triggers, auto-checked)</h3>
+<div id="ex1"></div>
+<div id="ex2"></div>
+
+<h3>Exam questions</h3>
+<div class="exam">
+  <div class="exam-src">DB QB · 23-24 4b · 10 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-1 | 2023–24 · 10 marks</div>
+  <div class="exam-q"><p>Consider the following schema: Student(Ssn, Name), TakenCourses(Ssn, CourseNo), Register(Ssn, CourseNo), Course(CourseNo, Name, Year, Term), PreRequisite(CourseNo, ReqCourseNo). Table TakenCourses manages courses info that a student has taken previously. A course may require pre-requisite courses and the pre-requisite course info is managed in table PreRequisite. Write a trigger to check if the student took the pre-requisite courses when s/he registers for a new course. If s/he didn't take a prerequisite course, the registration of the course should fail and an appropriate message should be displayed.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><b>Design.</b> Event: a new row in Register (INSERT, and also an UPDATE that changes Ssn or CourseNo). Timing: BEFORE, so a bad registration is never written. Level: row, because each registration has its own student and course (:NEW.Ssn, :NEW.CourseNo). Condition: some prerequisite of :NEW.CourseNo is not among the courses :NEW.Ssn has taken. Action: RAISE_APPLICATION_ERROR, which makes the INSERT fail with the message. The trigger reads PreRequisite and TakenCourses, not Register, so there is no mutating-table problem.</p>
+<pre>CREATE OR REPLACE TRIGGER CheckPrerequisites
+BEFORE INSERT OR UPDATE OF Ssn, CourseNo ON Register
+FOR EACH ROW
+DECLARE
+  v_missing NUMBER;
+BEGIN
+  SELECT COUNT(*) INTO v_missing
+  FROM PreRequisite p
+  WHERE p.CourseNo = :NEW.CourseNo
+    AND NOT EXISTS (SELECT * FROM TakenCourses t
+                    WHERE t.Ssn = :NEW.Ssn
+                      AND t.CourseNo = p.ReqCourseNo);
+
+  IF v_missing &gt; 0 THEN
+    RAISE_APPLICATION_ERROR(-20002,
+      'Registration failed: student ' || :NEW.Ssn || ' has not taken ' ||
+      v_missing || ' prerequisite course(s) of ' || :NEW.CourseNo);
+  END IF;
+END;
+/</pre>
+    <p>Line by line: DECLARE introduces a local variable for the count; SELECT … INTO stores the number of prerequisites of the new course that have no matching TakenCourses row for this student; if it is positive the registration is rejected and the INSERT (or UPDATE) fails with ORA-20002 and the message. A course with no prerequisites gives a count of 0 and the registration goes through. NOT EXISTS is used instead of NOT IN because NOT IN returns no rows at all if the subquery produces a NULL. (The bank's answer is correct apart from using NOT IN and covering only INSERT.)</p>
+    <p><b>SQLite version (syntax differs from Oracle)</b>: SQLite allows a subquery in WHEN, so the whole check fits in the condition. Sara has taken only CSE105, so her registration for CSE215 (which needs CSE105 and CSE107) fails; Rafi's succeeds.</p>
+    <div id="sqPre"></div>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 24-25 6b · 18 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-1 | 2024–25 Q2 · 18 marks</div>
+  <div class="exam-q"><p>Consider the following relational database schema: employee(employee_name, street, city), works(employee_name, company_name, salary), company(company_name, city), manages(employee_name, manager_name). Write SQL statements for the following scenarios:</p>
+  <p>(i) Give a 20% salary rise to employees who are manager.<br>(ii) Delete all tuples in the works relation for employees of the company "Sonali Bank".<br>Note that works.employee_name is a foreign key referencing employee(employee_name), manages.employee_name is a foreign key referencing employee(employee_name), manages.manager_name is a foreign key referencing employee(employee_name).<br>(iii) Design a trigger such that whenever a manager's salary is updated, all employees managed by that manager get a 10% salary increase.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><b>(i)</b> A manager is anyone who appears as manager_name in manages:</p>
+<pre>UPDATE works
+SET salary = salary * 1.20
+WHERE employee_name IN (SELECT manager_name FROM manages);</pre>
+    <p><b>(ii)</b></p>
+<pre>DELETE FROM works
+WHERE company_name = 'Sonali Bank';</pre>
+    <p>The foreign keys in the note all point <em>from</em> works and manages <em>to</em> employee. Deleting rows of works removes no employee, so no foreign key is violated and nothing cascades; the employees stay in employee and manages.</p>
+    <p><b>(iii)</b> Event: UPDATE OF salary ON works. The action updates <em>other rows of works</em>, so in Oracle a plain row-level trigger would fail with ORA-04091 (works is mutating). A compound trigger avoids it: the row section only records which employees' salaries changed, and the statement section, which runs after the triggering UPDATE is complete, raises their subordinates.</p>
+<pre>CREATE OR REPLACE TRIGGER RaiseTeam
+FOR UPDATE OF salary ON works
+COMPOUND TRIGGER
+  TYPE name_list IS TABLE OF works.employee_name%TYPE;
+  changed name_list := name_list();
+
+  AFTER EACH ROW IS
+  BEGIN
+    IF :NEW.salary &lt;&gt; :OLD.salary THEN          -- a real change
+      changed.EXTEND;
+      changed(changed.COUNT) := :NEW.employee_name;
+    END IF;
+  END AFTER EACH ROW;
+
+  AFTER STATEMENT IS
+  BEGIN
+    FOR i IN 1 .. changed.COUNT LOOP
+      UPDATE works
+      SET salary = salary * 1.10
+      WHERE employee_name IN (SELECT employee_name FROM manages
+                              WHERE manager_name = changed(i));
+    END LOOP;
+  END AFTER STATEMENT;
+END;
+/</pre>
+    <p>If the updated employee manages nobody, the inner UPDATE matches no row, so non-managers need no special test. Two consequences worth stating in an answer: (1) the UPDATE inside AFTER STATEMENT fires RaiseTeam again, so if a subordinate is also a manager, <em>their</em> team gets 10% too, cascading down the hierarchy (it stops at employees who manage nobody; a cycle in manages would hit Oracle's 32-level limit). (2) Once this trigger exists, statement (i) also gives every employee managed by a manager a 10% raise. If only direct subordinates should be raised, add a package variable that switches the trigger off while it runs its own UPDATE.</p>
+    <p>A student who writes the "obvious" version, AFTER UPDATE OF salary ON works FOR EACH ROW with the UPDATE in the body, gets ORA-04091 the first time it fires.</p>
+    <p><b>SQLite version (syntax differs from Oracle)</b> to test the effect. SQLite has no mutating-table rule, so a row trigger can do it directly; its recursive triggers are off by default, so here the raise goes one level down only.</p>
+    <div id="sqMgr"></div>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 17-18 8a · 10 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-2 | 2017–18 · 10 marks</div>
+  <div class="exam-q"><p>Consider the schema MovieExec(name, address, cert#, netWorth). Suppose that we want to prevent the average net worth of movie executives from dropping below 50,000$. This constraint could be violated by insertion, update and deletion to the netWorth column. Write a trigger that checks this constraint before each update to the netWorth column and if the constraint is violated then sets the value of networth equal to the minimum amount required to satisfy the constraint.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><b>The arithmetic.</b> With n executives and current total S, updating one executive from v<sub>old</sub> to v<sub>new</sub> makes the total S − v<sub>old</sub> + v<sub>new</sub>. The average stays ≥ 50000 iff that total ≥ 50000·n, so the smallest acceptable new value is v<sub>min</sub> = 50000·n − (S − v<sub>old</sub>). If v<sub>new</sub> &lt; v<sub>min</sub>, store v<sub>min</sub> instead.</p>
+    <p><b>Example.</b> Four executives worth 60000, 70000, 40000, 50000: S = 220000, average 55000. Lowering the second from 70000 to 30000 would give S = 180000, average 45000. v<sub>min</sub> = 200000 − 150000 = 50000, so 50000 is stored and the average is exactly 50000.</p>
+    <p><b>Oracle.</b> "Before each update … set the value" means a BEFORE row trigger that assigns :NEW.netWorth. But it needs SUM and COUNT of MovieExec, which a row trigger on MovieExec may not query (ORA-04091). A compound trigger reads them once in BEFORE STATEMENT and keeps a running total, which also handles an UPDATE that changes several executives at once:</p>
+<pre>CREATE OR REPLACE TRIGGER KeepAvgNetWorth
+FOR UPDATE OF netWorth ON MovieExec
+COMPOUND TRIGGER
+  v_sum NUMBER;
+  v_cnt NUMBER;
+
+  BEFORE STATEMENT IS
+  BEGIN
+    SELECT NVL(SUM(netWorth), 0), COUNT(*) INTO v_sum, v_cnt FROM MovieExec;
+  END BEFORE STATEMENT;
+
+  BEFORE EACH ROW IS
+  BEGIN
+    v_sum := v_sum - :OLD.netWorth + :NEW.netWorth;      -- total if this row changes
+    IF v_sum &lt; 50000 * v_cnt THEN
+      :NEW.netWorth := :NEW.netWorth + (50000 * v_cnt - v_sum);   -- = v_min
+      v_sum := 50000 * v_cnt;
+    END IF;
+  END BEFORE EACH ROW;
+END;
+/</pre>
+    <p>Adding (50000·n − total) to :NEW.netWorth is the same as setting it to v<sub>min</sub>. The question only asks for the update case; deletions and insertions can lower the average too and would need their own triggers (for those, "set the value" makes no sense, so they would reject with RAISE_APPLICATION_ERROR). The textbook's version of this rule (§7.5.2, Fig. 7.6) is a statement-level trigger that undoes the whole update using OLD TABLE / NEW TABLE, which is standard SQL but not Oracle syntax.</p>
+    <p>Note: the bank's answer uses MySQL syntax and itself warns that it would hit the mutating-table error in Oracle; the compound trigger above is the Oracle solution.</p>
+    <p><b>SQLite version (syntax differs from Oracle)</b>, using certNo for cert# (SQLite does not allow # in a plain name). SQLite cannot assign NEW, so an AFTER trigger corrects the row just written; the result is the same 50000:</p>
+    <div id="sqNet"></div>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2013–14 · 10 marks (similar: 2014–15)</div>
+  <div class="exam-q"><p>What is a Materialized View? Discuss four instances when a trigger can be applied. (2014–15: What is a Materialized View? Discuss the restrictions on triggers in brief.)</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><b>Materialized view.</b> An ordinary view stores only its query; every use re-runs it. A <b>materialized view</b> stores the query's <em>result</em> as a table on disk. Reads are fast (no joins or aggregation at query time), but the stored result goes stale when the base tables change, so it must be <b>refreshed</b>: completely (recompute) or incrementally (apply only the changes), either immediately when base tables change or periodically/on demand. Oracle syntax:</p>
+<pre>CREATE MATERIALIZED VIEW dept_salary_mv
+  BUILD IMMEDIATE
+  REFRESH COMPLETE ON DEMAND
+AS SELECT dept_name, SUM(salary) AS total, COUNT(*) AS cnt
+   FROM instructor
+   GROUP BY dept_name;</pre>
+    <p>(<code>REFRESH FAST ON COMMIT</code> refreshes incrementally at every commit, which needs materialized-view logs on the base table.) Materialized views are used for expensive aggregate queries in reporting and data warehouses, and the optimizer can answer matching queries from them.</p>
+    <p><b>Four instances when a trigger can be applied</b> (any four of section 5, each with an example):</p>
+    <ol>
+      <li><b>Enforcing a complex integrity rule</b>: reject a course registration if a prerequisite has not been taken (the 23-24 question above), which no CHECK or foreign key can express.</li>
+      <li><b>Maintaining derived data</b>: keep dept_total(dept_name, total) correct with AFTER INSERT/UPDATE/DELETE triggers on instructor, i.e. a materialized view maintained by hand.</li>
+      <li><b>Auditing</b>: an AFTER UPDATE trigger writes (who, when, :OLD.salary, :NEW.salary) to a log table.</li>
+      <li><b>Propagating changes</b>: when a PC is deleted, delete its Product row (slide 52); or make a join view updatable with an INSTEAD OF trigger.</li>
+    </ol>
+    <p><b>Restrictions on triggers</b> (2014–15 variant), in brief: no COMMIT/ROLLBACK/SAVEPOINT inside a trigger; a row-level trigger cannot query or modify its own (mutating) table; WHEN is allowed only in row-level triggers and cannot contain subqueries; :NEW/:OLD exist only in row-level triggers and :NEW can be changed only in BEFORE row triggers; INSTEAD OF triggers only on views; at most 32 cascading trigger levels; body at most 32 KB; no DDL statements directly in a DML trigger.</p>
+  </div></details>
+</div>
+
+<div class="key"><p><strong>Summary:</strong> Statement-level triggers fire once per statement and can read the table; row-level triggers cannot read or change their own table (mutating table, ORA-04091), so rules that need aggregates over the same table use a statement-level or compound trigger. INSTEAD OF triggers make views updatable. Triggers cascade; guard against recursion. No COMMIT in triggers. Use triggers for complex rules, derived data, auditing and propagation; use constraints when they suffice.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/sqlplay.js"></script>
+<script src="lecture.js"></script>
+<script>
+// mutating-table animation
+(() => {
+  const base = [['Ann', 60000], ['Ben', 70000], ['Cal', 40000], ['Dia', 50000]];
+  const avg = rows => rows.reduce((s, r) => s + r[1], 0) / rows.length;
+  const frames = [], cur = base.map(r => [...r]);
+  const tbl = (hl, title) => `<div class="ra-rel"><div class="ra-rt">${title}</div><table class="ra-t"><tr><th>name</th><th>netWorth</th><th>state</th></tr>${cur.map((r, i) => `<tr class="${i < hl ? 'new' : i === hl ? 'hl' : ''}"><td>${r[0]}</td><td>${r[1]}</td><td>${i < hl ? 'already updated' : i === hl ? 'being updated' : 'not yet'}</td></tr>`).join('')}</table></div>`;
+  frames.push({ html: tbl(-1, 'MovieExec before'), cap: '<code>UPDATE MovieExec SET netWorth = netWorth - 15000</code> will change all 4 rows, one at a time. Average now: ' + avg(cur) + '.' });
+  for (let i = 0; i < 4; i++) {
+    cur[i][1] -= 15000;
+    frames.push({ html: tbl(i, `MovieExec while the row trigger fires for ${cur[i][0]}`), cap: `The row trigger for ${cur[i][0]} wants AVG(netWorth). Rows above are new, rows below are old: the "average" here would be ${avg(cur)}, a value that never existed before or after the statement. Oracle refuses with <b>ORA-04091</b> instead.` });
+  }
+  frames.push({ html: tbl(4, 'MovieExec after the statement'), cap: `After the last row, the table is consistent again (average ${avg(cur)}). A statement-level AFTER trigger, or the AFTER STATEMENT section of a compound trigger, may read it now.` });
+  stepper('#mut', frames, { interval: 2400 });
+})();
+
+const PPC = raSetup(DB_PPLP, ['Product', 'PC']);
+sqlPlay('#sqView', { setup: PPC + `
+CREATE VIEW pc_catalog AS
+  SELECT p.maker, c.model, c.speed, c.price FROM Product p JOIN PC c ON p.model = c.model;
+CREATE TRIGGER pc_catalog_ins
+INSTEAD OF INSERT ON pc_catalog
+FOR EACH ROW
+BEGIN
+  INSERT INTO Product(maker, model, type) VALUES (NEW.maker, NEW.model, 'pc');
+  INSERT INTO PC(model, speed, ram, hd, price) VALUES (NEW.model, NEW.speed, NULL, NULL, NEW.price);
+END;`, query: "INSERT INTO pc_catalog VALUES ('Z', 1099, 3.6, 999);\nSELECT * FROM Product WHERE maker = 'Z';", note: 'SQLite version (syntax differs from Oracle). Also try SELECT * FROM PC WHERE model = 1099;' });
+
+const PRE = `CREATE TABLE Student (Ssn NUMBER, Name VARCHAR2(20));
+CREATE TABLE TakenCourses (Ssn NUMBER, CourseNo VARCHAR2(10));
+CREATE TABLE Register (Ssn NUMBER, CourseNo VARCHAR2(10));
+CREATE TABLE Course (CourseNo VARCHAR2(10), Name VARCHAR2(40), Year NUMBER, Term VARCHAR2(10));
+CREATE TABLE PreRequisite (CourseNo VARCHAR2(10), ReqCourseNo VARCHAR2(10));
+INSERT INTO Student VALUES (1, 'Rafi'); INSERT INTO Student VALUES (2, 'Sara');
+INSERT INTO Course VALUES ('CSE105', 'Structured Programming', 1, 'I');
+INSERT INTO Course VALUES ('CSE107', 'Object Oriented Programming', 1, 'II');
+INSERT INTO Course VALUES ('CSE215', 'Database', 2, 'I');
+INSERT INTO PreRequisite VALUES ('CSE215', 'CSE105'); INSERT INTO PreRequisite VALUES ('CSE215', 'CSE107');
+INSERT INTO TakenCourses VALUES (1, 'CSE105'); INSERT INTO TakenCourses VALUES (1, 'CSE107');
+INSERT INTO TakenCourses VALUES (2, 'CSE105');`;
+const PRETRG = `
+CREATE TRIGGER CheckPrerequisites
+BEFORE INSERT ON Register
+FOR EACH ROW
+WHEN EXISTS (SELECT * FROM PreRequisite p
+             WHERE p.CourseNo = NEW.CourseNo
+               AND NOT EXISTS (SELECT * FROM TakenCourses t
+                               WHERE t.Ssn = NEW.Ssn AND t.CourseNo = p.ReqCourseNo))
+BEGIN
+  SELECT RAISE(ABORT, 'Registration failed: a prerequisite course has not been taken');
+END;`;
+sqlPlay('#sqPre', { setup: PRE + PRETRG, query: "INSERT INTO Register VALUES (1, 'CSE215');   -- Rafi: accepted\nSELECT * FROM Register;\n-- now try: INSERT INTO Register VALUES (2, 'CSE215');", note: 'SQLite version (syntax differs from Oracle).' });
+
+const MGR = `CREATE TABLE employee (employee_name VARCHAR2(20), street VARCHAR2(20), city VARCHAR2(20));
+CREATE TABLE works (employee_name VARCHAR2(20), company_name VARCHAR2(20), salary NUMBER);
+CREATE TABLE company (company_name VARCHAR2(20), city VARCHAR2(20));
+CREATE TABLE manages (employee_name VARCHAR2(20), manager_name VARCHAR2(20));
+INSERT INTO employee VALUES ('Karim', 'Road 1', 'Dhaka'); INSERT INTO employee VALUES ('Lina', 'Road 2', 'Dhaka');
+INSERT INTO employee VALUES ('Mitu', 'Road 3', 'Dhaka'); INSERT INTO employee VALUES ('Nabil', 'Road 4', 'Khulna');
+INSERT INTO employee VALUES ('Omar', 'Road 5', 'Khulna');
+INSERT INTO company VALUES ('Sonali Bank', 'Dhaka'); INSERT INTO company VALUES ('Grameen', 'Dhaka');
+INSERT INTO works VALUES ('Karim', 'Sonali Bank', 100000); INSERT INTO works VALUES ('Lina', 'Sonali Bank', 60000);
+INSERT INTO works VALUES ('Mitu', 'Sonali Bank', 50000); INSERT INTO works VALUES ('Nabil', 'Grameen', 80000);
+INSERT INTO works VALUES ('Omar', 'Grameen', 40000);
+INSERT INTO manages VALUES ('Lina', 'Karim'); INSERT INTO manages VALUES ('Mitu', 'Karim'); INSERT INTO manages VALUES ('Omar', 'Nabil');`;
+const MGRTRG = `
+CREATE TRIGGER RaiseTeam
+AFTER UPDATE OF salary ON works
+FOR EACH ROW
+WHEN NEW.salary <> OLD.salary
+BEGIN
+  UPDATE works SET salary = salary * 1.10
+  WHERE employee_name IN (SELECT employee_name FROM manages WHERE manager_name = NEW.employee_name);
+END;`;
+sqlPlay('#sqMgr', { setup: MGR + MGRTRG, query: "UPDATE works SET salary = salary + 5000 WHERE employee_name = 'Karim';\nSELECT * FROM works;", note: 'SQLite version (syntax differs from Oracle). Karim manages Lina and Mitu: they get 10%. Then try statement (i): UPDATE works SET salary = salary * 1.20 WHERE employee_name IN (SELECT manager_name FROM manages);' });
+
+const NET = `CREATE TABLE MovieExec (name VARCHAR2(20), address VARCHAR2(30), certNo NUMBER, netWorth NUMBER);
+INSERT INTO MovieExec VALUES ('Ann', 'Dhaka', 1, 60000);
+INSERT INTO MovieExec VALUES ('Ben', 'Dhaka', 2, 70000);
+INSERT INTO MovieExec VALUES ('Cal', 'Khulna', 3, 40000);
+INSERT INTO MovieExec VALUES ('Dia', 'Sylhet', 4, 50000);`;
+sqlPlay('#sqNet', { setup: NET + `
+CREATE TRIGGER KeepAvgNetWorth
+AFTER UPDATE OF netWorth ON MovieExec
+FOR EACH ROW
+WHEN (SELECT AVG(netWorth) FROM MovieExec) < 50000
+BEGIN
+  UPDATE MovieExec
+  SET netWorth = netWorth + (50000 * (SELECT COUNT(*) FROM MovieExec) - (SELECT SUM(netWorth) FROM MovieExec))
+  WHERE certNo = NEW.certNo;
+END;`, query: "UPDATE MovieExec SET netWorth = 30000 WHERE certNo = 2;\nSELECT name, netWorth FROM MovieExec;\nSELECT AVG(netWorth) FROM MovieExec;", note: 'SQLite version (syntax differs from Oracle). Ben asked for 30000 and gets 50000; the average is exactly 50000. Try 60000 instead: no correction is needed.' });
+
+flashcards('#cards', [
+  { f: 'Mutating table (ORA-04091)', b: 'A row-level trigger may not query or modify the table being changed by the triggering statement.' },
+  { f: 'Compound trigger', b: 'One trigger with BEFORE/AFTER STATEMENT and BEFORE/AFTER EACH ROW sections sharing variables. The standard fix for mutating-table problems.' },
+  { f: 'INSERTING / UPDATING / DELETING', b: 'Predicates telling which event fired a multi-event trigger.' },
+  { f: 'INSTEAD OF trigger', b: 'Row-level trigger on a view; runs instead of the INSERT/UPDATE/DELETE on the view and changes the base tables.' },
+  { f: 'Cascading triggers', b: 'A trigger\'s action fires other triggers. Oracle allows at most 32 levels.' },
+  { f: 'COMMIT in a trigger', b: 'Not allowed (unless the trigger is an autonomous transaction).' },
+  { f: 'Materialized view', b: 'A view whose result is stored on disk and refreshed (complete or fast, on commit or on demand).' },
+]);
+quiz('#quiz', [
+  { q: 'A FOR EACH ROW trigger on MovieExec runs SELECT AVG(netWorth) FROM MovieExec during an UPDATE. In Oracle…', opts: ['it works', 'ORA-04091, mutating table', 'it returns NULL', 'it compiles with an error'], a: 1, why: 'The error comes at run time, when the trigger fires.' },
+  { q: 'Which can read the triggering table safely during an UPDATE?', opts: ['A BEFORE row trigger', 'An AFTER row trigger', 'An AFTER statement-level trigger', 'None'], a: 2, why: 'It runs after the whole statement, when the table is consistent.' },
+  { q: 'INSTEAD OF triggers can be defined on…', opts: ['tables only', 'views only', 'both', 'sequences'], a: 1, why: 'They replace an operation on a view.' },
+  { q: 'A trigger contains COMMIT. What happens?', opts: ['It commits the triggering statement', 'Error: transaction control is not allowed in a trigger', 'It is ignored', 'It commits only the trigger\'s changes'], a: 1, why: 'Triggers run inside the triggering statement\'s transaction.' },
+  { q: 'Which is <b>not</b> a typical use of a trigger?', opts: ['Auditing changes', 'Maintaining a summary table', 'Enforcing NOT NULL on a column', 'Making a join view updatable'], a: 2, why: 'NOT NULL is a simple constraint; declare it.' },
+]);
+ask('#try1', { q: 'Four executives are worth 60000, 70000, 40000, 50000. One is to be lowered from 50000 to 10000. What value must be stored to keep the average at least 50000?', a: 30000, why: 'S − v<sub>old</sub> = 220000 − 50000 = 170000; v<sub>min</sub> = 200000 − 170000 = 30000.' });
+
+sqlCheck('#ex1', { setup: PPC + "\nCREATE VIEW pc_prices AS SELECT model, price FROM PC;", check: 'state', table: 'PC', task: '1. Write an INSTEAD OF UPDATE trigger on the view pc_prices(model, price) that updates the price in PC. End with: <code>UPDATE pc_prices SET price = 999 WHERE model = 1003;</code>', solution: 'CREATE TRIGGER pc_prices_upd\nINSTEAD OF UPDATE ON pc_prices\nFOR EACH ROW\nBEGIN\n  UPDATE PC SET price = NEW.price WHERE model = OLD.model;\nEND;\nUPDATE pc_prices SET price = 999 WHERE model = 1003;', hint: 'INSTEAD OF UPDATE ON pc_prices FOR EACH ROW; use NEW.price and OLD.model.' });
+sqlCheck('#ex2', { setup: MGR + "\nCREATE TABLE company_total (company_name VARCHAR2(20), total NUMBER);\nINSERT INTO company_total SELECT company_name, SUM(salary) FROM works GROUP BY company_name;", check: 'state', table: 'company_total', task: '2. (Exam style: derived data) company_total(company_name, total) holds each company\'s salary total. Write an AFTER UPDATE OF salary trigger on works that keeps it correct. End with: <code>UPDATE works SET salary = salary + 1000 WHERE company_name = \'Grameen\';</code>', solution: 'CREATE TRIGGER keep_total\nAFTER UPDATE OF salary ON works\nFOR EACH ROW\nBEGIN\n  UPDATE company_total SET total = total - OLD.salary + NEW.salary\n  WHERE company_name = NEW.company_name;\nEND;\nUPDATE works SET salary = salary + 1000 WHERE company_name = \'Grameen\';', hint: 'total = total − OLD.salary + NEW.salary for the row\'s company.' });
+</script>
+</body>
+</html>

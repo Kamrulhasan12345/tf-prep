@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lossless Joins and the Chase · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 01 (Sukarna) · Chapter 12 · Slides 51–52 · Book §3.4.1–3.4.2</div>
+<h1>Recovering the Original: Lossless Joins and the Chase Test</h1>
+<p class="lede">Why does a BCNF split never invent tuples, while the employee split of Chapter 1 did? This chapter gives the argument from slides 51–52, a quick test for two-way splits, and the chase: a general, animated test for any decomposition.</p>
+
+<h2>1. Recovering R from a BCNF split (slide 51)</h2>
+<p>Take R(A, B, C) with the BCNF-violating FD B → C, decomposed into R₁(A, B) and R₂(B, C).</p>
+<ul>
+  <li><strong>Every original tuple comes back.</strong> A tuple t = (a, b, c) projects to (a, b) in R₁ and (b, c) in R₂. They share b, so the natural join pairs them and produces (a, b, c) = t.</li>
+  <li><strong>No bogus tuple appears</strong> (book §3.4.1). Suppose R has t = (a, b, c) and v = (d, b, e). The join can pair (a, b) from t with (b, e) from v, producing (a, b, e). Is this new? No: t and v agree on B, so by B → C they agree on C, so e = c, and (a, b, e) is just t.</li>
+</ul>
+<p>So R₁ ⋈ R₂ = R exactly. Such a join is called a <b class="term">lossless join</b>. The argument works for attribute sets too: if Y → Z holds in R(X, Y, Z), then R = π<sub>XY</sub>(R) ⋈ π<sub>YZ</sub>(R). By induction over the steps of the BCNF algorithm, the whole BCNF decomposition is lossless.</p>
+
+<h2>2. Why the BCNF split is lossless (slide 52)</h2>
+<p>For a violation X → Y, the algorithm makes R₁ = X⁺. In R₁, X is a key. R₁ and R₂ share exactly the attributes X. So when we join, <em>each row of R₂ matches exactly one row of R₁</em> (the one with its X-value), and the join cannot multiply rows.</p>
+<p>Slide 52's example: R(A, B, C) with AB → C and C → A. AB is a key ({A, B}⁺ = {A, B, C}). C → A violates BCNF, so R₁ = C⁺ = {A, C} and R₂ = {B, C}.</p>
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="slide52"></div>
+</figure>
+
+<h3>The two-relation test</h3>
+<div class="key"><p class="formula">R₁, R₂ is lossless ⇔ (R₁ ∩ R₂) → R₁ or (R₁ ∩ R₂) → R₂</p></div>
+<p>That is, the common attributes must be a superkey of at least one piece; this is slide 4's condition (Chapter 1) made precise. Test it with one closure: compute (R₁ ∩ R₂)⁺ and see whether it contains all of R₁ or all of R₂. For the example: R₁ ∩ R₂ = {C}, C⁺ = {A, C} ⊇ R₁. Lossless.</p>
+<p>The book's warning example (3.21): R(A, B, C) with neither B → A nor B → C, holding (1, 2, 3) and (4, 2, 5). Projected onto AB and BC and rejoined, it gives four tuples, including the bogus (1, 2, 5) and (4, 2, 3), exactly like the two Kims of Chapter 1. Here R₁ ∩ R₂ = {B} and B⁺ = {B}: the test says lossy.</p>
+
+<h2>3. The chase test (book §3.4.2)</h2>
+<p>For a decomposition into more than two relations, or when you want a proof you can draw, use the <b class="term">chase</b>. Suppose R is decomposed into S₁, …, Sₖ with FDs F. The join always contains every tuple of R; the question is whether a tuple t in the join must already be in R.</p>
+<dl class="def">
+  <dt>Tableau</dt><dd>A table with one row per relation Sᵢ. Write t = (a, b, c, …). Row i has the plain letter (a, b, …) in the columns of Sᵢ, because the tuple of R that produced t's projection onto Sᵢ agrees with t there, and a subscripted letter (b₁, c₁, …) everywhere else, standing for unknown values.</dd>
+  <dt>Chasing</dt><dd>Apply each FD X → A to the tableau: if two rows agree on all of X, make their A-symbols equal. If one of the two symbols is a plain letter, use it; otherwise pick either. Replace <em>every</em> occurrence in that column.</dd>
+  <dt>Result</dt><dd>If some row becomes all plain letters (equal to t), then t was in R: the join is <b>lossless</b>. If no FD can change anything and no row is all plain, the join is <b>lossy</b>, and the final tableau itself is a counterexample instance.</dd>
+</dl>
+
+<h3>Book Example 3.23: lossless</h3>
+<p>R(A, B, C, D) decomposed into {A, D}, {A, C}, {B, C, D}, with A → B, B → C, CD → A.</p>
+<figure class="wide">
+<span class="anim-tag">Interactive tool</span>
+<div id="tool"></div>
+<figcaption><b>Tool 6a: chase test.</b> Type attributes, FDs and a decomposition (schemas separated by <code>;</code>). Agreeing cells are outlined in red; changed cells turn green. For two relations the tool also shows the shortcut test.</figcaption>
+</figure>
+<p>In words: rows 1 and 2 agree on A, so A → B makes b₂ = b₁. Now they agree on B, so B → C makes c₁ = c (plain wins). Rows 1 and 3 now agree on C and D, so CD → A makes a₃ = a. Row 3 becomes (a, b, c, d): lossless.</p>
+
+<h3>Book Example 3.24: lossy</h3>
+<p>R(A, B, C, D) with B → AD, decomposed into {A, B}, {B, C}, {C, D}. Rows 1 and 2 agree on B, so a₂ = a and d₁ = d₂. Nothing else applies, and no row is all plain: <strong>lossy</strong>. Read the final tableau as a three-tuple instance: it satisfies B → AD, but projecting and rejoining produces (a, b, c, d), which is not one of its rows. Try it: enter <code>A B C D</code>, <code>B -> AD</code>, <code>AB; BC; CD</code>.</p>
+<div id="tool2"></div>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+
+<h3>Exam questions</h3>
+<div class="exam">
+  <div class="exam-src">DB QB · 19-20 8c · 5 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-2 | 2019–20 · 10 marks</div>
+  <div class="exam-q"><p>Suppose that we decompose the schema R = (A, B, C, D, E) into (A, B, C) and (A, D, E). Show whether this decomposition is a lossless decomposition or not if the following set F of functional dependencies holds: A → BC, CD → E, B → D, E → A.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><strong>Two-relation test.</strong> R₁ ∩ R₂ = {A}. A⁺: A → BC adds B, C; B → D adds D; CD → E adds E. A⁺ = {A, B, C, D, E}, which contains R₁ = {A, B, C} (and R₂). So A → R₁ holds: the common attribute is a key of R₁, and the decomposition is <strong>lossless</strong>.</p>
+    <p><strong>Same result with the chase:</strong></p>
+    <div id="chase72"></div>
+    <p>Rows agree on A, so A → B makes b₂ = b and A → C makes c₂ = c; row 2 becomes (a, b, c, d, e), all plain. Lossless.</p>
+  </div></details>
+</div>
+
+<div class="key"><p><strong>Summary:</strong> a decomposition is lossless if joining the pieces returns exactly R. Every original tuple always comes back; the danger is extra tuples. A two-way split is lossless iff the common attributes determine all of one piece, which BCNF splits guarantee (X is a key of X⁺). For any number of pieces use the chase: one tableau row per piece, equate symbols with the FDs, and the join is lossless iff some row becomes all plain letters.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="lecture.js"></script>
+<script>
+const R = [['a1', 'b1', 'c1'], ['a1', 'b2', 'c2'], ['a2', 'b1', 'c3']];
+const H = ['A', 'B', 'C'];
+const R1 = [['a1', 'c1'], ['a1', 'c2'], ['a2', 'c3']], R2 = [['b1', 'c1'], ['b2', 'c2'], ['b1', 'c3']];
+const row2 = (a, b) => `<div class="figrow"><div>${a}</div><div>${b}</div></div>`;
+const r1 = (o = {}) => inst(['A', 'C'], R1, { cap: 'R₁(A, C), key C', ...o }), r2 = (o = {}) => inst(['B', 'C'], R2, { cap: 'R₂(B, C)', ...o });
+const J = n => inst(H, [['a1', 'b1', 'c1'], ['a1', 'b2', 'c2'], ['a2', 'b1', 'c3']].slice(0, n), { cap: 'R₁ ⋈ R₂', rowCls: { [n - 1]: 'new' } });
+stepper('#slide52', [
+  { html: inst(H, R, { cap: 'R(A, B, C): AB → C, C → A' }), cap: 'An instance obeying AB → C and C → A (each C-value has one A-value).' },
+  { html: row2(r1(), r2()), cap: 'Split on the violation C → A: R₁ = C⁺ = {A, C}, R₂ = {B, C}. They share only C, and C is the key of R₁.' },
+  { html: row2(r1({ rowCls: { 0: 'hl' } }), r2({ rowCls: { 0: 'hl' } })) + J(1), cap: 'Join row (b1, c1) of R₂: exactly one R₁ row has c1.' },
+  { html: row2(r1({ rowCls: { 1: 'hl' } }), r2({ rowCls: { 1: 'hl' } })) + J(2), cap: '(b2, c2) matches exactly one R₁ row.' },
+  { html: row2(r1({ rowCls: { 2: 'hl' } }), r2({ rowCls: { 2: 'hl' } })) + J(3), cap: '(b1, c3) matches exactly one. Each R₂ row gives exactly one joined row: the join equals R. <b>Lossless.</b>' },
+]);
+FD.chaseTool('#tool', { attrs: 'A B C D', fds: 'A -> B; B -> C; CD -> A', decomp: 'AD; AC; BCD' });
+FD.chaseTool('#tool2', { attrs: 'A B C D', fds: 'B -> AD', decomp: 'AB; BC; CD' });
+FD.chaseTool('#chase72', { attrs: 'A B C D E', fds: 'A -> BC; CD -> E; B -> D; E -> A', decomp: 'ABC; ADE' });
+flashcards('#cards', [
+  { f: 'Lossless join', b: 'The natural join of the projections equals the original relation.' },
+  { f: 'Two-way test', b: 'R₁ ∩ R₂ → R₁ or R₁ ∩ R₂ → R₂ (common attributes are a superkey of a piece).' },
+  { f: 'Why BCNF splits are lossless', b: 'X is a key of R₁ = X⁺ and R₁ ∩ R₂ = X.' },
+  { f: 'Tableau row i', b: 'Plain letters in the columns of Sᵢ, subscripted letters elsewhere.' },
+  { f: 'Chase step', b: 'Two rows agree on X, FD X → A: equate their A symbols (plain letter wins) everywhere in the column.' },
+  { f: 'Chase verdict', b: 'Lossless iff some row becomes all plain letters.' },
+]);
+quiz('#quiz', [
+  { q: 'R(A, B, C) with A → B. Is the split AB, AC lossless?', opts: ['Yes', 'No'], a: 0, why: 'Common attribute A, and A → B gives A → AB = R₁.' },
+  { q: 'R(A, B, C) with A → B. Is the split AB, BC lossless?', opts: ['Yes', 'No'], a: 1, why: 'Common B, B⁺ = B: neither piece is determined.' },
+  { q: 'In the chase, two rows agree on X and have A-symbols c and c₂. After applying X → A…', opts: ['both become c₂', 'both become c', 'nothing changes', 'the rows are deleted'], a: 1, why: 'The plain letter wins.' },
+  { q: 'The chase ends with no all-plain row. The final tableau…', opts: ['proves the join is lossless', 'is an instance of R showing the join is lossy', 'is meaningless', 'has a key'], a: 1, why: 'It satisfies the FDs, yet its projections rejoin to the all-plain tuple, which it does not contain.' },
+]);
+ask('#try1', { q: 'R(A, B, C, D) with A → B, C → D decomposed into AB, CD, AC. Lossless? (yes / no)', a: ['yes'], hint: 'Run the chase in the tool above.', why: 'Rows AB and AC agree on A: b₃ = b. Rows CD and AC agree on C: d₃ = d. Row AC becomes (a, b, c, d).' });
+</script>
+</body>
+</html>

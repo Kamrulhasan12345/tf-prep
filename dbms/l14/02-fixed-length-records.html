@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fixed-Length Records · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 14 · Chapter 2 · Slides 3–5</div>
+<h1>Fixed-Length Records: Finding a Record</h1>
+<p class="lede">If every record is the same size, the position of any record is one multiplication away. This chapter shows the formula, the “records crossing blocks” problem, and works through the slide example and Question w2-1.</p>
+
+<h2>1. The address formula</h2>
+
+<p>Picture the instructor file as one long line of bytes. Every record takes exactly <i>n</i> bytes, and the records are packed one after another with no gaps. The first record starts at byte 0, the second at byte <i>n</i>, the third at byte 2<i>n</i>, and so on. The slide writes this as:</p>
+
+<div class="key"><p class="formula">record i starts at byte  n × (i − 1)</p></div>
+
+<p>Here <i>i</i> counts from 1 (the 1st record, the 2nd record, …). Subtract 1 because the 1st record has nothing in front of it. If you number records from 0 like the slide's tables do (“record 0”, “record 1”), the same formula is simply <code>n × i</code>. Both say the same thing: <em>the number of whole records in front of you, times the size of one record</em>.</p>
+
+<p>A <b class="term">byte offset</b> (or just “offset”) is this distance from the start of the file, measured in bytes. The database turns the offset into a physical place on disk (which track and sector), so it can jump straight there without reading anything in front of it.</p>
+
+<h3>Slide 3 example</h3>
+<p><em>Record size = 70 bytes. The disk head is at track 0, sector 0 (the start of the file). Find the location of the 5th record.</em></p>
+<p>Location = 70 × (5 − 1) = 70 × 4 = <strong>280</strong>. The 5th record starts at byte 280. In the table's 0-based labels, the 5th record is “record 4” (El Said). Four records of 70 bytes each sit in front of it: 4 × 70 = 280.</p>
+
+<figure>
+<svg id="f-70" role="img" aria-label="Five 70-byte records; the 5th starts at byte 280"></svg>
+<figcaption><b>Figure 1.</b> The first five 70-byte records. Four records (280 bytes) come before the 5th one, so it starts at byte 280.</figcaption>
+</figure>
+
+<h2>2. The problem: records crossing blocks</h2>
+
+<p>The disk does not read single bytes. It reads whole <b class="term">blocks</b>. Suppose a block is 512 bytes and a record is 100 bytes. 512 is not a multiple of 100, so after 5 records (500 bytes) only 12 bytes are left in the block. The 6th record starts at byte 500 and ends at byte 599, so its first 12 bytes are in block 0 and its other 88 bytes are in block 1. This is what the slide means by <b class="term">records may cross blocks</b>.</p>
+
+<figure>
+<svg id="f-cross" role="img" aria-label="100-byte records in 512-byte blocks; records 5 and 10 cross block boundaries"></svg>
+<figcaption><b>Figure 2.</b> 100-byte records packed into 512-byte blocks. The red lines are block boundaries. Record 5 (bytes 500–599) and record 10 (bytes 1000–1099) are split across two blocks (orange).</figcaption>
+</figure>
+
+<p>Why is that bad? Reading record 5 now needs <em>two</em> block reads instead of one. Writing it means updating two blocks, and if the system crashes between the two writes, the record is left half old and half new.</p>
+
+<p>The slide's <b class="term">modification</b>: <em>do not allow records to cross block boundaries</em>. Put as many whole records into a block as fit, and leave the leftover bytes empty. With 512-byte blocks and 100-byte records, each block holds ⌊512 ÷ 100⌋ = 5 records and wastes 12 bytes. The ⌊ ⌋ brackets mean “round down”. The formula changes to:</p>
+
+<div class="key">
+<p class="formula">records per block = ⌊ block size ÷ record size ⌋</p>
+<p class="formula">block of record i (0-based) = ⌊ i ÷ records per block ⌋</p>
+</div>
+
+<h2>3. How a query is executed, and how to count its cost</h2>
+
+<p>Two numbers measure the cost of a query on disk. They are the units every question in this lecture asks for.</p>
+
+<dl class="def">
+  <dt>Seek</dt><dd>Moving the disk arm to a different track. Slow (milliseconds). Count one seek each time the head has to jump somewhere new.</dd>
+  <dt>Block transfer</dt><dd>Reading (or writing) one block once the head is in position. Count one transfer per block read.</dd>
+</dl>
+
+<p>Consecutive blocks of a file are stored next to each other, so after one seek to the start of the file, the disk can read block after block without seeking again.</p>
+
+<p>With no index, the only way to find a row with a given ID is a <b class="term">file scan</b> (also called a linear search): start at block 0, read each block, check every record in it, and stop when the record is found. You can stop early only if ID is the primary key, because then there is at most one match.</p>
+
+<div class="q">
+<h4>Slide 4 example (worked answer)</h4>
+<p><em>Block size = 512 bytes. Record size = 100 bytes. <code>SELECT * FROM instructor WHERE id = 76766</code>. The head is at track 1000, and the instructor file starts at track 0, sector 0.</em></p>
+
+<p><strong>(a) How does a record cross a block?</strong> Records are packed back to back, 100 bytes each, but the block holds 512. Records 0–4 fill bytes 0–499. Record 5 occupies bytes 500–599, while block 0 ends at byte 511, so record 5 is split: 12 bytes in block 0 and 88 bytes in block 1. The same happens to record 10 (bytes 1000–1099), split between block 1 (ends at 1023) and block 2 (Figure 2).</p>
+
+<p><strong>(b) Block number of id = 76766.</strong> 76766 (Crick) is record 9 counting from 0, the 10th record. It starts at 100 × 9 = 900 and ends at 999. Block 1 covers bytes 512–1023, so it is in <strong>block 1</strong> (the 2nd block). It does not cross a boundary.</p>
+
+<p><strong>(c) How the query is executed.</strong></p>
+<ol>
+  <li>The arm seeks from track 1000 to track 0, where the file starts.</li>
+  <li>Block 0 is read into memory. Its records (0–4 and the first part of 5) are compared with 76766. No match.</li>
+  <li>Block 1 is read. It contains the rest of record 5 and records 6–9. Record 9 matches.</li>
+  <li>ID is the primary key, so no other record can match. The scan stops and the row is returned.</li>
+</ol>
+
+<p><strong>(d) Seeks and block transfers.</strong> <strong>1 seek</strong> (track 1000 → track 0) and <strong>2 block transfers</strong> (blocks 0 and 1). If ID were not unique, the scan would have to read the whole file: 1,200 bytes = 3 blocks, so 1 seek and 3 block transfers.</p>
+<figure>
+<span class="anim-tag">Animation</span>
+<div id="scan512"></div>
+</figure>
+</div>
+
+<figure>
+<svg id="f-nocross" role="img" aria-label="100-byte records in 350-byte blocks, 3 per block, no crossing"></svg>
+<figcaption><b>Figure 3.</b> Question w2-1 layout. 350-byte blocks, 100-byte records, no crossing allowed: 3 records per block and 50 unused bytes (grey) at the end of each block.</figcaption>
+</figure>
+
+<div class="q">
+<h4>Question w2-1 (worked answer)</h4>
+<p><em>Block size = 350 bytes. Record size = 100 bytes. <code>SELECT * FROM instructor WHERE id = 98345</code>. Head at track 1000, file at track 0, sector 0. Records do not cross block boundaries.</em></p>
+
+<p>First, the layout. Records per block = ⌊350 ÷ 100⌋ = 3, leaving 50 bytes unused per block. 12 records ÷ 3 = 4 blocks (block 0 to block 3), as in Figure 3.</p>
+
+<p><strong>(a) Block number.</strong> The question text asks for id = 76766 while the query uses 98345, which looks like a copy-paste mix-up on the slide. Both answers:</p>
+<ul>
+  <li>76766 is record 9 → block ⌊9 ÷ 3⌋ = <strong>block 3</strong> (the 4th block).</li>
+  <li>98345 is record 11 → block ⌊11 ÷ 3⌋ = <strong>block 3</strong> (the 4th block, the last one).</li>
+</ul>
+
+<p><strong>(b) Execution.</strong> Seek from track 1000 to track 0. Read block 0 (records 0–2), block 1 (3–5), block 2 (6–8), checking each ID. Read block 3 (9–11) and find 98345 in record 11. Stop.</p>
+
+<p><strong>(c) Cost.</strong> <strong>1 seek</strong> and <strong>4 block transfers</strong>. The record is in the last block, so the entire file is read either way.</p>
+<figure>
+<span class="anim-tag">Animation</span>
+<div id="scan350"></div>
+</figure>
+</div>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+<div id="try2"></div>
+
+<h3>Exam questions</h3>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 20-21 1a · 10 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-2 | 2020–21 · 10 marks</div>
+  <div class="exam-q"><p>A table student has been created as follows:</p>
+<pre>CREATE TABLE STUDENT(ID VARCHAR2(10), NAME VARCHAR2(50),
+  CGPA NUMBER(8), ADDRESS VARCHAR2(932), DESCRIPTION VARCHAR2(500));</pre>
+<p>There are three blocks 1, 2 and 3 and the size of each block is 4000 bytes. Show the storage of 5 sample records of student relation in these blocks using fixed-length record structure. No record can overlap the block boundary.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+<p><strong>Record size.</strong> In a fixed-length structure every field gets its <em>maximum</em> size, even a varchar2 field holding a short string (the rest is padding). So each record is 10 + 50 + 8 + 932 + 500 = <strong>1500 bytes</strong>, laid out as:</p>
+<div class="tbl"><table>
+<tr><th>Field</th><th>ID</th><th>NAME</th><th>CGPA</th><th>ADDRESS</th><th>DESCRIPTION</th></tr>
+<tr><td>Bytes in the record</td><td class="num">0–9</td><td class="num">10–59</td><td class="num">60–67</td><td class="num">68–999</td><td class="num">1000–1499</td></tr>
+</table></div>
+<p><strong>Records per block.</strong> No record may cross a block boundary, so each block holds ⌊4000 ÷ 1500⌋ = <strong>2 records</strong>, using 3000 bytes and leaving 1000 bytes unused. Five records need ⌈5 ÷ 2⌉ = 3 blocks.</p>
+<p>Five sample records:</p>
+<div id="q156r"></div>
+<figure><svg id="q156" role="img" aria-label="5 records of 1500 bytes in three 4000-byte blocks"></svg>
+<figcaption>Block 1: records r1 and r2 at bytes 0–1499 and 1500–2999, then 1000 unused bytes (grey). Block 2: r3 and r4, 1000 unused. Block 3: r5 at bytes 0–1499 of the block, 2500 bytes unused. If crossing were allowed, the 3rd record would start at byte 3000 and spill 500 bytes into block 2.</figcaption></figure>
+<div class="tbl"><table>
+<tr><th>Block</th><th>Records</th><th>Bytes used</th><th>Unused</th></tr>
+<tr><td>1</td><td>1, 2</td><td>3000</td><td>1000</td></tr>
+<tr><td>2</td><td>3, 4</td><td>3000</td><td>1000</td></tr>
+<tr><td>3</td><td>5</td><td>1500</td><td>2500 (free for the next record)</td></tr>
+</table></div>
+<p>The bank's answer is correct.</p>
+  </div></details>
+</div>
+
+<div class="key">
+<p><strong>Summary:</strong> with fixed-size records, record <i>i</i> starts at byte <i>n</i>(<i>i</i>−1). If records may cross blocks, some reads touch two blocks, so databases pack only whole records per block. Without an index, a lookup is a file scan: 1 seek to the start of the file, then one block transfer per block read until the record is found.</p>
+</div>
+</main>
+<script src="../assets/book.js"></script>
+<script>
+// Block ruler: records of `rec` bytes in blocks of `blk` bytes. cross=false → whole records only per block.
+function ruler(sel, { rec, blk, n, cross, scale, hl = {}, recLabels = true, base = 0 }) {
+  const x0 = 20, y = 50, h = 34;
+  let s = '', recs = [], end = 0;
+  if (cross) { for (let i = 0; i < n; i++) recs.push([i * rec, (i + 1) * rec]); end = n * rec; }
+  else {
+    const per = Math.floor(blk / rec);
+    for (let i = 0; i < n; i++) { const b = Math.floor(i / per), k = i % per; recs.push([b * blk + k * rec, b * blk + (k + 1) * rec]); }
+    end = Math.ceil(n / per) * blk;
+    for (let b = 0; b * blk < end; b++) {
+      const used = b * blk + per * rec;
+      s += `<rect x="${x0 + used * scale}" y="${y}" width="${(blk - per * rec) * scale}" height="${h}" style="fill:var(--idle);opacity:.5"/>`;
+    }
+  }
+  recs.forEach(([a, b], i) => {
+    const crosses = Math.floor(a / blk) !== Math.floor((b - 1) / blk);
+    const cls = hl[i] || (crosses ? 'cell-hl' : 'cell');
+    s += `<rect class="${cls}" x="${x0 + a * scale}" y="${y}" width="${(b - a) * scale}" height="${h}"/>`;
+    if (recLabels) s += `<text x="${x0 + (a + b) / 2 * scale}" y="${y + 22}" text-anchor="middle" style="font-size:11px">r${i + base}</text>`;
+  });
+  for (let b = 0; b * blk <= end; b++) {
+    const x = x0 + b * blk * scale;
+    s += `<line x1="${x}" x2="${x}" y1="${y - 26}" y2="${y + h + 8}" class="s-red"/>`;
+    s += `<text x="${x}" y="${y + h + 22}" text-anchor="middle" class="lbl">${b * blk}</text>`;
+    if ((b + 1) * blk <= end + (cross ? blk : 0) && b * blk < end)
+      s += `<text x="${x0 + (b * blk + Math.min((b + 1) * blk, end)) / 2 * scale}" y="${y - 12}" text-anchor="middle" class="lbl red">block ${b + base}</text>`;
+  }
+  const W = x0 + end * scale + 30;
+  if (!sel) return `<svg viewBox="0 0 ${W} ${y + h + 32}" width="${W}">${s}</svg>`;
+  const el = document.querySelector(sel);
+  el.setAttribute('viewBox', `0 0 ${W} ${y + h + 32}`); el.setAttribute('width', W); el.innerHTML = s;
+}
+// Fig 1: 70-byte records, labelled with start byte
+(() => {
+  const sc = 1.6, x0 = 20, y = 30; let s = '';
+  for (let i = 0; i < 5; i++) {
+    s += `<rect class="${i === 4 ? 'cell-hl' : 'cell'}" x="${x0 + i * 70 * sc}" y="${y}" width="${70 * sc}" height="34"/>`;
+    s += `<text x="${x0 + (i + .5) * 70 * sc}" y="${y + 21}" text-anchor="middle" style="font-size:12px">${i + 1}${['st','nd','rd','th','th'][i]} record</text>`;
+    s += `<text x="${x0 + i * 70 * sc}" y="${y + 52}" text-anchor="middle" class="lbl">${i * 70}</text>`;
+  }
+  s += `<text x="${x0 + 5 * 70 * sc}" y="${y + 52}" text-anchor="middle" class="lbl">350</text>`;
+  s += `<path d="M${x0} ${y - 8} H${x0 + 280 * sc}" class="s-acc"/><text x="${x0 + 140 * sc}" y="${y - 14}" text-anchor="middle" class="lbl acc" style="fill:var(--accent)">4 × 70 = 280 bytes in front</text>`;
+  const el = document.querySelector('#f-70'); const W = x0 + 350 * sc + 30;
+  el.setAttribute('viewBox', `0 0 ${W} ${y + 62}`); el.setAttribute('width', W); el.innerHTML = s;
+})();
+ruler('#f-cross', { rec: 100, blk: 512, n: 12, cross: true, scale: 0.55, hl: { 9: 'cell-new' } });
+ruler('#f-nocross', { rec: 100, blk: 350, n: 12, cross: false, scale: 0.47, hl: { 9: 'cell-new', 11: 'cell-new' } });
+
+// file scan animations: which records each block read brings into memory
+function scanSteps(o, blocks, target, seekCap) {
+  const steps = [{ html: ruler(null, { ...o, hl: Object.fromEntries([...Array(o.n).keys()].map(i => [i, 'cell'])) }), cap: seekCap }];
+  const done = new Set();
+  blocks.forEach((recs, b) => {
+    const hl = {};
+    for (let i = 0; i < o.n; i++) hl[i] = done.has(i) ? 'cell-dim' : 'cell';
+    recs.forEach(i => { hl[i] = i === target ? 'cell-new' : 'cell-hl'; });
+    const found = recs.includes(target);
+    steps.push({ html: ruler(null, { ...o, hl }), cap: `Read <b>block ${b}</b> (records ${recs.join(', ')}${o.cross && b < blocks.length - 1 && !found ? ', the last one only partly' : ''}) and compare each id with the target. ${found ? `<b>Found in record ${target}.</b> ID is unique, so the scan stops.` : 'No match.'} <b>Seeks: 1 · Block transfers: ${b + 1}</b>.` });
+    recs.forEach(i => done.add(i));
+    if (found) return;
+  });
+  return steps.slice(0, blocks.findIndex(r => r.includes(target)) + 2);
+}
+stepper('#scan512', scanSteps({ rec: 100, blk: 512, n: 12, cross: true, scale: 0.55 }, [[0, 1, 2, 3, 4, 5], [5, 6, 7, 8, 9, 10], [10, 11]], 9,
+  'The head is at track 1000. It <b>seeks</b> to track 0, where the file starts. <b>Seeks: 1 · Block transfers: 0</b>.'));
+stepper('#scan350', scanSteps({ rec: 100, blk: 350, n: 12, cross: false, scale: 0.47 }, [[0, 1, 2], [3, 4, 5], [6, 7, 8], [9, 10, 11]], 11,
+  'Seek from track 1000 to track 0. <b>Seeks: 1 · Block transfers: 0</b>. Looking for 98345 (record 11).'), { interval: 1500 });
+</script>
+<script>
+flashcards('#cards', [
+  { f: 'Address formula', b: 'Record i (1-based) starts at byte n × (i − 1), where n is the record size.' },
+  { f: 'Records crossing blocks', b: 'When the block size is not a multiple of the record size, a record can start in one block and end in the next, so reading it needs two block reads.' },
+  { f: 'Records per block (no crossing)', b: '⌊block size ÷ record size⌋. The leftover bytes at the end of each block stay unused.' },
+  { f: 'Seek', b: 'Moving the disk arm to another track. Counted once per jump to a new place.' },
+  { f: 'Block transfer', b: 'Reading or writing one block once the head is in position.' },
+  { f: 'File scan (linear search)', b: 'Read the file block by block from the start, checking every record. Stops early only on a unique key.' },
+]);
+quiz('#quiz', [
+  { q: 'Records are 70 bytes. Where does the 9th record start?', opts: ['630', '560', '490', '700'], a: 1, why: '70 × (9 − 1) = 560.' },
+  { q: 'Block 512 B, record 100 B, crossing allowed. Which record (0-based) is the first to cross a block boundary?', opts: ['Record 4', 'Record 6', 'Record 5', 'Record 10'], a: 2,
+    why: 'Record 5 occupies bytes 500–599, but block 0 ends at 511.' },
+  { q: 'Block 350 B, record 100 B, no crossing. In which block (0-based) is record 7?', opts: ['Block 2', 'Block 1', 'Block 3', 'Block 0'], a: 0,
+    why: '3 records per block, ⌊7 ÷ 3⌋ = 2.' },
+  { q: 'A full file scan of a 10-block file stored contiguously costs:', opts: ['10 seeks, 10 transfers', '1 seek, 1 transfer', '10 seeks, 1 transfer', '1 seek, 10 transfers'], a: 3,
+    why: 'One seek to the start of the file, then consecutive blocks are read without further seeks.' },
+  { q: 'Why can a scan for id = 76766 stop as soon as it finds a match?', opts: ['Because the file is sorted', 'Because id is the primary key, so no second match exists', 'Because blocks are small', 'It cannot stop early'], a: 1,
+    why: 'A primary key value appears at most once.' },
+]);
+ask('#try1', { q: 'Block = 4096 bytes, record = 300 bytes, records may not cross blocks. How many bytes of each block are unused?', a: 196,
+  hint: 'First find how many whole records fit.', why: '⌊4096 ÷ 300⌋ = 13 records use 3900 bytes, leaving 196.' });
+ask('#try2', { q: 'Same file (4096-byte blocks, 300-byte records, no crossing). Which block (0-based) holds record 40 (0-based)?', a: 3,
+  hint: 'Divide by the records per block and round down.', why: '⌊40 ÷ 13⌋ = 3.' });
+recTable('#q156r', [
+  ['1805001', 'Ayesha Rahman', '3.85', 'Dhanmondi, Dhaka', 'Class representative'], ['1805002', 'Tanvir Hasan', '3.42', 'Agrabad, Chattogram', '—'],
+  ['1805003', 'Nusrat Jahan', '3.91', 'Zindabazar, Sylhet', 'Dean’s list'], ['1805004', 'Rafiq Islam', '3.10', 'Sadar, Rajshahi', '—'],
+  ['1805005', 'Mitu Akter', '3.67', 'Sonadanga, Khulna', 'Debate club']].map((c, i) => ({ lab: `record ${i + 1}`, cells: c })), ['ID', 'NAME', 'CGPA', 'ADDRESS', 'DESCRIPTION']);
+ruler('#q156', { rec: 1500, blk: 4000, n: 5, cross: false, scale: 0.055, base: 1 });
+</script>
+</body>
+</html>

@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Multivalued Dependencies · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 01 (Sukarna) · Chapter 15 · Slides 60–61 · Book §3.6.1–3.6.2</div>
+<h1>Multivalued Dependencies: Redundancy That BCNF Misses</h1>
+<p class="lede">A relation can be in BCNF and still repeat data, when it stores two independent sets of facts about the same thing. This chapter shows the slides' shirts example, defines the multivalued dependency precisely, and checks the definition on the data.</p>
+
+<h2>1. BCNF with redundancy (slide 60)</h2>
+<p>A shop stores which sizes and which colors each shirt is available in:</p>
+<figure>
+<div id="shirts"></div>
+<figcaption><b>Figure 1.</b> AvailableShirts (slide 60). Each size of a shirt appears once per color, and each color once per size.</figcaption>
+</figure>
+<p>Sizes and colors are each repeated: shirt_01's size 15 appears twice (white, blue), and white appears three times (sizes 15, 16, 17). Yet the relation is in BCNF. <strong>Slide 60 asks: verify?</strong></p>
+<div class="q">
+<h4>Why AvailableShirts is in BCNF</h4>
+<p>Look for a nontrivial FD. shirt_code → size fails (shirt_01 has sizes 15, 16, 17). shirt_code → color fails. size → color fails (size 16 comes in white, blue, grey, black). shirt_code size → color fails ((shirt_01, 15) has white and blue). shirt_code color → size fails. color → shirt_code (and so also size color → shirt_code) happens to hold in these 12 rows, because the two shirts share no color, but nothing stops a second shirt from also coming in white, so it is not a real FD (Chapter 2: an instance cannot prove an FD). No nontrivial FD holds, so the only key is all three attributes {shirt_code, size, color}, and with no nontrivial FDs there is nothing to violate BCNF.</p>
+</div>
+<p>The textbook explains the cause: <em>the most common source of redundancy in BCNF schemas is an attempt to put two or more set-valued properties of the key into a single relation.</em> Its own example (§3.6.1) stores a star's set of addresses and set of movies in one relation, so each address is repeated once per movie and each movie once per address. Sizes and colors of a shirt are the same situation.</p>
+
+<h2>2. Definition (book §3.6.2)</h2>
+<dl class="def">
+  <dt>Multivalued dependency (MVD) A₁…Aₙ ↠ B₁…Bₘ</dt>
+  <dd>Holds in R if, whenever we fix values for the A's, the set of values among the B's is independent of the set of values of the remaining attributes (those not among the A's or B's). Precisely: <em>for each pair of tuples t and u of R that agree on all the A's, R also contains a tuple v that agrees with t and u on the A's, with t on the B's, and with u on all the other attributes.</em></dd>
+</dl>
+<p>Swapping the roles of t and u, a fourth tuple w (A's from both, B's from u, the rest from t) must exist too. So for each A-value, every B-combination appears with every rest-combination: a cross product. That is exactly what Figure 1 shows: for shirt_01, every size appears with every color.</p>
+<figure>
+<svg viewBox="0 0 560 190" width="560" role="img" aria-label="tuples t, u and v of an MVD">
+  <text x="105" y="20" text-anchor="middle" class="big">A's</text><text x="265" y="20" text-anchor="middle" class="big">B's</text><text x="440" y="20" text-anchor="middle" class="big">others</text>
+  <text x="18" y="54" class="big">t</text><rect x="40" y="36" width="130" height="28" class="cell-hl"/><rect x="170" y="36" width="190" height="28" class="cell-new"/><rect x="360" y="36" width="160" height="28" class="cell"/>
+  <text x="18" y="104" class="big">u</text><rect x="40" y="86" width="130" height="28" class="cell-hl"/><rect x="170" y="86" width="190" height="28" class="cell"/><rect x="360" y="86" width="160" height="28" class="cell-del"/>
+  <text x="18" y="164" class="big">v</text><rect x="40" y="146" width="130" height="28" class="cell-hl"/><rect x="170" y="146" width="190" height="28" class="cell-new"/><rect x="360" y="146" width="160" height="28" class="cell-del"/>
+  <text x="105" y="135" text-anchor="middle" class="lbl">same in all three</text><text x="265" y="135" text-anchor="middle" class="lbl grn">copied from t</text><text x="440" y="135" text-anchor="middle" class="lbl red">copied from u</text>
+</svg>
+<figcaption><b>Figure 2.</b> If t and u agree on the A's, the MVD A ↠ B guarantees that v exists (book Fig. 3.11). The A's and B's need not be adjacent columns.</figcaption>
+</figure>
+<p>The slide writes the shirts' MVDs as <code>shirt_code ↠ size</code> and <code>shirt_code ↠ color</code>: the sizes depend on the shirt, the colors depend on the shirt, and the set of sizes is independent of the set of colors.</p>
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="check"></div>
+</figure>
+
+<h3>MVDs and FDs</h3>
+<p>Every FD A → B is also an MVD A ↠ B: if t and u agree on the A's, they agree on the B's, so u itself serves as v. The converse fails: shirt_code ↠ size holds but shirt_code → size does not. MVDs capture independence; FDs capture uniqueness.</p>
+
+<h2>3. Removing the redundancy (slide 61)</h2>
+<p>Redundancy caused by an MVD is removed by <b class="term">fourth normal form (4NF)</b>, which the slides do not cover in detail (it is summarized in “Exam topics beyond the slides”). The fix is to split each independent set into its own relation:</p>
+<figure class="wide">
+<div id="split"></div>
+<figcaption><b>Figure 3.</b> Slide 61's decomposition. 12 rows × 3 values become 6 + 4 rows × 2 values, and the join gives back exactly the 12 rows because every size combines with every color.</figcaption>
+</figure>
+<p class="tbl-note">Slide 61 inconsistency: its left table shows shirt_01 in white, <em>grey</em> and blue, while slide 60's table and slide 61's own right-hand table give shirt_01 only white and blue. The figure above uses slide 60's data.</p>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+
+<h3>Exam questions</h3>
+<div class="exam">
+  <div class="exam-src">DB QB · 17-18 7c · 10 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-2 | 2017–18 · 10 marks</div>
+  <div class="exam-q"><p>Give an example of a relation which is in 3NF but not in BCNF. Define Multivalued Dependency.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><strong>3NF but not BCNF.</strong> Bookings(title, theatre, city) with theatre → city and title city → theatre. Keys: {title, city} and {title, theatre}, so every attribute is prime. theatre → city has a non-superkey left side (theatre⁺ = {theatre, city}), so R is <strong>not in BCNF</strong>; but its right side, city, is prime, and the other FD has a key on its left, so R <strong>is in 3NF</strong>. (Chapter 14 gives two more examples.)</p>
+    <p><strong>Multivalued dependency.</strong> X ↠ Y holds in R if for every two tuples t, u of R that agree on X, there is a tuple v in R that agrees with both on X, with t on Y, and with u on all attributes of R − X − Y. Informally: for a fixed X-value, the set of Y-values is independent of the values of the remaining attributes, so they appear in all combinations. Example: AvailableShirts(shirt_code, size, color) with shirt_code ↠ size: since (shirt_01, 15, white) and (shirt_01, 16, blue) are present, (shirt_01, 15, blue) must be present too. Every FD X → Y is an MVD, but not conversely. MVDs cause redundancy that BCNF does not detect; 4NF removes it.</p>
+  </div></details>
+</div>
+
+<div class="key"><p><strong>Summary:</strong> storing two independent set-valued properties of a key in one relation forces every combination to appear, which is redundancy even in BCNF (AvailableShirts has no nontrivial FD at all). The multivalued dependency X ↠ Y says: for tuples agreeing on X, the Y-values and the remaining values combine freely. Every FD is an MVD. The cure is to store each independent set in its own relation (4NF).</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="lecture.js"></script>
+<script>
+const H = ['shirt_code', 'size', 'color'];
+const T = [['shirt_01', '15', 'white'], ['shirt_01', '16', 'white'], ['shirt_01', '17', 'white'], ['shirt_01', '15', 'blue'], ['shirt_01', '16', 'blue'], ['shirt_01', '17', 'blue'],
+  ['shirt_02', '16', 'grey'], ['shirt_02', '17', 'grey'], ['shirt_02', '18', 'grey'], ['shirt_02', '16', 'black'], ['shirt_02', '17', 'black'], ['shirt_02', '18', 'black']];
+$('#shirts').innerHTML = inst(H, T, { cap: 'AvailableShirts', cell: { '0,1': 'hl', '3,1': 'hl', '0,2': 'good', '1,2': 'good', '2,2': 'good' } });
+stepper('#check', [
+  { html: inst(H, T, { rowCls: { 0: 'hl', 4: 'hl' } }), cap: 'Check <code>shirt_code ↠ size</code>. Pick t = (shirt_01, 15, white) and u = (shirt_01, 16, blue): they agree on shirt_code.' },
+  { html: inst(H, T, { rowCls: { 0: 'hl', 4: 'hl', 3: 'new' } }), cap: 'v must take size from t (15) and color from u (blue): (shirt_01, 15, blue). It is row 4 (green). ✓' },
+  { html: inst(H, T, { rowCls: { 0: 'hl', 4: 'hl', 1: 'new' } }), cap: 'Swap t and u: w = (shirt_01, 16, white) must exist. Row 2. ✓ The same works for every pair, so the MVD holds.' },
+  { html: inst(H, T.filter((_, i) => i !== 3), { rowCls: { 0: 'hl', 3: 'hl' } }), cap: 'If (shirt_01, 15, blue) were missing, t and u would have no v: the MVD would be violated. An MVD forces tuples to <b>exist</b>; an FD forbids them.' },
+]);
+const S = [['shirt_01', '15'], ['shirt_01', '16'], ['shirt_01', '17'], ['shirt_02', '16'], ['shirt_02', '17'], ['shirt_02', '18']];
+const C = [['shirt_01', 'white'], ['shirt_01', 'blue'], ['shirt_02', 'grey'], ['shirt_02', 'black']];
+$('#split').innerHTML = `<div class="figrow"><div>${inst(H, T, { cap: 'AvailableShirts' })}</div><div style="align-self:center;font:600 20px var(--mono)">→</div><div>${inst(['shirt_code', 'size'], S, { cap: 'ShirtSizes' })}<br>${inst(['shirt_code', 'color'], C, { cap: 'ShirtColors' })}</div></div>`;
+flashcards('#cards', [
+  { f: 'MVD X ↠ Y', b: 'For tuples agreeing on X, Y-values and the remaining values appear in every combination.' },
+  { f: 'Formal test', b: 'For t, u agreeing on X, some v agrees with both on X, with t on Y, with u on the rest.' },
+  { f: 'FD vs MVD', b: 'Every FD is an MVD; not every MVD is an FD.' },
+  { f: 'Why BCNF misses it', b: 'MVD redundancy can exist with no nontrivial FD at all.' },
+  { f: 'Fix', b: 'Split each independent set into its own relation (4NF).' },
+]);
+quiz('#quiz', [
+  { q: 'AvailableShirts has which key?', opts: ['shirt_code', '{shirt_code, size}', '{shirt_code, size, color}', 'none'], a: 2, why: 'No nontrivial FD holds, so only the full set is a key.' },
+  { q: 'Is AvailableShirts in BCNF?', opts: ['Yes', 'No'], a: 0, why: 'There is no nontrivial FD to violate it.' },
+  { q: 'If (shirt_02, 18, black) were deleted, would shirt_code ↠ size still hold?', opts: ['Yes', 'No'], a: 1, why: 't = (shirt_02, 18, grey), u = (shirt_02, 16, black) need v = (shirt_02, 18, black).' },
+  { q: 'A → B holds. Does A ↠ B hold?', opts: ['Always', 'Never', 'Only if B is a key'], a: 0, why: 'u itself serves as v.' },
+]);
+ask('#try1', { q: 'A shirt comes in 4 sizes and 3 colors. How many rows does it need in AvailableShirts, and how many in ShirtSizes + ShirtColors together? Type the difference.', a: 5, hint: '4 × 3 versus 4 + 3.', why: '12 rows versus 7 rows: 5 fewer.' });
+</script>
+</body>
+</html>

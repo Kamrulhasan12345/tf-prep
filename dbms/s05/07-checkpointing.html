@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Checkpointing an Undo Log · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 05 (Sukarna) · Chapter 7 · Slides 31–34 · Book §17.2.4–17.2.5</div>
+<h1>Checkpointing an Undo Log: Quiescent and Nonquiescent</h1>
+<p class="lede">Without help, recovery would read the entire log, which grows forever. A checkpoint marks a point before which the log is no longer needed. This chapter covers the simple (quiescent) checkpoint, the nonquiescent checkpoint that does not stop the system, how far back recovery must scan in each case, and several exam questions.</p>
+
+<h2>1. Why checkpoint? (slide 31)</h2>
+
+<p>The log only grows. After months of operation it is huge, and scanning all of it after every crash would take far too long. Yet with undo logging, most of it is useless: once a transaction's COMMIT record is on disk, its log records are never needed again (recovery ignores committed transactions). We cannot simply cut the log after each COMMIT, though, because many transactions run at once, and cutting could throw away records of some other transaction that is still active and might need undoing.</p>
+
+<dl class="def">
+  <dt>Checkpoint</dt><dd>A point marked in the log such that log records before it need not be examined during recovery (and may be deleted). For undo logging, every transaction that started before the checkpoint must have a COMMIT or ABORT record on the log.</dd>
+</dl>
+
+<h2>2. Quiescent checkpointing (slide 32)</h2>
+
+<p>The simple checkpoint (textbook §17.2.4):</p>
+<pre>Step 1: Stop accepting new transactions.
+Step 2: Wait until all active transactions commit or abort
+        (and have written their COMMIT or ABORT record).
+Step 3: Flush the log to disk.
+Step 4: Write a log record &lt;CKPT&gt; and flush the log again.
+Step 5: Resume accepting new transactions.</pre>
+<dl class="def">
+  <dt>Quiescent</dt><dd>“Quiet”: the system is brought to a state with no active transactions while the checkpoint is taken.</dd>
+</dl>
+<p><strong>Recovery:</strong> scan backward from the end as usual. On reaching &lt;CKPT&gt;, stop. Every transaction that began before it has a COMMIT or ABORT on disk, and by U2 its changes are on disk, so nothing before &lt;CKPT&gt; needs undoing. Every incomplete transaction began after &lt;CKPT&gt;, so all of its records have already been seen.</p>
+
+<div class="q">
+<h4>Textbook Example 17.4</h4>
+<p>The log begins &lt;START T1&gt; &lt;T1,A,5&gt; &lt;START T2&gt; &lt;T2,B,10&gt; and we decide to checkpoint. T1 and T2 are active, so we must wait for both to finish before writing &lt;CKPT&gt;. Fig. 17.4 continues: &lt;T2,C,15&gt; &lt;T1,D,20&gt; &lt;COMMIT T1&gt; &lt;COMMIT T2&gt; &lt;CKPT&gt; &lt;START T3&gt; &lt;T3,E,25&gt; &lt;T3,F,30&gt;, then a crash. Scanning backward, T3 is the only incomplete transaction: restore F = 30, then E = 25. At &lt;CKPT&gt; we stop.</p>
+<div id="ex174"></div>
+</div>
+
+<h2>3. Nonquiescent checkpointing (slide 33)</h2>
+
+<p>The trouble with a quiescent checkpoint: all new transactions must wait until every running transaction completes. One long transaction can make the database look shut down for a long time. A <b class="term">nonquiescent checkpoint</b> lets new transactions start while the checkpoint is in progress:</p>
+<pre>Step 1: Write &lt;START CKPT(T1, …, Tk)&gt; and flush the log.
+        T1 … Tk are all the transactions active at this moment.
+Step 2: Wait until T1 … Tk all commit or abort.
+        Do not prevent new transactions from starting.
+Step 3: When all of T1 … Tk have finished, write &lt;END CKPT&gt; and flush the log.</pre>
+
+<h3>The checkpoint timeline</h3>
+<p>Each transaction is a bar from its START to its COMMIT (green), ABORT (red) or the crash (amber, still running). Circles are update records. The START CKPT line is red, the END CKPT line green, and the checkpoint period is shaded. The last frame shows a crash and the part of the log recovery reads. Edit the log or switch the method; the captions change to the rules of that method.</p>
+<figure class="wide">
+<span class="anim-tag">Interactive animation</span>
+<div id="tl"></div>
+</figure>
+
+<h2>4. Recovery with a nonquiescent checkpoint (slide 34)</h2>
+
+<p>Recovery scans backward from the end and undoes incomplete transactions exactly as before. What changes is where it may stop. There are two cases, depending on which checkpoint record it meets first:</p>
+<ul>
+  <li><strong>Case 1: it meets &lt;END CKPT&gt; first.</strong> The checkpoint completed, so all of T1 … Tk finished before END CKPT. Any incomplete transaction must therefore have started <em>after</em> &lt;START CKPT(T1,…,Tk)&gt;. Scan back as far as that START CKPT and stop.</li>
+  <li><strong>Case 2: it meets &lt;START CKPT(T1,…,Tk)&gt; first</strong> (no END CKPT after it). The crash happened during the checkpoint. The only incomplete transactions are those met so far in the scan, plus those among T1 … Tk that did not finish. Scan back to the earliest &lt;START Ti&gt; among the unfinished Ti and stop there.</li>
+</ul>
+<p>As a rule, once an &lt;END CKPT&gt; is on disk, the log before the matching START CKPT can be deleted. The textbook adds a practical tip: chaining together the log records of each transaction (each record points to the transaction's previous record) lets recovery jump straight to the records it needs instead of reading everything in between.</p>
+
+<div class="q">
+<h4>Textbook Example 17.5, case 1 (Fig. 17.5)</h4>
+<p>The checkpoint starts after &lt;T2,B,10&gt; with T1 and T2 active, so &lt;START CKPT(T1,T2)&gt; is written. T3 starts during the checkpoint. T1 and T2 commit, &lt;END CKPT&gt; is written, and the crash comes after &lt;T3,F,30&gt;. Scanning backward: T3 is incomplete, so F = 30. Then &lt;END CKPT&gt;: case 1. Continue to &lt;START CKPT&gt;: on the way &lt;T3,E,25&gt; gives E = 25; T1's and T2's records are ignored because they committed. Stop at &lt;START CKPT(T1,T2)&gt;.</p>
+<div id="ex175"></div>
+</div>
+
+<div class="q">
+<h4>Textbook Example 17.5, case 2 (Fig. 17.6)</h4>
+<p>Now the crash comes during the checkpoint, after &lt;T3,E,25&gt; (T1 committed, T2 did not). Backward: E = 25 (T3), &lt;COMMIT T1&gt;, ignore &lt;T1,D,20&gt;, &lt;START T3&gt;, C = 15 (T2). Then &lt;START CKPT(T1,T2)&gt; with no END: case 2. Of T1 and T2 only T2 is unfinished, so continue to &lt;START T2&gt;, restoring B = 10 on the way, and stop there. &lt;T1,A,5&gt; and &lt;START T1&gt; are never read.</p>
+<div id="ex176"></div>
+</div>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+<div id="try2"></div>
+
+<h3>Exam questions</h3>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 22-23 3a · 8 marks, and 22-23 3b · 10 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-1 | 2022–23 · 15 marks</div>
+  <div class="exam-q"><p>Consider the following sequence of undo log records:</p>
+  <pre>&lt;START S&gt;; &lt;S, A, 60&gt;; &lt;COMMIT S&gt;; &lt;START T&gt;; &lt;T, A, 10&gt;; &lt;START U&gt;;
+&lt;U, B, 20&gt;; &lt;T, C, 30&gt;; &lt;START V&gt;; &lt;U, D, 40&gt;; &lt;V, F, 70&gt;; &lt;COMMIT U&gt;;
+&lt;T, E, 50&gt;; &lt;COMMIT T&gt;; &lt;V, B, 80&gt;; &lt;COMMIT V&gt;.</pre>
+  <p>(3a) Suppose that we begin a nonquiescent checkpoint immediately after the &lt;U, B, 20&gt; log record has been written (in memory). Determine the last log record that must be sent to disk before each of the following events: (i) &lt;START CKPT (...)&gt; is written to disk and (ii) &lt;END CKPT&gt; is written to disk.</p>
+  <p>(3b) For the given undo log records, suppose we begin a nonquiescent checkpoint after the log record &lt;U, B, 20&gt; and a system crash occurs after one of the following: (i) &lt;V, B, 80&gt; and (ii) &lt;T, E, 50&gt;. For each case, determine the oldest log record that the recovery manager needs to scan to find all possible incomplete transactions.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+  <p><strong>The checkpoint record.</strong> Right after &lt;U,B,20&gt;, S has committed and T and U have started without committing. So the record is <strong>&lt;START CKPT(T, U)&gt;</strong>.</p>
+  <p><strong>3a (i).</strong> Step 1 writes &lt;START CKPT(T,U)&gt; and flushes the log. Log records reach disk in order, so everything before it goes first. The last record that must be on disk before it is <strong>&lt;U, B, 20&gt;</strong>.</p>
+  <p><strong>3a (ii).</strong> Under undo logging, &lt;END CKPT&gt; may be written only after both T and U have finished. U commits at &lt;COMMIT U&gt;, T later at &lt;COMMIT T&gt;. So &lt;END CKPT&gt; comes right after &lt;COMMIT T&gt;, and the last record that must be on disk before it is <strong>&lt;COMMIT T&gt;</strong>. The full log is then:</p>
+  <pre>&lt;START S&gt; &lt;S,A,60&gt; &lt;COMMIT S&gt; &lt;START T&gt; &lt;T,A,10&gt; &lt;START U&gt; &lt;U,B,20&gt;
+&lt;START CKPT(T,U)&gt; &lt;T,C,30&gt; &lt;START V&gt; &lt;U,D,40&gt; &lt;V,F,70&gt; &lt;COMMIT U&gt;
+&lt;T,E,50&gt; &lt;COMMIT T&gt; &lt;END CKPT&gt; &lt;V,B,80&gt; &lt;COMMIT V&gt;</pre>
+  <p><strong>3b (i), crash after &lt;V,B,80&gt;.</strong> &lt;END CKPT&gt; is already on the log (it follows &lt;COMMIT T&gt;). Scanning backward, the first checkpoint record met is &lt;END CKPT&gt;: case 1. Every incomplete transaction (here only V) started after the START CKPT. The oldest record to scan is <strong>&lt;START CKPT(T, U)&gt;</strong>. (Recovery writes B = 80 and F = 70 and logs &lt;ABORT V&gt;.)</p>
+  <p><strong>3b (ii), crash after &lt;T,E,50&gt;.</strong> T has not committed, so no &lt;END CKPT&gt; exists. The first checkpoint record met is &lt;START CKPT(T,U)&gt;: case 2. U committed (its COMMIT was seen in the scan), T did not, so we must reach T's start. The oldest record to scan is <strong>&lt;START T&gt;</strong>. (Recovery writes E = 50, F = 70, C = 30, A = 10 and logs &lt;ABORT T&gt;, &lt;ABORT V&gt;.)</p>
+  <p>Both cases in the simulator (case (ii) shown; change the log to try case (i)):</p>
+  <div id="ex117"></div>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 17-18 4a · 12 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-2 | 2017–18 · 12 marks</div>
+  <div class="exam-q"><p>The following is a sequence of undo log records found in the disk after a crash:</p>
+  <pre>&lt;START T1&gt; &lt;T1, A, 10&gt; &lt;START T2&gt; &lt;T2, B, 5&gt; &lt;T1, C, 7&gt; &lt;START T3&gt; &lt;T3, D, 12&gt;
+&lt;COMMIT T1&gt; &lt;START CKPT ?&gt; &lt;START T4&gt; &lt;T2, E, 5&gt; &lt;COMMIT T2&gt; &lt;T3, F, 1&gt;
+&lt;T4, G, 15&gt; &lt;END CKPT&gt; &lt;COMMIT T3&gt; &lt;START T5&gt; &lt;T5, H, 3&gt; &lt;START CKPT ?&gt; &lt;COMMIT T5&gt;</pre>
+  <p>Now answer the following questions: (i) What are the correct values of the two "?"-s in the log record? (ii) Describe the action of recovery manager, showing changes to both the disk and the log.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+  <p><strong>(i)</strong> A START CKPT record lists the transactions active (started, not committed or aborted) when it is written.</p>
+  <ul>
+    <li>First ?: T1, T2, T3 have started and T1 has just committed. Active: <strong>&lt;START CKPT(T2, T3)&gt;</strong>.</li>
+    <li>Second ?: T2 and T3 have committed; T4 and T5 have started and not finished. Active: <strong>&lt;START CKPT(T4, T5)&gt;</strong>.</li>
+  </ul>
+  <p>A remark on the given log: under undo logging the first &lt;END CKPT&gt; may only be written after both T2 and T3 finish, but here it appears before &lt;COMMIT T3&gt;. The list must still be (T2, T3), because T3 was active; the END CKPT is simply placed too early in the question. It does not affect the recovery below, which is governed by the second checkpoint.</p>
+  <p><strong>(ii)</strong> Scan backward from the end:</p>
+  <div class="tbl"><table>
+  <tr><th>Record</th><th>Action</th></tr>
+  <tr><td>&lt;COMMIT T5&gt;</td><td>T5 committed.</td></tr>
+  <tr><td>&lt;START CKPT(T4,T5)&gt;</td><td>First checkpoint record met, and it is a START with no END after it: case 2. Of T4 and T5, T5 has committed, so we must scan back to &lt;START T4&gt;.</td></tr>
+  <tr><td>&lt;T5,H,3&gt;</td><td>T5 committed: ignore.</td></tr>
+  <tr><td>&lt;START T5&gt;, &lt;COMMIT T3&gt;</td><td>T3 committed.</td></tr>
+  <tr><td>&lt;END CKPT&gt;</td><td>Belongs to an older checkpoint; we already know where to stop.</td></tr>
+  <tr><td>&lt;T4,G,15&gt;</td><td>T4 has no COMMIT: <strong>write G = 15</strong> on disk.</td></tr>
+  <tr><td>&lt;T3,F,1&gt;</td><td>T3 committed: ignore.</td></tr>
+  <tr><td>&lt;COMMIT T2&gt;, &lt;T2,E,5&gt;</td><td>T2 committed: ignore.</td></tr>
+  <tr><td>&lt;START T4&gt;</td><td>Start of the last unfinished listed transaction: <strong>stop</strong>.</td></tr>
+  </table></div>
+  <p><strong>Disk:</strong> G = 15. <strong>Log:</strong> append &lt;ABORT T4&gt; and flush the log. The records before &lt;START T4&gt; are never read.</p>
+  <div id="ex120"></div>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 19-20 4c · 25 marks (as printed) &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-2 | 2019–20 · 5 marks</div>
+  <div class="exam-q"><p>Explain checkpoint in database recovery.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+  <p><strong>Need.</strong> Recovery reads the log, and in principle the whole log, which grows without bound. Most of it concerns transactions that finished long ago and whose changes are safely on disk. A <strong>checkpoint</strong> is a record in the log guaranteeing that nothing before a certain point is needed for recovery, so recovery stops there and the older log can be deleted.</p>
+  <p><strong>Quiescent checkpoint</strong> (undo logging): stop accepting new transactions; wait until every active transaction commits or aborts; flush the log; write &lt;CKPT&gt; and flush; resume. On recovery, scan backward and stop at &lt;CKPT&gt;: every transaction before it is finished and (rule U2) on disk. Drawback: the system stalls while long transactions finish.</p>
+  <p><strong>Nonquiescent checkpoint:</strong> write &lt;START CKPT(T1,…,Tk)&gt; naming the active transactions, flush; let new transactions start; when T1…Tk have all finished, write &lt;END CKPT&gt; and flush. On recovery, scanning backward: if &lt;END CKPT&gt; is met first, stop at the matching &lt;START CKPT&gt;; if &lt;START CKPT(T1…Tk)&gt; is met first, stop at the earliest &lt;START Ti&gt; of the unfinished Ti.</p>
+  <p><strong>With redo and undo/redo logging</strong> (Lecture 06), the checkpoint instead writes dirty buffers to disk between START CKPT and END CKPT (only those of committed transactions for redo logging, all of them for undo/redo), and does not wait for the active transactions.</p>
+  <p><strong>Example:</strong> in the timeline above (Fig. 17.5), recovery after the crash reads only from &lt;START CKPT(T1,T2)&gt; to the end.</p>
+  <p><em>Note on the CSE215 bank's answer:</em> it describes the Silberschatz-style checkpoint (suspend transactions, flush all dirty buffers, write &lt;checkpoint L&gt;). That is a valid scheme from another textbook, but for this course give the quiescent and nonquiescent checkpoints above.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2012–13 · 10 marks</div>
+  <div class="exam-q"><p>What properties of a recovery system allow us to recover from a crash while recovering a previous crash? What are the purposes of checkpointing and nonquiescent checkpointing?</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+  <p><strong>Recovering from a crash during recovery.</strong> The key property is that recovery is <strong>idempotent</strong>: running it twice, or running part of it and then all of it, has the same effect as running it once. This holds because:</p>
+  <ul>
+    <li>Update records store <em>values</em> (the old value for undo, the new value for redo), not changes such as “add 100”. Undo writes v into X regardless of X's current value; doing it again writes the same v.</li>
+    <li>Recovery does not depend on what is currently on disk; it decides everything from the log, which it does not modify until the end.</li>
+    <li>The log records that recovery relies on are already on disk (write-ahead rules), and recovery only <em>appends</em> &lt;ABORT T&gt; records after all undo work is done, then flushes. If it crashes before that, the next recovery simply redoes the same work; if after, the ABORTs tell it the work is done.</li>
+  </ul>
+  <p><strong>Purpose of checkpointing:</strong> to bound the part of the log recovery must read, so recovery is fast, and to allow the log before the checkpoint to be deleted, so the log does not grow forever.</p>
+  <p><strong>Purpose of nonquiescent checkpointing:</strong> a quiescent checkpoint stops new transactions until all active ones finish, which can make the system unavailable for a long time. A nonquiescent checkpoint gets the same benefit without stopping the system: new transactions keep starting while the checkpoint waits (undo logging) or while dirty buffers are flushed (redo, undo/redo logging), marked by &lt;START CKPT(…)&gt; and &lt;END CKPT&gt;.</p>
+  <p><em>Note:</em> the CSE215 bank's answer explains idempotence through ARIES (LSNs, PageLSN, compensation log records). That is correct for ARIES, which is not part of this course; the answer above uses the course's logging methods.</p>
+  </div></details>
+</div>
+
+<div class="key"><p><strong>Summary:</strong> a quiescent checkpoint waits for all active transactions to finish, then writes &lt;CKPT&gt;; recovery stops there. A nonquiescent checkpoint writes &lt;START CKPT(active list)&gt;, lets new transactions run, and writes &lt;END CKPT&gt; when the listed ones finish. Recovery that meets END CKPT first stops at the matching START CKPT; recovery that meets START CKPT first goes back to the earliest START of the unfinished listed transactions.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="lecture.js"></script>
+<script>
+const F175 = '<START T1> <T1,A,5> <START T2> <T2,B,10> <START CKPT(T1,T2)> <T2,C,15> <START T3> <T1,D,20> <COMMIT T1> <T3,E,25> <COMMIT T2> <END CKPT> <T3,F,30>';
+recoveryAnim('#ex174', '<START T1> <T1,A,5> <START T2> <T2,B,10> <T2,C,15> <T1,D,20> <COMMIT T1> <COMMIT T2> <CKPT> <START T3> <T3,E,25> <T3,F,30>', 'undo');
+timelineTool('#tl', { log: F175, mode: 'undo' });
+recoveryAnim('#ex175', F175, 'undo');
+recoveryAnim('#ex176', '<START T1> <T1,A,5> <START T2> <T2,B,10> <START CKPT(T1,T2)> <T2,C,15> <START T3> <T1,D,20> <COMMIT T1> <T3,E,25>', 'undo');
+recoveryTool('#ex117', { log: '<START S> <S,A,60> <COMMIT S> <START T> <T,A,10> <START U> <U,B,20>\n<START CKPT(T,U)> <T,C,30> <START V> <U,D,40> <V,F,70> <COMMIT U>\n<T,E,50>', mode: 'undo' });
+recoveryAnim('#ex120', '<START T1> <T1,A,10> <START T2> <T2,B,5> <T1,C,7> <START T3> <T3,D,12> <COMMIT T1> <START CKPT(T2,T3)> <START T4> <T2,E,5> <COMMIT T2> <T3,F,1> <T4,G,15> <END CKPT> <COMMIT T3> <START T5> <T5,H,3> <START CKPT(T4,T5)> <COMMIT T5>', 'undo');
+flashcards('#cards', [
+  { f: 'Checkpoint', b: 'A log mark before which no record is needed for recovery; older log can be deleted.' },
+  { f: 'Quiescent checkpoint', b: 'Stop new transactions, wait for active ones to finish, flush, write &lt;CKPT&gt;, resume.' },
+  { f: 'Nonquiescent checkpoint (undo)', b: '&lt;START CKPT(T1..Tk)&gt; + flush; wait for T1..Tk while new ones run; &lt;END CKPT&gt; + flush.' },
+  { f: 'END CKPT met first', b: 'Case 1: stop the backward scan at the matching START CKPT.' },
+  { f: 'START CKPT met first', b: 'Case 2: crash during checkpoint; scan back to the earliest START of the unfinished listed transactions.' },
+  { f: 'When may old log be deleted?', b: 'Once &lt;END CKPT&gt; is on disk, everything before the matching START CKPT.' },
+]);
+quiz('#quiz', [
+  { q: 'Main drawback of a quiescent checkpoint?', opts: ['It needs more log space', 'New transactions are blocked until all active ones finish', 'It cannot be used with undo logging', 'It loses data'], a: 1, why: 'Step 1 stops new transactions; one long transaction stalls the system.' },
+  { q: 'What does &lt;START CKPT(T1,T2)&gt; list?', opts: ['Committed transactions', 'Transactions active when it is written', 'Transactions that will start during the checkpoint', 'All transactions ever'], a: 1, why: 'It names the active (uncommitted) transactions at that moment.' },
+  { q: 'Undo logging: when is &lt;END CKPT&gt; written?', opts: ['Immediately after START CKPT', 'After all listed transactions have committed or aborted', 'After all transactions in the system have finished', 'At the next crash'], a: 1, why: 'Only the listed ones must finish; new ones may still be running.' },
+  { q: 'Backward scan meets &lt;END CKPT&gt; first. Where can it stop?', opts: ['At the END CKPT', 'At the matching START CKPT', 'At the earliest START of a listed transaction', 'At the beginning of the log'], a: 1, why: 'All listed transactions finished; incomplete ones started after START CKPT.' },
+  { q: 'Fig. 17.6: crash during the checkpoint. Which record is the last one read?', opts: ['&lt;START T1&gt;', '&lt;START T2&gt;', '&lt;START CKPT(T1,T2)&gt;', '&lt;START T3&gt;'], a: 1, why: 'T2 is the only unfinished listed transaction; T1 committed.' },
+]);
+ask('#try1', { q: 'Log: &lt;START T1> &lt;T1,A,1> &lt;COMMIT T1> &lt;START T2> &lt;T2,B,2> &lt;START CKPT(T2)> &lt;START T3> &lt;T3,C,3> &lt;COMMIT T2> &lt;END CKPT> &lt;T3,D,4>, crash. How many records does undo recovery read (counting the one it stops at)?', a: 6, hint: 'END CKPT is met first, so stop at START CKPT, record 6 of 11.', why: 'It reads records 11 down to 6: &lt;T3,D,4>, &lt;END CKPT>, &lt;COMMIT T2>, &lt;T3,C,3>, &lt;START T3>, &lt;START CKPT(T2)>.' });
+ask('#try2', { q: 'Same log, but the crash comes right after &lt;T3,C,3&gt;. Which START record does the scan stop at? (transaction name)', a: ['T2', 'START T2', '<START T2>'], show: 'T2', why: 'START CKPT(T2) is met first and T2 has not committed, so scan back to &lt;START T2&gt;.' });
+</script>
+</body>
+</html>

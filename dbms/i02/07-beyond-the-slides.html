@@ -1,0 +1,375 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>XML, MapReduce and Distributed Data · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<style>
+.mr { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; font: 12px/1.5 var(--mono); }
+.mr .col { min-width: 130px; }
+.mr .h { font-weight: 600; color: var(--muted); text-align: center; margin-bottom: 6px; font-size: 11px; letter-spacing: .05em; }
+.mr .b { border: 1.2px solid var(--fg); border-radius: 6px; background: var(--cell); padding: 6px 9px; margin-bottom: 8px; white-space: pre; }
+.mr .b.hl { background: var(--cell-hl); } .mr .b.new { background: var(--cell-new); } .mr .b.dim { opacity: .35; }
+.mr .t { font-weight: 600; font-size: 11px; color: var(--accent); }
+.mrform { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-start; margin-bottom: 12px; }
+.mrform textarea { font: 13px var(--mono); padding: 6px 8px; border: 1.5px solid var(--fg); border-radius: 5px; background: var(--bg); color: var(--fg); width: min(100%, 26em); height: 5.5em; }
+.mrform button { font: 600 13px var(--mono); padding: 6px 12px; border-radius: 5px; border: 1.5px solid var(--fg); background: var(--bg); color: var(--fg); cursor: pointer; }
+.mrform button:hover { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+.mrmsg { color: var(--red); font-size: .95rem; }
+</style>
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 01–02 (Ishrak) · Chapter 7 · Exam topics beyond the slides · Book §20.2, §20.4–20.5</div>
+<h1>Exam Topics Beyond the Slides: XML, MapReduce, Bags, Objects and Distributed Data</h1>
+<p class="lede">Lecture 02 ends by contrasting relational and non-relational storage. Past exams have pushed further in the same direction: semistructured data (XML and DTDs), large-scale processing (MapReduce), bag semantics, object identity and references, and databases spread over many sites (two-phase commit, semijoins, parallel joins). Each topic is taught briefly here and every related bank question is answered.</p>
+
+<h2>1. Bags versus sets</h2>
+
+<dl class="def">
+<dt>Set</dt><dd>A collection in which each element appears at most once. A relation in the formal relational model is a set of tuples.</dd>
+<dt>Bag (multiset)</dt><dd>A collection in which an element may appear several times; only the count matters, not the order. SQL tables and query results are bags unless <code>DISTINCT</code>, a key, or a set operator removes duplicates.</dd>
+</dl>
+<p>Write C(x, A) for the number of times x occurs in bag A. The bag operations are defined by counts (the textbook, §5.1):</p>
+<div class="formula">C(x, A ∪ B) = C(x, A) + C(x, B)<br>C(x, A ∩ B) = min(C(x, A), C(x, B))<br>C(x, A − B) = max(0, C(x, A) − C(x, B))</div>
+<p>Why do DBMSs use bags? Removing duplicates requires sorting or hashing the whole result, which is expensive, and some queries need duplicates (an average of salaries must count two equal salaries twice). In SQL, <code>UNION ALL</code> is bag union and <code>UNION</code> is set union. Oracle 21c also has <code>INTERSECT ALL</code> and <code>MINUS ALL</code>/<code>EXCEPT ALL</code> for bag intersection and difference; the plain operators are set operations.</p>
+<div id="bagplay"></div>
+
+<h2>2. Object identity and reference types</h2>
+
+<p>In the relational model a row is identified only by its values (its key). <b class="term">Object-relational</b> SQL (SQL:1999, supported by Oracle) adds user-defined types, tables whose rows are objects of a type (<b class="term">typed tables</b>), and pointers between them.</p>
+<dl class="def">
+<dt>Object identifier (OID)</dt><dd>A system-generated, unique, immutable identifier given to each row object of a typed table. It is independent of the row's attribute values: updating every attribute keeps the same OID.</dd>
+<dt>Reference type, REF(T)</dt><dd>A data type whose values are OIDs of objects of type T, that is, typed pointers. <code>SCOPE</code> restricts a reference to objects of one particular table.</dd>
+<dt>Dereferencing</dt><dd>Following a reference to the object it points to: <code>-&gt;</code> in standard SQL, a dot in Oracle, or the <code>DEREF</code> function for the whole object.</dd>
+</dl>
+
+<h2>3. XML and DTDs</h2>
+
+<dl class="def">
+<dt>Semistructured data</dt><dd>Data that carries its own structure (tags or field names) instead of following a fixed table schema; elements may be nested, repeated or missing. XML and JSON are the two common formats (the textbook, §11.1).</dd>
+<dt>XML element</dt><dd>A start tag, content, and the matching end tag: <code>&lt;NAME&gt;Tom Hanks&lt;/NAME&gt;</code>. Elements nest to form a tree with one root element.</dd>
+<dt>DTD (document type definition)</dt><dd>A grammar that says which elements may appear and what each may contain: <code>&lt;!ELEMENT STAR (NAME, ADDRESS+, MOVIES)&gt;</code> means a STAR contains a NAME, then one or more ADDRESSes, then MOVIES, in that order. <code>*</code> = zero or more, <code>+</code> = one or more, <code>?</code> = optional, <code>#PCDATA</code> = text.</dd>
+<dt>Valid XML</dt><dd>A document that is well formed (tags properly nested and closed) and also follows its DTD.</dd>
+</dl>
+
+<h2>4. MapReduce</h2>
+
+<p><b class="term">MapReduce</b> (the textbook, §20.2) is a framework for running a computation over a huge dataset on a cluster of many machines. The programmer writes only two functions; the framework does the rest (splitting the input, running tasks in parallel, moving data between machines, restarting failed tasks).</p>
+<dl class="def">
+<dt>Map function</dt><dd>Applied to each input element independently, in parallel; outputs a list of key–value pairs. Word count: for each word w in a line, output (w, 1).</dd>
+<dt>Shuffle (group by key)</dt><dd>Done by the framework: all pairs with the same key are collected and sent to the same reduce task. Which reducer gets a key is usually decided by hashing the key.</dd>
+<dt>Reduce function</dt><dd>Applied to each key with the list of all its values; outputs the final result for that key. Word count: (w, [1, 1, 1]) → (w, 3).</dd>
+</dl>
+<figure class="wide">
+<span class="anim-tag">Animation · Interactive</span>
+<div id="mr"></div>
+<figcaption><b>Figure 1.</b> Word count in MapReduce. Each input line goes to a map task; two reduce tasks split the keys (a–m and n–z). Type your own text and press <b>Run</b>.</figcaption>
+</figure>
+
+<h2>5. Distributed and parallel databases</h2>
+
+<dl class="def">
+<dt>Distributed database</dt><dd>One logical database whose data is stored at several <b class="term">sites</b> (machines) connected by a network. A relation may be <b class="term">fragmented</b> (different rows or columns at different sites) or <b class="term">replicated</b> (copies at several sites).</dd>
+<dt>Distributed transaction</dt><dd>A transaction that reads or writes data at several sites. Its parts at each site must all commit or all abort.</dd>
+<dt>Two-phase commit (2PC)</dt><dd>The standard protocol for that all-or-nothing decision (the textbook, §20.5.2). The <b class="term">coordinator</b> (usually the site where the transaction started) runs <b>phase 1 (voting)</b>: it logs &lt;prepare T&gt; and sends <code>prepare T</code> to every participant; each participant either makes its part durable, logs &lt;ready T&gt; and replies <code>ready T</code>, or logs &lt;abort T&gt; (“don't commit”) and replies <code>abort T</code>. In <b>phase 2 (decision)</b>, if every reply was ready the coordinator logs &lt;commit T&gt; and sends <code>commit T</code> to all; if any reply was abort (or a site timed out) it logs &lt;abort T&gt; and sends <code>abort T</code>. Participants log the decision, apply it, and send <code>ack T</code>; after all acks the coordinator logs &lt;complete T&gt;.</dd>
+<dt>Semijoin</dt><dd>R ⋉ S: the tuples of R that join with at least one tuple of S. Used to reduce how much data crosses the network before a distributed join (the textbook, §20.4.2).</dd>
+<dt>Parallel join</dt><dd>Splitting a join over several processors: partition both relations on the join attribute with the same hash function, join each pair of partitions on its own processor, and union the results.</dd>
+</dl>
+<p>Two-phase commit is unrelated to two-phase locking (Sukarna sir's Lec 02); they only share the phrase “two-phase”.</p>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+
+<h3>Exam questions</h3>
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2012–13 · 15 marks</div>
+  <div class="exam-q"><p>What are bags in DBMS? How are they different from sets? Give examples of union, intersection and minus operation on bags to highlight the differences.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+<p>A <strong>bag</strong> (multiset) is an unordered collection in which an element may occur more than once. A <strong>set</strong> allows each element at most once. Relational algebra on paper uses sets; SQL tables and query results are bags, because eliminating duplicates costs a sort or hash of the whole result and because some aggregates need duplicates. In SQL, duplicates are removed only by <code>DISTINCT</code>, keys, or set operators (<code>UNION</code>, <code>INTERSECT</code>, <code>MINUS</code>).</p>
+<p>Take A = {a, a, a, b, b, c} and B = {a, a, b, b, b, d}, so C(a,A)=3, C(b,A)=2, C(c,A)=1, C(a,B)=2, C(b,B)=3, C(d,B)=1.</p>
+<div class="tbl"><table>
+<tr><th>Operation</th><th>Bag rule</th><th>Bag result</th><th>Set result (on {a,b,c} and {a,b,d})</th></tr>
+<tr><td>A ∪ B</td><td>C(x,A) + C(x,B)</td><td>{a×5, b×5, c, d} (12 elements)</td><td>{a, b, c, d}</td></tr>
+<tr><td>A ∩ B</td><td>min(C(x,A), C(x,B))</td><td>{a, a, b, b}</td><td>{a, b}</td></tr>
+<tr><td>A − B</td><td>max(0, C(x,A) − C(x,B))</td><td>{a, c}</td><td>{c}</td></tr>
+</table></div>
+<p>The difference row shows the sharpest contrast: as sets, a is in B so it is removed from A; as bags, A has one more a than B, so one a survives. Laws also differ: for sets, A ∪ A = A, but for bags A ∪ A has every element twice as often. In SQL: <code>UNION ALL</code> = bag union, <code>UNION</code> = set union; Oracle 21c adds <code>INTERSECT ALL</code> and <code>MINUS ALL</code>.</p>
+<p>The bank's answer is correct (its counts were checked with Python's <code>Counter</code>).</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2010–11 · 10 marks</div>
+  <div class="exam-q"><p>Describe with an example, the object identity and reference types in SQL. How can you process queries using reference type?</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+<p><strong>Object identity.</strong> In a typed table (a table whose rows are objects of a user-defined type), each row object gets a system-generated object identifier (OID). The OID is unique, never changes, and does not depend on attribute values, unlike a primary key, which is made of values.</p>
+<p><strong>Reference types.</strong> <code>REF(T)</code> is a type whose values are OIDs of objects of type T; it acts as a typed pointer. A <code>SCOPE</code> clause limits it to the objects of one table. Example (Oracle syntax; the SQL:1999 standard is similar):</p>
+<pre>CREATE TYPE dept_t AS OBJECT (dept_no NUMBER, dept_name VARCHAR2(50));
+/
+CREATE TABLE departments OF dept_t (dept_no PRIMARY KEY);   -- typed table: each row has an OID
+
+CREATE TYPE emp_t AS OBJECT (emp_id NUMBER, name VARCHAR2(50), works_for REF dept_t);
+/
+CREATE TABLE employees OF emp_t (emp_id PRIMARY KEY, SCOPE FOR (works_for) IS departments);
+
+INSERT INTO departments VALUES (dept_t(10, 'Research'));
+INSERT INTO employees
+  SELECT emp_t(101, 'Alice', REF(d)) FROM departments d WHERE d.dept_no = 10;  -- store the pointer</pre>
+<p><strong>Querying with references.</strong> A reference is followed with a path expression instead of a join. Standard SQL writes <code>e.works_for-&gt;dept_name</code>; Oracle writes it with a dot:</p>
+<pre>SELECT e.name, e.works_for.dept_name FROM employees e;            -- implicit dereference, no join
+SELECT DEREF(e.works_for) FROM employees e WHERE e.name = 'Alice';  -- the whole department object
+SELECT e.name FROM employees e WHERE e.works_for.dept_name = 'Research';</pre>
+<p>The equivalent relational query needs <code>JOIN departments d ON e.dept_no = d.dept_no</code>. References make queries shorter and let the DBMS go directly to the referenced row; the cost is that the pointer has no meaning outside the DBMS and dangling references (to deleted objects) are possible.</p>
+<p>The bank's answer uses the SQL:1999 syntax (<code>REF IS … SYSTEM GENERATED</code>, <code>-&gt;</code>), which is correct for the standard; in Oracle use the forms above.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 17-18 8c · 10 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-2 | 2017–18 · 10 marks</div>
+  <div class="exam-q"><p>From the Document Type Definition (DTD) given below describe the structure of the data in XML. Write a sample XML file using this DTD.</p>
+<pre>&lt;!DOCTYPE STARS [
+  &lt;!ELEMENT STARS (STAR*)&gt;
+  &lt;!ELEMENT STAR (NAME, ADDRESS+, MOVIES)&gt;
+  &lt;!ELEMENT NAME (#PCDATA)&gt;
+  &lt;!ELEMENT ADDRESS (STREET, CITY)&gt;
+  &lt;!ELEMENT STREET (#PCDATA)&gt;
+  &lt;!ELEMENT CITY (#PCDATA)&gt;
+  &lt;!ELEMENT MOVIES (MOVIE*)&gt;
+  &lt;!ELEMENT MOVIE (TITLE, YEAR)&gt;
+  &lt;!ELEMENT TITLE (#PCDATA)&gt;
+  &lt;!ELEMENT YEAR (#PCDATA)&gt;
+]&gt;</pre></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+<p><strong>Structure.</strong> The root element is STARS, which contains zero or more STAR elements (<code>*</code>). Each STAR contains, in this order, exactly one NAME, one or more ADDRESS elements (<code>+</code>), and exactly one MOVIES element. Each ADDRESS contains one STREET followed by one CITY. MOVIES contains zero or more MOVIE elements, and each MOVIE contains one TITLE followed by one YEAR. NAME, STREET, CITY, TITLE and YEAR contain only text (<code>#PCDATA</code>). So the data is a list of movie stars, each with a name, at least one address, and a (possibly empty) list of movies with titles and years.</p>
+<figure><svg id="dtd" role="img" aria-label="DTD tree"></svg></figure>
+<p><strong>Sample valid document</strong> (one star with two addresses and two movies, one with one address and no movies):</p>
+<pre>&lt;?xml version="1.0" encoding="UTF-8"?&gt;
+&lt;!DOCTYPE STARS SYSTEM "stars.dtd"&gt;
+&lt;STARS&gt;
+  &lt;STAR&gt;
+    &lt;NAME&gt;Carrie Fisher&lt;/NAME&gt;
+    &lt;ADDRESS&gt;&lt;STREET&gt;123 Maple St.&lt;/STREET&gt;&lt;CITY&gt;Hollywood&lt;/CITY&gt;&lt;/ADDRESS&gt;
+    &lt;ADDRESS&gt;&lt;STREET&gt;5 Locust Ln.&lt;/STREET&gt;&lt;CITY&gt;Malibu&lt;/CITY&gt;&lt;/ADDRESS&gt;
+    &lt;MOVIES&gt;
+      &lt;MOVIE&gt;&lt;TITLE&gt;Star Wars&lt;/TITLE&gt;&lt;YEAR&gt;1977&lt;/YEAR&gt;&lt;/MOVIE&gt;
+      &lt;MOVIE&gt;&lt;TITLE&gt;Empire Strikes Back&lt;/TITLE&gt;&lt;YEAR&gt;1980&lt;/YEAR&gt;&lt;/MOVIE&gt;
+    &lt;/MOVIES&gt;
+  &lt;/STAR&gt;
+  &lt;STAR&gt;
+    &lt;NAME&gt;Mark Hamill&lt;/NAME&gt;
+    &lt;ADDRESS&gt;&lt;STREET&gt;456 Oak Rd.&lt;/STREET&gt;&lt;CITY&gt;Brentwood&lt;/CITY&gt;&lt;/ADDRESS&gt;
+    &lt;MOVIES&gt;&lt;/MOVIES&gt;
+  &lt;/STAR&gt;
+&lt;/STARS&gt;</pre>
+<p>The second star has an empty MOVIES element, which is valid because MOVIE is <code>*</code>; it could not omit MOVIES itself or its ADDRESS, because those are required. (The DTD can also be included inline in the <code>DOCTYPE</code>, as the bank's answer does.)</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 17-18 8d · 5 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-2 | 2017–18 · 5 marks</div>
+  <div class="exam-q"><p>Briefly describe Map-Reduce framework.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+<p>MapReduce is a programming model and runtime for processing very large datasets in parallel on a cluster of commodity machines. The user writes two functions; the framework handles distribution, parallelism and fault tolerance.</p>
+<ol>
+<li><strong>Input split:</strong> the input (typically in a distributed file system) is divided into chunks, each given to a map task, preferably on the machine that stores the chunk.</li>
+<li><strong>Map:</strong> Map(k1, v1) → list of (k2, v2), applied to every input element independently.</li>
+<li><strong>Shuffle and sort:</strong> the framework groups all intermediate pairs by key and sends each key, with all its values, to one reduce task (chosen by hashing the key).</li>
+<li><strong>Reduce:</strong> Reduce(k2, list of v2) → list of (k3, v3), combining the values for one key.</li>
+</ol>
+<p><strong>Example, word count</strong> on the lines “the cat sat”, “the dog sat”, “the cat ran”: map emits (the,1), (cat,1), (sat,1), …; the shuffle produces (the,[1,1,1]), (cat,[1,1]), (sat,[1,1]), (dog,[1]), (ran,[1]); reduce sums each list: the 3, cat 2, sat 2, dog 1, ran 1 (Figure 1).</p>
+<p><strong>Fault tolerance:</strong> if a machine fails, the master re-runs its map or reduce tasks elsewhere; this works because map and reduce are deterministic functions of their inputs. Typical uses: indexing the web, log analysis, joins and aggregations over huge files.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2015–16 · 20 marks</div>
+  <div class="exam-q"><p>A distributed database system consists of five sites (S<sub>1</sub>–S<sub>5</sub>). A transaction T<sub>1</sub> initiated from site S<sub>1</sub> reads and writes data items A (fragmented in S<sub>2</sub> and S<sub>4</sub>) and B (fragmented in S<sub>2</sub>, S<sub>3</sub> and S<sub>5</sub>). Any write operation must be performed to all related sites. T<sub>1</sub>: READ(A); READ(B); WRITE(A); WRITE(B); COMMIT.<br>(a) Show all the messages (e.g. &lt;Prepare T<sub>1</sub>&gt;, etc.) passing between S<sub>1</sub> and the related sites (S<sub>2</sub>, S<sub>3</sub>, S<sub>4</sub>, S<sub>5</sub>) for Phase 1 and Phase 2 to COMMIT the transaction T<sub>1</sub> using the two-phase commit protocol.<br>(b) Show all the message passing for Phase 1 and Phase 2 to ABORT the transaction T<sub>1</sub> because of an &lt;Abort T<sub>1</sub>&gt; message sent from S<sub>5</sub> to S<sub>1</sub>.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+<p><strong>Participants.</strong> T<sub>1</sub> writes A (at S<sub>2</sub>, S<sub>4</sub>) and B (at S<sub>2</sub>, S<sub>3</sub>, S<sub>5</sub>), so it has a component at S<sub>2</sub>, S<sub>3</sub>, S<sub>4</sub> and S<sub>5</sub>. S<sub>1</sub>, where T<sub>1</sub> started, is the coordinator.</p>
+<p><strong>(a) Commit.</strong></p>
+<div class="tbl"><table>
+<tr><th>Phase</th><th>Log record written</th><th>Messages</th></tr>
+<tr><td rowspan="2">1 (voting)</td><td>S<sub>1</sub>: &lt;prepare T<sub>1</sub>&gt;</td><td>S<sub>1</sub> → S<sub>2</sub>, S<sub>3</sub>, S<sub>4</sub>, S<sub>5</sub>: &lt;prepare T<sub>1</sub>&gt; (4 messages)</td></tr>
+<tr><td>each of S<sub>2</sub>–S<sub>5</sub>: flushes T<sub>1</sub>'s log records, then &lt;ready T<sub>1</sub>&gt;</td><td>S<sub>2</sub> → S<sub>1</sub>, S<sub>3</sub> → S<sub>1</sub>, S<sub>4</sub> → S<sub>1</sub>, S<sub>5</sub> → S<sub>1</sub>: &lt;ready T<sub>1</sub>&gt; (4 messages)</td></tr>
+<tr><td rowspan="2">2 (decision)</td><td>S<sub>1</sub>: &lt;commit T<sub>1</sub>&gt; (all four voted ready)</td><td>S<sub>1</sub> → S<sub>2</sub>, S<sub>3</sub>, S<sub>4</sub>, S<sub>5</sub>: &lt;commit T<sub>1</sub>&gt; (4 messages)</td></tr>
+<tr><td>each of S<sub>2</sub>–S<sub>5</sub>: &lt;commit T<sub>1</sub>&gt;, commits locally; then S<sub>1</sub>: &lt;complete T<sub>1</sub>&gt;</td><td>S<sub>2</sub>, S<sub>3</sub>, S<sub>4</sub>, S<sub>5</sub> → S<sub>1</sub>: &lt;ack T<sub>1</sub>&gt; (4 messages)</td></tr>
+</table></div>
+<p>Total: 16 messages.</p>
+<p><strong>(b) Abort because S<sub>5</sub> votes abort.</strong></p>
+<div class="tbl"><table>
+<tr><th>Phase</th><th>Log record written</th><th>Messages</th></tr>
+<tr><td rowspan="2">1 (voting)</td><td>S<sub>1</sub>: &lt;prepare T<sub>1</sub>&gt;</td><td>S<sub>1</sub> → S<sub>2</sub>, S<sub>3</sub>, S<sub>4</sub>, S<sub>5</sub>: &lt;prepare T<sub>1</sub>&gt;</td></tr>
+<tr><td>S<sub>2</sub>, S<sub>3</sub>, S<sub>4</sub>: &lt;ready T<sub>1</sub>&gt;; S<sub>5</sub>: &lt;abort T<sub>1</sub>&gt; (“don't commit”) and aborts its part at once</td><td>S<sub>2</sub>, S<sub>3</sub>, S<sub>4</sub> → S<sub>1</sub>: &lt;ready T<sub>1</sub>&gt;; S<sub>5</sub> → S<sub>1</sub>: &lt;abort T<sub>1</sub>&gt;</td></tr>
+<tr><td rowspan="2">2 (decision)</td><td>S<sub>1</sub>: &lt;abort T<sub>1</sub>&gt; (one abort vote is enough)</td><td>S<sub>1</sub> → S<sub>2</sub>, S<sub>3</sub>, S<sub>4</sub> (and, by the textbook protocol, also S<sub>5</sub>): &lt;abort T<sub>1</sub>&gt;</td></tr>
+<tr><td>S<sub>2</sub>, S<sub>3</sub>, S<sub>4</sub>: &lt;abort T<sub>1</sub>&gt;, undo their parts; S<sub>1</sub>: &lt;complete T<sub>1</sub>&gt; after acks</td><td>S<sub>2</sub>, S<sub>3</sub>, S<sub>4</sub> (and S<sub>5</sub> if it was sent the decision) → S<sub>1</sub>: &lt;ack T<sub>1</sub>&gt;</td></tr>
+</table></div>
+<p>The coordinator may send &lt;abort T<sub>1</sub>&gt; as soon as S<sub>5</sub>'s abort arrives, without waiting for the other votes. Sending the decision to S<sub>5</sub> is harmless; S<sub>5</sub> already knows the outcome, so sending it only to the sites that voted ready (as the bank's answer does) is also accepted.</p>
+<figure class="wide"><span class="anim-tag">Animation</span><div id="tpc"></div></figure>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2010–11 · 10 marks</div>
+  <div class="exam-q"><p>Given relations R<sub>1</sub>(A, B, C, D) and R<sub>2</sub>(C, D, E) stored in sites S<sub>1</sub> and S<sub>2</sub>. Describe the join operation of R<sub>1</sub> and R<sub>2</sub> using the semi-join strategy. Give an example of parallel join.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+<p>The join attributes are C and D. Suppose the result R<sub>1</sub> ⋈ R<sub>2</sub> is wanted at S<sub>2</sub>. Shipping all of R<sub>1</sub> to S<sub>2</sub> wastes bandwidth on R<sub>1</sub> tuples that match nothing. The semijoin strategy:</p>
+<ol>
+<li>At S<sub>2</sub>, compute L = π<sub>C,D</sub>(R<sub>2</sub>) (only the join columns, duplicates removed).</li>
+<li>Ship L to S<sub>1</sub>.</li>
+<li>At S<sub>1</sub>, compute R<sub>1</sub>′ = R<sub>1</sub> ⋉ L = R<sub>1</sub> ⋈ L projected on R<sub>1</sub>'s attributes: exactly the R<sub>1</sub> tuples that will join.</li>
+<li>Ship R<sub>1</sub>′ to S<sub>2</sub>.</li>
+<li>At S<sub>2</sub>, compute R<sub>1</sub>′ ⋈ R<sub>2</sub>, which equals R<sub>1</sub> ⋈ R<sub>2</sub>.</li>
+</ol>
+<p>It pays off when L is small and few R<sub>1</sub> tuples match. Worked example (checked in Python):</p>
+<figure class="wide"><span class="anim-tag">Animation</span><div id="semi"></div></figure>
+<p><strong>Parallel join example.</strong> Join Orders(order_id, cust_id, amount) with Customer(cust_id, name) on cust_id using 3 processors P<sub>0</sub>, P<sub>1</sub>, P<sub>2</sub>. Partition both relations with h(cust_id) = cust_id mod 3: customers 12 (→ P<sub>0</sub>), 10 and 13 (→ P<sub>1</sub>), 11 (→ P<sub>2</sub>), and every order goes to the processor of its cust_id. Matching tuples land on the same processor, so each P<sub>i</sub> joins its own Orders<sub>i</sub> ⋈ Customer<sub>i</sub> independently and in parallel; the final result is the union of the three local results. With balanced partitions the join takes about one third of the single-processor time.</p>
+  </div></details>
+</div>
+
+<div class="key"><p><strong>Summary:</strong> bags allow duplicates; bag union adds counts, intersection takes the minimum, difference subtracts with a floor of zero. Object-relational SQL gives typed-table rows immutable OIDs and REF types that are followed with path expressions instead of joins. XML is semistructured, tree-shaped data; a DTD fixes which elements nest where (* zero or more, + one or more). MapReduce runs map (emit key–value pairs), shuffle (group by key) and reduce (combine values per key) across a cluster. Distributed transactions commit with two-phase commit (prepare/vote, then commit or abort, then ack); distributed joins shrink network traffic with semijoins; parallel joins hash-partition both inputs so each processor joins its own partitions.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/sqlplay.js"></script>
+<script src="lecture.js"></script>
+<script>
+sqlPlay('#bagplay', {
+  setup: `CREATE TABLE A (x VARCHAR2(1)); CREATE TABLE B (x VARCHAR2(1));
+INSERT INTO A VALUES ('a'); INSERT INTO A VALUES ('a'); INSERT INTO A VALUES ('a');
+INSERT INTO A VALUES ('b'); INSERT INTO A VALUES ('b'); INSERT INTO A VALUES ('c');
+INSERT INTO B VALUES ('a'); INSERT INTO B VALUES ('a'); INSERT INTO B VALUES ('b');
+INSERT INTO B VALUES ('b'); INSERT INTO B VALUES ('b'); INSERT INTO B VALUES ('d');`,
+  query: `SELECT x, COUNT(*) AS times FROM (SELECT x FROM A UNION ALL SELECT x FROM B)
+GROUP BY x ORDER BY x;`,
+  note: 'UNION ALL is bag union: a appears 3 + 2 = 5 times. Replace <code>UNION ALL</code> by <code>UNION</code> to get the set union (each value once). Also try <code>SELECT x FROM A MINUS SELECT x FROM B</code>: the set difference is just {c}.',
+});
+// MapReduce word count
+function mrSteps(text) {
+  const lines = text.split(/\n+/).map(l => l.trim()).filter(Boolean).slice(0, 4);
+  const words = l => (l.toLowerCase().match(/[a-z0-9]+/g) || []);
+  if (!lines.length || !lines.some(l => words(l).length)) return null;
+  const maps = lines.map(l => words(l).map(w => [w, 1]));
+  const groups = {}; maps.flat().forEach(([w]) => (groups[w] = groups[w] || []).push(1));
+  const keys = Object.keys(groups).sort(), red = k => (k[0] <= 'm' ? 0 : 1);
+  const col = (h, boxes) => `<div class="col"><div class="h">${h}</div>${boxes.join('')}</div>`;
+  const b = (t, body, cls = '') => `<div class="b ${cls}"><div class="t">${t}</div>${body}</div>`;
+  const frame = k => {
+    const inp = col('INPUT SPLITS', lines.map((l, i) => b('split ' + (i + 1), l, k === 1 ? 'hl' : '')));
+    const mp = col('MAP OUTPUT', maps.map((m, i) => b('mapper ' + (i + 1), k >= 2 ? m.map(([w]) => `(${w}, 1)`).join('\n') : '…', k === 2 ? 'hl' : k < 2 ? 'dim' : '')));
+    const sh = col('SHUFFLE (group by key)', [0, 1].map(r => b(`to reducer ${r + 1} (${r ? 'n–z' : 'a–m'})`,
+      k >= 3 ? (keys.filter(x => red(x) === r).map(x => `(${x}, [${groups[x].join(', ')}])`).join('\n') || '(no keys)') : '…', k === 3 ? 'hl' : k < 3 ? 'dim' : '')));
+    const rd = col('REDUCE OUTPUT', [0, 1].map(r => b('reducer ' + (r + 1), k >= 4 ? (keys.filter(x => red(x) === r).map(x => `${x}  ${groups[x].length}`).join('\n') || '(nothing)') : '…', k === 4 ? 'new' : 'dim')));
+    return `<div class="mr">${inp}${mp}${sh}${rd}</div>`;
+  };
+  const total = maps.flat().length;
+  return [
+    { html: frame(0), cap: `The input has ${lines.length} line${lines.length > 1 ? 's' : ''}. The framework gives each line (split) to its own map task, which can run on a different machine.` },
+    { html: frame(1), cap: 'Each mapper reads only its own split. No mapper needs to see the others, so all of them run at the same time.' },
+    { html: frame(2), cap: `<b>Map:</b> for every word w, emit the pair (w, 1). The mappers emit ${total} pairs in total.` },
+    { html: frame(3), cap: '<b>Shuffle:</b> the framework collects all pairs with the same key and sends them to one reducer. Here keys starting a–m go to reducer 1 and n–z to reducer 2 (real systems hash the key).' },
+    { html: frame(4), cap: `<b>Reduce:</b> each reducer sums the list of 1s for each of its keys. Final counts: ${keys.map(x => `${x} ${groups[x].length}`).join(', ')}.` },
+  ];
+}
+(() => {
+  const host = $('#mr');
+  host.innerHTML = `<form class="mrform"><textarea aria-label="Input text, one split per line">the cat sat\nthe dog sat\nthe cat ran</textarea><button type="submit">Run ▶</button><span class="mrmsg" aria-live="polite"></span></form><div class="mr-st"></div>`;
+  const run = () => {
+    const st = mrSteps(host.querySelector('textarea').value), msg = host.querySelector('.mrmsg');
+    if (!st) { msg.textContent = 'Type at least one line containing a word (letters or digits).'; return; }
+    msg.textContent = host.querySelector('textarea').value.split(/\n+/).filter(l => l.trim()).length > 4 ? 'Only the first 4 lines are used.' : '';
+    stepper(host.querySelector('.mr-st'), st, { interval: 2600 });
+  };
+  host.querySelector('form').addEventListener('submit', e => { e.preventDefault(); run(); });
+  run();
+})();
+// DTD tree
+(() => {
+  const N = { STARS: [330, 30, ''], STAR: [330, 90, '*'], NAME: [120, 160, '#PCDATA'], ADDRESS: [330, 160, '+'], MOVIES: [540, 160, ''], STREET: [260, 230, '#PCDATA'], CITY: [400, 230, '#PCDATA'], MOVIE: [540, 230, '*'], TITLE: [480, 300, '#PCDATA'], YEAR: [610, 300, '#PCDATA'] };
+  const E = [['STARS', 'STAR'], ['STAR', 'NAME'], ['STAR', 'ADDRESS'], ['STAR', 'MOVIES'], ['ADDRESS', 'STREET'], ['ADDRESS', 'CITY'], ['MOVIES', 'MOVIE'], ['MOVIE', 'TITLE'], ['MOVIE', 'YEAR']];
+  let s = '';
+  E.forEach(([a, b]) => { const [x1, y1] = N[a], [x2, y2] = N[b]; s += arrow(x1, y1 + 14, x2, y2 - 16); });
+  Object.entries(N).forEach(([n, [x, y, m]]) => {
+    s += `<rect x="${x - 50}" y="${y - 14}" width="100" height="28" rx="5" class="${m === '#PCDATA' ? 'cell-new' : 'cell'}"/>` + T(x, y + 4, n, { w: 1 });
+    if (m) s += T(x + 56, y + 4, m === '#PCDATA' ? '' : m, { a: 'start', cls: 'red', w: 1, size: 13 });
+  });
+  s += T(10, 340, 'green = text (#PCDATA) · * zero or more · + one or more', { a: 'start', cls: 'lbl' });
+  const el = $('#dtd'); el.setAttribute('viewBox', '0 0 680 350'); el.setAttribute('width', 680); el.innerHTML = s;
+})();
+// 2PC animation
+(() => {
+  const P = { S2: 60, S3: 140, S4: 220, S5: 300 };
+  const F = (o) => {
+    let s = box(30, 150, 150, 60, 'S1', ['coordinator'], o.c || 'cell-hl');
+    Object.entries(P).forEach(([n, y]) => { s += box(560, y - 24, 150, 48, n, [n === 'S2' ? 'A, B' : n === 'S4' ? 'A' : 'B'], (o.p || {})[n] || 'cell'); });
+    (o.m || []).forEach(([n, dir, t, c]) => {
+      const y = P[n], col = c === 'r' ? ['s-red', 'm-red', 'red'] : c === 'g' ? ['s-grn', 'm-grn', 'grn'] : ['s-acc', 'm-acc', 'acc'];
+      const [x1, y1, x2, y2] = dir === '>' ? [182, 180, 556, y] : [556, y + 6, 182, 186];
+      s += arrow(x1, y1, x2, y2, { cls: col[0], m: col[1] }) + T(440, y1 + (y2 - y1) * ((440 - x1) / (x2 - x1)) - 6 - Math.abs((y2 - y1) / (x2 - x1)) * 38, t, { cls: col[2], size: 11, w: 1 });
+    });
+    s += T(30, 240, 'S1 log:', { a: 'start', cls: 'lbl' }) + (o.log || []).map((l, i) => T(30, 258 + i * 16, l.replace(/</g, '&lt;').replace(/>/g, '&gt;'), { a: 'start', size: 11 })).join('');
+    if (o.ph) s += T(370, 20, o.ph, { w: 1, size: 13 });
+    return svgWrap(730, 340, s, 'Two-phase commit');
+  };
+  const all = (dir, t, c) => Object.keys(P).map(n => [n, dir, t, c]);
+  const ready = { S2: 'cell-new', S3: 'cell-new', S4: 'cell-new', S5: 'cell-new' };
+  stepper('#tpc', [
+    { html: F({}), cap: 'T<sub>1</sub> has done its reads and writes at S2 (A, B), S3 (B), S4 (A) and S5 (B). S1, where T<sub>1</sub> started, coordinates the commit.' },
+    { html: F({ ph: 'COMMIT CASE · phase 1', m: all('>', 'prepare T1'), log: ['<prepare T1>'] }), cap: '<b>Phase 1.</b> S1 logs &lt;prepare T1&gt; and sends <code>prepare T1</code> to all four participants.' },
+    { html: F({ ph: 'COMMIT CASE · phase 1', p: ready, m: all('<', 'ready T1', 'g'), log: ['<prepare T1>'] }), cap: 'Each participant forces its log to disk, logs &lt;ready T1&gt; (it can no longer abort on its own) and replies <code>ready T1</code>.' },
+    { html: F({ ph: 'COMMIT CASE · phase 2', p: ready, m: all('>', 'commit T1', 'g'), log: ['<prepare T1>', '<commit T1>'] }), cap: '<b>Phase 2.</b> All four voted ready, so S1 logs &lt;commit T1&gt; (the decision is now final) and sends <code>commit T1</code> to all.' },
+    { html: F({ ph: 'COMMIT CASE · phase 2', p: ready, m: all('<', 'ack T1'), log: ['<prepare T1>', '<commit T1>', '<complete T1>'] }), cap: 'Each participant logs &lt;commit T1&gt;, commits, and replies <code>ack T1</code>. After all acks S1 logs &lt;complete T1&gt;. 16 messages in total.' },
+    { html: F({ ph: 'ABORT CASE · phase 1', m: all('>', 'prepare T1'), log: ['<prepare T1>'] }), cap: '<b>Abort case.</b> Phase 1 starts the same way: S1 sends <code>prepare T1</code> to S2–S5.' },
+    { html: F({ ph: 'ABORT CASE · phase 1', p: { S2: 'cell-new', S3: 'cell-new', S4: 'cell-new', S5: 'cell-del' }, m: [['S2', '<', 'ready T1', 'g'], ['S3', '<', 'ready T1', 'g'], ['S4', '<', 'ready T1', 'g'], ['S5', '<', 'abort T1', 'r']], log: ['<prepare T1>'] }), cap: 'S2, S3 and S4 reply <code>ready T1</code>. S5 cannot commit its part: it logs &lt;abort T1&gt;, aborts locally and replies <code>abort T1</code>.' },
+    { html: F({ ph: 'ABORT CASE · phase 2', c: 'cell-del', p: { S2: 'cell-del', S3: 'cell-del', S4: 'cell-del', S5: 'cell-del' }, m: [['S2', '>', 'abort T1', 'r'], ['S3', '>', 'abort T1', 'r'], ['S4', '>', 'abort T1', 'r']], log: ['<prepare T1>', '<abort T1>'] }), cap: '<b>Phase 2.</b> One abort vote decides: S1 logs &lt;abort T1&gt; and sends <code>abort T1</code> to the sites that voted ready (sending it to S5 too is allowed and harmless).' },
+    { html: F({ ph: 'ABORT CASE · phase 2', c: 'cell-del', p: { S2: 'cell-del', S3: 'cell-del', S4: 'cell-del', S5: 'cell-del' }, m: [['S2', '<', 'ack T1'], ['S3', '<', 'ack T1'], ['S4', '<', 'ack T1']], log: ['<prepare T1>', '<abort T1>', '<complete T1>'] }), cap: 'S2, S3 and S4 log &lt;abort T1&gt;, undo their parts of T1, and acknowledge. No site committed, so T1 is atomic across all five sites.' },
+  ], { interval: 2600 });
+})();
+// semijoin animation
+(() => {
+  const R1 = [['1', 'a', 'x', '1'], ['2', 'b', 'x', '2'], ['3', 'c', 'y', '1'], ['4', 'd', 'z', '3'], ['5', 'e', 'y', '2']];
+  const R2 = [['x', '1', 'p'], ['y', '1', 'q'], ['w', '4', 'r']];
+  const F = k => {
+    let s = T(150, 16, 'Site S1', { w: 1, size: 13 }) + T(560, 16, 'Site S2', { w: 1, size: 13 }) + `<line x1="350" y1="10" x2="350" y2="250" class="s-fg dash"/>`;
+    s += tblSVG({ x: 40, y: 40, title: '', head: ['A', 'B', 'C', 'D'], rows: R1, w: [34, 34, 34, 34], hl: k >= 3 ? { 0: 'cell-new', 2: 'cell-new', 1: 'cell-del', 3: 'cell-del', 4: 'cell-del' } : {} }) + T(108, 34, 'R1 (5 tuples)', { cls: 'lbl' });
+    s += tblSVG({ x: 520, y: 40, head: ['C', 'D', 'E'], rows: R2, w: [34, 34, 34] }) + T(571, 34, 'R2', { cls: 'lbl' });
+    if (k >= 1) s += tblSVG({ x: 400, y: 40, head: ['C', 'D'], rows: R2.map(r => r.slice(0, 2)), w: [34, 34], hl: { 0: 'cell-hl', 1: 'cell-hl', 2: 'cell-hl' } }) + T(434, 34, 'L', { cls: 'lbl' });
+    if (k >= 2) s += tblSVG({ x: 200, y: 40, head: ['C', 'D'], rows: R2.map(r => r.slice(0, 2)), w: [34, 34], hl: { 0: 'cell-hl', 1: 'cell-hl', 2: 'cell-hl' } }) + T(234, 34, 'L (copy)', { cls: 'lbl' }) + arrow(396, 100, 272, 100, { cls: 's-red', m: 'm-red', label: '6 values', lcls: 'lbl red' });
+    if (k >= 4) s += tblSVG({ x: 400, y: 150, head: ['A', 'B', 'C', 'D'], rows: [R1[0], R1[2]], w: [34, 34, 34, 34], hl: { 0: 'cell-new', 1: 'cell-new' } }) + T(468, 144, "R1′ shipped", { cls: 'lbl' }) + arrow(180, 175, 396, 175, { cls: 's-red', m: 'm-red', label: '8 values', lcls: 'lbl red' });
+    if (k >= 5) s += tblSVG({ x: 560, y: 150, head: ['A', 'B', 'C', 'D', 'E'], rows: [['1', 'a', 'x', '1', 'p'], ['3', 'c', 'y', '1', 'q']], w: [28, 28, 28, 28, 28], hl: { 0: 'cell-new', 1: 'cell-new' } }) + T(630, 144, 'R1 ⋈ R2', { cls: 'lbl' });
+    return svgWrap(720, 240, s, 'Semijoin strategy');
+  };
+  stepper('#semi', [
+    { html: F(0), cap: 'R1(A, B, C, D) has 5 tuples at S1; R2(C, D, E) has 3 tuples at S2. We want R1 ⋈ R2 at S2. Shipping all of R1 would send 5 × 4 = <b>20 values</b>.' },
+    { html: F(1), cap: '<b>Step 1.</b> At S2, project R2 on the join attributes: L = π<sub>C,D</sub>(R2) = {(x,1), (y,1), (w,4)}.' },
+    { html: F(2), cap: '<b>Step 2.</b> Ship L to S1: 3 × 2 = <b>6 values</b>.' },
+    { html: F(3), cap: '<b>Step 3.</b> At S1, R1′ = R1 ⋉ L keeps only tuples whose (C, D) is in L: (1,a,x,1) and (3,c,y,1). The other three would join with nothing.' },
+    { html: F(4), cap: '<b>Step 4.</b> Ship R1′ to S2: 2 × 4 = <b>8 values</b>.' },
+    { html: F(5), cap: '<b>Step 5.</b> At S2, R1′ ⋈ R2 = {(1,a,x,1,p), (3,c,y,1,q)}, the same as R1 ⋈ R2. Network cost: 6 + 8 = <b>14 values instead of 20</b>. The saving grows when R1 is large and few of its tuples match.' },
+  ], { interval: 2800 });
+})();
+flashcards('#cards', [
+  { f: 'Bag', b: 'A collection that allows duplicates; SQL results are bags.' },
+  { f: 'Bag difference', b: 'C(x, A − B) = max(0, C(x, A) − C(x, B)).' },
+  { f: 'OID', b: 'System-generated, immutable identifier of a row object in a typed table.' },
+  { f: 'REF type', b: 'A typed pointer holding an OID; followed with -> (standard) or a dot (Oracle), or DEREF.' },
+  { f: 'DTD', b: 'Grammar for an XML document: which elements contain which, in what order, how many times.' },
+  { f: 'Map / Reduce', b: 'Map emits key–value pairs per input element; reduce combines all values of one key.' },
+  { f: 'Shuffle', b: 'Framework step that groups map output by key and sends each key to one reducer.' },
+  { f: 'Two-phase commit', b: 'Phase 1: prepare and vote (ready/abort). Phase 2: coordinator sends commit (all ready) or abort; participants ack.' },
+  { f: 'Semijoin', b: 'R ⋉ S: tuples of R that join with S; used to ship fewer tuples between sites.' },
+]);
+quiz('#quiz', [
+  { q: 'A = {a, a, b}, B = {a, b, b}. As bags, A − B = ?', opts: ['{ }', '{a}', '{a, a}', '{b}'], a: 1, why: 'a: max(0, 2 − 1) = 1; b: max(0, 1 − 2) = 0.' },
+  { q: 'Which SQL operator is bag union?', opts: ['UNION', 'UNION ALL', 'INTERSECT', 'MINUS'], a: 1, why: 'UNION removes duplicates (set union); UNION ALL keeps them.' },
+  { q: 'In the STARS DTD, which STAR is invalid?', opts: ['One ADDRESS and empty MOVIES', 'Two ADDRESSes and two MOVIEs', 'No ADDRESS', 'One ADDRESS and one MOVIE'], a: 2, why: 'ADDRESS+ requires at least one ADDRESS.' },
+  { q: 'In word count, what does the shuffle deliver to a reducer for “the” in “the cat sat / the dog sat”?', opts: ['(the, 2)', '(the, [1, 1])', '(the, 1)', '(2, the)'], a: 1, why: 'The shuffle groups values by key; the reducer then sums them to 2.' },
+  { q: 'In 2PC, when may the coordinator decide to commit?', opts: ['When any participant is ready', 'When all participants have voted ready', 'After phase 2 acks', 'Immediately'], a: 1, why: 'A single abort (or timeout) forces an abort.' },
+  { q: 'Once a participant has sent ready T, it…', opts: ['may still abort on its own', 'must wait for the coordinator\'s decision', 'commits immediately', 'deletes its log'], a: 1, why: 'It is precommitted: it can neither commit nor abort without the coordinator.' },
+  { q: 'In the semijoin example, how many values cross the network?', opts: ['20', '14', '9', '6'], a: 1, why: '6 for L plus 8 for R1′.' },
+]);
+</script>
+</body>
+</html>

@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Checkpointing a Redo Log · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="../s05/lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 06 (Sukarna) · Chapter 2 · Slides 7–11 · Book §17.3.3–17.3.4</div>
+<h1>Checkpointing a Redo Log</h1>
+<p class="lede">With redo logging, a committed transaction's changes may sit in memory long after it commits, so a checkpoint must write them out. This chapter gives the nonquiescent checkpoint for redo logs, the recovery algorithm that uses it, the slides' “why?” questions, and the three crash scenarios of slide 11.</p>
+
+<h2>1. A new problem</h2>
+
+<p>For undo logging, a checkpoint only had to wait until the active transactions finished: after that, U2 guaranteed their data was on disk. Redo logging gives no such guarantee. A transaction that committed an hour ago may still have changed blocks sitting in memory, and if the log before the checkpoint were thrown away, nothing could redo them. So, whether quiescent or nonquiescent, a redo checkpoint must <em>write to disk all elements modified by committed transactions</em>. For that the buffer manager must track which buffers are <b class="term">dirty</b> (changed but not yet written to disk) and which transactions changed them.</p>
+<p>On the other hand, the checkpoint does <em>not</em> need to wait for the active transactions: under the redo rule they are not allowed to write their changes to disk anyway.</p>
+
+<h2>2. The nonquiescent checkpoint for redo logging (slide 7)</h2>
+<pre>1. Write &lt;START CKPT(T1, …, Tk)&gt;, where T1 … Tk are all the active
+   (uncommitted) transactions, and flush the log.
+2. Write to disk all database elements that were written to buffers but not yet
+   to disk by transactions that had ALREADY COMMITTED when the START CKPT
+   record was written.
+3. Write &lt;END CKPT&gt; and flush the log.</pre>
+
+<h3>The slide's example (slide 8, textbook Fig. 17.8)</h3>
+<div class="logrow">
+<pre class="log">&lt;START T1&gt;
+&lt;T1,A,5&gt;
+&lt;START T2&gt;
+&lt;COMMIT T1&gt;
+&lt;T2,B,10&gt;
+&lt;START CKPT(T2)&gt;
+&lt;T2,C,15&gt;
+&lt;START T3&gt;
+&lt;T3,D,20&gt;
+&lt;END CKPT&gt;
+&lt;COMMIT T2&gt;
+&lt;COMMIT T3&gt;</pre>
+<div style="flex:1 1 300px">
+<p>When the checkpoint starts, T1 has committed and T2 is active, so the record is &lt;START CKPT(T2)&gt;. The value A = 5 written by T1 may or may not have reached disk; if not, the checkpoint must write it before &lt;END CKPT&gt;. B = 10 belongs to T2, which has not committed, so the checkpoint must <em>not</em> write it.</p>
+<p>While the checkpoint is writing A, the log keeps growing: T2 writes C, T3 starts and writes D. After &lt;END CKPT&gt;, T2 and T3 commit.</p>
+</div></div>
+
+<figure class="wide">
+<span class="anim-tag">Interactive animation</span>
+<div id="tl"></div>
+</figure>
+
+<h2>3. Recovery with a checkpointed redo log (slides 9–10)</h2>
+
+<p><strong>Case 1: the last checkpoint record on the log is &lt;END CKPT&gt;.</strong></p>
+<ol>
+  <li>Find the last &lt;END CKPT&gt;, and scan back to the matching &lt;START CKPT(T1,…,Tk)&gt;.</li>
+  <li>Every transaction that committed before that START CKPT has its changes on disk, so it can be ignored.</li>
+  <li>Only T1 … Tk and transactions that started after the START CKPT can need redoing. Find the earliest &lt;START Ti&gt; among T1 … Tk.</li>
+  <li>From there, scan forward and redo every update of a <em>committed</em> transaction that is one of T1 … Tk or started after the START CKPT. (Updates of transactions that committed before the START CKPT may appear in this stretch too; they are skipped.)</li>
+</ol>
+
+<div class="q">
+<h4>Slide 9 questions (worked answers)</h4>
+<p><strong>Why do all transactions committed before &lt;START CKPT…&gt; have their updates on disk?</strong> Because step 2 of the checkpoint wrote to disk every element changed by a transaction that had committed when the START CKPT was written, and &lt;END CKPT&gt; is written only after step 2 finished. Seeing &lt;END CKPT&gt; on the log proves that step 2 completed.</p>
+<p><strong>Why can none of T1 … Tk have a &lt;COMMIT&gt; record before &lt;START CKPT…&gt;?</strong> By definition the list holds the transactions that were active, i.e. uncommitted, at the moment the START CKPT record was written. A transaction that had committed earlier would not be in the list. So their COMMIT records, if any, come after the START CKPT, and they can still have committed changes that are not on disk.</p>
+</div>
+
+<p><strong>Case 2: the last checkpoint record is &lt;START CKPT(T1,…,Tk)&gt;</strong> with no END after it (slide 10).</p>
+
+<div class="q">
+<h4>Slide 10 question: why are transactions that committed before this START CKPT not guaranteed to be on disk?</h4>
+<p>The crash interrupted the checkpoint in step 2, while it was still writing committed transactions' data to disk. We do not know how far it got, so this checkpoint guarantees nothing. Instead we use the previous complete checkpoint: find the previous &lt;END CKPT&gt; and its matching &lt;START CKPT(S1,…,Sm)&gt;, and redo all committed transactions that are among S1 … Sm or started after that START CKPT, beginning at the earliest &lt;START Si&gt;. If there is no earlier checkpoint, start at the beginning of the log. (A detail from the textbook's footnote: we look for an &lt;END CKPT&gt; first, then its START CKPT, because an older START CKPT might itself have no END after an earlier crash.)</p>
+</div>
+
+<p>The textbook also suggests putting into &lt;START CKPT&gt; not just the names of T1 … Tk but pointers to their START records. Then, once &lt;END CKPT&gt; is written, everything before the earliest of those START records can be deleted.</p>
+
+<h2>4. The three scenarios of slide 11 (textbook Example 17.9)</h2>
+
+<div class="q">
+<h4>Slide 11 (worked answers), log of Fig. 17.8</h4>
+<p><strong>System crashes at the end.</strong> Scanning back, the last checkpoint record is &lt;END CKPT&gt;; its START CKPT lists T2. Candidates for redo: T2 and transactions that started after the START CKPT, i.e. T3. Both have COMMIT records, so both are redone. Scan forward from &lt;START T2&gt; (the earliest start among the list): redo <strong>B = 10, C = 15, D = 20</strong>. T1 committed before the START CKPT: its A = 5 was flushed by the checkpoint, so &lt;T1,A,5&gt; is not redone (it lies before &lt;START T2&gt; anyway).</p>
+<p><strong>Crash between &lt;COMMIT T2&gt; and &lt;COMMIT T3&gt;.</strong> Same as above, except T3 has no COMMIT. Its record &lt;T3,D,20&gt; is in the scanned range but is not redone. Redo <strong>B = 10, C = 15</strong>; then write &lt;ABORT T3&gt;.</p>
+<p><strong>Crash just before &lt;END CKPT&gt;.</strong> The last checkpoint record is &lt;START CKPT(T2)&gt; with no END, so it guarantees nothing. We would look for the previous END CKPT, but there is none, so we go back to the beginning of the log. The only committed transaction is T1: redo <strong>A = 5</strong>. Write &lt;ABORT T2&gt; and &lt;ABORT T3&gt;.</p>
+</div>
+
+<p>The recovery simulator, set to redo logging with the full log of Fig. 17.8. Delete the last records to try the other two scenarios.</p>
+<figure class="wide">
+<span class="anim-tag">Interactive animation</span>
+<div id="rv"></div>
+</figure>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+<div id="try2"></div>
+
+<div class="key"><p><strong>Summary:</strong> a redo checkpoint writes &lt;START CKPT(active list)&gt;, flushes the dirty data of transactions that had already committed, then writes &lt;END CKPT&gt;; it does not wait for active transactions. Recovery uses the last <em>completed</em> checkpoint: redo committed transactions that are in its list or started after its START CKPT, scanning forward from the earliest START of the listed ones. If the last checkpoint is incomplete, fall back to the previous complete one, or the start of the log.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../s05/lecture.js"></script>
+<script>
+const F178 = '<START T1> <T1,A,5> <START T2> <COMMIT T1> <T2,B,10> <START CKPT(T2)> <T2,C,15> <START T3> <T3,D,20> <END CKPT> <COMMIT T2> <COMMIT T3>';
+timelineTool('#tl', { log: F178, mode: 'redo' });
+recoveryTool('#rv', { log: F178.replace(/> </g, '>\n<'), mode: 'redo' });
+flashcards('#cards', [
+  { f: 'Dirty buffer', b: 'A buffer changed in memory but not yet written to disk.' },
+  { f: 'Redo checkpoint, step 2', b: 'Write to disk all elements changed by transactions that had committed before START CKPT.' },
+  { f: 'Does a redo checkpoint wait for active transactions?', b: 'No. They may not write to disk before committing anyway.' },
+  { f: 'Recovery, last record END CKPT', b: 'Redo committed transactions in the START CKPT list or started after it, from the earliest listed START.' },
+  { f: 'Recovery, last record START CKPT', b: 'Ignore it; use the previous END CKPT and its START CKPT (or the whole log).' },
+]);
+quiz('#quiz', [
+  { q: 'Which buffers does a redo checkpoint write to disk?', opts: ['All dirty buffers', 'Dirty buffers of transactions committed before START CKPT', 'Buffers of the listed active transactions', 'None'], a: 1, why: 'Uncommitted data may not reach disk under redo logging.' },
+  { q: 'Fig. 17.8, crash at the end. Is &lt;T1,A,5&gt; redone?', opts: ['Yes', 'No: T1 committed before START CKPT, so the checkpoint flushed A', 'No: T1 is uncommitted', 'Only if A is dirty'], a: 1, why: 'END CKPT proves A = 5 is on disk.' },
+  { q: 'Fig. 17.8, crash just before END CKPT. What is redone?', opts: ['B, C, D', 'A only', 'Nothing', 'A and B'], a: 1, why: 'The checkpoint is incomplete and there is no earlier one, so the whole log is used; only T1 committed.' },
+  { q: 'Why can a listed transaction not have its COMMIT before START CKPT?', opts: ['It is a rule of SQL', 'The list contains only transactions that were uncommitted at that moment', 'The log manager deletes it', 'Because of U2'], a: 1, why: 'Active means started and not yet committed.' },
+]);
+ask('#try1', { q: 'Fig. 17.8, crash at the end: from which record number does the forward redo scan start? (1 = &lt;START T1&gt;)', a: 3, why: '&lt;START T2&gt;, record 3, the earliest START among the checkpoint list {T2}.' });
+ask('#try2', { q: 'Fig. 17.8, crash between &lt;COMMIT T2&gt; and &lt;COMMIT T3&gt;: how many elements are redone?', a: 2, why: 'B = 10 and C = 15 for T2; T3 did not commit.' });
+</script>
+</body>
+</html>

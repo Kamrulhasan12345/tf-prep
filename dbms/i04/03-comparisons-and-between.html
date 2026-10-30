@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Comparisons, BETWEEN and String Equality · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="../i03/lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 04 (Ishrak) · Chapter 3 · Slides 19–25 · Book §6.1.2–6.1.3</div>
+<h1>Comparisons, BETWEEN and String Equality</h1>
+<p class="lede">Range conditions on numbers, strings and dates: the six comparison operators, BETWEEN … AND … and NOT BETWEEN (both inclusive), and how Oracle compares strings, including the blank-padding rule for CHAR columns that slides 24–25 point out.</p>
+
+<h2>1. A range condition (slide 19)</h2>
+<p><em>Show all products' info that will cost more than 100 dollars.</em></p>
+<pre>SELECT *
+FROM   Product
+WHERE  price &gt; 100;</pre>
+<p>The slide shows the result next to the loop of slide 17: each row is tested; SingleTouch (149.99) and MultiTouch (203.99) pass.</p>
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="a1"></div>
+</figure>
+
+<h2>2. Comparison operators (slide 20)</h2>
+<div class="tbl"><table>
+<tr><th>Operator</th><th>Meaning</th><th>Example</th></tr>
+<tr><td><code>=</code></td><td>equal to</td><td><code>category = 'Gadgets'</code></td></tr>
+<tr><td><code>&gt;</code></td><td>greater than</td><td><code>price &gt; 100</code></td></tr>
+<tr><td><code>&lt;</code></td><td>less than</td><td><code>price &lt; 100</code></td></tr>
+<tr><td><code>&gt;=</code></td><td>greater than or equal to</td><td><code>price &gt;= 149.99</code></td></tr>
+<tr><td><code>&lt;=</code></td><td>less than or equal to</td><td><code>year &lt;= 1990</code></td></tr>
+<tr><td><code>&lt;&gt;</code> or <code>!=</code></td><td>not equal to (two spellings; Oracle also accepts <code>^=</code>)</td><td><code>manufacturer &lt;&gt; 'Canon'</code></td></tr>
+</table></div>
+<p>The operators work on numbers, strings and dates. Numbers compare by value and dates by time (earlier is smaller). Strings compare in <b class="term">lexicographic</b> order, character by character, like words in a dictionary; Oracle's default compares the characters' codes, so all upper-case letters come before all lower-case ones (<code>'Zebra' &lt; 'apple'</code>), and a string that is a prefix of another is smaller (<code>'P' &lt; 'Photography'</code>).</p>
+
+<h2>3. BETWEEN … AND … (slides 21–22)</h2>
+<pre>SELECT &lt;attributes&gt;
+FROM   &lt;table&gt;
+WHERE  attribute BETWEEN value1 AND value2</pre>
+<dl class="def">
+  <dt>BETWEEN</dt>
+  <dd><code>x BETWEEN a AND b</code> means exactly <code>x &gt;= a AND x &lt;= b</code>. It is <strong>inclusive</strong>: both end values qualify. It works on numbers, texts and dates. The smaller value must come first: <code>BETWEEN 200 AND 100</code> is never true.</dd>
+</dl>
+<p><em>Show all products' info in the price range $100 to $200 (inclusive).</em></p>
+<pre>SELECT *
+FROM   Product
+WHERE  price BETWEEN 100 AND 200;      -- SingleTouch only</pre>
+<figure>
+<svg viewBox="0 0 640 150" width="640" role="img" aria-label="Number line from 0 to 220 with the interval 100 to 200 and the four prices">
+  <g id="nl"></g>
+</svg>
+<figcaption><b>Figure 1.</b> <code>BETWEEN 100 AND 200</code> is the closed interval [100, 200] (filled end points). <code>NOT BETWEEN 10 AND 200</code> is everything outside [10, 200]. Only MultiTouch (203.99) is outside it.</figcaption>
+</figure>
+
+<h2>4. NOT BETWEEN (slide 23)</h2>
+<p><em>Show all products' info not in the price range $10 to $200 (inclusive).</em></p>
+<pre>SELECT *
+FROM   Product
+WHERE  price NOT BETWEEN 10 AND 200;   -- MultiTouch only</pre>
+<p><code>x NOT BETWEEN a AND b</code> means <code>x &lt; a OR x &gt; b</code>. The slide says "NOT BETWEEN-AND is also inclusive": the range being excluded, [10, 200], includes its end points, so a price of exactly 10 or 200 would <em>not</em> be returned. Gizmo (19.99) lies inside [10, 200], so it is excluded too; only MultiTouch is left.</p>
+<div id="p1"></div>
+
+<h2>5. String equality and CHAR padding (slides 24–25)</h2>
+<p><em>Show all household products' info.</em></p>
+<pre>SELECT pname, price, manufacturer
+FROM   Product
+WHERE  category = 'Household';</pre>
+<p>Slides 24 and 25 make a point about the column's type. Suppose <code>category</code> were declared <code>CHAR(15)</code>. Then the stored value is <code>'Household'</code> followed by 6 blanks. Does it still equal the 9-character constant <code>'Household'</code>? In Oracle, yes, because of this rule:</p>
+<dl class="def">
+  <dt>Blank-padded comparison</dt>
+  <dd>When Oracle compares two values that are both of a fixed-length type (CHAR columns and string constants count as CHAR), it first pads the shorter one with blanks to the same length, then compares. Trailing blanks therefore never matter.</dd>
+  <dt>Non-padded comparison</dt>
+  <dd>When either value is a VARCHAR2, Oracle compares the strings exactly as they are; trailing blanks count, and a string with an extra blank is different (and greater).</dd>
+</dl>
+<p>So with a CHAR column, both <code>category = 'Household'</code> (slide 24) and <code>category = 'Household '</code> (slide 25, an extra blank in the constant) match MultiTouch. With a VARCHAR2 column, the first matches and the second does not. Step through the four cases:</p>
+<figure>
+<span class="anim-tag">Animation</span>
+<div id="a2"></div>
+</figure>
+<p>The playground's SQLite never pads, so it behaves like Oracle's VARCHAR2 in all cases. Our sample <code>category</code> column is VARCHAR2, so the box below reproduces slide 25's VARCHAR2 behaviour: with the extra blank, no rows.</p>
+<div id="p2"></div>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div><div id="try2"></div>
+<h3>SQL exercises</h3>
+<div id="c1"></div><div id="c2"></div><div id="c3"></div><div id="c4"></div><div id="c5"></div><div id="c6"></div>
+
+<div class="key"><p><strong>Summary:</strong> the comparison operators are = &lt; &gt; &lt;= &gt;= and two forms of not-equal, &lt;&gt; and !=. They work on numbers, strings (lexicographic, case-sensitive) and dates. <code>x BETWEEN a AND b</code> = <code>a &lt;= x AND x &lt;= b</code>, inclusive, smaller value first; NOT BETWEEN excludes the same closed range. Oracle compares two CHAR values after padding with blanks, so trailing blanks do not matter; with VARCHAR2 they do.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/sqlplay.js"></script>
+<script src="../i03/lecture.js"></script>
+<script>
+selectAnim('#a1', { name: 'Product', head: GIZ_HEAD, rows: GIZ_ROWS, perRow: true,
+  where: { test: r => r[1] > 100, why: r => `${r[1]} &gt; 100` },
+  sql: [['select', 'SELECT *'], ['from', 'FROM   Product'], ['where', 'WHERE  price > 100;']] });
+(() => {
+  const X = v => 30 + v * 2.6;
+  let s = `<path d="M20 70 L${X(230)} 70" class="s-fg" marker-end="url(#m-fg)"/>`;
+  for (let v = 0; v <= 220; v += 20) s += `<path d="M${X(v)} 66 L${X(v)} 74" class="s-fg"/><text x="${X(v)}" y="90" text-anchor="middle" class="lbl">${v}</text>`;
+  s += `<rect x="${X(100)}" y="40" width="${X(200) - X(100)}" height="14" class="cell-new"/><circle cx="${X(100)}" cy="47" r="5" class="cell-hl" style="stroke-width:2"/><circle cx="${X(200)}" cy="47" r="5" class="cell-hl" style="stroke-width:2"/><text x="${(X(100) + X(200)) / 2}" y="34" text-anchor="middle" style="font-size:12px">BETWEEN 100 AND 200</text>`;
+  s += `<rect x="${X(10)}" y="104" width="${X(200) - X(10)}" height="12" class="cell-dim"/><text x="${(X(10) + X(200)) / 2}" y="134" text-anchor="middle" style="font-size:12px">[10, 200] is excluded by NOT BETWEEN 10 AND 200</text>`;
+  GIZ_ROWS.forEach(r => { s += `<circle cx="${X(r[1])}" cy="70" r="5" class="${r[1] >= 100 && r[1] <= 200 ? 'cell-new' : r[1] > 200 ? 'cell-del' : 'cell'}"/><text x="${X(r[1])}" y="${r[1] < 25 ? 60 : 60}" text-anchor="${r[1] < 25 ? 'end' : r[1] < 40 ? 'start' : 'middle'}" class="lbl">${r[0]}</text>`; });
+  document.querySelector('#nl').innerHTML = s;
+})();
+(() => {
+  const cell = (txt, n, cls) => { let s = ''; for (let i = 0; i < n; i++) s += `<span class="pad" style="background:var(${i < txt.length ? '--cell' : '--cell-hl'})">${i < txt.length ? txt[i] : '␣'}</span>`; return `<span style="white-space:nowrap">${s}</span>`; };
+  const fr = (colType, stored, lit, padded, eq) => ({ html: `<div class="tbl"><table>
+      <tr><th>column type</th><td><code>${colType}</code></td></tr>
+      <tr><th>stored value</th><td>${cell(stored, stored.length + (colType === 'CHAR(15)' ? 15 - stored.length : 0))}</td></tr>
+      <tr><th>constant</th><td>${cell(lit, padded ? 15 : lit.length)}${padded ? ' &nbsp;<span class="lbl">(padded to 15)</span>' : ''}</td></tr>
+      <tr><th>equal?</th><td>${eq ? '<b class="good">TRUE: row returned</b>' : '<b class="bad">FALSE: no row</b>'}</td></tr></table></div>`, cap: '' });
+  const st = [
+    fr('CHAR(15)', 'Household', 'Household', true, true), fr('CHAR(15)', 'Household', 'Household ', true, true),
+    fr('VARCHAR2(20)', 'Household', 'Household', false, true), fr('VARCHAR2(20)', 'Household', 'Household ', false, false)];
+  st[0].cap = "<b>Slide 24, CHAR column.</b> The stored value has 6 padding blanks (orange). Oracle pads the constant 'Household' to 15 as well; the strings are then identical: TRUE.";
+  st[1].cap = "<b>Slide 25, CHAR column.</b> The constant 'Household ' has one trailing blank. Padded to 15 it is again identical: TRUE. Trailing blanks never matter between CHAR values.";
+  st[2].cap = "<b>VARCHAR2 column, slide 24's query.</b> No padding is stored or added. 'Household' = 'Household': TRUE.";
+  st[3].cap = "<b>VARCHAR2 column, slide 25's query.</b> Non-padded comparison: 'Household' (9 characters) ≠ 'Household ' (10 characters): FALSE. This is slide 25's warning: \"does not match if it's VARCHAR2\".";
+  stepper('#a2', st, { interval: 2600 });
+})();
+sqlPlay('#p1', { setup: GIZ, query: 'SELECT *\nFROM   Product\nWHERE  price NOT BETWEEN 10 AND 200;', note: 'Also run slide 22: <code>WHERE price BETWEEN 100 AND 200</code>. Then try <code>BETWEEN 200 AND 100</code>.' });
+sqlPlay('#p2', { setup: GIZ, query: "SELECT pname, price, manufacturer\nFROM   Product\nWHERE  category = 'Household ';", note: "Remove the blank before the closing quote and run again: MultiTouch appears." });
+flashcards('#cards', [
+  { f: 'Not equal', b: '<> or != (Oracle also ^=).' },
+  { f: 'BETWEEN a AND b', b: 'x >= a AND x <= b. Inclusive; a must be the smaller value.' },
+  { f: 'NOT BETWEEN a AND b', b: 'x < a OR x > b. The end points are excluded from the result.' },
+  { f: 'String order', b: 'Lexicographic by character code: \'Z\' < \'a\', and a prefix is smaller.' },
+  { f: 'Blank-padded comparison', b: 'CHAR vs CHAR: pad the shorter with blanks first; trailing blanks never matter.' },
+  { f: 'Non-padded comparison', b: 'If either side is VARCHAR2: compare exactly; trailing blanks count.' },
+]);
+quiz('#quiz', [
+  { q: '<code>WHERE price BETWEEN 19.99 AND 29.99</code> returns…', opts: ['Gizmo and Powergizmo', 'Neither', 'Only Gizmo', 'Only Powergizmo'], a: 0, why: 'BETWEEN is inclusive at both ends.' },
+  { q: '<code>WHERE price BETWEEN 200 AND 100</code> returns…', opts: ['SingleTouch', 'No rows', 'All rows', 'An error'], a: 1, why: 'It means price >= 200 AND price <= 100, which is impossible.' },
+  { q: "<code>WHERE category BETWEEN 'G' AND 'P'</code> returns which categories?", opts: ['Gadgets, Household, Photography', 'Gadgets, Household', 'Household only', 'Photography only'], a: 1, why: "'P' < 'Photography' (a prefix is smaller), so Photography is above the range." },
+  { q: 'Which is equivalent to <code>price NOT BETWEEN 10 AND 200</code>?', opts: ['price < 10 AND price > 200', 'price < 10 OR price > 200', 'price <= 10 OR price >= 200', 'price > 10 AND price < 200'], a: 1, why: 'Outside the closed interval.' },
+  { q: "A CHAR(10) column holds 'Dhaka'. Does <code>col = 'Dhaka  '</code> (two trailing blanks) match in Oracle?", opts: ['Yes', 'No', 'Only with LIKE', 'Error'], a: 0, why: 'Blank-padded comparison: trailing blanks are ignored.' },
+  { q: "Which is TRUE in Oracle's default ordering?", opts: ["'apple' < 'Banana'", "'Banana' < 'apple'", "'apple' = 'APPLE'", "'Z' > 'a'"], a: 1, why: 'Upper-case letters have smaller codes than lower-case ones.' },
+]);
+ask('#try1', { q: 'On the Employees table, how many employees have <code>salary BETWEEN 6000 AND 9000</code>?', a: 5, hint: 'Ends included. Look for 6000, 7000, 8600, 9000 …', why: 'Hunold 9000, Ernst 6000, Taylor 8600, Grant 7000, Fay 6000.' });
+ask('#try2', { q: 'How many products of the 4-row Product table satisfy <code>price &lt;&gt; 149.99</code>?', a: 3, why: 'All except SingleTouch.' });
+chk('#c1', GIZ, '<b>Easy (slide 19).</b> Show all information about products costing more than $100.', 'SELECT * FROM Product WHERE price > 100;');
+chk('#c2', GIZ, '<b>Slide 22.</b> Show all information about products priced from $100 to $200 inclusive, using BETWEEN.', 'SELECT * FROM Product WHERE price BETWEEN 100 AND 200;');
+chk('#c3', GIZ, '<b>Slide 23.</b> Show all information about products <em>not</em> in the range $10 to $200 inclusive.', 'SELECT * FROM Product WHERE price NOT BETWEEN 10 AND 200;');
+chk('#c4', GIZ, '<b>Not equal.</b> Show the names of products not made by GizmoWorks.', "SELECT pname FROM Product WHERE manufacturer <> 'GizmoWorks';");
+chk('#c5', HR, '<b>BETWEEN on numbers.</b> Show <code>last_name</code> and <code>salary</code> of employees earning from 5000 to 10000 inclusive.', 'SELECT last_name, salary FROM Employees WHERE salary BETWEEN 5000 AND 10000;');
+chk('#c6', HR, '<b>Exam style: dates.</b> Show <code>last_name</code>, <code>hire_date</code> and <code>job_id</code> of employees hired in 2005 or 2006 whose job is not <code>ST_CLERK</code>.', "SELECT last_name, hire_date, job_id\nFROM Employees\nWHERE hire_date BETWEEN DATE '2005-01-01' AND DATE '2006-12-31'\n  AND job_id <> 'ST_CLERK';", { hint: "BETWEEN works on dates: <code>hire_date BETWEEN DATE '2005-01-01' AND DATE '2006-12-31'</code>, then AND a second condition." });
+</script>
+</body>
+</html>

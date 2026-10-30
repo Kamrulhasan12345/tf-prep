@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Query Processor · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 07 (Sukarna) · Chapter 1 · Slides 1–12 · Book §15.1</div>
+<h1>The Query Processor: From SQL to a Physical Plan</h1>
+<p class="lede">What happens between typing an SQL query and getting rows back: parsing, query rewrite, and physical plan generation, plus the metadata the optimizer uses to pick a plan. This chapter sets up the vocabulary for the whole of Lectures 07 and 08.</p>
+
+<h2>1. What the query processor does (slide 2)</h2>
+
+<p>SQL is a <em>declarative</em> language: a query says <em>what</em> rows you want, never <em>how</em> to find them. Something inside the DBMS has to turn that request into a concrete sequence of disk reads, comparisons and copies. That component is the query processor.</p>
+
+<dl class="def">
+<dt>Query processor</dt>
+<dd>The part of the DBMS that (1) converts a high-level SQL query into a sequence of low-level database operations, and (2) chooses and runs an efficient algorithm for each of those operations.</dd>
+<dt>Query compilation</dt>
+<dd>The first major part: turning the SQL text into a <em>physical query plan</em>. It has three steps: <b>parsing → query rewrite → physical plan generation</b>.</dd>
+<dt>Query execution</dt>
+<dd>The second major part: running the physical plan's algorithms on the stored data and producing the answer.</dd>
+</dl>
+
+<p>The slide's schematic is <code>SQL → compiler → physical plan → executor</code>. The figure (from the textbook, Fig. 15.2) shows the three compilation steps and the tree each one hands to the next. The two middle steps, choosing a logical plan and choosing a physical plan, are together called <b class="term">query optimization</b>, because both try to make the query cheaper.</p>
+
+<figure>
+<svg viewBox="0 0 620 330" width="620" role="img" aria-label="Query compilation pipeline">
+  <text x="310" y="18" text-anchor="middle" class="big">SQL query</text>
+  <line x1="310" y1="24" x2="310" y2="44" class="s-fg" marker-end="url(#m-fg)"/>
+  <rect x="230" y="46" width="160" height="40" rx="5" class="cell"/><text x="310" y="71" text-anchor="middle" class="big">Parse query</text>
+  <line x1="310" y1="86" x2="310" y2="122" class="s-fg" marker-end="url(#m-fg)"/>
+  <text x="322" y="108" class="lbl">parse tree (query expression tree)</text>
+  <rect x="230" y="124" width="160" height="40" rx="5" class="cell-hl"/><text x="310" y="149" text-anchor="middle" class="big">Select logical plan</text>
+  <line x1="310" y1="164" x2="310" y2="200" class="s-fg" marker-end="url(#m-fg)"/>
+  <text x="322" y="186" class="lbl">logical query plan tree (relational algebra)</text>
+  <rect x="230" y="202" width="160" height="40" rx="5" class="cell-hl"/><text x="310" y="227" text-anchor="middle" class="big">Select physical plan</text>
+  <line x1="310" y1="242" x2="310" y2="278" class="s-fg" marker-end="url(#m-fg)"/>
+  <text x="322" y="264" class="lbl">physical query plan tree</text>
+  <rect x="230" y="280" width="160" height="40" rx="5" class="cell-new"/><text x="310" y="305" text-anchor="middle" class="big">Execute plan</text>
+  <path d="M220 128 C 170 150, 170 220, 220 240" class="s-acc"/>
+  <text x="160" y="180" text-anchor="end" class="acc" style="font-size:12px;font-weight:600">query</text>
+  <text x="160" y="195" text-anchor="end" class="acc" style="font-size:12px;font-weight:600">optimization</text>
+  <text x="20" y="62" class="lbl">query compilation:</text><text x="20" y="77" class="lbl">parsing</text>
+  <text x="20" y="145" class="lbl">query rewrite</text>
+  <text x="20" y="223" class="lbl">physical plan generation</text>
+  <text x="20" y="301" class="lbl">query execution</text>
+</svg>
+<figcaption><b>Figure 1.</b> The outline of query compilation (slide 2, textbook Fig. 15.2). Orange boxes are the two optimization steps.</figcaption>
+</figure>
+
+<h2>2. Parsing (slide 3)</h2>
+
+<dl class="def">
+<dt>Parsing</dt>
+<dd>Checking the <em>syntax</em> (is this legal SQL?) and the <em>semantics</em> (do the named tables and columns exist, are the types compatible?) of the query, and building a <b>parse tree</b>.</dd>
+<dt>Parse tree (syntax tree)</dt>
+<dd>A tree whose shape follows the SQL grammar: the root is the whole statement, its children are the clauses, and the leaves are names and constants.</dd>
+</dl>
+
+<p>The slide's example is <code>SELECT title FROM ParamountMovies WHERE year = 1979;</code>. Its parse tree has a SELECT-statement root with three children, one per clause. The WHERE clause holds a condition node, which splits into <code>year</code>, <code>=</code> and <code>1979</code>.</p>
+
+<figure>
+<svg viewBox="0 0 560 210" width="560" role="img" aria-label="Parse tree">
+  <g style="font-size:12px">
+  <rect x="210" y="10" width="140" height="28" rx="4" class="cell"/><text x="280" y="29" text-anchor="middle">SELECT statement</text>
+  <line x1="280" y1="38" x2="90" y2="70" class="s-fg"/><line x1="280" y1="38" x2="280" y2="70" class="s-fg"/><line x1="280" y1="38" x2="460" y2="70" class="s-fg"/>
+  <rect x="30" y="70" width="120" height="28" rx="4" class="cell"/><text x="90" y="89" text-anchor="middle">SELECT clause</text>
+  <rect x="220" y="70" width="120" height="28" rx="4" class="cell"/><text x="280" y="89" text-anchor="middle">FROM clause</text>
+  <rect x="400" y="70" width="120" height="28" rx="4" class="cell"/><text x="460" y="89" text-anchor="middle">WHERE clause</text>
+  <line x1="90" y1="98" x2="90" y2="125" class="s-fg"/><line x1="280" y1="98" x2="280" y2="125" class="s-fg"/><line x1="460" y1="98" x2="460" y2="125" class="s-fg"/>
+  <text x="90" y="140" text-anchor="middle" class="acc">title</text>
+  <text x="280" y="140" text-anchor="middle" class="acc">ParamountMovies</text>
+  <rect x="415" y="126" width="90" height="26" rx="4" class="cell-hl"/><text x="460" y="144" text-anchor="middle">condition</text>
+  <line x1="460" y1="152" x2="410" y2="180" class="s-fg"/><line x1="460" y1="152" x2="460" y2="180" class="s-fg"/><line x1="460" y1="152" x2="510" y2="180" class="s-fg"/>
+  <text x="410" y="195" text-anchor="middle" class="acc">year</text><text x="460" y="195" text-anchor="middle" class="acc">=</text><text x="510" y="195" text-anchor="middle" class="acc">1979</text>
+  </g>
+</svg>
+<figcaption><b>Figure 2.</b> Parse tree for <code>SELECT title FROM ParamountMovies WHERE year = 1979</code> (slide 3). Blue leaves are the tokens from the query.</figcaption>
+</figure>
+
+<h2>3. Query rewrite (slide 4)</h2>
+
+<dl class="def">
+<dt>Logical query plan</dt>
+<dd>A relational-algebra (RA) expression for the query, usually drawn as a tree (an <b>RA tree</b>): leaves are stored relations, inner nodes are RA operators (σ, π, ⋈, ×, ∪, …). It says <em>which</em> operations to do, but not which algorithm to use for each.</dd>
+<dt>Query rewrite</dt>
+<dd>Translating the parse tree into an initial logical plan, then improving it with <b>algebraic equivalences</b> (laws such as "a selection with an AND can be split into two selections"). The result computes the same answer, more cheaply.</dd>
+</dl>
+
+<p>The slide's example starts from π<sub>B,D</sub>(σ<sub>R.A="c" ∧ R.C=S.C</sub>(R × S)) and splits the selection into σ<sub>R.C=S.C</sub>(σ<sub>R.A="c"</sub>(R × S)). Splitting is only the first step. The reason to split is that each piece can then move to where it is cheapest. The animation finishes the rewrite and reaches the "best logical plan" that slide 5 starts from.</p>
+
+<figure>
+<span class="anim-tag">Animation</span>
+<div id="rewrite"></div>
+</figure>
+
+<h2>4. Physical plan generation (slides 5–6)</h2>
+
+<dl class="def">
+<dt>Physical query plan</dt>
+<dd>A logical plan in which every operator has been given a concrete <b>algorithm</b> (for example hash join instead of nested-loop join), every relation has an <b>access method</b> (table scan or index scan), and any needed <b>sorting</b> is made explicit.</dd>
+<dt>Physical operator</dt>
+<dd>A piece of code that implements one step of a physical plan, such as Table scan, Index scan, Sort, Hash join or Nested-loop join.</dd>
+</dl>
+
+<p>Slide 5 turns the best logical plan π<sub>B,D</sub>(σ<sub>R.A="c"</sub>(R) ⋈ S) into a physical plan. The selection on R becomes an <b>index scan</b> (there is presumably an index on R.A, so only rows with A = "c" are read), S is read by a <b>table scan</b>, the natural join becomes a <b>hash join</b>, and π becomes a Project operator.</p>
+
+<figure>
+<svg viewBox="0 0 600 220" width="600" role="img" aria-label="logical plan to physical plan">
+  <g style="font-size:13px">
+  <text x="130" y="20" text-anchor="middle" class="lbl">best logical plan</text>
+  <text x="130" y="48" text-anchor="middle">π<tspan class="lbl" dy="4">B,D</tspan></text>
+  <line x1="130" y1="54" x2="130" y2="78" class="s-fg"/>
+  <text x="130" y="94" text-anchor="middle">⋈</text>
+  <line x1="122" y1="100" x2="80" y2="130" class="s-fg"/><line x1="138" y1="100" x2="180" y2="130" class="s-fg"/>
+  <text x="80" y="146" text-anchor="middle">σ<tspan class="lbl" dy="4">R.A="c"</tspan></text>
+  <text x="180" y="146" text-anchor="middle">S</text>
+  <line x1="75" y1="152" x2="75" y2="178" class="s-fg"/><text x="75" y="194" text-anchor="middle">R</text>
+  <path d="M245 110 H320" class="s-acc" marker-end="url(#m-acc)"/>
+  <text x="283" y="100" text-anchor="middle" class="lbl">choose algorithms</text>
+  <text x="460" y="20" text-anchor="middle" class="lbl">physical plan</text>
+  <rect x="410" y="32" width="100" height="26" rx="4" class="cell"/><text x="460" y="50" text-anchor="middle">Project B, D</text>
+  <line x1="460" y1="58" x2="460" y2="80" class="s-fg"/>
+  <rect x="410" y="80" width="100" height="26" rx="4" class="cell-hl"/><text x="460" y="98" text-anchor="middle">Hash join</text>
+  <line x1="440" y1="106" x2="400" y2="132" class="s-fg"/><line x1="480" y1="106" x2="520" y2="132" class="s-fg"/>
+  <rect x="345" y="132" width="110" height="26" rx="4" class="cell-new"/><text x="400" y="150" text-anchor="middle">Index scan R</text>
+  <rect x="470" y="132" width="110" height="26" rx="4" class="cell-new"/><text x="525" y="150" text-anchor="middle">Table scan S</text>
+  <text x="400" y="178" text-anchor="middle" class="lbl">(reads only A = "c")</text>
+  </g>
+</svg>
+<figcaption><b>Figure 3.</b> Slide 5: each logical operator gets an algorithm, and each leaf gets an access method.</figcaption>
+</figure>
+
+<p>Slide 6 explains how the choice is made. A single logical plan usually has many candidate physical plans P1, P2, …, Pn (hash join or nested-loop join? index scan or table scan? which relation first?). The optimizer <b>estimates the cost</b> C1, C2, …, Cn of each candidate and <b>picks the minimum</b>. This is called <b class="term">cost-based optimization</b>. Chapters 4 to 7 and all of Lecture 08 are about how those costs are computed.</p>
+
+<h3>Logical plan versus physical plan (slide 7)</h3>
+<p>Slide 7 gives a second example. The logical plan is "select the rows with salary &gt; 5000, then project the name". A possible physical plan is: <b>use an index scan</b> on the table, <b>apply the selection predicate</b> salary &gt; 50000 to each row, then <b>apply the projection</b> to keep only name. The same logical plan could also be run with a table scan; deciding between those is exactly physical plan generation.</p>
+<p><em>Two small slide slips:</em> the logical plan writes the constant as 5000 and the physical plan as 50000; they should be the same number. The relation is called <code>department</code>, although a salary column belongs more naturally to an employee or instructor relation. Neither affects the idea.</p>
+
+<h2>5. Metadata the optimizer needs (slides 8–11)</h2>
+
+<p>To estimate the cost of a plan without running it, the optimizer reads statistics that the DBMS keeps in its <b>catalog</b> (data dictionary). The slides list four kinds.</p>
+
+<div class="tbl"><table>
+<tr><th>Metadata</th><th>What it is</th><th>How the optimizer uses it</th></tr>
+<tr><td><b>Size of each relation</b> (slide 8)</td><td>Number of rows (tuples), and number of disk blocks.</td><td>Estimates how long a scan or join takes. A small table can simply be scanned; a large one may call for an index or a different join order.</td></tr>
+<tr><td><b>Value statistics</b> (slide 9)</td><td>Approximate number of distinct values and how often values occur, kept as <b>histograms</b> or summaries.</td><td>Estimates the <b>selectivity</b> of a condition such as <code>WHERE age &gt; 40</code>: the fraction of rows that match.</td></tr>
+<tr><td><b>Existing indexes</b> (slide 10)</td><td>Which columns have B+ tree or hash indexes.</td><td>An index can speed retrieval a lot, but only if it exists and using it is cheaper than scanning the whole table.</td></tr>
+<tr><td><b>Data layout on disk</b> (slide 11)</td><td>Row-wise or columnar storage, clustering of rows, block size.</td><td>Sequential reads are faster than random reads, and well-clustered data needs fewer block reads.</td></tr>
+</table></div>
+
+<dl class="def">
+<dt>Selectivity</dt>
+<dd>The fraction of a relation's rows that satisfy a condition. The slides use "high selectivity" to mean <em>few</em> matches (the condition is very selective): then an index is likely worth using. "Low selectivity" means <em>many</em> matches: then reading the whole table by a scan is usually cheaper than following an index pointer for each row.</dd>
+<dt>Histogram</dt>
+<dd>A summary of a column's value distribution: the value range is split into buckets, and the catalog stores how many rows fall into each bucket.</dd>
+</dl>
+
+<p>The textbook's own short list of such statistics, B(R), T(R) and V(R, a), is defined in Chapter 4 of this lecture; it is the notation used in every cost formula.</p>
+
+<h2>6. Physical query plan operators (slide 12)</h2>
+<p>The last slide of this part pairs the two vocabularies:</p>
+<ul>
+  <li><b>Logical operations</b> are the relational-algebra operations: selection, projection, join, union, intersection, difference, and so on.</li>
+  <li><b>Physical operators</b> implement those logical operations in the plan: <b>table scan, index scan, sort, hash, nested-loop join, hash join, sort-merge join</b>, and others.</li>
+</ul>
+<p>Some physical operators implement no RA operation at all. A <b>scan</b> just brings a relation's tuples into memory so that another operator can use them, and a <b>sort</b> puts them in order. The textbook (§15.1) points this out: physical plans need these extra building blocks.</p>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+
+<h3>Exam questions</h3>
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2012–13 · 10 marks</div>
+  <div class="exam-q"><p>Discuss the subsystems that are related to query processing in a Database Management System (DBMS).</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+  <p>A query passes through these subsystems, in order:</p>
+  <ol>
+    <li><b>Parser and translator.</b> Checks syntax and semantics (using the catalog to confirm that tables and columns exist) and builds a parse tree, then translates it into an initial relational-algebra expression (the logical query plan).</li>
+    <li><b>Query rewriter (logical optimizer).</b> Applies algebraic equivalences to the logical plan: splits conjunctive selections, pushes selections and projections down, turns σ over × into joins, and so on. The output is a better logical plan.</li>
+    <li><b>Physical plan generator (cost-based optimizer).</b> For the logical plan it enumerates candidate physical plans (choice of join algorithm, scan type, join order, where to sort), estimates the cost of each in disk I/Os, and picks the cheapest.</li>
+    <li><b>Catalog / statistics manager.</b> Supplies the metadata used by steps 1–3: relation sizes B(R) and T(R), distinct-value counts V(R, a) and histograms, which indexes exist, and how data is laid out.</li>
+    <li><b>Execution engine.</b> Runs the physical plan. Operators are usually implemented as iterators (Open, GetNext, Close), so results can be pipelined from one operator to the next instead of being written to disk (Chapter 5).</li>
+    <li><b>Buffer manager and storage manager.</b> The execution engine asks for blocks; the buffer manager keeps up to M buffers of them in memory and reads or writes disk blocks through the storage manager. Every disk I/O counted in our cost formulas happens here.</li>
+  </ol>
+  <figure><svg viewBox="0 0 560 120" width="560" role="img" aria-label="query processing subsystems">
+    <g style="font-size:11.5px">
+    <rect x="5" y="20" width="90" height="36" rx="4" class="cell"/><text x="50" y="42" text-anchor="middle">Parser</text>
+    <rect x="115" y="20" width="90" height="36" rx="4" class="cell-hl"/><text x="160" y="42" text-anchor="middle">Rewriter</text>
+    <rect x="225" y="20" width="100" height="36" rx="4" class="cell-hl"/><text x="275" y="36" text-anchor="middle">Physical plan</text><text x="275" y="50" text-anchor="middle">generator</text>
+    <rect x="345" y="20" width="95" height="36" rx="4" class="cell-new"/><text x="392" y="42" text-anchor="middle">Executor</text>
+    <rect x="460" y="20" width="95" height="36" rx="4" class="cell"/><text x="507" y="36" text-anchor="middle">Buffer +</text><text x="507" y="50" text-anchor="middle">storage mgr</text>
+    <path d="M95 38 H113" class="s-fg" marker-end="url(#m-fg)"/><path d="M205 38 H223" class="s-fg" marker-end="url(#m-fg)"/><path d="M325 38 H343" class="s-fg" marker-end="url(#m-fg)"/><path d="M440 38 H458" class="s-fg" marker-end="url(#m-fg)"/>
+    <rect x="115" y="80" width="210" height="30" rx="4" class="cell-plain"/><text x="220" y="99" text-anchor="middle">Catalog: B, T, V, histograms, indexes</text>
+    <path d="M50 80 V58" class="s-acc dash" marker-end="url(#m-acc)"/><path d="M160 80 V58" class="s-acc dash" marker-end="url(#m-acc)"/><path d="M275 80 V58" class="s-acc dash" marker-end="url(#m-acc)"/>
+    </g></svg></figure>
+  </div></details>
+</div>
+
+<div class="key"><p><strong>Summary:</strong> the query processor compiles SQL into a physical plan and then executes it. Compilation is parsing (syntax and semantic check, parse tree), query rewrite (RA tree improved by algebraic laws), and physical plan generation (choose an algorithm and access method for every node, estimate costs, keep the cheapest). The cost estimates rely on catalog metadata: relation sizes, value statistics, indexes and data layout.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="lecture.js"></script>
+<script>
+// RA tree rewrite animation. Node: [label, children]
+const tree = (t, hl = []) => {
+  const W = 520, nodes = [], edges = [];
+  const depth = n => 1 + Math.max(0, ...(n[1] || []).map(depth));
+  const leaves = n => (n[1] && n[1].length) ? n[1].reduce((a, c) => a + leaves(c), 0) : 1;
+  const L = leaves(t);
+  (function place(n, d, x0, x1, px, py) {
+    const x = (x0 + x1) / 2, y = 24 + d * 46;
+    nodes.push([n[0], x, y, hl.includes(n[0])]);
+    if (px != null) edges.push(`<line x1="${px}" y1="${py + 8}" x2="${x}" y2="${y - 16}" class="s-fg"/>`);
+    const kids = n[1] || []; let cx = x0;
+    kids.forEach(c => { const w = (x1 - x0) * leaves(c) / leaves(n); place(c, d + 1, cx, cx + w, x, y); cx += w; });
+  })(t, 0, 0, W);
+  const H = 24 + (depth(t) - 1) * 46 + 24;
+  return `<svg viewBox="0 0 ${W} ${H}" width="${W}" role="img" aria-label="relational algebra tree">${edges.join('')}` +
+    nodes.map(([l, x, y, h]) => `<text x="${x}" y="${y}" text-anchor="middle" style="font-size:13px" class="${h ? 'red' : ''}">${l}</text>`).join('') + '</svg>';
+};
+const P = 'π B,D', SAND = 'σ R.A="c" ∧ R.C=S.C', SC = 'σ R.C=S.C', SA = 'σ R.A="c"';
+stepper('#rewrite', [
+  { html: tree([P, [[SAND, [['×', [['R'], ['S']]]]]]]), cap: 'The initial logical plan, translated directly from the SQL: take the product R × S, keep the rows satisfying both conditions, project B and D. R × S is huge: every R tuple paired with every S tuple.' },
+  { html: tree([P, [[SC, [[SA, [['×', [['R'], ['S']]]]]]]]], [SC, SA]), cap: '<b>Split the conjunction</b> (slide 4): σ<sub>c1 ∧ c2</sub>(E) = σ<sub>c2</sub>(σ<sub>c1</sub>(E)). The answer is unchanged, but now each condition is a separate node that can move on its own.' },
+  { html: tree([P, [[SC, [['×', [[SA, [['R']]], ['S']]]]]]], [SA]), cap: '<b>Push the selection down</b>: R.A = "c" mentions only R, so it can be applied to R before the product. Far fewer R tuples now reach the product.' },
+  { html: tree([P, [['⋈', [[SA, [['R']]], ['S']]]]], ['⋈']), cap: '<b>Turn σ over × into a join</b>: σ<sub>R.C=S.C</sub>(X × S) is the (natural) join on C. This is the "best logical plan" that slide 5 hands to physical plan generation.' },
+]);
+
+flashcards('#cards', [
+  { f: 'Query compilation', b: 'Parsing → query rewrite → physical plan generation. Turns SQL into a physical plan.' },
+  { f: 'Parse tree', b: 'Tree following the SQL grammar: statement → clauses → tokens. Built after the syntax and semantic checks.' },
+  { f: 'Logical query plan', b: 'A relational-algebra expression (RA tree) for the query. Says which operations, not which algorithms.' },
+  { f: 'Query rewrite', b: 'Improve the logical plan with algebraic equivalences (split σ, push σ down, σ over × becomes ⋈).' },
+  { f: 'Physical query plan', b: 'Logical plan + an algorithm for every operator + an access method (table/index scan) for every relation + explicit sorts.' },
+  { f: 'Cost-based optimization', b: 'Generate candidate physical plans, estimate the cost (disk I/Os) of each, pick the cheapest.' },
+  { f: 'Selectivity', b: 'Fraction of rows satisfying a condition. Few matches → an index is attractive; many matches → a table scan.' },
+  { f: 'Physical operators', b: 'Table scan, index scan, sort, hash, nested-loop join, hash join, sort-merge join, …' },
+]);
+quiz('#quiz', [
+  { q: 'Which step checks that the table <code>ParamountMovies</code> exists?', opts: ['Parsing', 'Query rewrite', 'Physical plan generation', 'Query execution'], a: 0, why: 'Parsing checks syntax <em>and semantics</em>, which includes resolving table and column names against the catalog.' },
+  { q: 'Choosing "hash join" instead of "nested-loop join" for a ⋈ node happens in…', opts: ['parsing', 'query rewrite', 'physical plan generation', 'the buffer manager'], a: 2, why: 'Query rewrite only changes the RA expression. Picking an algorithm per operator is physical plan generation.' },
+  { q: 'Pushing σ<sub>R.A="c"</sub> below a product is an example of…', opts: ['physical plan generation', 'query rewrite using an algebraic law', 'cost estimation', 'parsing'], a: 1, why: 'It changes the logical plan by an equivalence (selection commutes with product when it mentions one side only).' },
+  { q: 'A condition matches 90% of a table\'s rows. Which access is probably cheapest?', opts: ['Index scan, following a pointer per row', 'Table scan', 'Hash index lookup', 'It does not matter'], a: 1, why: 'Low selectivity (many matches): reading every block once in sequence beats following almost every row pointer through the index.' },
+  { q: 'Which statistic helps estimate how many rows <code>WHERE age &gt; 40</code> returns?', opts: ['Block size', 'A histogram of age values', 'Whether the table is a heap', 'The parse tree'], a: 1, why: 'Histograms summarise the value distribution, which gives the selectivity of a range condition.' },
+  { q: 'Which physical operator implements no relational-algebra operation by itself?', opts: ['Hash join', 'Table scan', 'Sort-merge join', 'Nested-loop join'], a: 1, why: 'A scan only brings a relation\'s tuples into memory for another operator. The joins implement ⋈.' },
+]);
+ask('#try1', { q: 'The optimizer considers 4 physical plans with estimated costs 5500, 4500, 7500 and 6000 disk I/Os. What cost does the chosen plan have?', a: 4500, why: 'Cost-based optimization picks the minimum estimated cost.' });
+</script>
+</body>
+</html>

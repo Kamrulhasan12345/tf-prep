@@ -1,0 +1,376 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bitmap Indices · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<style>
+table.bm { border-collapse: collapse; font: 13px/1.3 var(--mono); }
+table.bm th, table.bm td { border: 1px solid var(--line); padding: 3px 8px; }
+table.bm td.bits { letter-spacing: .35em; }
+table.bm td.bits b { color: var(--accent); }
+table.bm tr.res td { background: var(--cell-new); font-weight: 600; }
+table.bm tr.cur td { background: var(--cell-hl); }
+.bm-form select { font: 14px var(--mono); padding: 5px 6px; border: 1.5px solid var(--fg); border-radius: 5px; background: var(--bg); color: var(--fg); }
+.bm-form label { display: inline-flex; gap: 6px; align-items: center; }
+</style>
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 15 · Chapter 12 · Beyond the slides (asked in exams)</div>
+<h1>Bitmap Indices</h1>
+<p class="lede">A bitmap index stores one string of bits per attribute value instead of lists of record pointers. It is tiny for attributes with few distinct values, and it answers queries with several conditions by plain AND, OR and NOT on bits. This chapter follows Silberschatz §14.9, shows the bitmap index scan that rescues secondary indices, compares bitmaps with B+ trees and hashing, and answers every bitmap question in the banks.</p>
+
+<h2>1. One bitmap per value</h2>
+
+<p>A bitmap index needs the records of the relation to be numbered sequentially, 0, 1, 2, …, and it needs a quick way to fetch record number <i>i</i>. With fixed-size records that is easy: record <i>i</i> sits at a computable block and offset (Lec 14, Chapter 2).</p>
+
+<dl class="def">
+<dt>Bitmap</dt><dd>An array of bits, one bit per record of the relation.</dd>
+<dt>Bitmap index on attribute A</dt><dd>One bitmap for each value <i>v</i> that A takes. Bit <i>i</i> of the bitmap for <i>v</i> is 1 if record <i>i</i> has A = <i>v</i>, and 0 otherwise.</dd>
+<dt>Cardinality of an attribute</dt><dd>The number of distinct values it takes. Gender or status has low cardinality; ID or NID has high cardinality (one value per record).</dd>
+</dl>
+
+<p>Silberschatz's example is a relation <code>instructor_info(ID, gender, income_level)</code> with five records. The bitmap index on gender has two bitmaps; the one on income_level has five (L1 to L5), one per income band.</p>
+
+<figure>
+<div class="figrow">
+<div><div class="figlabel">instructor_info</div><div id="iiRel"></div></div>
+<div><div class="figlabel">bitmaps for gender</div><div id="iiG"></div></div>
+<div><div class="figlabel">bitmaps for income_level</div><div id="iiL"></div></div>
+</div>
+<figcaption><b>Figure 1.</b> Bitmap indices on gender and income_level (Silberschatz's example). Read a bitmap left to right as records 0 to 4: the bitmap for m is 10010 because records 0 and 3 are male.</figcaption>
+</figure>
+
+<p>A single-value selection such as <code>gender = 'f'</code> is answered by scanning the bitmap for f and fetching the records whose bit is 1. On its own that is no better than any other index. Bitmaps shine when a query has <em>several</em> conditions.</p>
+
+<h2>2. Operations on bitmaps</h2>
+
+<h3>2.1 AND, OR, NOT</h3>
+<p>Take <code>SELECT * FROM instructor_info WHERE gender = 'f' AND income_level = 'L2'</code>. Fetch the bitmap for f (01101) and the bitmap for L2 (01000), and AND them bit by bit: 01101 ∧ 01000 = 01000. Only record 1 satisfies both conditions, and we found that out without reading a single record.</p>
+<ul>
+<li><strong>Intersection</strong> (conditions joined by AND) is the bitwise AND of the bitmaps.</li>
+<li><strong>Union</strong> (OR) is the bitwise OR.</li>
+<li><strong>Complement</strong> (NOT) flips every bit. The bitmap for <code>NOT gender = 'm'</code> is NOT 10010 = 01101.</li>
+</ul>
+<p>These operations are very fast: a computer ANDs 32 or 64 bits in one instruction, so a relation with 1 million records needs only 1,000,000 / 64 = 15,625 instructions per AND. The bitmaps for a million records are 125 KB each, small enough to read and combine in memory.</p>
+
+<h3>2.2 The existence bitmap</h3>
+<p>Complement has a trap. If record <i>i</i> has been <em>deleted</em>, its bit is 0 in every value's bitmap, so NOT turns it into a 1 and the query would return a record that does not exist. The same happens with null values. The fix is an <b class="term">existence bitmap</b>: bit <i>i</i> is 1 if record <i>i</i> exists. NOT <i>B</i> is computed as (NOT <i>B</i>) AND existence. For nulls, the result is also ANDed with the complement of the bitmap for null.</p>
+
+<h3>2.3 Counting</h3>
+<p>Some queries only need a count: <code>SELECT COUNT(*) … WHERE gender = 'f' AND income_level = 'L2'</code>. Count the 1 bits of the result bitmap and stop. No record is read at all. Silberschatz notes a cheap way to count: a 256-entry table gives the number of 1s in each possible byte, so the count is one table lookup per byte.</p>
+
+<h3>2.4 Try it: bitmap query tool</h3>
+<p>Choose a value for each attribute of the account relation used in the last-but-one exam question below (or "any" to ignore the attribute) and whether the conditions are joined by AND or OR. The animation fetches each bitmap and combines it with the running result.</p>
+<figure>
+<span class="anim-tag">Interactive</span>
+<div id="bmTool"></div>
+<figcaption><b>Figure 2.</b> Answering a multi-condition query with bitmaps only. The last step lists the records that are actually fetched.</figcaption>
+</figure>
+
+<h2>3. Size, and when bitmaps are the right choice</h2>
+<p>A bitmap has one <em>bit</em> per record. If records are 100 bytes (800 bits) long, one bitmap is 1/800 of the relation's size. An attribute with 8 values needs 8 bitmaps, together only 1% of the relation. Compare a B+ tree or a list of record pointers, which needs a 4- to 8-byte pointer (32 to 64 bits) for <em>every</em> record.</p>
+<p>The picture reverses for high-cardinality attributes. A bitmap index on ID would have one bitmap per record, each with a single 1 among a million 0s. Silberschatz's rule of thumb: for a value that occurs in more than 1/64 of the records, a bitmap (1 bit per record) is smaller than a list of 64-bit record identifiers; for rarer values a list is smaller. Some systems combine the two inside a B+ tree: leaf entries for frequent values hold a bitmap, entries for rare values hold a list.</p>
+<p>Updates are the other cost. Inserting a record appends a bit to every bitmap of the attribute; changing a value flips bits in two bitmaps. That is cheap for one record, but bitmaps are usually stored compressed and are shared by many records, so frequent concurrent updates to them are slow.</p>
+<p>So bitmap indices are preferred when:</p>
+<ol>
+<li>the attribute has <strong>few distinct values</strong> (gender, status, region, income band, rating);</li>
+<li>queries combine <strong>several conditions</strong> on such attributes, or only need <strong>counts</strong>;</li>
+<li>the data is <strong>read-mostly</strong>, as in data warehouses and decision-support systems, where data is loaded in batches.</li>
+</ol>
+
+<h2>4. Bitmap index scan: making a secondary index safe for big results</h2>
+
+<p>The same bit idea fixes a real weakness of ordinary secondary indices. Recall from Chapter 3 that a secondary index lists matching records in <em>key order</em>, and those records are scattered over the file. A plain <b class="term">secondary index scan</b> follows each pointer immediately: one random block read per matching record. If 2 matching records sit in the same block, that block may be read twice, because by the time the second pointer comes along the block may have left the buffer.</p>
+<p>A <b class="term">bitmap index scan</b> (the name PostgreSQL uses; Silberschatz describes it in the query-processing chapter) works in two phases:</p>
+<ol>
+<li><strong>Build:</strong> scan the index and, instead of fetching records, set a bit in an in-memory bitmap for every block (or record) that contains a match. Several conditions can each build a bitmap and be ANDed or ORed here.</li>
+<li><strong>Fetch</strong> (the "bitmap heap scan"): go through the bitmap in order and read each block whose bit is 1. Every needed block is read <em>exactly once</em>, in <em>physical order</em>, in one sweep of the disk arm.</li>
+</ol>
+
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="scan"></div>
+<figcaption><b>Figure 3.</b> A file of 8 blocks; 8 records match the condition (shaded). The plain secondary-index scan follows the pointers in key order and jumps around the disk, reading 8 blocks with 8 seeks (blocks 0, 2, 4 and 6 each twice). The bitmap index scan reads the 4 needed blocks once each, in order.</figcaption>
+</figure>
+
+<p>Why this matters, with numbers (Silberschatz's disk parameters: seek t<sub>S</sub> = 4 ms, block transfer t<sub>T</sub> = 0.1 ms). A relation has 1,000,000 records in 10,000 blocks. A query matches 20,000 records (2%) through a secondary index of height 3.</p>
+<ul>
+<li><strong>Linear scan:</strong> one seek, then 10,000 sequential transfers: 4 + 10,000 × 0.1 = <strong>1,004 ms</strong>.</li>
+<li><strong>Plain secondary index scan:</strong> 3 index blocks plus one random block access per match: (3 + 20,000) × 4.1 ms ≈ <strong>82,012 ms</strong>, 82 times slower than the linear scan. The two costs are equal at only about 242 matching records (0.024% of the relation).</li>
+<li><strong>Bitmap index scan:</strong> 20,000 matches scattered at random hit about 10,000 × (1 − (1 − 1/10,000)<sup>20,000</sup>) ≈ 8,647 distinct blocks. They are read once each in disk order in one sweep, so the cost is close to a linear scan (≈ 1 s) instead of 82 s. When only a handful of records match, it reads only those few blocks, like an index scan.</li>
+</ul>
+<p>So the bitmap index scan is never much worse than the better of the two plain strategies, which is why optimizers use it when they cannot predict the result size well.</p>
+
+<h2>5. Hash index, B+ tree or bitmap?</h2>
+<div class="tbl"><table>
+<tr><th></th><th>Hash index</th><th>B+ tree index</th><th>Bitmap index</th></tr>
+<tr><td>Structure</td><td>Buckets chosen by h(K), overflow chains</td><td>Balanced tree of sorted keys; linked leaves</td><td>One bitmap (bit per record) per distinct value</td></tr>
+<tr><td>Best for</td><td>Equality (point) queries</td><td>Equality and range queries, ordered output</td><td>Multi-condition AND/OR/NOT queries and counts on low-cardinality attributes</td></tr>
+<tr><td>Point lookup cost</td><td>About 1 block (plus overflow)</td><td>Height of tree, about 3–4 blocks</td><td>Scan one bitmap (n/8 bytes), then fetch records</td></tr>
+<tr><td>Range queries</td><td>No</td><td>Yes</td><td>Only as an OR over the values in the range</td></tr>
+<tr><td>Good cardinality</td><td>High (many distinct values)</td><td>Any, best for high</td><td>Low</td></tr>
+<tr><td>Space</td><td>One entry per record, plus slack</td><td>One entry per record plus internal nodes</td><td>(number of values) × n bits; tiny for few values</td></tr>
+<tr><td>Updates</td><td>Cheap, unless chains grow (static) or splits occur (dynamic)</td><td>Moderate; local splits and merges</td><td>Expensive under frequent concurrent updates</td></tr>
+<tr><td>Typical use</td><td>Key lookups, hash joins</td><td>Default index in OLTP systems</td><td>Data warehouses, read-mostly analysis</td></tr>
+</table></div>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+<div id="try2"></div>
+<div id="try3"></div>
+
+<h3>Exam questions</h3>
+
+<div class="exam">
+<div class="exam-src">DB QB · 21-22 7a · 15 marks &nbsp;/&nbsp; BUET QBank · CSE 215 | L-2/T-2 | 2021–22 · 15 marks</div>
+<div class="exam-q"><p>"Without bitmap index scan strategy, secondary index scan can sometimes perform worse than linear file scan." Justify or criticize this statement with proper explanation.</p></div>
+<details><summary>Show worked answer</summary><div class="exam-a">
+<p><strong>The statement is correct.</strong></p>
+<p><strong>Why a secondary index scan can lose.</strong> A secondary index is ordered on a key different from the file's order, so consecutive index entries point to records in unrelated blocks. A plain secondary index scan fetches the record for each pointer as it meets it: one random block access (a seek plus a transfer) per matching record, and the same block may be fetched several times if it holds several matches. A linear scan reads every block exactly once, sequentially, with essentially one seek. When many records match, the random accesses cost far more than the sequential reads.</p>
+<p><strong>Numbers.</strong> 1,000,000 records in 10,000 blocks, t<sub>S</sub> = 4 ms, t<sub>T</sub> = 0.1 ms, index height 3, and a condition matching 20,000 records (2%):</p>
+<ul>
+<li>Linear scan: t<sub>S</sub> + 10,000 t<sub>T</sub> = 4 + 1,000 = 1,004 ms.</li>
+<li>Secondary index scan: (3 + 20,000)(t<sub>S</sub> + t<sub>T</sub>) = 20,003 × 4.1 ≈ 82,012 ms, about 82 times slower.</li>
+<li>Break-even: (3 + N) × 4.1 = 1,004 gives N ≈ 242 matching records. Above roughly 0.024% of the relation, the index scan already loses.</li>
+</ul>
+<p>When only a few records match (say 10: 13 × 4.1 ≈ 53 ms) the index scan wins easily. That is why the statement says "sometimes": it depends on how many records match, which the optimizer can only estimate.</p>
+<p><strong>What the bitmap index scan changes.</strong> It first scans the index and only sets bits in an in-memory bitmap with one bit per block (or per record). Then it reads the blocks whose bit is 1 in physical order. Each needed block is read once, in one sweep of the disk arm. In the example the 20,000 matches fall in about 8,647 distinct blocks, read in order: close to the 1 s linear scan instead of 82 s. With 10 matches it reads at most 10 blocks, as cheaply as the plain index scan. So the bitmap strategy never does much worse than the better of the two, and several index conditions can be ANDed or ORed in the bitmap before any block is read (Figure 3 animates the difference).</p>
+<p>The question-bank answer reaches the same conclusion; its "5% to 15%" threshold is a rule of thumb for real systems with caching, while the pure cost model above puts the break-even much lower.</p>
+</div></details>
+</div>
+
+<div class="exam">
+<div class="exam-src">DB QB · 17-18 2c · 5 marks &nbsp;/&nbsp; BUET QBank · CSE 215 | L-2/T-2 | 2017–18 · 5 marks &nbsp;/&nbsp; BUET QBank · CSE 303 | L-3/T-1 | 2012–13 · 5 marks</div>
+<div class="exam-q"><p>Give an example where the Bit-map index is preferred over other indexing techniques.</p></div>
+<details><summary>Show worked answer</summary><div class="exam-a">
+<p><strong>Example.</strong> A national census or bank data warehouse holds a relation <code>person(NID, name, gender, division, income_level, …)</code> with 10 million rows. Gender has 2 values, division 8, income_level 5. Analysts run queries like</p>
+<pre>SELECT COUNT(*) FROM person
+WHERE gender = 'f' AND division = 'Sylhet' AND income_level = 'L2';</pre>
+<p>With bitmap indices on the three attributes, the system reads three bitmaps of 10,000,000 bits (1.25 MB each), ANDs them (about 156,000 64-bit operations per AND) and counts the 1 bits. No record is read at all. On a small sample with gender bitmap f = 01101 and income bitmap L2 = 01000 (Figure 1), f AND L2 = 01000: one matching record.</p>
+<p><strong>Why other indices are worse here.</strong></p>
+<ul>
+<li>A B+ tree on gender returns about 5 million record pointers for 'f' (40 MB of 64-bit pointers), and intersecting three such lists is slow. All three bitmaps together cost 2 + 8 + 5 = 15 bitmaps × 1.25 MB, smaller than one such pointer list.</li>
+<li>A hash index helps only one equality condition at a time and cannot combine conditions cheaply.</li>
+<li>The data is loaded in batches and rarely updated, so the update cost of bitmaps does not matter.</li>
+</ul>
+<p>Bitmaps would be a poor choice for NID (10 million distinct values) or for a heavily updated OLTP table.</p>
+</div></details>
+</div>
+
+<div class="exam">
+<div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2015–16 · 5 marks</div>
+<div class="exam-q"><p>Write a short note on bitmap indexing.</p></div>
+<details><summary>Show worked answer</summary><div class="exam-a">
+<p>A <strong>bitmap index</strong> on attribute A of relation r keeps, for every distinct value v of A, a bitmap with one bit per record: bit i is 1 if record i has A = v. Records must be numbered sequentially and record i must be fetchable quickly (for example with fixed-size records). Example: instructor_info with genders m, f, f, m, f has bitmaps m = 10010 and f = 01101.</p>
+<p><strong>Query processing.</strong> Conjunctions are answered by AND of bitmaps, disjunctions by OR, negations by NOT ANDed with an <em>existence bitmap</em> (so deleted records and nulls are not returned). Counting the 1s of the result answers COUNT queries without reading records. Bitwise operations handle 64 records per instruction.</p>
+<p><strong>Space.</strong> One bit per record per value: for 100-byte records a bitmap is 1/800 of the relation's size, far smaller than a pointer per record when the attribute has few values. For a value that occurs in fewer than about 1/64 of the records, a list of record identifiers is smaller, so some systems store bitmaps inside B+ tree leaves only for frequent values.</p>
+<p><strong>Use.</strong> Best for low-cardinality attributes in read-mostly data warehouses with multi-condition and counting queries. Poor for high-cardinality keys and for frequently updated OLTP data. The bitmap idea also powers the bitmap index scan, which makes secondary-index lookups read each block once in physical order.</p>
+</div></details>
+</div>
+
+<div class="exam">
+<div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2014–15 · 5 marks</div>
+<div class="exam-q"><p>Given the relation employee(emp_id, name, gender, status), create bitmap indices on gender and status.</p>
+<div class="tbl"><table><tr><th>emp_id</th><th>name</th><th>gender</th><th>status</th></tr>
+<tr><td>E001</td><td>Abid</td><td>Male</td><td>Full Time</td></tr><tr><td>E002</td><td>Arif</td><td>Male</td><td>Full Time</td></tr><tr><td>E003</td><td>Sajid</td><td>Male</td><td>Full Time</td></tr><tr><td>E004</td><td>Rafiq</td><td>Male</td><td>Part Time</td></tr><tr><td>E005</td><td>Shahid</td><td>Male</td><td>Full Time</td></tr><tr><td>E006</td><td>Sajid</td><td>Male</td><td>Full Time</td></tr><tr><td>E007</td><td>Karim</td><td>Male</td><td>Part Time</td></tr><tr><td>E008</td><td>Zahid</td><td>Male</td><td>Full Time</td></tr></table></div></div>
+<details><summary>Show worked answer</summary><div class="exam-a">
+<p>Number the records 0 to 7 in file order (E001 = record 0, …, E008 = record 7). Each bitmap has 8 bits, written for records 0 to 7 from left to right.</p>
+<div class="figrow">
+<div><div class="figlabel">bitmap index on gender</div><div id="q8g"></div></div>
+<div><div class="figlabel">bitmap index on status</div><div id="q8s"></div></div>
+</div>
+<p>Every employee is male, so the gender index has a single bitmap of all 1s. A bitmap for Female is needed only if that value can occur; if the schema allows it, it is 00000000 now and gets bits as female employees are inserted. Full Time is 11101101 (records 0, 1, 2, 4, 5, 7) and Part Time is 00010010 (E004 and E007). Check: the two status bitmaps are complements of each other and their 1s add up to 8 records.</p>
+<p>Use: <code>gender = 'Male' AND status = 'Part Time'</code> is 11111111 AND 00010010 = 00010010, giving Rafiq and Karim. The question-bank answer is correct.</p>
+</div></details>
+</div>
+
+<div class="exam">
+<div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2010–11 · 10 marks</div>
+<div class="exam-q"><p>The relation account is given in Figure 1. Construct bitmap indices on type, branchname and location attribute. Explain how you can find balance for branchname = 'B2' and location = 'L1' and type = 'D'.</p>
+<p><em>The figure is missing from both question banks ("No Figure found in PDF"). The answer below uses a small account relation of the same shape; the method is identical for any data.</em></p></div>
+<details><summary>Show worked answer</summary><div class="exam-a">
+<p><strong>Assumed relation</strong> (records numbered 0 to 7 in file order):</p>
+<div id="q10rel"></div>
+<p><strong>Bitmap indices.</strong> One bitmap per distinct value, 8 bits each:</p>
+<div id="q10bm"></div>
+<p><strong>Finding the balance.</strong> The condition is a conjunction, so AND the three bitmaps, then fetch only the records whose bit is 1:</p>
+<pre>B2  = 01100110
+L1  = 11100011
+D   = 10110110
+AND = 00100010   → records 2 and 6</pre>
+<p>Fetch records 2 and 6 (A-103 and A-107) and project balance: <strong>400 and 600</strong>. Only two records are read; the selection itself was done entirely on bits. If the query only asked how many such accounts exist, counting the 1s (2) would answer it without reading any record. Use the tool in Section 2.4 to try other combinations on this relation.</p>
+</div></details>
+</div>
+
+<div class="exam">
+<div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2013–14 · 6 marks</div>
+<div class="exam-q"><p>Compare Hash-based index, B+ -tree index, and Bitmap index.</p></div>
+<details><summary>Show worked answer</summary><div class="exam-a">
+<p>The table in Section 5 is the answer. In short:</p>
+<ul>
+<li><strong>Hash index:</strong> computes the bucket from the key, so an equality lookup costs about one block. No range queries, no ordered output. Static hashing degrades as the file grows; dynamic hashing (extendible, linear) fixes that.</li>
+<li><strong>B+ tree:</strong> keeps keys sorted in a balanced tree; equality lookups cost the tree height (3 to 4 block reads for millions of keys), range queries follow the leaf chain. Updates are local splits and merges. The general-purpose default.</li>
+<li><strong>Bitmap:</strong> one bit per record per value. Tiny for low-cardinality attributes, and multi-condition and COUNT queries become bitwise AND/OR/NOT on bitmaps. Bad for high-cardinality attributes and frequent updates; used in data warehouses.</li>
+</ul>
+<p>Note: the question-bank answer lists bitmap operations as "O(1)". They are linear in the number of records (n/64 machine words per operation); they are fast because that constant is tiny, not because they are constant time.</p>
+</div></details>
+</div>
+
+<div class="key"><p><strong>Summary:</strong> A bitmap index keeps one bitmap per attribute value, one bit per record. Multi-condition queries become bitwise AND, OR and NOT (with an existence bitmap), and counts need no record reads. Bitmaps are tiny for low-cardinality attributes and suit read-mostly warehouses; they are poor for high-cardinality or frequently updated attributes. A bitmap index scan collects matches from an ordinary index into a bitmap and then reads each needed block once in physical order, so a secondary index never becomes far worse than a linear scan. Hash indices are best for equality, B+ trees for equality and ranges, bitmaps for combinations of low-cardinality conditions.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script>
+// ---------- bitmap tables ----------
+const bits = (rows, col, v) => rows.map(r => r[col] === v ? '1' : '0').join('');
+const distinct = (rows, col) => [...new Set(rows.map(r => r[col]))].sort();
+function relTable(head, rows) {
+  return `<table class="bm"><tr><th>record</th>${head.map(h => `<th>${h}</th>`).join('')}</tr>` +
+    rows.map((r, i) => `<tr><td>${i}</td>${r.map(c => `<td>${c}</td>`).join('')}</tr>`).join('') + '</table>';
+}
+function bmTable(rows, col, label = 'value') {
+  return `<table class="bm"><tr><th>${label}</th><th>bitmap</th></tr>` +
+    distinct(rows, col).map(v => `<tr><td>${v}</td><td class="bits">${bits(rows, col, v)}</td></tr>`).join('') + '</table>';
+}
+const II = [['76766', 'm', 'L1'], ['22222', 'f', 'L2'], ['12121', 'f', 'L1'], ['15151', 'm', 'L4'], ['58583', 'f', 'L3']];
+$('#iiRel').innerHTML = relTable(['ID', 'gender', 'income_level'], II);
+$('#iiG').innerHTML = bmTable(II, 1, 'gender');
+$('#iiL').innerHTML = `<table class="bm"><tr><th>income_level</th><th>bitmap</th></tr>` +
+  ['L1', 'L2', 'L3', 'L4', 'L5'].map(v => `<tr><td>${v}</td><td class="bits">${bits(II, 2, v)}</td></tr>`).join('') + '</table>';
+
+const ACC = [['A-101', 'D', 'B1', 'L1', '500'], ['A-102', 'S', 'B2', 'L1', '700'], ['A-103', 'D', 'B2', 'L1', '400'], ['A-104', 'D', 'B3', 'L2', '900'],
+  ['A-105', 'S', 'B1', 'L2', '350'], ['A-106', 'D', 'B2', 'L2', '750'], ['A-107', 'D', 'B2', 'L1', '600'], ['A-108', 'S', 'B3', 'L1', '300']];
+const ACCH = ['acc_no', 'type', 'branchname', 'location', 'balance'];
+$('#q10rel').innerHTML = `<div class="tbl">${relTable(ACCH, ACC)}</div>`;
+$('#q10bm').innerHTML = `<div class="figrow">${[1, 2, 3].map(c => `<div><div class="figlabel">on ${ACCH[c]}</div>${bmTable(ACC, c, ACCH[c])}</div>`).join('')}</div>`;
+
+const EMP = [['E001', 'Abid', 'Male', 'Full Time'], ['E002', 'Arif', 'Male', 'Full Time'], ['E003', 'Sajid', 'Male', 'Full Time'], ['E004', 'Rafiq', 'Male', 'Part Time'],
+  ['E005', 'Shahid', 'Male', 'Full Time'], ['E006', 'Sajid', 'Male', 'Full Time'], ['E007', 'Karim', 'Male', 'Part Time'], ['E008', 'Zahid', 'Male', 'Full Time']];
+$('#q8g').innerHTML = bmTable(EMP, 2, 'gender');
+$('#q8s').innerHTML = bmTable(EMP, 3, 'status');
+
+// ---------- interactive bitmap query tool (account relation) ----------
+(() => {
+  const host = $('#bmTool'), cols = [1, 2, 3];
+  host.innerHTML = `<form class="bp-form bm-form">${cols.map(c => `<label>${ACCH[c]} <select name="c${c}"><option value="">any</option>${distinct(ACC, c).map(v => `<option>${v}</option>`).join('')}</select></label>`).join('')}
+    <label>join with <select name="op"><option>AND</option><option>OR</option></select></label><button type="submit">Animate</button></form>
+    <div class="tbl" style="margin:0 0 10px">${relTable(ACCH, ACC)}</div><div class="bm-st"></div>`;
+  const f = host.querySelector('form');
+  f.elements.c1.value = 'D'; f.elements.c2.value = 'B2'; f.elements.c3.value = 'L1';
+  const run = () => {
+    const op = f.elements.op.value, conds = cols.filter(c => f.elements['c' + c].value).map(c => ({ c, v: f.elements['c' + c].value }));
+    const steps = [];
+    if (!conds.length) {
+      steps.push({ html: '<p>No condition chosen: every record qualifies.</p>', cap: 'Choose at least one value to see bitmaps combined.' });
+      return stepper(host.querySelector('.bm-st'), steps);
+    }
+    let acc = null;
+    const shown = [];
+    conds.forEach((k, j) => {
+      const b = bits(ACC, k.c, k.v);
+      shown.push({ lab: `${ACCH[k.c]} = ${k.v}`, b });
+      const prev = acc;
+      acc = acc == null ? b : [...b].map((x, i) => op === 'AND' ? (x === '1' && acc[i] === '1' ? '1' : '0') : (x === '1' || acc[i] === '1' ? '1' : '0')).join('');
+      const rows = shown.map((s, i) => `<tr class="${i === j ? 'cur' : ''}"><td>${s.lab}</td><td class="bits">${s.b}</td></tr>`).join('') +
+        `<tr class="res"><td>running ${op}</td><td class="bits">${acc}</td></tr>`;
+      steps.push({ html: `<table class="bm"><tr><th>bitmap</th><th>records 0–7</th></tr>${rows}</table>`,
+        cap: j === 0 ? `Fetch the bitmap for <b>${ACCH[k.c]} = ${k.v}</b>: ${b}. It is the starting result.` : `Fetch the bitmap for <b>${ACCH[k.c]} = ${k.v}</b> (${b}) and ${op} it with the running result ${prev}: <b>${acc}</b>.` });
+    });
+    const hits = [...acc].map((x, i) => x === '1' ? i : -1).filter(i => i >= 0);
+    steps.push({ html: steps[steps.length - 1].html + `<p style="margin-top:10px">${hits.length ? hits.map(i => `record ${i}: <code>(${ACC[i].join(', ')})</code>`).join('<br>') : 'No record qualifies.'}</p>`,
+      cap: hits.length ? `Bits ${hits.join(', ')} are 1, so only record${hits.length > 1 ? 's' : ''} ${hits.join(', ')} ${hits.length > 1 ? 'are' : 'is'} fetched (${hits.length} of ${ACC.length}). Balances: <b>${hits.map(i => ACC[i][4]).join(', ')}</b>.` : 'The result bitmap is all 0: no record is fetched at all.' });
+    stepper(host.querySelector('.bm-st'), steps, { interval: 2200 });
+  };
+  f.addEventListener('submit', e => { e.preventDefault(); run(); });
+  run();
+})();
+
+// ---------- secondary index scan vs bitmap index scan ----------
+(() => {
+  const NB = 8, RPB = 3, match = [13, 1, 20, 7, 2, 14, 19, 8]; // record numbers in index (key) order
+  const blk = r => Math.floor(r / RPB);
+  const BW = 78, X0 = 20, FY = 200, IY = 40;
+  function draw(o) {
+    let s = `<text x="${X0}" y="${IY - 14}" class="lbl">secondary index entries for the matching records, in key order</text>`;
+    match.forEach((r, k) => {
+      const x = X0 + k * 76, cls = o.entry === k ? 'cell-hl' : 'cell-plain';
+      s += `<rect class="${cls}" x="${x}" y="${IY}" width="70" height="24"/><text x="${x + 35}" y="${IY + 16}" text-anchor="middle" style="font-size:11.5px">→ rec ${r}</text>`;
+    });
+    if (o.bitmap) {
+      s += `<text x="${X0}" y="${IY + 62}" class="lbl">in-memory bitmap, one bit per block</text>`;
+      for (let b = 0; b < NB; b++) {
+        const on = o.bitmap[b], x = X0 + b * BW + 20;
+        s += `<rect class="${on ? 'cell-new' : 'cell-plain'}" x="${x}" y="${IY + 70}" width="30" height="24"/><text x="${x + 15}" y="${IY + 87}" text-anchor="middle" class="big">${on ? 1 : 0}</text>`;
+      }
+    }
+    s += `<text x="${X0}" y="${FY - 8}" class="lbl">data file (3 records per block)</text>`;
+    for (let b = 0; b < NB; b++) {
+      const x = X0 + b * BW, hot = o.read === b;
+      for (let q = 0; q < RPB; q++) {
+        const r = b * RPB + q, m = match.includes(r);
+        s += `<rect class="${m ? (hot ? 'cell-hl' : 'cell') : 'cell-plain'}" x="${x}" y="${FY + q * 20}" width="${BW - 10}" height="20"/><text x="${x + 6}" y="${FY + q * 20 + 14}" class="${m ? '' : 'lbl'}" style="font-size:11px">rec ${r}</text>`;
+      }
+      s += `<text x="${x + (BW - 10) / 2}" y="${FY + 78}" text-anchor="middle" class="lbl">block ${b}</text>`;
+      if (hot) s += `<rect x="${x - 3}" y="${FY - 3}" width="${BW - 4}" height="${RPB * 20 + 6}" rx="3" class="s-red" style="stroke-width:2.5;fill:none"/>`;
+    }
+    if (o.entry != null && o.read != null) {
+      const ex = X0 + o.entry * 76 + 35, bx = X0 + o.read * BW + (BW - 10) / 2;
+      s += `<path d="M${ex} ${IY + 24} L${bx} ${FY - 4}" class="s-red" marker-end="url(#m-red)"/>`;
+    }
+    if (o.head != null) s += `<path d="M${X0 + o.head * BW + (BW - 10) / 2} ${FY + 120} V${FY + 90}" class="s-acc" marker-end="url(#m-acc)"/><text x="${X0 + o.head * BW + (BW - 10) / 2}" y="${FY + 134}" text-anchor="middle" class="lbl acc">disk head</text>`;
+    s += `<text x="${X0}" y="${FY + 160}" class="big">${o.counter}</text>`;
+    const W = X0 + NB * BW + 10;
+    return `<svg viewBox="0 0 ${W} ${FY + 172}" width="${W}" role="img" aria-label="index scan comparison">${s}</svg>`;
+  }
+  const steps = [];
+  steps.push({ html: draw({ counter: 'plain secondary index scan · blocks read 0 · seeks 0' }), cap: 'The index lists 8 matching records in key order. They live in blocks 4, 0, 6, 2, 0, 4, 6, 2: scattered, and some blocks hold two matches. Assume one buffer block.' });
+  let reads = 0, seeks = 0, prev = null;
+  match.forEach((r, k) => {
+    const b = blk(r);
+    reads++; seeks++;
+    steps.push({ html: draw({ entry: k, read: b, head: b, counter: `plain secondary index scan · blocks read ${reads} · seeks ${seeks}` }),
+      cap: `Entry ${k + 1} points to record ${r} in <b>block ${b}</b>: seek and read it.` + (prev != null && Math.abs(prev - b) > 1 ? ` The head jumps from block ${prev} to ${b}.` : '') + (match.slice(0, k).some(x => blk(x) === b) ? ` Block ${b} was read before, but the buffer now holds another block, so it is read again.` : '') });
+    prev = b;
+  });
+  const bm = Array(NB).fill(false);
+  steps.push({ html: draw({ bitmap: bm, counter: 'bitmap index scan, phase 1 · blocks read 0' }), cap: 'Bitmap index scan, phase 1: scan the same index entries, but only <b>set a bit</b> for each block that holds a match. No data block is read yet.' });
+  match.forEach(r => { bm[blk(r)] = true; });
+  steps.push({ html: draw({ bitmap: [...bm], counter: 'bitmap index scan, phase 1 done · blocks read 0' }), cap: 'After scanning the index, the bitmap is 10101010: blocks 0, 2, 4 and 6 are needed. Duplicates (two matches in one block) collapse into one bit.' });
+  let rd = 0;
+  bm.forEach((on, b) => {
+    if (!on) return;
+    rd++;
+    steps.push({ html: draw({ bitmap: [...bm], read: b, head: b, counter: `bitmap index scan, phase 2 · blocks read ${rd} · one sweep` }),
+      cap: `Phase 2: read <b>block ${b}</b> and take all its matching records. The head only ever moves forward.` + (rd === 4 ? ' Done: 4 block reads in one sweep, against 8 reads and 8 seeks for the plain scan (and 8 reads with 1 seek for a linear scan).' : '') });
+  });
+  stepper('#scan', steps, { interval: 2000 });
+})();
+
+flashcards('#cards', [
+  { f: 'Bitmap index', b: 'One bitmap per value of the attribute; bit i is 1 when record i has that value.' },
+  { f: 'Existence bitmap', b: 'Bit i = 1 if record i exists. NOT B is computed as (NOT B) AND existence, so deleted records are not returned.' },
+  { f: 'Low cardinality', b: 'Few distinct values (gender, status). Where bitmap indices are small and effective.' },
+  { f: 'Counting with bitmaps', b: 'COUNT(*) with conditions = number of 1s in the combined bitmap; use a 256-entry table of byte counts.' },
+  { f: '1/64 rule', b: 'For a value in more than 1/64 of the records, a bitmap beats a list of 64-bit record ids in size.' },
+  { f: 'Bitmap index scan', b: 'Phase 1: set a bit per matching block from the index. Phase 2: read the marked blocks once each, in physical order.' },
+  { f: 'Why plain secondary scans can lose', b: 'One random block access per matching record, possibly re-reading blocks; a linear scan reads each block once sequentially.' },
+]);
+quiz('#quiz', [
+  { q: 'Bitmaps for gender: m = 10010, f = 01101. Income L1 = 10100. Which records are male with income L1?', opts: ['Record 0 only', 'Records 0 and 3', 'Records 0 and 2', 'Record 2 only'], a: 0, why: '10010 AND 10100 = 10000: record 0.' },
+  { q: 'Why is NOT computed together with the existence bitmap?', opts: ['To make it faster', 'Deleted records have 0 in every bitmap and would otherwise appear in the result', 'Because NOT is not a CPU instruction', 'To compress the bitmap'], a: 1, why: 'A deleted record\'s 0 becomes 1 after complement; ANDing with existence removes it.' },
+  { q: 'For which attribute is a bitmap index the worst choice?', opts: ['gender', 'blood group', 'NID', 'division'], a: 2, why: 'NID is unique per record: one bitmap per record, each almost all zeros.' },
+  { q: 'Relation of 1,000,000 records of 100 bytes. Size of one bitmap?', opts: ['1,000,000 bytes', '125,000 bytes', '100 MB', '8 MB'], a: 1, why: '1,000,000 bits / 8 = 125,000 bytes, which is 1/800 of the 100 MB relation.' },
+  { q: 'What does phase 2 of a bitmap index scan guarantee?', opts: ['Records come out in key order', 'Each needed block is read once, in physical order', 'No block is ever read', 'Only the root of the index is read'], a: 1, why: 'Blocks are visited in bitmap order, which is disk order, and each set bit is one read.' },
+  { q: 'Which query suits a B+ tree better than a bitmap index?', opts: ['COUNT of female employees in Sylhet', 'salary BETWEEN 50000 AND 60000 on a salary column with thousands of distinct values', 'gender = \'f\' AND status = \'Part Time\'', 'NOT status = \'Full Time\''], a: 1, why: 'A range over a high-cardinality attribute is a leaf-chain walk in a B+ tree; as bitmaps it would be an OR of thousands of bitmaps.' },
+]);
+ask('#try1', { q: 'Using the account relation of Section 2.4, how many accounts have type = \'S\' OR location = \'L2\'? (Count the 1s of the OR.)', a: 5, hint: 'S = 01001001, L2 = 00011100.', why: '01001001 OR 00011100 = 01011101, which has five 1s (records 1, 3, 4, 5, 7).' });
+ask('#try2', { q: 'An attribute has 6 distinct values in a relation of 2,000,000 records. How many kilobytes (1 KB = 1000 bytes) do all its bitmaps take together?', a: 1500, hint: 'Each bitmap has one bit per record.', why: '6 × 2,000,000 bits = 12,000,000 bits = 1,500,000 bytes = 1,500 KB.' });
+ask('#try3', { q: 'With t<sub>S</sub> = 4 ms, t<sub>T</sub> = 0.1 ms, a 5,000-block relation and an index of height 2, at how many matching records (round down) does a plain secondary index scan still cost no more than a linear scan?', a: 120, hint: 'Linear: 4 + 5000 × 0.1. Index: (2 + N) × 4.1.', why: 'Linear = 504 ms. (2 + N) × 4.1 ≤ 504 gives N ≤ 120.9, so 120 records.' });
+</script>
+</body>
+</html>

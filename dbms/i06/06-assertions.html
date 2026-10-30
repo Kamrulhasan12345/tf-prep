@@ -1,0 +1,291 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Assertions · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 06 (Ishrak) · Chapter 6 · Slides 37–50 · Textbook §7.4</div>
+<h1>Assertions: Constraints on the Whole Database</h1>
+<p class="lede">An assertion is a condition over any number of tables that must be true at all times. This chapter explains CREATE ASSERTION, the "negative approach" (NOT EXISTS of a violation) used in every example, works through all of the slides' assertions on real data, compares the three kinds of CHECK (slide 50), and answers the big 24-mark constraints question.</p>
+
+<h2>1. Database-level CHECK: the assertion (slide 37)</h2>
+<dl class="def">
+  <dt>Assertion</dt>
+  <dd>A named, stand-alone schema element <code>CREATE ASSERTION name CHECK (condition);</code> whose condition (usually built from subqueries) may involve several tables. The condition must be true in every state of the database; any modification that would make it false is rejected.</dd>
+</dl>
+<p>Slide 37 lists the properties: assertions are <em>database-level CHECK constraints</em>; their condition checks <em>over multiple relations</em>; they are <em>executed upon any modification to any relation mentioned in the assertion</em>; and the <em>SQL standard supports</em> them.</p>
+<p>That last line hides an important fact: <strong>Oracle does not implement CREATE ASSERTION</strong> (it fails with <code>ORA-00901: invalid CREATE command</code>), and neither do MySQL, PostgreSQL, SQL Server or SQLite. Checking an arbitrary condition after every change is expensive, so vendors leave it to triggers (Lec 12). You still need assertions for exams: they are the clean, declarative way to state a multi-table rule, and writing one is mostly writing the right query. The playground boxes below run that query: the set of rows that would violate the assertion.</p>
+
+<h2>2. Positive or negative approach? (slides 38–39)</h2>
+<p>Take the rule of slide 39: <em>a departmental head must be an employee of the university</em>.</p>
+<ul>
+  <li><strong>Positive approach:</strong> look at each departmental head and make sure that he or she is an employee. This is a "for all" statement: for every Department row, the head is in Employee.</li>
+  <li><strong>Negative approach:</strong> look for a departmental head who is <em>not</em> an employee, and make sure that such a head <em>does not exist</em>.</li>
+</ul>
+<div class="q">
+<h4>Question (slide 39): EXISTS or NOT EXISTS, which way to go?</h4>
+<p>NOT EXISTS, the negative approach. SQL has no "for all" quantifier, but it has EXISTS, and "for all x, rule(x)" is logically the same as "there is no x with NOT rule(x)". So we write a query that finds the <em>violations</em>, and assert that its result is empty:</p>
+<p class="formula">CHECK (NOT EXISTS (query returning the violating rows))</p>
+<p>This recipe works for every assertion in the lecture, and it has a practical bonus: the inner query, run on its own, shows you exactly which rows break the rule. A positive version (CHECK (EXISTS …)) would only say that <em>some</em> row is fine, which is not what we want.</p>
+</div>
+
+<h2>3. The head must be an employee (slide 40)</h2>
+<pre>CREATE ASSERTION checkHeadConstraint
+CHECK (NOT EXISTS (SELECT head
+                   FROM Department
+                   WHERE head NOT IN (SELECT id FROM Employee)));</pre>
+<p>(The slide closes only two of the three parentheses.) This is the foreign key of Chapter 2 written as an assertion, and the comparison is instructive. Both reject a department whose head is not an employee, and both reject deleting an employee who heads a department, because the assertion mentions Employee and is re-checked when Employee changes. A row with head NULL is fine for both: <code>NULL NOT IN (…)</code> is UNKNOWN, so that row is not returned as a violation. But the foreign key can also do CASCADE or SET NULL, and it is supported everywhere, so for this rule the foreign key is the right tool; the assertion is here to show the method.</p>
+<figure class="wide"><span class="anim-tag">Animation</span><div id="a40"></div></figure>
+<div id="p1"></div>
+
+<h2>4. No manufacturer of PCs may also make laptops (slides 41–43)</h2>
+<p>The negative approach: "a manufacturer of a PC makes a laptop: such occurrences do NOT EXIST".</p>
+<pre>CREATE ASSERTION noPcLaptopMaker
+CHECK (NOT EXISTS (SELECT maker
+                   FROM Product
+                   WHERE type = 'pc'
+                     AND maker IN (SELECT maker FROM Product WHERE type = 'laptop')));</pre>
+<p>Only the Product table is involved, yet this cannot be a tuple-based CHECK: it compares <em>different rows</em> (a pc row and a laptop row of the same maker), and a tuple CHECK sees one row at a time. The slides name every assertion <code>makeConstraint</code>; in a real schema each needs its own name, so this chapter renames them. The slide is again one parenthesis short. An equivalent condition uses set operations: <code>NOT EXISTS (SELECT maker FROM Product WHERE type = 'pc' INTERSECT SELECT maker FROM Product WHERE type = 'laptop')</code>.</p>
+<p>On the textbook's data the rule is false: makers A, B and E make both. An assertion must hold when it is created, so <code>CREATE ASSERTION</code> itself would be rejected until the data is fixed.</p>
+<div id="p2"></div>
+
+<h2>5. More RAM must cost more (slides 44–45)</h2>
+<p>"If a laptop has a larger main memory than a PC, then the laptop must also have a higher price than the PC." For each <em>pair</em> (laptop, PC): P = Laptop.ram &gt; PC.ram, Q = Laptop.price &gt; PC.price. A violating pair has P true and Q false, so the violation query is a join of the two tables with P AND NOT Q:</p>
+<pre>CREATE ASSERTION ramPriceConstraint
+CHECK (NOT EXISTS (SELECT Laptop.model, PC.model
+                   FROM Laptop, PC
+                   WHERE Laptop.ram &gt; PC.ram
+                     AND Laptop.price &lt;= PC.price));</pre>
+<p>Two repairs to the slide: <code>SELECT model</code> is ambiguous because both tables have a model column (Oracle: <code>ORA-00918: column ambiguously defined</code>), so qualify it (or write <code>SELECT *</code>); and the slide has one closing parenthesis too many. On the textbook data three pairs violate it: (2002, 1002), (2006, 1001) and (2008, 1002). For example laptop 2002 has 1024 MB and costs $949, while PC 1002 has only 512 MB and costs $995.</p>
+<div id="p3"></div>
+
+<h2>6. The model must be in the table for its type (slides 46–47)</h2>
+<p>This is the rule of slide 36, now as an assertion. The violation is a Product row of type pc whose model is not in PC, or of type laptop not in Laptop, or of type printer not in Printer:</p>
+<pre>CREATE ASSERTION typeTableConstraint
+CHECK (NOT EXISTS (
+  SELECT model
+  FROM Product
+  WHERE (type = 'pc'      AND model NOT IN (SELECT model FROM PC))
+     OR (type = 'laptop'  AND model NOT IN (SELECT model FROM Laptop))
+     OR (type = 'printer' AND model NOT IN (SELECT model FROM Printer))));</pre>
+<p>Compare it with slide 36's CHECK: the condition inside is exactly the negation of the CHECK's condition (by De Morgan, NOT((A AND B) OR …) = (NOT A OR NOT B) AND …, and for the rows whose type is pc, laptop or printer that comes to the three ORed cases above). The difference is <em>when</em> it is checked. The CHECK on Product runs only when Product changes; the assertion also runs when PC, Laptop or Printer changes, so deleting PC 1001 while Product lists it is now rejected. The textbook data satisfies this rule.</p>
+<div id="p4"></div>
+
+<h2>7. A PC maker must also make a laptop at least as fast (slides 48–49)</h2>
+<p>"A manufacturer of a PC also makes a laptop with at least as great a processor speed." A violation is a PC whose speed is greater than the speed of <em>every</em> laptop of the same maker:</p>
+<pre>CREATE ASSERTION speedConstraint
+CHECK (NOT EXISTS (SELECT maker
+                   FROM Product P1 NATURAL JOIN PC
+                   WHERE speed &gt; ALL (SELECT speed
+                                      FROM Product P2 NATURAL JOIN Laptop
+                                      WHERE P2.maker = P1.maker)));</pre>
+<p><code>Product NATURAL JOIN PC</code> joins on the only common column, model, giving each PC its maker. The subquery returns the speeds of that maker's laptops, and <code>speed &gt; ALL (…)</code> is true when the PC is faster than all of them. A subtle point makes this exactly right: if the maker makes <em>no</em> laptops, the subquery is empty and <code>&gt; ALL</code> of an empty set is <em>true</em>, so the PC counts as a violation. That is what the rule wants: such a maker does not "also make a laptop" at all. The same condition without ALL: <code>WHERE NOT EXISTS (SELECT * FROM Product P2 NATURAL JOIN Laptop L WHERE P2.maker = P1.maker AND L.speed &gt;= PC.speed)</code>. (In Oracle a column used for a NATURAL JOIN, here model, may not be qualified with a table name; maker and speed are not join columns, so P1.maker and P2.maker are fine.)</p>
+<figure class="wide"><span class="anim-tag">Animation</span><div id="a49"></div></figure>
+<div id="p5"></div>
+
+<h2>8. Comparing the three kinds of constraint (slide 50)</h2>
+<div class="tbl"><table>
+<tr><th>Type</th><th>Where declared</th><th>When activated</th><th>Guaranteed to hold?</th></tr>
+<tr><td>Attribute-based CHECK</td><td>with the attribute</td><td>on insertion, or update of that attribute</td><td>not if it has a subquery</td></tr>
+<tr><td>Tuple-based CHECK</td><td>in the relation schema</td><td>on insertion or update of a row of the relation</td><td>not if it has a subquery</td></tr>
+<tr><td>Assertion</td><td>in the database schema</td><td>on any change to any relation it mentions</td><td>yes</td></tr>
+</table></div>
+<p>Read the last column with section 3 of Chapter 5 in mind. A CHECK is only evaluated for the rows of its own table that change. If its condition reads other tables (or other rows of its own table) through a subquery, those can change without the CHECK being re-evaluated, and the rule can silently become false. An assertion has no "own table": the DBMS re-evaluates it after a change to <em>any</em> table it mentions, so it always holds. The price is cost: a naive DBMS would re-run the whole query after every change, which is the main reason vendors do not offer assertions. Without subqueries, a CHECK only looks at the row being changed, and then it is guaranteed too.</p>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+<h3>Write it yourself: the violation queries</h3>
+<p>Each exercise asks for the inner query of an assertion, run on the textbook data (Product, PC, Laptop, Printer). An empty result means the assertion holds.</p>
+<div id="c1"></div><div id="c2"></div><div id="c3"></div><div id="c4"></div><div id="c5"></div><div id="c6"></div><div id="c7"></div>
+
+<h3>Exam questions</h3>
+<div class="exam">
+  <div class="exam-src">DB QB · 21-22 4b · 24 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-2 | 2021–22 · 24 marks</div>
+  <div class="exam-q"><p>Consider the following relational database schema:</p>
+  <p>Product(maker, model, type)<br>PC(model, speed, ram, hd, price)<br>Laptop(model, speed, ram, hd, screen, price)<br>Printer(model, color, type, price)</p>
+  <p>The Product relation gives the manufacturer, model number and type (PC, laptop, or printer) of various products. Model numbers are unique over all manufacturers and product types. The PC relation gives for each model number that is a PC the speed (of the processor, in gigahertz), the amount of RAM (in megabytes), the size of the hard disk (in gigabytes), and the price. The Laptop relation is similar, except that the screen size (in inches) is also included. The Printer relation records for each printer model whether the printer produces color output ('T', if so; 'F' otherwise), the process type (laser or ink-jet, typically), and the price.</p>
+  <p>Write necessary constraints to implement the followings (answer each independently):<br>
+  (i) speed, ram, hd, screen and price cannot be negative.<br>
+  (ii) A model of a product must also be the model of a PC, a laptop, or a printer.<br>
+  (iii) A laptop with a screen size less than 15 inches must have at least a 40 GB hard disk or sell for less than $1000.<br>
+  (iv) No manufacturer of PCs may also make laptops.<br>
+  (v) If a laptop has a larger main memory than a PC, then the laptop must also have a higher price than the PC.<br>
+  (vi) A manufacturer of a PC also makes a laptop with at least as great a processor speed.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+  <p>Choose the weakest tool that can express each rule: a CHECK when one row is enough, an assertion when several rows or tables are involved. Product's type values are written 'pc', 'laptop', 'printer' as in the data (string comparison is case-sensitive, so be consistent).</p>
+  <p><strong>(i) Non-negative values: attribute-based CHECKs</strong> (one condition per column, one row at a time).</p>
+<pre>CREATE TABLE PC (
+  model CHAR(4) PRIMARY KEY,
+  speed NUMBER(3,2) CHECK (speed &gt;= 0),
+  ram   INT         CHECK (ram &gt;= 0),
+  hd    INT         CHECK (hd &gt;= 0),
+  price NUMBER(7,2) CHECK (price &gt;= 0)
+);
+CREATE TABLE Laptop (
+  model  CHAR(4) PRIMARY KEY,
+  speed  NUMBER(3,2) CHECK (speed &gt;= 0),
+  ram    INT         CHECK (ram &gt;= 0),
+  hd     INT         CHECK (hd &gt;= 0),
+  screen NUMBER(3,1) CHECK (screen &gt;= 0),
+  price  NUMBER(7,2) CHECK (price &gt;= 0)
+);
+ALTER TABLE Printer ADD CONSTRAINT printer_price_nonneg CHECK (price &gt;= 0);</pre>
+  <p>(For existing tables the same conditions can be added with <code>ALTER TABLE … ADD CONSTRAINT name CHECK (…)</code>, Chapter 7.)</p>
+  <p><strong>(ii) Product model appears in PC, Laptop or Printer: assertion</strong> (other tables are involved; slide 30's CHECK with a subquery would only be checked when Product changes).</p>
+<pre>CREATE ASSERTION productModelExists
+CHECK (NOT EXISTS (SELECT model FROM Product
+                   WHERE model NOT IN (SELECT model FROM PC)
+                     AND model NOT IN (SELECT model FROM Laptop)
+                     AND model NOT IN (SELECT model FROM Printer)));</pre>
+  <p><strong>(iii) Small-screen laptops: tuple-based CHECK on Laptop</strong>, P → (Q ∨ R) ≡ ¬P ∨ Q ∨ R:</p>
+<pre>ALTER TABLE Laptop ADD CONSTRAINT small_screen_rule
+  CHECK (screen &gt;= 15 OR hd &gt;= 40 OR price &lt; 1000);</pre>
+  <p><strong>(iv) No PC maker makes laptops: assertion</strong> (compares different rows of Product).</p>
+<pre>CREATE ASSERTION noPcLaptopMaker
+CHECK (NOT EXISTS (SELECT maker FROM Product
+                   WHERE type = 'pc'
+                     AND maker IN (SELECT maker FROM Product WHERE type = 'laptop')));</pre>
+  <p><strong>(v) More RAM, higher price: assertion</strong> over pairs (laptop, PC); a violation is ram larger but price not higher:</p>
+<pre>CREATE ASSERTION ramPriceConstraint
+CHECK (NOT EXISTS (SELECT * FROM Laptop L, PC P
+                   WHERE L.ram &gt; P.ram AND L.price &lt;= P.price));</pre>
+  <p><strong>(vi) PC makers have a laptop at least as fast: assertion</strong>; a violation is a PC with no laptop of the same maker at least as fast:</p>
+<pre>CREATE ASSERTION speedConstraint
+CHECK (NOT EXISTS (
+  SELECT * FROM Product P1, PC
+  WHERE P1.model = PC.model
+    AND NOT EXISTS (SELECT * FROM Product P2, Laptop L
+                    WHERE P2.model = L.model
+                      AND P2.maker = P1.maker
+                      AND L.speed &gt;= PC.speed)));</pre>
+  <p>(Equivalently, slide 49's form with <code>speed &gt; ALL (…)</code>.)</p>
+  <p><strong>In Oracle</strong>, (i) and (iii) work as written. Assertions do not exist in Oracle and CHECKs cannot contain subqueries, so (ii), (iv), (v), (vi) must be enforced with triggers that run the same NOT EXISTS query after each change to the tables involved (Lec 12). On the textbook's sample data, (ii) holds, but (iv), (v) and (vi) are violated (makers A, B, E; three laptop/PC pairs; ten PCs of makers A–E), so those assertions could not even be created until the data is corrected. Exercises 2, 3 and 5 above compute these violators.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2011–12 · 15 marks (part b; part a is in Chapter 5)</div>
+  <div class="exam-q"><p>For the schema Product(maker, model, type), PC(model, speed, ram, hd, price), Laptop(model, speed, ram, hd, screen, price), Printer(model, color, type, price), write the following assertions: (i) The price of a laptop must be larger than the average price of PCs made by the same manufacturer. (ii) A manufacturer of a PC must also make Laptop(s). (iii) If a PC has a greater processor speed than a laptop then the PC must also have a higher price than the laptop.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+  <p><strong>(i)</strong> Violation: a laptop whose price is at most the average PC price of its maker. The maker of a laptop comes from Product; the average from Product joined with PC.</p>
+<pre>CREATE ASSERTION laptopAbovePcAvg
+CHECK (NOT EXISTS (
+  SELECT * FROM Product PL, Laptop L
+  WHERE PL.model = L.model
+    AND L.price &lt;= (SELECT AVG(PC.price)
+                    FROM Product PP, PC
+                    WHERE PP.model = PC.model
+                      AND PP.maker = PL.maker)));</pre>
+  <p>If a maker makes no PCs, AVG returns NULL, the comparison is UNKNOWN, and that laptop is (correctly) not a violation. On the textbook data two laptops violate it: 2004 of maker A ($1150 ≤ A's PC average $1195.67) and 2003 of maker E ($549 ≤ $712.33).</p>
+  <p><strong>(ii)</strong> Violation: a maker that makes a PC but no laptop. In Oracle set difference is MINUS (EXCEPT in the standard):</p>
+<pre>CREATE ASSERTION pcMakerMakesLaptop
+CHECK (NOT EXISTS (SELECT maker FROM Product WHERE type = 'pc'
+                   MINUS
+                   SELECT maker FROM Product WHERE type = 'laptop'));</pre>
+  <p>or without set operators: <code>NOT EXISTS (SELECT * FROM Product P WHERE type = 'pc' AND maker NOT IN (SELECT maker FROM Product WHERE type = 'laptop'))</code>. Violators on the textbook data: makers C and D.</p>
+  <p><strong>(iii)</strong> P = PC.speed &gt; Laptop.speed, Q = PC.price &gt; Laptop.price; a violating pair has P AND NOT Q:</p>
+<pre>CREATE ASSERTION speedPriceConstraint
+CHECK (NOT EXISTS (SELECT * FROM PC, Laptop
+                   WHERE PC.speed &gt; Laptop.speed
+                     AND PC.price &lt;= Laptop.price));</pre>
+  <p>The textbook data has 82 such pairs (PCs are generally cheaper than laptops). As with every assertion, Oracle would need triggers; the conditions themselves are standard.</p>
+  </div></details>
+</div>
+
+<div class="key"><p><strong>Summary:</strong> <code>CREATE ASSERTION name CHECK (condition)</code> states a rule over any tables; it is re-checked after any change to any table it mentions, so it is the only constraint that is always guaranteed (slide 50). Write it with the negative approach: <code>NOT EXISTS (query for violations)</code>, translating "if P then Q" into the violation P AND NOT Q. Standard SQL only: Oracle has no assertions and enforces such rules with triggers.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/sqlplay.js"></script>
+<script src="lecture.js"></script>
+<script>
+// slide 40: assertion re-checked after DELETE FROM Employee WHERE id = 4
+(() => {
+  const A = '<pre style="margin:0 0 10px">checkHeadConstraint: NOT EXISTS (SELECT head FROM Department WHERE head NOT IN (SELECT id FROM Employee))</pre>';
+  const E1 = EMP0.filter(r => r[0] !== 4);
+  stepper('#a40', [
+    { html: A + edFig(DEPT0, EMP0), cap: 'The assertion holds now: heads 2, 4, 1 are all employee ids. Statement: <code>DELETE FROM Employee WHERE id = 4</code>. Employee is mentioned in the assertion, so the DBMS must re-evaluate it.' },
+    { html: A + edFig(DEPT0, EMP0, { ec: { 3: 'del' } }), cap: 'Tentatively apply the delete: employee 4 is removed.' },
+    { html: A + edFig(DEPT0, E1, { ec: { 0: 'hl', 1: 'hl', 2: 'hl' }, es: { 0: 'ids = {1, 2, 3}' } }), cap: 'Evaluate the inner subquery on the new state: SELECT id FROM Employee = {1, 2, 3}.' },
+    { html: A + edFig(DEPT0, E1, { dc: { 0: 'new' }, ds: { 0: '2 ∈ ids, fine' } }), cap: 'Scan Department. CSE: head 2 is in {1, 2, 3}; not returned.' },
+    { html: A + edFig(DEPT0, E1, { dc: { 0: 'new', 1: 'del' }, ds: { 0: '2 ∈ ids, fine', 1: '4 ∉ ids → violation' } }), cap: 'EEE: head 4 is NOT IN {1, 2, 3}, so the subquery returns a row.' },
+    { html: A + edFig(DEPT0, EMP0, { dc: { 1: 'hl' }, ds: { 1: 'still needs employee 4' } }), cap: 'The subquery is not empty, so NOT EXISTS is <b>false</b>: the assertion would be violated. The DELETE is <span class="bad">rejected</span> and Employee 4 is back. (The same rule as a foreign key gives the same result.)' },
+  ], { interval: 2400 });
+})();
+// slide 49: per-maker comparison
+(() => {
+  const mk = {}; PROD.forEach(([m, mo, t]) => { (mk[m] ||= { pc: [], lap: [] }); if (t === 'pc') mk[m].pc.push(mo); if (t === 'laptop') mk[m].lap.push(mo); });
+  const sp = (tbl, mo) => tbl.find(r => r[0] === mo)[1];
+  const makers = Object.keys(mk).filter(m => mk[m].pc.length);
+  const rows = makers.map(m => { const ls = mk[m].lap.map(x => sp(LAPS, x)), mx = ls.length ? Math.max(...ls) : null;
+    const bad = mk[m].pc.filter(x => !ls.some(s => s >= sp(PCS, x)));
+    return { m, pcs: mk[m].pc.map(x => `${x}:${sp(PCS, x).toFixed(2)}`).join(' '), mx, bad }; });
+  const fig = k => recTable(null, rows.map((r, i) => ({ cells: [r.m, r.pcs, r.mx == null ? '(none)' : r.mx.toFixed(2), i <= k ? (r.bad.length ? r.bad.join(', ') : '–') : ''],
+    cls: i === k ? (r.bad.length ? 'hl' : 'new') : '' })), ['maker', 'PCs (model:speed)', 'fastest laptop', 'violating PCs']);
+  const steps = [{ html: fig(-1), cap: 'For each maker of PCs: list its PCs and its fastest laptop. A PC violates the rule if its speed is &gt; ALL laptop speeds of its maker, i.e. greater than the fastest one (or the maker has no laptop at all).' }];
+  rows.forEach((r, i) => steps.push({ html: fig(i), cap: `Maker ${r.m}: ` + (r.mx == null ? `makes no laptops. The subquery is empty and &gt; ALL of an empty set is true, so every PC of ${r.m} violates: ${r.bad.join(', ')}.` :
+    r.bad.length ? `fastest laptop ${r.mx.toFixed(2)} GHz. PCs faster than that: ${r.bad.join(', ')}. Violations.` : `fastest laptop ${r.mx.toFixed(2)} GHz is at least as fast as every PC. No violation.`) }));
+  const n = rows.reduce((a, r) => a + r.bad.length, 0);
+  steps.push({ html: fig(rows.length), cap: `${n} PCs violate the rule, from makers ${rows.filter(r => r.bad.length).map(r => r.m).join(', ')}. NOT EXISTS is false: on this data the assertion does not hold.` });
+  stepper('#a49', steps, { interval: 2400 });
+})();
+
+sqlPlay('#p1', { setup: ED_NOFK, query: '-- the inner query of checkHeadConstraint: the violating rows\nSELECT head\nFROM Department\nWHERE head NOT IN (SELECT id FROM Employee);',
+  note: 'Department here has no foreign key, so (CE, 5) got in; the query finds it. An assertion would have rejected that INSERT.' });
+sqlPlay('#p2', { setup: PCDB, query: "SELECT DISTINCT maker\nFROM Product\nWHERE type = 'pc'\n  AND maker IN (SELECT maker FROM Product WHERE type = 'laptop');" });
+sqlPlay('#p3', { setup: PCDB, query: 'SELECT Laptop.model AS laptop, Laptop.ram, Laptop.price,\n       PC.model AS pc, PC.ram, PC.price\nFROM Laptop, PC\nWHERE Laptop.ram > PC.ram\n  AND Laptop.price <= PC.price;' });
+sqlPlay('#p4', { setup: PCDB, query: "SELECT model, type\nFROM Product\nWHERE (type = 'pc'      AND model NOT IN (SELECT model FROM PC))\n   OR (type = 'laptop'  AND model NOT IN (SELECT model FROM Laptop))\n   OR (type = 'printer' AND model NOT IN (SELECT model FROM Printer));\n-- empty. Now add a line:  DELETE FROM PC WHERE model = '1001';  above the SELECT and run again.",
+  note: 'The tables have no foreign keys, so the DELETE succeeds and the violation appears. A CHECK on Product would not notice; the assertion would reject the DELETE.' });
+sqlPlay('#p5', { setup: PCDB, query: 'SELECT DISTINCT maker\nFROM Product P1 NATURAL JOIN PC\nWHERE speed > ALL (SELECT speed\n                   FROM Product P2 NATURAL JOIN Laptop\n                   WHERE P2.maker = P1.maker);',
+  note: 'SQLite has no <code>&gt; ALL</code>; the playground rewrites it for you, so this runs as written. Try the equivalent NOT EXISTS form from the text too: <code>WHERE NOT EXISTS (SELECT * FROM Product P2 NATURAL JOIN Laptop L WHERE P2.maker = P1.maker AND L.speed &gt;= PC.speed)</code>.' });
+
+flashcards('#cards', [
+  { f: 'Assertion', b: 'CREATE ASSERTION name CHECK (condition): a database-wide rule over any tables, re-checked after changes to any of them.' },
+  { f: 'Negative approach', b: 'Write a query for the violations and assert NOT EXISTS (that query).' },
+  { f: 'Why NOT EXISTS?', b: 'SQL has no "for all"; ∀x rule(x) ≡ ¬∃x ¬rule(x).' },
+  { f: '> ALL (empty set)', b: 'True. So a PC whose maker has no laptops counts as faster than all of them.' },
+  { f: 'Guaranteed to hold', b: 'Only assertions (and CHECKs without subqueries). A CHECK with a subquery can be broken by changes to other tables.' },
+  { f: 'Assertions in Oracle', b: 'Not supported (ORA-00901). Use triggers.' },
+  { f: 'DROP ASSERTION name', b: 'Removes an assertion (slide 52).' },
+]);
+quiz('#quiz', [
+  { q: 'An assertion mentions Product and PC. When does a standard DBMS check it?', opts: ['Only on INSERT into Product', 'On any change to Product or PC', 'Once a day', 'Only when the assertion is created'], a: 1, why: 'Slide 50: on change to any relation mentioned.' },
+  { q: 'Rule: "every laptop costs more than $500". The assertion body is…', opts: ['EXISTS (SELECT * FROM Laptop WHERE price > 500)', 'NOT EXISTS (SELECT * FROM Laptop WHERE price <= 500)', 'NOT EXISTS (SELECT * FROM Laptop WHERE price > 500)', 'EXISTS (SELECT * FROM Laptop WHERE price <= 500)'], a: 1, why: 'Assert that no violating laptop exists. (A simple CHECK on Laptop would also do here.)' },
+  { q: 'Why can "no PC maker makes laptops" not be a tuple-based CHECK on Product?', opts: ['It uses a string comparison', 'It compares two different rows of Product', 'CHECKs cannot use IN', 'Product has no primary key'], a: 1, why: 'A tuple CHECK sees one row at a time; this rule relates a pc row to a laptop row.' },
+  { q: 'Maker C makes PC 1007 and no laptops. In slide 49\'s assertion, PC 1007 is…', opts: ['ignored, since the subquery is empty', 'a violation, since speed > ALL (empty) is true', 'an error', 'a violation only if C makes printers'], a: 1, why: '> ALL over an empty set is true, which matches the rule: C does not make a laptop at all.' },
+  { q: 'Which statement does Oracle accept?', opts: ['CREATE ASSERTION a CHECK (NOT EXISTS (…))', 'CHECK (model IN (SELECT model FROM PC))', 'CHECK (speed >= 2.0 OR price <= 800)', 'all three'], a: 2, why: 'Oracle has no assertions and no subqueries in CHECK; a plain tuple CHECK is fine.' },
+  { q: 'Which constraint is "guaranteed to hold" per slide 50?', opts: ['attribute CHECK with a subquery', 'tuple CHECK with a subquery', 'assertion', 'none'], a: 2, why: 'It is re-evaluated whenever any table it reads changes.' },
+]);
+ask('#try1', { q: 'On the textbook data, how many (laptop, PC) pairs violate slide 45\'s rule (laptop has more RAM but is not more expensive)?', a: 3, why: '(2002, 1002), (2006, 1001), (2008, 1002).' });
+
+sqlCheck('#c1', { setup: ED_NOFK + "INSERT INTO Department VALUES ('BME', NULL);\nINSERT INTO Department VALUES ('URP', 9);",
+  task: 'Easy. Department has no foreign key. Write the violation query of slide 40: the name and head of every department whose head is not an employee. (A NULL head is not a violation.)',
+  solution: 'SELECT name, head FROM Department WHERE head NOT IN (SELECT id FROM Employee);' });
+sqlCheck('#c2', { setup: PCDB,
+  task: 'Slide 43: list (once each) the makers that make both PCs and laptops.',
+  solution: "SELECT DISTINCT maker FROM Product\nWHERE type = 'pc' AND maker IN (SELECT maker FROM Product WHERE type = 'laptop');" });
+sqlCheck('#c3', { setup: PCDB,
+  task: 'Slide 45: list the pairs (laptop model, PC model) where the laptop has more RAM than the PC but is not more expensive.',
+  solution: 'SELECT Laptop.model, PC.model FROM Laptop, PC\nWHERE Laptop.ram > PC.ram AND Laptop.price <= PC.price;' });
+sqlCheck('#c4', { setup: PCDB + "INSERT INTO Product VALUES ('H', '3008', 'printer');\nINSERT INTO Product VALUES ('A', '2099', 'laptop');",
+  task: 'Slide 47 (two invented bad rows were added to Product): list model and type of every product that is missing from the table for its type.',
+  solution: "SELECT model, type FROM Product\nWHERE (type = 'pc' AND model NOT IN (SELECT model FROM PC))\n   OR (type = 'laptop' AND model NOT IN (SELECT model FROM Laptop))\n   OR (type = 'printer' AND model NOT IN (SELECT model FROM Printer));" });
+sqlCheck('#c5', { setup: PCDB,
+  task: 'Slide 49: list the model and speed of every PC for which its maker has no laptop at least as fast. (SQLite has no &gt; ALL; use NOT EXISTS.)',
+  hint: 'FROM Product P1 JOIN PC ON P1.model = PC.model WHERE NOT EXISTS (… laptops of P1.maker with speed >= PC.speed)',
+  solution: 'SELECT PC.model, PC.speed FROM Product P1 JOIN PC ON P1.model = PC.model\nWHERE NOT EXISTS (SELECT * FROM Product P2 JOIN Laptop L ON P2.model = L.model\n                  WHERE P2.maker = P1.maker AND L.speed >= PC.speed);' });
+sqlCheck('#c6', { setup: PCDB,
+  task: 'Exam level (2011–12 b-i). List the model and price of every laptop whose price is not larger than the average price of the PCs made by the same maker.',
+  solution: 'SELECT L.model, L.price FROM Product PL JOIN Laptop L ON PL.model = L.model\nWHERE L.price <= (SELECT AVG(PC.price) FROM Product PP JOIN PC ON PP.model = PC.model\n                  WHERE PP.maker = PL.maker);' });
+sqlCheck('#c7', { setup: PCDB,
+  task: 'Exam level (2011–12 b-ii). List the makers that make a PC but no laptop. Use Oracle\'s MINUS.',
+  solution: "SELECT maker FROM Product WHERE type = 'pc'\nMINUS\nSELECT maker FROM Product WHERE type = 'laptop';" });
+</script>
+</body>
+</html>

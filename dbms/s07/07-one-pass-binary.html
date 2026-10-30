@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>One-Pass Algorithms for Binary Operations · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 07 (Sukarna) · Chapter 7 · Slides 45–54 · Book §15.2.3</div>
+<h1>One-Pass Algorithms for Union, Intersection, Difference, Product and Join</h1>
+<p class="lede">All the binary one-pass algorithms share one plan: keep the smaller relation in memory with a search structure, then stream the larger one past it a block at a time. This chapter gives each operation's rule, its cost B(R) + B(S) and its memory condition, lets you animate any of them on your own tuples, and answers the exam question on S − R.</p>
+
+<h2>1. Bag union: no memory needed (slide 45)</h2>
+<dl class="def">
+<dt>Bag</dt>
+<dd>A multiset: a collection in which the same tuple may occur several times. SQL tables are bags unless DISTINCT is used. A <b>set</b> has no duplicates.</dd>
+<dt>Bag union R ∪<sub>B</sub> S</dt>
+<dd>Keeps all tuples of both: a tuple occurring m times in R and n times in S occurs m + n times in the result (SQL's UNION ALL).</dd>
+</dl>
+<p><b>Algorithm:</b> copy every tuple of R to the output, then copy every tuple of S. <b>Disk I/Os: B(R) + B(S). Memory: M = 1 suffices</b>, whatever the sizes, because nothing is stored: pipelining lets the output leave one tuple at a time (this is the union iterator of Chapter 5).</p>
+
+<h2>2. The general plan for the other binary operations</h2>
+<p>Every other binary operation needs to compare tuples of R with tuples of S, so one of them must be in memory. Following the slides, <b>assume B(S) &lt; B(R)</b>, so S is the one we store:</p>
+<ol>
+  <li>Read S into <b>M − 1</b> buffers and build a main-memory search structure on it (a hash table or balanced tree). The search key is the <b>entire tuple</b> for ∪, ∩ and −, and the <b>join attributes Y</b> for the join.</li>
+  <li>Read R one block at a time into the one remaining buffer (the M-th), and handle each tuple of R using the structure.</li>
+</ol>
+<div class="key">
+<p class="formula">Disk I/Os = B(R) + B(S) &nbsp;&nbsp;·&nbsp;&nbsp; Memory: min(B(R), B(S)) &lt; M</p>
+<p style="text-align:center;margin:0">"At least one of R and S must fit in M − 1 buffers." The exact condition is min(B(R), B(S)) ≤ M − 1.</p>
+</div>
+
+<figure class="wide">
+<span class="anim-tag">Interactive animation</span>
+<div id="bin"></div>
+</figure>
+
+<h2>3. The rules, operation by operation (slides 46–54)</h2>
+
+<h3>Set union R ∪ S (slides 46–48)</h3>
+<p>R and S are sets; the union keeps <b>one copy</b> of each tuple that occurs in both.</p>
+<ul>
+  <li>Read S into M − 1 buffers, build the structure (key = entire tuple), and <b>copy all tuples of S to the output</b>.</li>
+  <li>Read R a block at a time. For each tuple of R: if it is <b>not in S</b>, copy it to the output; if it is in S, do not copy it (it was already output as part of S).</li>
+</ul>
+
+<h3>Set intersection R ∩ S (slide 49)</h3>
+<ul>
+  <li>Read S into M − 1 buffers with the structure (key = full tuple).</li>
+  <li>Read each block of R. For each tuple of R: if it <b>is in S</b>, copy it to the output; otherwise do not.</li>
+</ul>
+
+<h3>Set difference (slide 50, and the textbook for the other direction)</h3>
+<p>Difference is not commutative, so the two directions differ. S is in memory in both.</p>
+<ul>
+  <li><b>R − S</b> (slide 50): read R a block at a time; for each tuple of R, if it is <b>not in S</b>, copy it to the output; if it is in S, do not.</li>
+  <li><b>S − R</b> (textbook): read R a block at a time; for each tuple t of R, if t is in S, <b>delete t from the in-memory copy of S</b>; otherwise do nothing. After all of R, <b>copy the tuples of S that remain</b> to the output.</li>
+</ul>
+
+<h3>Bag intersection (slides 51–52)</h3>
+<p>For bags, an element appears in R ∩<sub>B</sub> S the <b>minimum</b> of the number of times it appears in R and in S. Example: {a, a, a, b} ∩<sub>B</sub> {a, a, b, b, c} = {a, a, b}.</p>
+<ul>
+  <li>Assume B(S) &lt; B(R) and B(S) ≤ M − 1. Read S into M − 1 buffers and build a hash table whose key is the full tuple value, storing with each distinct tuple a <b>count</b> = the number of times it occurs in S. (Duplicates are not stored separately, so S often shrinks.)</li>
+  <li>Read R one block at a time. For each tuple t of R: if t is in S and its count is <b>positive</b>, <b>decrease the count by one and copy t to the output</b>; if the count is zero (or t is not in S), do nothing.</li>
+</ul>
+
+<h3>Cartesian product R × S (slide 53)</h3>
+<ul>
+  <li>Read S into M − 1 buffers; <b>no special data structure</b> is needed, since every pair is output.</li>
+  <li>Read R one block at a time; <b>concatenate</b> each tuple of R with each tuple of S in memory, and send each concatenated tuple to the output.</li>
+</ul>
+<p>The processor time per R tuple is large (it meets every S tuple), but so is the output, so the time per output tuple is small.</p>
+
+<h3>Natural join R(X, Y) ⋈ S(Y, Z) (slide 54)</h3>
+<p>Notation: Y is all the attributes R and S have in common, X the rest of R's attributes, Z the rest of S's.</p>
+<ul>
+  <li>Read S into M − 1 buffers and build a search structure on S with <b>search key = Y</b>.</li>
+  <li>Read each block of R into the one remaining buffer. For each tuple t of R, find the tuples of S that <b>agree with t on all attributes of Y</b>, concatenate each with t, and send the result to the output.</li>
+</ul>
+<p>An equijoin works the same way after renaming; a theta-join is a product or equijoin followed by a selection.</p>
+
+<h3>Summary of one-pass binary algorithms</h3>
+<div class="tbl"><table>
+<tr><th>Operation</th><th>Search key on S</th><th>For each tuple t of R</th><th>At the end</th></tr>
+<tr><td>R ∪<sub>B</sub> S</td><td>none (M = 1)</td><td>output t (after all of R, output S)</td><td>—</td></tr>
+<tr><td>R ∪ S</td><td>whole tuple</td><td>output t if t ∉ S (S was output first)</td><td>—</td></tr>
+<tr><td>R ∩ S</td><td>whole tuple</td><td>output t if t ∈ S</td><td>—</td></tr>
+<tr><td>R − S</td><td>whole tuple</td><td>output t if t ∉ S</td><td>—</td></tr>
+<tr><td>S − R</td><td>whole tuple</td><td>if t ∈ S, delete t from memory</td><td>output what is left of S</td></tr>
+<tr><td>R ∩<sub>B</sub> S</td><td>whole tuple, with count</td><td>if count(t) &gt; 0: output t, count − 1</td><td>—</td></tr>
+<tr><td>R × S</td><td>none</td><td>output t joined with every S tuple</td><td>—</td></tr>
+<tr><td>R ⋈ S</td><td>join attributes Y</td><td>output t joined with matching S tuples</td><td>—</td></tr>
+</table></div>
+<p>All cost <b>B(R) + B(S)</b> and need <b>min(B(R), B(S)) &lt; M</b>, except bag union (M = 1).</p>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+<div id="try2"></div>
+
+<h3>Exam questions</h3>
+<div class="exam">
+  <div class="exam-src">DB QB · 17-18 1c · 6 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-2 | 2017–18 · 6 marks</div>
+  <div class="exam-q"><p>Write the steps of a one-pass algorithm for finding S − R, where number of records in relation R is smaller than the number of records in relation S.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+  <p>R is the smaller relation, so <b>R</b> is the one kept in memory (here it plays the role that S plays on the slides), and S is streamed. The result keeps the tuples of S that are not in R. Assume B(R) ≤ M − 1 (R fits in memory).</p>
+  <ol>
+    <li>Read R block by block into M − 1 buffers. Build a main-memory search structure (hash table or balanced tree) whose search key is the <b>entire tuple</b>.</li>
+    <li>Read S one block at a time into the remaining buffer.</li>
+    <li>For each tuple s of the current block of S: look s up in the structure. If s is <b>in R</b>, discard it. If s is <b>not in R</b>, copy it to the output.</li>
+    <li>Repeat until all blocks of S have been processed.</li>
+  </ol>
+  <p><b>Cost:</b> each block of R and S is read once: <b>B(R) + B(S)</b> disk I/Os. <b>Memory:</b> B(R) &lt; M (at least B(R) + 1 buffers, plus an output buffer if it is counted).</p>
+  <p>To check it with the animation above, remember that the tool always calls the in-memory relation S and the streamed one R. So the bank's R goes in the tool's "S" box and the bank's S in the "R" box, and the operation is the tool's "R − S". With memory relation {b, c, e} and streamed relation {a, b, c, d} the output is {a, d}.</p>
+  <p><i>Variation:</i> if S were the smaller relation, keep S in memory, delete from it every tuple that appears in R while R is streamed, and output what remains of S at the end (the textbook's S − R algorithm). The cost is the same.</p>
+  </div></details>
+</div>
+
+<div class="key"><p><strong>Summary:</strong> bag union copies R then S with one buffer. Every other binary operation reads the smaller relation S into M − 1 buffers with a search structure (whole tuple for set operations, join attributes for ⋈, counts for bag ∩, nothing for ×) and streams the larger relation R through the last buffer. Cost B(R) + B(S); condition min(B(R), B(S)) &lt; M. For S − R with S in memory, matching tuples are deleted from memory and the survivors are output at the end.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="lecture.js"></script>
+<script>
+const OPS = [['union', 'R ∪ S (set union)'], ['inter', 'R ∩ S (set intersection)'], ['strMinusMem', 'R − S'], ['memMinusStr', 'S − R'], ['bagInter', 'R ∩ S (bag intersection)'], ['join', 'R(X,Y) ⋈ S(Y,Z)']];
+QE.form('#bin', [
+  { id: 'op', label: 'Operation', value: 'union', options: OPS },
+  { id: 'S', label: 'S (kept in memory), comma-separated', value: 'b, c, e', cls: 'wide' },
+  { id: 'R', label: 'R (streamed), comma-separated', value: 'a, b, c, d', cls: 'wide' },
+], 'Animate', (v, out) => {
+  const S = QE.list(v.S, 'S', 1, 8), R = QE.list(v.R, 'R', 1, 10);
+  if (v.op === 'join') {
+    [...S, ...R].forEach(t => { if (t.split(/\s+/).length !== 2) throw new Error('For the join, give S tuples as "Y Z" (like "1 z1") and R tuples as "X Y" (like "x1 1").'); });
+  } else if (v.op !== 'bagInter') {
+    const dup = a => a.length !== new Set(a).size;
+    if (dup(S) || dup(R)) throw new Error('Set operations need sets: remove the repeated tuples, or choose bag intersection.');
+  }
+  out.innerHTML = '<div></div>';
+  QE.onePassAnim(out.firstChild, { op: v.op, mem: S, str: R, tpb: 2, memName: 'S', strName: 'R' });
+});
+// give the join a ready-made example when it is chosen
+document.querySelector('#bin select').addEventListener('change', e => {
+  const f = e.target.form, ex = { join: ['1 z1, 2 z2, 1 z3', 'x1 1, x2 3, x3 2, x4 1'], bagInter: ['a, a, b, b, c', 'a, a, a, b, d'] }[e.target.value] || ['b, c, e', 'a, b, c, d'];
+  f.S.value = ex[0]; f.R.value = ex[1]; f.requestSubmit();
+});
+
+flashcards('#cards', [
+  { f: 'Bag union cost', b: 'B(R) + B(S) with M = 1: copy R, then copy S.' },
+  { f: 'One-pass binary memory rule', b: 'min(B(R), B(S)) < M: the smaller relation must fit in M − 1 buffers.' },
+  { f: 'Search key for ∪, ∩, −', b: 'The entire tuple.' },
+  { f: 'Search key for ⋈', b: 'The join attributes Y.' },
+  { f: 'S − R with S in memory', b: 'Delete from memory each S tuple seen in R; output the survivors at the end.' },
+  { f: 'Bag intersection', b: 'Store S with a count per distinct tuple; output an R tuple and decrement while the count is positive.' },
+  { f: 'Product R × S', b: 'S in memory with no structure; concatenate each R tuple with every S tuple.' },
+]);
+quiz('#quiz', [
+  { q: 'B(R) = 1000, B(S) = 50, M = 60. One-pass R ⋈ S costs…', opts: ['50', '1000', '1050', '50,000'], a: 2, why: 'S fits (50 < 60): B(R) + B(S) = 1050.' },
+  { q: 'B(R) = 1000, B(S) = 500, M = 101. Can a one-pass join be used?', opts: ['Yes', 'No: neither relation fits in M − 1 = 100 buffers', 'Only for bag union', 'Yes, if R is in memory'], a: 1, why: 'min(1000, 500) = 500 > 100. This is why Lecture 08 needs nested-loop and two-pass joins.' },
+  { q: 'In one-pass set union with S in memory, when are S\'s tuples output?', opts: ['Never', 'At the start, when S is read', 'Only if they also occur in R', 'At the end'], a: 1, why: 'Slide 47: copy all tuples of S into the output, then output only the R tuples not in S.' },
+  { q: '{a, a, a, b} ∩<sub>B</sub> {a, a, b, b, c} = ?', opts: ['{a, b}', '{a, a, b}', '{a, a, a, b, b}', '{a, a, a, b}'], a: 1, why: 'Minimum counts: a: min(3, 2) = 2, b: min(1, 2) = 1, c: 0.' },
+  { q: 'Which operation needs no search structure on S?', opts: ['R ∩ S', 'R ⋈ S', 'R × S', 'R − S'], a: 2, why: 'Every R tuple pairs with every S tuple, so nothing is looked up.' },
+]);
+ask('#try1', { q: 'B(R) = 800, B(S) = 120. What is the smallest M that allows a one-pass R ∩ S (exact condition B(S) ≤ M − 1)?', a: 121, why: '120 blocks of S plus 1 buffer for R\'s current block.' });
+ask('#try2', { q: 'With the bag intersection example in the animation (S = a, a, b, b, c; R = a, a, a, b, d), how many tuples are output?', a: 3, why: 'a twice (S has 2), b once (R has 1): {a, a, b}.' });
+</script>
+</body>
+</html>

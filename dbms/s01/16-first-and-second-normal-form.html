@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>1NF, 2NF and 3NF · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 01 (Sukarna) · Chapter 16 · Slides 62–64 · Book §3.5 (box: Other Normal Forms)</div>
+<h1>First, Second and Third Normal Form, Step by Step</h1>
+<p class="lede">The classic ladder: atomic values (1NF), no partial dependencies (2NF), no transitive dependencies (3NF). This chapter explains each rung with the slides' examples, connects it to the FD-based definitions of earlier chapters, and provides a normal-form checker.</p>
+
+<h2>1. First normal form (slide 62)</h2>
+<dl class="def">
+  <dt>1NF</dt><dd>Every attribute value is <b>atomic</b> (indivisible): each cell of the table holds one value.</dd>
+</dl>
+<ul>
+  <li><strong>Lists, sets and groups are not allowed.</strong> Several phone numbers in one <code>phone</code> attribute break 1NF.</li>
+  <li><strong>Composite values are not allowed when the business needs their parts.</strong> If queries need the city or postcode of an address separately, a single <code>address</code> attribute is not acceptable; store city, country, postcode as separate attributes. The slide notes this is not a rigid rule: if nobody ever needs the parts, one address string is fine.</li>
+</ul>
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="nf1"></div>
+</figure>
+<p>The textbook (box “Other Normal Forms”) agrees: 1NF is “simply the condition that every component of every tuple is an atomic value”. Every relation in the relational model is assumed to be in 1NF; the higher normal forms are all about FDs.</p>
+
+<h2>2. Second normal form (slide 63)</h2>
+<dl class="def">
+  <dt>Non-key (non-prime) attribute</dt><dd>An attribute that is not part of any key.</dd>
+  <dt>Partial dependency</dt><dd>A non-key attribute is determined by a proper part of a composite key (not the whole key).</dd>
+  <dt>2NF</dt><dd>1NF, and for every FD X → Y where Y is a non-key attribute, X is not a proper subset of a key. “Every non-key attribute must depend on the <em>whole</em> key.”</dd>
+</dl>
+<p>Slide 63's example: CUSTOMER(Cust_ID, Name, Order_ID) with key {Order_ID, Cust_ID}. Name depends on Cust_ID alone, a part of the key: a partial dependency, so not 2NF. The second example: Registration(student_id, course_id, course_name), key {student_id, course_id}, FD course_id → course_name.</p>
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="nf2"></div>
+</figure>
+<p>The fix: move the partially dependent attributes into a new relation keyed by the part of the key they depend on. A relation whose keys are all single attributes is automatically in 2NF (a single attribute has no proper non-empty part).</p>
+
+<h2>3. Third normal form, classic form (slide 64)</h2>
+<dl class="def">
+  <dt>Transitive dependency</dt><dd>A non-key attribute determines another non-key attribute, so the second depends on the key only through the first: key → A → B.</dd>
+  <dt>3NF (slide 64)</dt><dd>2NF, and for every FD X → Y where Y is a non-key attribute, X is a superkey. “Every non-key attribute must depend on the key, the whole key, and nothing but the key.”</dd>
+</dl>
+<p>This is the same as the definition of Chapter 14 (left side a superkey, or right side prime), stated for non-prime right sides. Slide 64's examples: EMPLOYEE(Emp_ID, F_Name, L_Name, Dept_ID, Dept_Name) with Dept_ID → Dept_Name; and Student(student_id, home_town, home_country) with key student_id and home_town → home_country.</p>
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="nf3"></div>
+</figure>
+
+<h2>4. The ladder, and a checker</h2>
+<div class="tbl"><table>
+<tr><th>Form</th><th>Forbids</th><th>Fix</th></tr>
+<tr><td>1NF</td><td>non-atomic values (sets, lists, needed composites)</td><td>one value per cell; repeating groups to their own relation</td></tr>
+<tr><td>2NF</td><td>non-prime attribute determined by part of a key</td><td>move it out with that part of the key</td></tr>
+<tr><td>3NF</td><td>non-prime attribute determined by a non-superkey</td><td>move it out with its determinant</td></tr>
+<tr><td>BCNF</td><td>any nontrivial FD with a non-superkey left side</td><td>BCNF decomposition (Chapter 11)</td></tr>
+</table></div>
+<p>Each form includes the ones above it: BCNF ⊂ 3NF ⊂ 2NF ⊂ 1NF. One subtlety: the slides' definitions say “a key”, meaning <em>any</em> candidate key. Some textbooks (Connolly & Begg) first define 2NF and 3NF with respect to the primary key only and then generalize. When a relation has several candidate keys, use the general version, as the checker below does.</p>
+<figure class="wide">
+<span class="anim-tag">Interactive tool</span>
+<div id="tool"></div>
+<figcaption><b>Normal-form checker.</b> Finds the keys and prime attributes, then partial dependencies (2NF), 3NF violations and BCNF violations, and reports the highest normal form (1NF is assumed). Preset: the StaffPropertyInspection exam question below.</figcaption>
+</figure>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+
+<h3>Exam questions</h3>
+<div class="exam">
+  <div class="exam-src">DB QB · Jan 20 8 (Q63 and Q73) · 10 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-2 | 2018–19 · 10 marks</div>
+  <div class="exam-q"><p>Suppose we are generating a StaffPropertyInspection table to include property inspection by staff members. When the staffs are required to undertake the inspections, they are allocated a company car for use on the day of the inspections. However, a car may be allocated to several staff members on the same day at different time slots. A member of staff may inspect several properties on a given date, but a property is only inspected once by a single staff member on a given date. Now normalize the Table StaffPropertyInspection of the following figure up to 2NF. Hint: you have to perform and only show the results of the following steps: i) Find all the candidate keys. ii) Determine the primary key. iii) Find all the functional dependencies. iv) Get the first normal form. v) Get the second normal form.</p><div id="spi"></div></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><strong>(iii) Functional dependencies</strong> (from the rules and the data):</p>
+    <ul>
+      <li>fd1: <code>propertyNo iDate → iTime comments staffNo carReg</code> (a property is inspected once, by one staff member, on a date)</li>
+      <li>fd2: <code>propertyNo → pAddress</code> (a property has one address)</li>
+      <li>fd3: <code>staffNo → sName</code></li>
+      <li>fd4: <code>staffNo iDate → carReg</code> (a staff member gets one car for the day)</li>
+      <li>fd5: <code>carReg iDate iTime → propertyNo comments staffNo</code> (a car is used by one staff member in a time slot, who is at one property)</li>
+      <li>fd6: <code>staffNo iDate iTime → propertyNo comments</code> (a staff member is at one property at a given time)</li>
+    </ul>
+    <p>The data agrees: SG14 on 22-Apr-01 has car M533 HDR in both rows (fd4); PG4's address is the same in all three rows (fd2).</p>
+    <p><strong>(i) Candidate keys.</strong> iDate appears on no right side, so it is in every key. Closures (checked with the key finder): {propertyNo, iDate}⁺ = all attributes (fd1, fd2, fd3). {staffNo, iDate, iTime}⁺ = all (fd6, fd2, fd3, fd4). {carReg, iDate, iTime}⁺ = all (fd5, then the rest). No proper subset of these works, so the candidate keys are <strong>{propertyNo, iDate}</strong>, <strong>{staffNo, iDate, iTime}</strong> and <strong>{carReg, iDate, iTime}</strong>.</p>
+    <p><strong>(ii) Primary key:</strong> <strong>{propertyNo, iDate}</strong>: the shortest, and it names what the table is about (an inspection of a property on a date).</p>
+    <p><strong>(iv) 1NF.</strong> The table as given has one value per cell and a primary key, so it is already in 1NF: StaffPropertyInspection(<u>propertyNo, iDate</u>, iTime, pAddress, comments, staffNo, sName, carReg). (If the property data had been written once with several inspections nested under it, we would first flatten it into this form.)</p>
+    <p><strong>(v) 2NF.</strong> Prime attributes: propertyNo, iDate, iTime, staffNo, carReg. Non-prime: pAddress, comments, sName. Partial dependencies:</p>
+    <ul>
+      <li>propertyNo → pAddress: propertyNo is part of the key {propertyNo, iDate}.</li>
+      <li>staffNo → sName: staffNo is part of the key {staffNo, iDate, iTime}.</li>
+    </ul>
+    <p>(staffNo iDate → carReg does not count: carReg is prime.) Remove both:</p>
+    <ul>
+      <li><strong>Property</strong>(<u>propertyNo</u>, pAddress)</li>
+      <li><strong>Staff</strong>(<u>staffNo</u>, sName)</li>
+      <li><strong>PropertyInspection</strong>(<u>propertyNo, iDate</u>, iTime, comments, staffNo, carReg)</li>
+    </ul>
+    <p class="tbl-note">Note: the CSE 215 bank's answer removes only propertyNo → pAddress and keeps sName in PropertyInspection. That is 2NF with respect to the primary key alone (Connolly & Begg's first definition). With the slides' definition (“X cannot be a proper subset of <em>a</em> key”), staffNo → sName is also a partial dependency, on the candidate key {staffNo, iDate, iTime}, so Staff must be split off as well. Under the bank's reading, staffNo → sName is removed one step later, as a transitive dependency in 3NF.</p>
+  </div></details>
+</div>
+
+<div class="key"><p><strong>Summary:</strong> 1NF: atomic values. 2NF: no non-key attribute depends on part of a key. 3NF: no non-key attribute depends on anything but a superkey (no transitive dependency). In each step the fix is to move the offending attributes, with their determinant, into a new relation. Check against all candidate keys, not just the primary key.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="lecture.js"></script>
+<script>
+const row2 = (a, b) => `<div class="figrow"><div>${a}</div><div>${b}</div></div>`;
+const DH = ['Dname', 'Dnumber', 'Dmgr_ssn', 'Dlocations'];
+stepper('#nf1', [
+  { html: inst(DH, [['Research', '5', '333445555', '{Bellaire, Sugarland, Houston}'], ['Administration', '4', '987654321', '{Stafford}'], ['Headquarters', '1', '888665555', '{Houston}']], { cap: 'DEPARTMENT (not 1NF)', cell: { '0,3': 'bad' } }), cap: 'Slide 62: Dlocations holds a <b>set</b>. “Which departments are in Houston?” needs string searching, and adding one location means rewriting a whole value.' },
+  { html: row2(inst(DH.slice(0, 3), [['Research', '5', '333445555'], ['Administration', '4', '987654321'], ['Headquarters', '1', '888665555']], { cap: 'DEPARTMENT' }),
+      inst(['Dnumber', 'Dlocation'], [['5', 'Bellaire'], ['5', 'Sugarland'], ['5', 'Houston'], ['4', 'Stafford'], ['1', 'Houston']], { cap: 'DEPT_LOCATIONS', rowCls: { 0: 'new', 1: 'new', 2: 'new' } })), cap: 'Move the multivalued attribute to its own relation with the department key: one row per (department, location). Key {Dnumber, Dlocation}. Every cell is now atomic.' },
+]);
+stepper('#nf2', [
+  { html: inst(['Cust_ID', 'Name', 'Order_ID'], [['101', 'AT&T', '1234'], ['101', 'AT&T', '156'], ['125', 'Cisco', '1250']], { cap: 'CUSTOMER: key {Order_ID, Cust_ID}', cell: { '0,0': 'hl', '1,0': 'hl', '0,1': 'bad', '1,1': 'bad' } }), cap: 'Slide 63: Name depends on Cust_ID only, which is <b>part</b> of the key. AT&T is stored once per order: a partial dependency.' },
+  { html: row2(inst(['Cust_ID', 'Name'], [['101', 'AT&T'], ['125', 'Cisco']], { cap: 'Customer (key Cust_ID)' }), inst(['Order_ID', 'Cust_ID'], [['1234', '101'], ['156', '101'], ['1250', '125']], { cap: 'Orders' })), cap: 'Move Name out with its determinant Cust_ID. Each customer name is stored once. (If each order has one customer, Order_ID alone is the key of Orders.)' },
+  { html: inst(['student_id', 'course_id', 'course_name'], [['1905001', 'CSE215', 'Database'], ['1905002', 'CSE215', 'Database'], ['1905001', 'CSE207', 'Data Structures']], { cap: 'Registration: key {student_id, course_id}', cell: { '0,1': 'hl', '1,1': 'hl', '0,2': 'bad', '1,2': 'bad' } }), cap: 'Second example: course_id → course_name, a partial dependency. “Database” repeats for every student taking CSE215.' },
+  { html: row2(inst(['course_id', 'course_name'], [['CSE215', 'Database'], ['CSE207', 'Data Structures']], { cap: 'Course' }), inst(['student_id', 'course_id'], [['1905001', 'CSE215'], ['1905002', 'CSE215'], ['1905001', 'CSE207']], { cap: 'Registration' })), cap: '2NF: Course(course_id, course_name) and Registration(student_id, course_id).' },
+]);
+stepper('#nf3', [
+  { html: inst(['Emp_ID', 'F_Name', 'L_Name', 'Dept_ID', 'Dept_Name'], [['111', 'Mary', 'Jones', '1', 'Acct'], ['122', 'Sarah', 'Smith', '2', 'Mktg'], ['135', 'Rafi', 'Khan', '1', 'Acct']], { cap: 'EMPLOYEE: key Emp_ID', cell: { '0,3': 'hl', '2,3': 'hl', '0,4': 'bad', '2,4': 'bad' } }), cap: 'Slide 64: Emp_ID → Dept_ID → Dept_Name. Dept_Name is a non-key attribute determined by another non-key attribute: a transitive dependency. (Third row added to show the repetition.)' },
+  { html: row2(inst(['Emp_ID', 'F_Name', 'L_Name', 'Dept_ID'], [['111', 'Mary', 'Jones', '1'], ['122', 'Sarah', 'Smith', '2'], ['135', 'Rafi', 'Khan', '1']], { cap: 'Employee' }), inst(['Dept_ID', 'Dept_Name'], [['1', 'Acct'], ['2', 'Mktg']], { cap: 'Department' })), cap: 'Move Dept_Name out with Dept_ID. Both relations are in 3NF (in fact BCNF).' },
+  { html: inst(['student_id', 'home_town', 'home_country'], [['1905001', 'Dhaka', 'Bangladesh'], ['1905002', 'Dhaka', 'Bangladesh'], ['1905003', 'Kolkata', 'India']], { cap: 'Student: key student_id', cell: { '0,1': 'hl', '1,1': 'hl', '0,2': 'bad', '1,2': 'bad' } }), cap: 'Second example: home_town → home_country. Split into Student(student_id, home_town) and Town(home_town, home_country).' },
+]);
+$('#spi').innerHTML = inst(['propertyNo', 'iDate', 'iTime', 'pAddress', 'comments', 'staffNo', 'sName', 'carReg'], [
+  ['PG4', '18-Oct-00', '10.00', '6 Lawrence St, Glasgow', 'Need to replace crockery', 'SG37', 'Ann Beech', 'M231 JGR'],
+  ['PG4', '22-Apr-01', '09.00', '6 Lawrence St, Glasgow', 'In good order', 'SG14', 'David Ford', 'M533 HDR'],
+  ['PG4', '1-Oct-01', '12.00', '6 Lawrence St, Glasgow', 'Damp rot in bathroom', 'SG14', 'David Ford', 'N721 HFR'],
+  ['PG16', '22-Apr-01', '13.00', '5 Novar Dr, Glasgow', 'Replace living room carpet', 'SG14', 'David Ford', 'M533 HDR'],
+  ['PG16', '24-Oct-01', '14.00', '5 Novar Dr, Glasgow', 'Good condition', 'SG37', 'Ann Beech', 'N721 HFR']], { cap: 'StaffPropertyInspection' });
+FD.nfTool('#tool', { attrs: 'propertyNo iDate iTime pAddress comments staffNo sName carReg', fds: 'propertyNo iDate -> iTime comments staffNo carReg\npropertyNo -> pAddress\nstaffNo -> sName\nstaffNo iDate -> carReg\ncarReg iDate iTime -> propertyNo comments staffNo\nstaffNo iDate iTime -> propertyNo comments' });
+flashcards('#cards', [
+  { f: '1NF', b: 'Every value atomic: no sets, lists or (needed) composite values.' },
+  { f: 'Partial dependency', b: 'A non-key attribute depends on a proper part of a composite key.' },
+  { f: '2NF', b: '1NF + no partial dependency.' },
+  { f: 'Transitive dependency', b: 'key → A → B with A, B non-key.' },
+  { f: '3NF (slide 64)', b: '2NF + every FD with a non-key right side has a superkey left side.' },
+  { f: 'Slogan', b: 'The key, the whole key, and nothing but the key.' },
+]);
+quiz('#quiz', [
+  { q: 'R(A, B, C, D), key AB, FDs AB → C, B → D. Highest normal form?', opts: ['1NF', '2NF', '3NF', 'BCNF'], a: 0, why: 'B → D is a partial dependency.' },
+  { q: 'R(A, B, C), key A, FDs A → B, B → C. Highest normal form?', opts: ['1NF', '2NF', '3NF', 'BCNF'], a: 1, why: 'Single-attribute key: no partial dependency. B → C is transitive.' },
+  { q: 'A relation whose only key is a single attribute is always in…', opts: ['2NF', '3NF', 'BCNF', 'none of these'], a: 0, why: 'There is no proper part of a one-attribute key (assuming 1NF).' },
+  { q: 'Storing “Dhaka, Bangladesh, 1205” in one address field when the city is queried separately breaks…', opts: ['1NF', '2NF', '3NF', 'nothing'], a: 0, why: 'A composite value whose parts are needed is not atomic.' },
+]);
+ask('#try1', { q: 'R(A, B, C, D, E), key AB, FDs AB → C, A → D, D → E. After removing partial dependencies (2NF), how many relations are there?', a: 2, hint: 'A → D, and D → E brings E along with A.', why: 'A⁺ = ADE, so R₁(A, D, E) and R₂(A, B, C). R₁ is not yet 3NF (D → E).' });
+</script>
+</body>
+</html>

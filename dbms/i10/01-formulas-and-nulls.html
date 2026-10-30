@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Formulas, NULLs and Three-Valued Logic · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 10 (Ishrak) · Chapter 1 · Slides 1–12</div>
+<h1>Formulas, NULLs and Three-Valued Logic</h1>
+<p class="lede">Before aggregating, we need two tools: arithmetic formulas inside queries, and a precise understanding of NULL. This chapter covers slides 3–12: computing values in SELECT, what NULL means, why any formula with NULL gives NULL, and the three-valued logic (TRUE, UNKNOWN, FALSE) that decides which rows a WHERE clause keeps. A small tool evaluates slide 9's condition for values you choose.</p>
+
+<p>Slide 2 outlines the lecture: mathematical operators and functions (this chapter), aggregation (Chapter 2; the slide cites textbook sections 6.4.3–6.4.6), the HAVING clause (Chapter 3), and many examples (Chapter 4).</p>
+
+<h2>1. Formulas in SQL (slides 3–4)</h2>
+<p>So far every query returned stored values. SQL also lets you compute: a formula may appear wherever a column or literal may appear, in SELECT, WHERE, the SET of an UPDATE, the VALUES of an INSERT, and HAVING. The infix operators are <code>+</code>, <code>-</code>, <code>*</code> and <code>/</code> (slide 3), with the usual precedence (* and / before + and −) and parentheses to override it.</p>
+<p><em>Find the day-wise sale of each product</em> (slide 4). The sale amount is price × quantity:</p>
+<pre>SELECT product, day, price*quantity AS Sales
+FROM   Purchase;</pre>
+<dl class="def"><dt>Column alias</dt><dd>A name given to an output column with <code>AS name</code> (the AS is optional in Oracle for column aliases, and forbidden for table aliases). Without it, the column would be titled <code>PRICE*QUANTITY</code>. Put the alias in double quotes to keep spaces or lower case: <code>AS "Total Sales"</code>.</dd></dl>
+<figure><div id="purch"></div><figcaption><b>Figure 1.</b> The Purchase table (slide 4) and the computed Sales column: 1 · 20 = 20, 0.5 · 10 = 5, 1 · 10 = 10, 1.50 · 20 = 30.</figcaption></figure>
+<p>The slides print dates as MM/DD/YYYY (10/21/2005). The table stores them as Oracle DATE values; how a date is displayed depends on the session's date format (Oracle's default is DD-MON-RR, e.g. 21-OCT-05), and the playground shows them as 2005-10-21.</p>
+<div id="p4"></div>
+
+<h2>2. NULL (slides 5–6)</h2>
+<dl class="def">
+<dt>NULL</dt>
+<dd>A special marker meaning "no value here". It is not zero and not the empty string. Slide 5 lists what it can mean: the value does not exist (a person with no middle name), the value exists but is unknown (a student whose mark is not yet entered), or the value is not applicable (the commission of an employee who is not in sales).</dd>
+<dt>Nullable attribute</dt>
+<dd>A column allowed to contain NULL. The schema decides for each column: <code>mark NUMBER</code> is nullable, <code>mark NUMBER NOT NULL</code> is not; primary-key columns are never nullable.</dd>
+</dl>
+<p><strong>Rule 1: any NULL in a formula makes the whole formula NULL</strong> (slide 6, "not a value of 0"). If a mark is unknown, mark/3 is unknown too; treating it as 0 would invent a mark of 0. So for the Marks table:</p>
+<pre>SELECT student, mark, mark/3
+FROM   Marks;</pre>
+<p>gives 43 → 14.3333333, 57 → 19, 72 → 24 and Pinder Surree's NULL → NULL. (Slide 6 prints Helen Treacy's mark as 32 in the input table and as 72 in the output. 72 is the right value for mark/3 = 24; the 32 is a typo. Our sample data uses 72.)</p>
+<div id="p6"></div>
+<p>If you really want a NULL treated as some value, say so explicitly with Oracle's <code>NVL(mark, 0)</code>, which returns 0 when mark is NULL. That is a decision about meaning, not something SQL does on its own.</p>
+
+<h2>3. Comparisons with NULL: three-valued logic (slides 7–10)</h2>
+<p>What is <code>x = 'Joe'</code> when x is NULL? We cannot say it is true (x might not be Joe) or false (x might be Joe). SQL answers <b class="term">UNKNOWN</b>. So conditions in SQL have three truth values, and slide 7 gives them numbers that make the rules easy:</p>
+<div class="figrow">
+<div class="tbl"><table><tr><th>Value</th><th>Number</th></tr><tr><td>FALSE</td><td class="num">0</td></tr><tr><td>UNKNOWN</td><td class="num">0.5</td></tr><tr><td>TRUE</td><td class="num">1</td></tr></table></div>
+<div class="tbl"><table><tr><th>Operator</th><th>Rule (slide 9)</th></tr><tr><td>C1 AND C2</td><td>min(C1, C2)</td></tr><tr><td>C1 OR C2</td><td>max(C1, C2)</td></tr><tr><td>NOT C1</td><td>1 − C1</td></tr></table></div>
+</div>
+<p>Every comparison (=, &lt;, &gt;, &lt;&gt;, …) with a NULL operand is UNKNOWN, even <code>NULL = NULL</code>. The min/max rules then give the full truth tables:</p>
+<figure><div id="tt"></div><figcaption><b>Figure 2.</b> AND, OR and NOT over TRUE (T), UNKNOWN (U) and FALSE (F). U AND F = F because one false part makes AND false whatever the unknown is; U OR T = T for the same reason.</figcaption></figure>
+
+<p><strong>Rule 2: the WHERE clause keeps a row only if its condition is TRUE.</strong> Slide 8 recalls the order in which a query is evaluated: (1) FROM, (2) WHERE, (3) SELECT. Only rows whose WHERE condition evaluates to TRUE are passed on to SELECT. UNKNOWN is treated like FALSE: the row is dropped.</p>
+
+<div class="q">
+<h4>Question (worked answer): slide 9, "Will it be in the result?" (age = 20, height = NULL, weight = 200)</h4>
+<pre>SELECT * FROM Person
+WHERE (age &lt; 25) AND (height &gt; 6 OR weight &gt; 190)</pre>
+<p>age &lt; 25 → 20 &lt; 25 = TRUE (1). height &gt; 6 → NULL &gt; 6 = UNKNOWN (0.5). weight &gt; 190 → 200 &gt; 190 = TRUE (1).<br>
+OR: max(0.5, 1) = 1 (TRUE). AND: min(1, 1) = 1 (TRUE). <strong>Yes</strong>, the row is in the result. The unknown height does not matter, because the weight alone makes the OR true.</p>
+</div>
+<div class="q">
+<h4>Question (worked answer): slide 10 (age = NULL, height = 5, weight = 200)</h4>
+<p>age &lt; 25 → UNKNOWN (0.5). height &gt; 6 → 5 &gt; 6 = FALSE (0). weight &gt; 190 → TRUE (1).<br>
+OR: max(0, 1) = 1. AND: min(0.5, 1) = 0.5 = UNKNOWN. Only TRUE passes, so <strong>no</strong>, the row is not in the result.</p>
+</div>
+
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="where"></div>
+</figure>
+
+<h3>Try it: evaluate slide 9's condition</h3>
+<p>Enter values (leave a box empty for NULL) and the tool evaluates <code>(age &lt; 25) AND (height &gt; 6 OR weight &gt; 190)</code> step by step.</p>
+<div id="tool"></div>
+
+<h2>4. Unexpected behaviour, and IS NULL (slides 11–12)</h2>
+<pre>SELECT * FROM Person
+WHERE  age &lt; 25 OR age &gt;= 25;</pre>
+<p>In ordinary logic this condition is always true, so it should return every person. Slide 11 warns that <em>some persons are not included</em>: for a person whose age is NULL both comparisons are UNKNOWN, max(0.5, 0.5) = 0.5, and the row is dropped. In our sample data Babu and Era have no age, so 3 of the 5 persons are returned.</p>
+<p>To test for NULL you need special predicates, because <code>age = NULL</code> is itself always UNKNOWN (slide 12):</p>
+<dl class="def"><dt>x IS NULL / x IS NOT NULL</dt><dd>TRUE or FALSE (never UNKNOWN) depending on whether x is NULL. These are the only correct ways to look for NULLs.</dd></dl>
+<pre>SELECT * FROM Person
+WHERE  age &lt; 25 OR age &gt;= 25 OR age IS NULL;     -- now all persons</pre>
+<div id="p11"></div>
+
+<div class="q">
+<h4>Question (worked answer): which of these return the person with age NULL?</h4>
+<p>(a) <code>WHERE NOT (age &lt; 25)</code>: NOT UNKNOWN = 1 − 0.5 = UNKNOWN, so <strong>no</strong>. (b) <code>WHERE age &lt;&gt; 30</code>: UNKNOWN, <strong>no</strong>. (c) <code>WHERE NVL(age, 0) &lt; 25</code>: NVL makes it 0, 0 &lt; 25 is TRUE, <strong>yes</strong>. (d) <code>WHERE age IS NULL OR age &gt; 100</code>: TRUE OR UNKNOWN = TRUE, <strong>yes</strong>. The lesson: a negated or "not equal" condition does not pick up NULLs; you must ask for them with IS NULL.</p>
+</div>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div><div id="try2"></div>
+<h3>Try it in SQL</h3>
+<p>The exercises use Purchase, Marks and Person from this chapter (Person has two NULL ages and one NULL height).</p>
+<div id="c1"></div><div id="c2"></div><div id="c3"></div><div id="c4"></div><div id="c5"></div><div id="c6"></div>
+
+<div class="key"><p><strong>Summary:</strong> formulas with + − * / can appear in SELECT, WHERE, SET, VALUES and HAVING, and AS names the output column. NULL means "no value" (missing, unknown or not applicable); any formula with a NULL operand is NULL, and any comparison with NULL is UNKNOWN. SQL logic has three values (F = 0, U = 0.5, T = 1) with AND = min, OR = max, NOT = 1 − x, and WHERE keeps only rows that evaluate to TRUE. Therefore "x &lt; 25 OR x &gt;= 25" misses NULLs; test for them with IS NULL / IS NOT NULL.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/sqlplay.js"></script>
+<script src="../i08/lecture.js"></script>
+<script>
+const PU = [['Bagel', '10/21/2005', 1, 20], ['Banana', '10/03/2005', 0.5, 10], ['Banana', '10/10/2005', 1, 10], ['Bagel', '10/25/2005', 1.5, 20]];
+$('#purch').innerHTML = row2(rel('Purchase', ['product', 'day', 'price', 'quantity'], PU), rel('product, day, price*quantity AS Sales', ['product', 'day', 'Sales'], PU.map(r => [r[0], r[1], r[2] * r[3]])));
+const V = { 1: 'T', 0.5: 'U', 0: 'F' }, vals = [1, 0.5, 0];
+const tt = (name, f) => `<div class="tbl"><table><tr><th>${name}</th>${vals.map(v => `<th>${V[v]}</th>`).join('')}</tr>${vals.map(a => `<tr><th>${V[a]}</th>${vals.map(b => `<td>${V[f(a, b)]}</td>`).join('')}</tr>`).join('')}</table></div>`;
+$('#tt').innerHTML = `<div class="figrow">${tt('AND', Math.min)}${tt('OR', Math.max)}<div class="tbl"><table><tr><th>x</th><th>NOT x</th></tr>${vals.map(a => `<tr><td>${V[a]}</td><td>${V[1 - a]}</td></tr>`).join('')}</table></div></div>`;
+// WHERE animation over the sample Person table
+const PERS = [['Asif', 20, null, 200], ['Babu', null, 5, 200], ['Chaya', 30, 5.5, 130], ['Dipu', 22, 6.2, 180], ['Era', null, 5.4, 120]];
+const cmp = (x, f) => x === null ? 0.5 : f(x) ? 1 : 0;
+const ev = r => { const a = cmp(r[1], x => x < 25), h = cmp(r[2], x => x > 6), w = cmp(r[3], x => x > 190); return { a, h, w, or: Math.max(h, w), all: Math.min(a, Math.max(h, w)) }; };
+const WH = ['name', 'age', 'height', 'weight', 'age<25', 'height>6', 'weight>190', 'OR', 'AND'];
+const wrows = k => PERS.map((r, i) => i <= k ? [...r, ...(e => [V[e.a], V[e.h], V[e.w], V[e.or], V[e.all]])(ev(r))] : [...r, '', '', '', '', '']);
+const ws = [{ html: row2(rel('Person', WH, wrows(-1))), cap: 'WHERE (age &lt; 25) AND (height &gt; 6 OR weight &gt; 190), evaluated row by row with T = 1, U = 0.5, F = 0.' }];
+PERS.forEach((r, k) => { const e = ev(r); ws.push({ html: row2(rel('Person', WH, wrows(k), { cls: Object.fromEntries(PERS.slice(0, k + 1).map((q, i) => [i, ev(q).all === 1 ? 'new' : 'del'])), side: { [k]: e.all === 1 ? 'kept' : 'dropped' } })),
+  cap: `${r[0]}: age&lt;25 = ${V[e.a]}, height&gt;6 = ${V[e.h]}, weight&gt;190 = ${V[e.w]}. OR = max = ${V[e.or]}; AND = min = ${V[e.all]}. ${e.all === 1 ? '<b>TRUE: kept.</b>' : e.all === 0.5 ? '<b>UNKNOWN: dropped</b> (only TRUE passes).' : 'FALSE: dropped.'}${k === 0 ? ' (Slide 9.)' : k === 1 ? ' (Slide 10.)' : ''}` }); });
+stepper('#where', ws);
+// tool
+(() => {
+  const host = $('#tool');
+  host.innerHTML = `<form class="bp-form"><label>age <input id="ta" value="20" style="width:6em"></label><label>height <input id="th" value="" placeholder="NULL" style="width:6em"></label><label>weight <input id="tw" value="200" style="width:6em"></label><button type="submit">Evaluate</button></form><div id="tout"></div>`;
+  const num = id => { const s = $(id).value.trim(); if (s === '' || /^null$/i.test(s)) return null; const n = Number(s); return isNaN(n) ? undefined : n; };
+  const run = () => {
+    const a = num('#ta'), h = num('#th'), w = num('#tw'), out = $('#tout');
+    if ([a, h, w].includes(undefined)) { out.innerHTML = '<p class="bad">Enter numbers, or leave a box empty (or type NULL) for NULL.</p>'; return; }
+    const e = ev(['', a, h, w]), name = v => ({ 1: 'TRUE (1)', 0.5: 'UNKNOWN (0.5)', 0: 'FALSE (0)' })[v], s = v => v === null ? 'NULL' : v;
+    out.innerHTML = `<ol><li>age &lt; 25 → ${s(a)} &lt; 25 = <b>${name(e.a)}</b></li><li>height &gt; 6 → ${s(h)} &gt; 6 = <b>${name(e.h)}</b></li><li>weight &gt; 190 → ${s(w)} &gt; 190 = <b>${name(e.w)}</b></li>
+      <li>height &gt; 6 OR weight &gt; 190 = max(${e.h}, ${e.w}) = <b>${name(e.or)}</b></li><li>(age &lt; 25) AND (…) = min(${e.a}, ${e.or}) = <b>${name(e.all)}</b></li></ol>
+      <p class="${e.all === 1 ? 'good' : 'bad'}">${e.all === 1 ? 'TRUE: the row IS in the result.' : 'Not TRUE: the row is NOT in the result.'}</p>`;
+  };
+  host.querySelector('form').addEventListener('submit', ev2 => { ev2.preventDefault(); run(); });
+  run();
+})();
+sqlPlay('#p4', { setup: AGG, query: 'SELECT product, day, price*quantity AS Sales\nFROM   Purchase;', note: 'Slide 4.' });
+sqlPlay('#p6', { setup: AGG, query: 'SELECT student, mark, mark/3\nFROM   Marks;', note: 'Slide 6. Try NVL(mark, 0)/3 to see the difference.' });
+sqlPlay('#p11', { setup: AGG, query: 'SELECT *\nFROM   Person\nWHERE  age < 25 OR age >= 25;', note: 'Slide 11: 3 rows. Add "OR age IS NULL" (slide 12): 5 rows.' });
+flashcards('#cards', [
+  { f: 'NULL', b: 'No value: missing, unknown or not applicable. Not 0, not \'\'.' },
+  { f: 'NULL in a formula', b: 'The result is NULL (5 + NULL = NULL).' },
+  { f: 'NULL in a comparison', b: 'The result is UNKNOWN, even NULL = NULL.' },
+  { f: 'AND / OR / NOT with U = 0.5', b: 'AND = min, OR = max, NOT = 1 − x.' },
+  { f: 'Which rows does WHERE keep?', b: 'Only those whose condition is TRUE; UNKNOWN is dropped.' },
+  { f: 'IS NULL', b: 'The only correct test for NULL; never UNKNOWN.' },
+  { f: 'NVL(x, v)', b: 'Oracle: x, or v if x is NULL.' },
+]);
+quiz('#quiz', [
+  { q: 'What is 10 + NULL?', opts: ['10', '0', 'NULL', 'error'], a: 2, why: 'Any formula with a NULL operand is NULL.' },
+  { q: 'UNKNOWN AND FALSE = ?', opts: ['TRUE', 'UNKNOWN', 'FALSE'], a: 2, why: 'min(0.5, 0) = 0.' },
+  { q: 'UNKNOWN OR TRUE = ?', opts: ['TRUE', 'UNKNOWN', 'FALSE'], a: 0, why: 'max(0.5, 1) = 1.' },
+  { q: 'NOT UNKNOWN = ?', opts: ['TRUE', 'UNKNOWN', 'FALSE'], a: 1, why: '1 − 0.5 = 0.5.' },
+  { q: 'Which condition finds rows where age is missing?', opts: ['age = NULL', 'age IS NULL', 'age = 0', 'NOT age'], a: 1, why: 'age = NULL is UNKNOWN for every row.' },
+  { q: 'Person(age=NULL). Is it returned by WHERE age < 25 OR age >= 25?', opts: ['Yes', 'No'], a: 1, why: 'U OR U = U, not TRUE.' },
+]);
+ask('#try1', { q: 'Evaluate with T = 1, U = 0.5, F = 0: (U OR F) AND NOT F. Give the number.', a: 0.5, why: 'U OR F = max(0.5, 0) = 0.5; NOT F = 1; min(0.5, 1) = 0.5 = UNKNOWN.' });
+ask('#try2', { q: 'Marks has 43, 57, 72 and NULL. How many rows does SELECT * FROM Marks WHERE mark <> 57 return?', a: 2, why: '43 and 72. NULL <> 57 is UNKNOWN.' });
+sqlCheck('#c1', { setup: AGG, task: '1. (Easy) For each purchase, show the product and the price including 15% VAT (price * 1.15), titled with_vat.', solution: 'SELECT product, price * 1.15 AS with_vat FROM Purchase;' });
+sqlCheck('#c2', { setup: AGG, task: '2. List the purchases whose sale amount (price × quantity) is at least 10: product, day and the amount.', solution: 'SELECT product, day, price * quantity FROM Purchase WHERE price * quantity >= 10;' });
+sqlCheck('#c3', { setup: AGG, task: '3. List the students whose mark is missing.', solution: 'SELECT student FROM Marks WHERE mark IS NULL;' });
+sqlCheck('#c4', { setup: AGG, task: '4. Show every student with mark/3, treating a missing mark as 0.', solution: 'SELECT student, NVL(mark, 0) / 3 FROM Marks;', hint: 'NVL(mark, 0).' });
+sqlCheck('#c5', { setup: AGG, task: '5. Return the names of persons for which (height > 6 OR weight > 190) is TRUE.', solution: 'SELECT name FROM Person WHERE height > 6 OR weight > 190;' });
+sqlCheck('#c6', { setup: AGG, task: '6. (Exam style) Return the names of persons for which the condition age &lt; 25 is <em>not TRUE</em> (it is FALSE or UNKNOWN).', solution: 'SELECT name FROM Person WHERE age >= 25 OR age IS NULL;', hint: 'NOT (age < 25) misses the NULL ages; add them with IS NULL.' });
+</script>
+</body>
+</html>

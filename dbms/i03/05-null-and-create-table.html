@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NULL and CREATE TABLE · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="../i03/lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 03 (Ishrak) · Chapter 5 · Slides 27–34 · Book §2.3.3</div>
+<h1>NULL and the CREATE TABLE Statement</h1>
+<p class="lede">What NULL means and the three situations it stands for; the general form of CREATE TABLE and the classic syntax mistake on slide 31; which parts of SQL care about upper and lower case; the naming conventions this course follows; and a worked answer to Activity 1.</p>
+
+<h2>1. NULL: a missing value (slides 27–28)</h2>
+<dl class="def">
+  <dt>NULL</dt>
+  <dd>A special marker meaning "no value here". Any attribute of any type (number, string, date) can be NULL unless a constraint forbids it. NULL is <em>not</em> zero, <em>not</em> a blank and <em>not</em> the string <code>'NULL'</code>: it is the absence of a value.</dd>
+</dl>
+<p>The slides use the schema <code>Students(sid: string, name: string, email: string, gpa: float, dob: date)</code> and list three different reasons a value can be missing:</p>
+<ol>
+  <li><strong>The value does not exist.</strong> A student who has no email address: there is nothing to record.</li>
+  <li><strong>The value exists but is unknown.</strong> Every student has a date of birth, but this one's is waiting for verification, so we cannot record it yet.</li>
+  <li><strong>The value is not applicable to this record.</strong> A Level-1 Term-1 student has no GPA yet; the attribute does not apply to them.</li>
+</ol>
+<p>SQL uses the same single NULL for all three, so the database itself cannot tell them apart; the meaning lives in the application. The animation marks each kind in our sample <code>Students</code> table.</p>
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="nullA"></div>
+</figure>
+<p>Three facts about NULL that you will need in every later lecture:</p>
+<ul>
+  <li><strong>You cannot test for NULL with <code>=</code>.</strong> Any comparison with NULL (even <code>NULL = NULL</code>) gives the truth value UNKNOWN, not TRUE, so <code>WHERE email = NULL</code> returns no rows. Use <code>IS NULL</code> and <code>IS NOT NULL</code>. <a href="../i04/08-null-and-three-valued-logic.html">Lec 04 Chapter 8</a> explains the three-valued logic behind this.</li>
+  <li><strong>Arithmetic with NULL gives NULL:</strong> <code>gpa + 1</code> is NULL when gpa is NULL.</li>
+  <li><strong>In Oracle, the empty string <code>''</code> is NULL.</strong> Inserting <code>''</code> into a VARCHAR2 column stores NULL. (Most other systems, and the playground's SQLite, keep <code>''</code> and NULL separate.)</li>
+</ul>
+<div id="p1"></div>
+
+<h2>2. The general form of CREATE TABLE (slides 29–31)</h2>
+<pre>CREATE TABLE &lt;tableName&gt; (
+    attribute1  type1,
+    attribute2  type2,
+    …
+    attributeN  typeN
+);</pre>
+<p>The table name is followed by a parenthesised, comma-separated list of attribute declarations, each an attribute name followed by its type. Later items in the list can also be constraints, such as <code>PRIMARY KEY (…)</code> (Chapter 6). Slide 31 gives an example:</p>
+<pre>CREATE TABLE Product (
+    maker VARCHAR2(10),
+    model NUMBER(10),
+    type  VARCHAR2(10),      <span class="bad">← this comma is an error</span>
+);</pre>
+<div class="q">
+<h4>Slide error: the comma after the last attribute</h4>
+<p>Slides 31 and 33 end the last attribute with a comma. Oracle then expects another attribute name and finds <code>)</code>, so it reports <code>ORA-00904: invalid identifier</code>. Commas <em>separate</em> items; the last item has none. The correct statement is:</p>
+<pre>CREATE TABLE Product (
+    maker VARCHAR2(10),
+    model NUMBER(10),
+    type  VARCHAR2(10)
+);</pre>
+<p>Run both versions in the playground below to see the error and the fix.</p>
+</div>
+<div id="p2"></div>
+
+<h2>3. What is case-sensitive (slide 32)</h2>
+<ul>
+  <li><strong>Keywords are case-insensitive:</strong> <code>SELECT</code>, <code>Select</code> and <code>select</code> are the same.</li>
+  <li><strong>Table and attribute names are case-insensitive:</strong> <code>Product</code> and <code>product</code> name the same table. (Oracle stores unquoted names in upper case, PRODUCT.)</li>
+  <li><strong>String constants are case-sensitive:</strong> <code>'Seattle'</code> and <code>'seattle'</code> are different values, so <code>WHERE city = 'seattle'</code> does not find Seattle.</li>
+  <li><strong>String constants use single quotes:</strong> <code>'abc'</code> is a string. <code>"abc"</code> is <em>not</em> a string in SQL: double quotes make a <b class="term">quoted identifier</b>, a table or column name that keeps its exact case (and may contain spaces). <code>WHERE name = "Ayesha"</code> looks for a <em>column</em> called Ayesha and fails.</li>
+</ul>
+<div id="p3"></div>
+
+<h2>4. Naming conventions (slide 33)</h2>
+<p>SQL does not require any particular style, but a consistent one makes statements easy to read. The course convention:</p>
+<div class="tbl"><table>
+<tr><th>Item</th><th>Convention</th><th>Examples</th></tr>
+<tr><td>SQL commands (keywords)</td><td>all capitals</td><td><code>CREATE TABLE</code>, <code>SELECT</code></td></tr>
+<tr><td>Table names</td><td>start with a capital; each later word capitalised</td><td><code>Product</code>, <code>MovieStar</code></td></tr>
+<tr><td>Attribute names</td><td>start lower case; later words capitalised or joined by underscores</td><td><code>maker</code>, <code>certNo</code> or <code>cert_no</code></td></tr>
+<tr><td>Data types</td><td>all capitals</td><td><code>CHAR</code>, <code>VARCHAR2</code></td></tr>
+</table></div>
+<p>Avoid naming a column with an Oracle reserved word such as <code>NUMBER</code>, <code>DATE</code>, <code>ORDER</code> or <code>GROUP</code>: <code>CREATE TABLE Course (number NUMBER(3))</code> fails. This is why our sample <code>Course</code> table calls slide 36's "number" column <code>num</code>.</p>
+
+<h2>5. Activity 1: create the student database (slide 34)</h2>
+<div class="q">
+<h4>Activity 1 (worked answer)</h4>
+<p><em>Create a table for <code>Students(sid: string, name: string, email: string, gpa: float, dob: date)</code>.</em></p>
+<p>Choose a concrete Oracle type for each abstract type. Student IDs at BUET have a fixed length (7 digits, kept as a string so leading zeros and the ID's structure are preserved), so CHAR fits (CHAR(7) would be exact; the slides use CHAR(10), which also leaves room for longer ID formats); names and emails vary, so VARCHAR2; GPA is a real number, so FLOAT (or <code>NUMBER(3,2)</code>, which stores exactly two decimals); the birth date is a DATE.</p>
+<pre>CREATE TABLE Students (
+    sid    CHAR(10),
+    name   VARCHAR2(50),
+    email  VARCHAR2(50),
+    gpa    FLOAT,
+    dob    DATE
+);</pre>
+<p>This is the same as slide 43's version without the <code>username</code> column and the key. A complete design also declares the key, <code>PRIMARY KEY (sid)</code>, which is the topic of Chapter 6.</p>
+</div>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+<h3>SQL exercises</h3>
+<div id="c1"></div><div id="c2"></div><div id="c3"></div><div id="c4"></div><div id="c5"></div>
+
+<div class="key"><p><strong>Summary:</strong> NULL marks a missing value: one that does not exist, is unknown, or does not apply. Test it with IS NULL / IS NOT NULL, never with =. In Oracle '' is NULL. CREATE TABLE name ( attr type, …, attr type ); with commas between items and none after the last. Keywords and names are case-insensitive; string constants are case-sensitive and use single quotes; double quotes make case-sensitive identifiers.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/sqlplay.js"></script>
+<script src="../i03/lecture.js"></script>
+<script>
+(() => {
+  const H = ['sid', 'name', 'email', 'gpa', 'dob'];
+  const R = [['1905001', 'Ayesha Rahman', 'ayesha@cse.buet.ac.bd', 3.85, '2001-03-14'], ['1905002', 'Tanvir Hasan', null, 3.42, '2000-11-02'],
+    ['1905004', 'Sadia Islam', 'sadia@cse.buet.ac.bd', 3.97, null], ['2005011', 'Mahir Chowdhury', null, 2.95, '2002-05-30'],
+    ['2305010', 'Rafid Ahmed', 'rafid@cse.buet.ac.bd', null, '2004-01-09']];
+  const f = (rows, cap) => ({ html: T(H, rows, { name: 'Students' }), cap });
+  const mark = (pred, side) => R.map(r => pred(r) ? { c: r, cls: 'hl', side } : { c: r });
+  stepper('#nullA', [
+    f(R, 'Five students. Four cells hold NULL, but for three different reasons.'),
+    f(mark(r => r[2] == null, 'email: does not exist'), '<b>Value does not exist.</b> Tanvir and Mahir have no email address. NULL here means "there is nothing to store".'),
+    f(mark(r => r[4] == null, 'dob: exists, unknown'), '<b>Value exists but is unknown.</b> Sadia certainly has a date of birth, but it is waiting for verification.'),
+    f(mark(r => r[3] == null, 'gpa: not applicable'), '<b>Not applicable.</b> Rafid (ID 2305…, Level 1 Term 1) has no GPA yet; the attribute does not apply to him.'),
+    f(R, 'The database stores the same NULL in all four cells. Only the application knows which meaning each has.'),
+  ]);
+})();
+sqlPlay('#p1', { setup: UNI, query: "SELECT name, email FROM Students WHERE email IS NULL;", note: 'Now change <code>IS NULL</code> to <code>= NULL</code> and run again: no rows, because a comparison with NULL is never TRUE.' });
+sqlPlay('#p2', { setup: '', query: 'CREATE TABLE Product (\n    maker VARCHAR2(10),\n    model NUMBER(10),\n    type  VARCHAR2(10),\n);', note: 'Run it: SQLite reports a syntax error (Oracle: ORA-00904). Delete the last comma and run again.' });
+sqlPlay('#p3', { setup: UNI, query: "select NAME, Email from STUDENTS where name = 'ayesha rahman';", note: "Keywords and names in any case work, but the string 'ayesha rahman' does not match 'Ayesha Rahman': no rows. Fix the capitals and run again." });
+flashcards('#cards', [
+  { f: 'NULL', b: 'Marker for a missing value; not 0, not blank.' },
+  { f: 'Three meanings of NULL', b: 'Does not exist; exists but unknown; not applicable.' },
+  { f: 'Testing for NULL', b: 'IS NULL / IS NOT NULL. "= NULL" is never TRUE.' },
+  { f: "'' in Oracle", b: 'The empty string is treated as NULL.' },
+  { f: 'CREATE TABLE form', b: 'CREATE TABLE name ( attr type, …, attr type );' },
+  { f: 'ORA-00904', b: 'Invalid identifier; e.g. a comma before the closing parenthesis.' },
+  { f: "'abc' vs \"abc\"", b: 'Single quotes: string constant. Double quotes: quoted identifier (a name).' },
+  { f: 'Case rules', b: 'Keywords and names: case-insensitive. String values: case-sensitive.' },
+]);
+quiz('#quiz', [
+  { q: 'A student\'s date of birth exists but has not been verified yet. Which NULL meaning is this?', opts: ['Does not exist', 'Exists but unknown', 'Not applicable', 'Zero'], a: 1, why: 'Slide 28\'s example for "unknown".' },
+  { q: 'Which query finds students with no GPA?', opts: ['WHERE gpa = NULL', 'WHERE gpa IS NULL', "WHERE gpa = ''", 'WHERE gpa = 0'], a: 1, why: '= NULL is never TRUE; 0 is a real value.' },
+  { q: 'Which two names refer to the same table?', opts: ['Product and product', '"Product" and "PRODUCT"', "'Product' and Product", 'None'], a: 0, why: 'Unquoted names are case-insensitive. Quoted identifiers keep their case.' },
+  { q: "WHERE city = 'dhaka' when the stored value is 'Dhaka'…", opts: ['matches', 'does not match', 'raises an error', 'matches only in Oracle'], a: 1, why: 'String constants are case-sensitive.' },
+  { q: 'What is wrong with <code>WHERE name = "Ayesha Rahman"</code>?', opts: ['Nothing', 'Double quotes make an identifier, not a string', 'Names cannot contain spaces', 'It should use LIKE'], a: 1, why: 'Oracle looks for a column named Ayesha Rahman: ORA-00904.' },
+  { q: 'In Oracle, INSERT … VALUES (\'\') into a VARCHAR2 column stores…', opts: ['an empty string', 'NULL', 'a blank', 'an error'], a: 1, why: 'Oracle treats \'\' as NULL.' },
+]);
+ask('#try1', { q: 'How many NULL cells does the sample <code>Students</code> table in the playground have in the <code>gpa</code> column? (Run <code>SELECT * FROM Students</code> to count.)', a: 2, why: 'Rafid Ahmed and Nusrat Jahan (both Level 1) have NULL gpa.' });
+chk('#c1', '', '<b>Activity 1.</b> The database is empty. Create <code>Students(sid, name, email, gpa, dob)</code> as in Activity 1, then insert (\'1905001\', \'Ayesha Rahman\', \'ayesha@cse.buet.ac.bd\', 3.85, 14 March 2001).', "CREATE TABLE Students (\n  sid   CHAR(10),\n  name  VARCHAR2(50),\n  email VARCHAR2(50),\n  gpa   FLOAT,\n  dob   DATE\n);\nINSERT INTO Students VALUES ('1905001', 'Ayesha Rahman', 'ayesha@cse.buet.ac.bd', 3.85, DATE '2001-03-14');", { check: 'state', table: 'Students' });
+chk('#c2', '', '<b>Fix the slide.</b> The database is empty. Write slide 31\'s <code>CREATE TABLE Product</code> correctly, then insert the row (\'A\', 1001, \'pc\').', "CREATE TABLE Product (\n  maker VARCHAR2(10),\n  model NUMBER(10),\n  type  VARCHAR2(10)\n);\nINSERT INTO Product VALUES ('A', 1001, 'pc');", { check: 'state', table: 'Product' });
+chk('#c3', UNI, '<b>IS NULL.</b> Show the <code>sid</code> and <code>name</code> of students whose email is missing.', 'SELECT sid, name FROM Students WHERE email IS NULL;');
+chk('#c4', UNI, '<b>Insert with NULLs.</b> Add student 2305099, Arif Hossain, whose email, GPA, birth date and username are all unknown. Write NULL for each missing value.', "INSERT INTO Students VALUES ('2305099', 'Arif Hossain', NULL, NULL, NULL, NULL);", { check: 'state', table: 'Students', hint: 'Students has 6 columns: sid, name, email, gpa, dob, username.' });
+chk('#c5', UNI, '<b>Exam style.</b> Show the names of students who have an email address but no GPA, together with that email.', 'SELECT name, email FROM Students WHERE gpa IS NULL AND email IS NOT NULL;', { hint: 'Two conditions joined by AND; one uses IS NULL, the other IS NOT NULL.' });
+</script>
+</body>
+</html>

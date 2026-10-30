@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Data Dictionary Storage · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<style>
+.schema { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px; }
+.ent { border: 1.5px solid var(--fg); background: var(--bg); font: 13px/1.5 var(--mono); }
+.ent h5 { margin: 0; padding: 4px 10px; background: var(--cell); border-bottom: 1.5px solid var(--fg); font: italic 600 13px var(--mono); text-align: center; }
+.ent ul { list-style: none; margin: 0; padding: 6px 10px; }
+.ent li { margin: 0; }
+.ent .pk { text-decoration: underline; }
+.ent .fk { color: var(--accent); }
+</style>
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 14 · Chapter 8 · Slides 20–22</div>
+<h1>Data Dictionary Storage</h1>
+<p class="lede">The database has to remember what tables exist, what columns they have, who may use them and where they are stored. It keeps all of that in the data dictionary, which is itself stored as tables. Includes the answer to Question w2-4.</p>
+
+<h2>1. Metadata and the data dictionary</h2>
+
+<p>The rows in <code>instructor</code> are <em>data</em>. But to read them, the database also needs to know things like: does a table called <code>instructor</code> exist? What are its columns, in what order, of which types and lengths? Which file is it in? This information is <b class="term">metadata</b>, meaning <em>data about data</em>.</p>
+
+<p>The place where a DBMS keeps all its metadata is called the <b class="term">data dictionary</b>, also known as the <b class="term">system catalog</b>. Every SQL statement you run starts by consulting it. For <code>SELECT name FROM instructor</code>, the database first checks that <code>instructor</code> exists, that it has a <code>name</code> column, where that column is in each record, and where the file is.</p>
+
+<h2>2. What the dictionary stores (slides 20–21)</h2>
+
+<dl class="def">
+  <dt>Information about relations</dt>
+  <dd>Names of relations. The names, types and lengths of each relation's attributes. Names and definitions of views (a <b class="term">view</b> is a saved query that can be used like a table). Integrity constraints, such as primary keys, foreign keys and <code>NOT NULL</code> rules.</dd>
+  <dt>User and accounting information</dt>
+  <dd>User names, their (encrypted) passwords, and which group or role each user is in, so the database can check permissions.</dd>
+  <dt>Statistical and descriptive data</dt>
+  <dd>For example, the number of tuples (rows) in each relation. The query optimizer uses these numbers to choose the fastest way to run a query.</dd>
+  <dt>Physical file organization information</dt>
+  <dd>How each relation is stored (sequential, hash, clustered, …) and where it is physically located on disk.</dd>
+  <dt>Information about indices</dt>
+  <dd>Which indexes exist, on which relation and which attributes, and of which type. (Indexes are covered in a later lecture.)</dd>
+</dl>
+
+<h2>3. The dictionary is stored as relations (slide 22)</h2>
+
+<p>The neat trick is that the database stores its own metadata <em>as ordinary tables</em>. This is called the <b class="term">relational representation</b> of system metadata. The slides show one possible design:</p>
+
+<figure>
+<div class="schema">
+  <div class="ent"><h5>Relation_metadata</h5><ul><li class="pk">relation_name</li><li>number_of_attributes</li><li>storage_organization</li><li>location</li></ul></div>
+  <div class="ent"><h5>Attribute_metadata</h5><ul><li class="pk fk">relation_name</li><li class="pk">attribute_name</li><li>domain_type</li><li>position</li><li>length</li></ul></div>
+  <div class="ent"><h5>Index_metadata</h5><ul><li class="pk">index_name</li><li class="pk fk">relation_name</li><li>index_type</li><li>index_attributes</li></ul></div>
+  <div class="ent"><h5>View_metadata</h5><ul><li class="pk">view_name</li><li>definition</li></ul></div>
+  <div class="ent"><h5>User_metadata</h5><ul><li class="pk">user_name</li><li>encrypted_password</li><li>group</li></ul></div>
+</div>
+<figcaption><b>Figure 1.</b> The catalog schema from the slides. Underlined attributes form each table's primary key. Blue attributes refer to <code>Relation_metadata.relation_name</code> (the arrows on the slide).</figcaption>
+</figure>
+
+<p>Here is what some of the rows would look like for the instructor table:</p>
+
+<figure>
+<div class="figlabel">Relation_metadata</div>
+<div id="rm"></div>
+<div class="figlabel" style="margin-top:14px">Attribute_metadata</div>
+<div id="am"></div>
+<figcaption><b>Figure 2.</b> Example catalog rows describing <code>instructor</code>. The database reads these to learn that <code>salary</code> is the 4th attribute, a number, 8 bytes long.</figcaption>
+</figure>
+
+<p>Storing metadata as relations has a big benefit: the database can use its own machinery (storage, queries, transactions, recovery) on its own catalog, with no separate system. That is why you can usually run SQL queries on the catalog itself, for example <code>SELECT * FROM information_schema.tables</code>.</p>
+
+<p>The slide adds one practical detail: the catalog is stored as relations <em>on disk</em>, but the DBMS also keeps <b class="term">specialized data structures in memory</b> for fast access. The catalog is read for every single query, so going to disk each time would be far too slow. Frequently used catalog entries are cached in memory, in structures like hash tables keyed by name.</p>
+
+<div class="q">
+<h4>Question w2-4 (worked answer)</h4>
+<p><em>In a DBMS you cannot create two tables or two views with the same name, or two attributes or two indices with the same name in the same table. How are these rules implemented?</em></p>
+
+<p>They are implemented as <b class="term">primary key</b> (or unique) constraints on the catalog relations themselves. A primary key is a set of attributes whose value must be different in every row. Creating an object means inserting a row into the catalog, and if that row would repeat an existing key value, the insert fails and so does the <code>CREATE</code> statement.</p>
+
+<ul>
+  <li><strong>Two tables with the same name:</strong> <code>CREATE TABLE instructor</code> inserts a row into <code>Relation_metadata</code>, whose primary key is <code>relation_name</code>. A second <code>instructor</code> row would duplicate the key, so it is rejected.</li>
+  <li><strong>Two views with the same name:</strong> the same rule, using the key <code>view_name</code> of <code>View_metadata</code>. Tables and views are used the same way in queries (<code>FROM instructor</code> could be either), so a real DBMS also checks that a new view's name is not already used by a table, and vice versa. Many systems keep tables and views in one catalog table with one key, for this reason.</li>
+  <li><strong>Two attributes with the same name in one table:</strong> <code>Attribute_metadata</code> has the composite key (<code>relation_name</code>, <code>attribute_name</code>). (instructor, salary) can appear only once, but (instructor, name) and (student, name) are both allowed, because the pairs differ.</li>
+  <li><strong>Two indices with the same name:</strong> <code>Index_metadata</code> has the composite key (<code>index_name</code>, <code>relation_name</code>) on the slide, so an index name is unique <em>within one table</em>, the same pattern as attributes. (Oracle and PostgreSQL go further and make index names unique across the whole schema.)</li>
+</ul>
+
+<p>Real example: PostgreSQL keeps tables, views and indexes in one catalog table, <code>pg_class</code>, with a unique index on (name, schema). Columns live in <code>pg_attribute</code> with a unique index on (table id, column name). These are exactly the constraints described above.</p>
+</div>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+
+<div class="key">
+<p><strong>Summary:</strong> the data dictionary (system catalog) stores metadata: relations, attributes, views, constraints, users, statistics, indexes and physical storage details. It is stored as ordinary relations on disk and cached in memory. Naming rules such as “no two tables with the same name” are just primary key constraints on those catalog relations.</p>
+</div>
+</main>
+<script src="../assets/book.js"></script>
+<script>
+recTable('#rm', [{ cells: ['instructor', '4', 'sequential', 'file 12, block 0'] }, { cells: ['department', '3', 'sequential', 'file 13, block 0'] }],
+  ['relation_name', 'number_of_attributes', 'storage_organization', 'location']);
+recTable('#am', [
+  { cells: ['instructor', 'ID', 'char', '1', '5'] }, { cells: ['instructor', 'name', 'varchar', '2', '20'] },
+  { cells: ['instructor', 'dept_name', 'varchar', '3', '20'] }, { cells: ['instructor', 'salary', 'numeric', '4', '8'], cls: 'hl' }],
+  ['relation_name', 'attribute_name', 'domain_type', 'position', 'length']);
+</script>
+<script>
+flashcards('#cards', [
+  { f: 'Metadata', b: 'Data about data: names, types, constraints, locations, statistics.' },
+  { f: 'Data dictionary / system catalog', b: 'Where the DBMS stores its metadata, itself as relations.' },
+  { f: 'What the catalog stores', b: 'Relations, attributes (name, type, length), views, integrity constraints, users and passwords, statistics (tuple counts), physical organization and location, indices.' },
+  { f: 'Relational representation of metadata', b: 'Catalog tables such as Relation_metadata, Attribute_metadata, Index_metadata, View_metadata, User_metadata, cached in memory for speed.' },
+  { f: 'Unique names (Question w2-4)', b: 'Enforced as primary keys of catalog relations, e.g. (relation_name, attribute_name) in Attribute_metadata.' },
+]);
+quiz('#quiz', [
+  { q: 'Which is NOT metadata?', opts: ['The type of instructor.salary', 'The salary 65000 of Srinivasan', 'The number of tuples in instructor', 'Where the instructor file is stored'], a: 1, why: 'A salary value is ordinary data; the others describe data.' },
+  { q: 'Which key stops two attributes named “name” in the same table, but allows “name” in two tables?', opts: ['attribute_name', 'relation_name', '(relation_name, attribute_name)', 'position'], a: 2, why: 'A composite key repeats only when both the table and the attribute name repeat.' },
+  { q: 'Why is the catalog also kept in specialized in-memory structures?', opts: ['It is consulted by every query, so disk access each time would be too slow', 'It does not fit on disk', 'It contains passwords', 'SQL cannot read it'], a: 0, why: 'Parsing and planning any query reads the catalog.' },
+  { q: 'The query optimizer mainly uses which part of the catalog?', opts: ['User passwords', 'View definitions', 'Statistics such as the number of tuples', 'Attribute positions'], a: 2, why: 'Statistics let it estimate the cost of different plans.' },
+]);
+ask('#try1', { q: 'Name the catalog relation whose primary key stops two tables from having the same name.', a: ['Relation_metadata', 'relation metadata', 'relation_metadata'], why: 'Its key is relation_name.' });
+</script>
+</body>
+</html>

@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Why Design Theory · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 01 (Sukarna) · Chapter 1 · Slides 1–5 · Book §3.3, §3.4.1</div>
+<h1>Why We Need Design Theory: Redundancy and Decomposition</h1>
+<p class="lede">A relation that stores too much in one place repeats facts. This chapter shows the problem on the slides' teacher table, fixes it by splitting the table, and then shows a split that goes wrong and invents tuples that never existed.</p>
+
+<h2>1. Two ways to design a database (slide 2)</h2>
+<p>Before a database holds any data, someone has to decide which tables (relations) exist and which columns (attributes) each one has. The slides describe two routes:</p>
+<ul>
+  <li><strong>Intermediate design.</strong> First draw a high-level picture of the data, such as an ER diagram (entities, attributes, relationships), and then convert that picture into relations.</li>
+  <li><strong>Straight approach.</strong> Read the requirements and write down relations directly. The slides mark this as <em>not recommended</em>, because it is easy to miss structure.</li>
+</ul>
+<p>Both routes share one weakness: <em>the first relation schemas you get can contain redundancy</em>. The usual cause is a relation that tries to hold too much information, such as facts about teachers and facts about departments in one table. Design theory is the set of tools that detects this and repairs it. Its main tool is the <b class="term">functional dependency</b> (Chapter 2).</p>
+
+<dl class="def">
+  <dt>Relation schema</dt><dd>The name of a relation and its list of attributes, for example <code>teacher_in_dept(ID, name, salary, dept_name, building, budget)</code>. A <b>relation instance</b> is the set of tuples (rows) stored in it at one moment.</dd>
+  <dt>Redundancy</dt><dd>The same fact stored more than once. Every copy must be kept identical, and that is where errors creep in.</dd>
+</dl>
+
+<h2>2. Redundancy on a real table (slide 3)</h2>
+<p>The slide's relation records each teacher together with the building and budget of the teacher's department:</p>
+<figure>
+<div id="tid"></div>
+<figcaption><b>Figure 1.</b> <code>teacher_in_dept</code>. The fact “CSE is in ECE Building with budget 5,000,000” is stored twice (orange), once per CSE teacher.</figcaption>
+</figure>
+<p>A department's building and budget belong to the department, not to any teacher. Yet the table repeats them in every row of every teacher in that department. With 50 CSE teachers, the same building and budget would appear 50 times. If the budget changes, all 50 copies must change together. Chapter 9 names the problems this causes (update, insertion and deletion anomalies).</p>
+
+<h2>3. The fix: decompose into two relations (slide 4)</h2>
+<p>The slides split the table into two smaller relations, each about one thing:</p>
+<p class="formula">teacher(ID, name, salary, dept_name) &nbsp; department(dept_name, building, budget)</p>
+<p>The two relations share the attribute <code>dept_name</code>. Each department's building and budget is now stored once. To answer a question that needs both, such as “which building does Rahim Ahmed work in?”, we put the tables back together with a <b class="term">natural join</b>: pair every teacher row with the department row that has the same <code>dept_name</code>.</p>
+
+<dl class="def">
+  <dt>Decomposition</dt><dd>Replacing a relation R by two or more relations whose attribute sets together cover all of R's attributes. Each new relation holds the projection of R's tuples onto its attributes.</dd>
+  <dt>Natural join (R ⋈ S)</dt><dd>Combine every tuple of R with every tuple of S that has equal values on all attributes the two relations share.</dd>
+  <dt>Lossless decomposition</dt><dd>A decomposition where the natural join of the pieces gives back <em>exactly</em> the original relation: no tuple lost, no tuple added.</dd>
+</dl>
+
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="split"></div>
+</figure>
+
+<p>The slide states the condition that made this work: <em>the common attribute must be a key of at least one of the decomposed relations</em>. Here <code>dept_name</code> is a key of <code>department</code>: no two department rows share a <code>dept_name</code>. So each teacher row matches <strong>exactly one</strong> department row in the join, and the join rebuilds each original tuple and nothing else. (A key is defined precisely in Chapter 3. For now: a set of attributes whose values identify a single row.)</p>
+
+<h2>4. A bad decomposition (slide 5)</h2>
+<p>Not every split is safe. The slide's example decomposes</p>
+<p class="formula">employee(ID, name, street, city, salary) &nbsp;→&nbsp; (ID, name) &nbsp;and&nbsp; (name, street, city, salary)</p>
+<p>The common attribute is <code>name</code>, and <code>name</code> is <em>not</em> a key of either piece: two different employees are both called Kim. Watch what the join does:</p>
+
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="lossy"></div>
+</figure>
+
+<p>The original relation had two tuples. The join of the pieces has <strong>four</strong>. Two of them, (57766, Kim, North, Hampton, 67000) and (98776, Kim, Main, Perryridge, 75000), never existed. Since both pieces are consistent with either version of the data, no algorithm can tell which Kim lives where. We got more tuples, but we have <em>lost information</em>: the link between each ID and its address. This is a <b class="term">lossy decomposition</b>.</p>
+
+<dl class="def">
+  <dt>Lossy decomposition</dt><dd>A decomposition whose natural join produces tuples that were not in the original relation (called spurious tuples), so the original cannot be reconstructed.</dd>
+</dl>
+
+<div class="q">
+<h4>Why does the teacher split work while the employee split fails?</h4>
+<p>In the teacher split, the shared attribute <code>dept_name</code> determines a single department row, so each teacher row can join with exactly one partner. In the employee split, the shared attribute <code>name</code> determines nothing: the value Kim appears with two different addresses, so each Kim row from the left piece joins with <em>both</em> Kim rows from the right piece. 2 × 2 = 4 joined tuples. The general rule (made precise in Chapter 12): a two-way split R₁, R₂ is lossless when the common attributes R₁ ∩ R₂ functionally determine all of R₁ or all of R₂.</p>
+</div>
+
+<p>The rest of the lecture builds the tools to make these decisions mechanically: functional dependencies (what determines what), keys, closures, and normal forms (BCNF and 3NF) that say when a relation needs splitting and how to split it without loss.</p>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+
+<div class="key"><p><strong>Summary:</strong> a relation that mixes facts about several things (teachers and departments) stores some facts many times. That redundancy is removed by decomposing the relation into smaller ones and rejoining them with a natural join when needed. A decomposition must be lossless: the join must return exactly the original tuples. It is safe when the shared attributes form a key of one of the pieces; when they do not (two employees named Kim), the join invents spurious tuples.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="lecture.js"></script>
+<script>
+const TID_H = ['ID', 'name', 'salary', 'dept_name', 'building', 'budget'];
+const TID = [['101', 'Rahim Ahmed', '60000', 'CSE', 'ECE Building', '5,000,000'], ['103', 'Tanvir Islam', '65000', 'CSE', 'ECE Building', '5,000,000'], ['102', 'Ayesha Khan', '55000', 'EEE', 'Main Building', '4,000,000']];
+$('#tid').innerHTML = inst(TID_H, TID, { cell: { '0,4': 'hl', '0,5': 'hl', '1,4': 'hl', '1,5': 'hl' }, cap: 'teacher_in_dept' });
+
+const T = TID.map(r => r.slice(0, 4)), D = [['CSE', 'ECE Building', '5,000,000'], ['EEE', 'Main Building', '4,000,000']];
+const row2 = (a, b) => `<div class="figrow"><div>${a}</div><div>${b}</div></div>`;
+const tT = (o = {}) => inst(['ID', 'name', 'salary', 'dept_name'], T, { cap: 'teacher', ...o });
+const tD = (o = {}) => inst(['dept_name', 'building', 'budget'], D, { cap: 'department (key: dept_name)', ...o });
+const joined = n => inst(TID_H, TID.slice(0, n), { cap: 'teacher ⋈ department', rowCls: { [n - 1]: 'new' } });
+stepper('#split', [
+  { html: inst(TID_H, TID, { cap: 'teacher_in_dept' }), cap: 'Start: one relation with 3 tuples and 6 attributes. CSE\'s building and budget appear twice.' },
+  { html: row2(tT(), tD()), cap: 'Project onto (ID, name, salary, dept_name) and onto (dept_name, building, budget). Duplicates vanish in the second projection: CSE now appears <b>once</b>.' },
+  { html: row2(tT({ rowCls: { 0: 'hl' } }), tD({ rowCls: { 0: 'hl' } })) + joined(1), cap: 'Join: teacher 101 has dept_name CSE. Exactly one department row has CSE, so exactly one joined tuple is produced.' },
+  { html: row2(tT({ rowCls: { 1: 'hl' } }), tD({ rowCls: { 0: 'hl' } })) + joined(2), cap: 'Teacher 103 (CSE) also matches only the CSE row.' },
+  { html: row2(tT({ rowCls: { 2: 'hl' } }), tD({ rowCls: { 1: 'hl' } })) + joined(3), cap: 'Teacher 102 (EEE) matches only the EEE row. The join has exactly the original 3 tuples: <b>lossless</b>.' },
+]);
+
+const E_H = ['ID', 'name', 'street', 'city', 'salary'];
+const E = [['57766', 'Kim', 'Main', 'Perryridge', '75000'], ['98776', 'Kim', 'North', 'Hampton', '67000']];
+const L = E.map(r => r.slice(0, 2)), Rr = E.map(r => r.slice(1));
+const J = [[...L[0], ...Rr[0].slice(1)], [...L[0], ...Rr[1].slice(1)], [...L[1], ...Rr[0].slice(1)], [...L[1], ...Rr[1].slice(1)]];
+const pl = (o = {}) => inst(['ID', 'name'], L, { cap: 'π ID,name', ...o }), pr = (o = {}) => inst(['name', 'street', 'city', 'salary'], Rr, { cap: 'π name,street,city,salary', ...o });
+const jn = (n, bad) => inst(E_H, J.slice(0, n), { cap: 'join of the two pieces', rowCls: Object.fromEntries(bad.filter(b => b < n).map(b => [b, 'del'])) });
+stepper('#lossy', [
+  { html: inst(E_H, E, { cap: 'employee' }), cap: 'Two employees, both named Kim, with different addresses and salaries.' },
+  { html: row2(pl(), pr()), cap: 'Project onto (ID, name) and (name, street, city, salary). The only shared attribute is <b>name</b>.' },
+  { html: row2(pl({ rowCls: { 0: 'hl' } }), pr({ rowCls: { 0: 'hl', 1: 'hl' } })) + jn(2, [1]), cap: '57766 has name Kim. <b>Both</b> right-hand rows have name Kim, so 57766 joins with both. The second result (red) gives 57766 the wrong address and salary.' },
+  { html: row2(pl({ rowCls: { 1: 'hl' } }), pr({ rowCls: { 0: 'hl', 1: 'hl' } })) + jn(4, [1, 2]), cap: '98776 also joins with both Kim rows. The join has <b>4 tuples</b>; 2 are spurious (red). The decomposition is <b>lossy</b>.' },
+]);
+
+flashcards('#cards', [
+  { f: 'Redundancy', b: 'The same fact stored in several tuples, e.g. a department\'s budget repeated for every teacher in it.' },
+  { f: 'Decomposition', b: 'Splitting relation R into relations whose attribute sets cover R; each holds the projection of R.' },
+  { f: 'Natural join', b: 'Pairs tuples of two relations that agree on all shared attributes.' },
+  { f: 'Lossless decomposition', b: 'Joining the pieces gives back exactly the original relation.' },
+  { f: 'Lossy decomposition', b: 'Joining the pieces adds spurious tuples, so the original cannot be recovered.' },
+  { f: 'Safe two-way split (slide 4)', b: 'The common attribute(s) must be a key of at least one piece.' },
+]);
+quiz('#quiz', [
+  { q: 'Why does <code>teacher_in_dept</code> contain redundancy?', opts: ['It has no key', 'Building and budget belong to the department but are stored once per teacher', 'Salaries repeat', 'IDs are not sorted'], a: 1, why: 'A department fact is repeated for every teacher of the department.' },
+  { q: 'teacher ⋈ department is lossless mainly because…', opts: ['both tables are small', 'dept_name is a key of department', 'ID is a key of teacher', 'the tables have the same number of rows'], a: 1, why: 'Each teacher row can match only one department row, so no spurious tuples appear.' },
+  { q: 'The employee example\'s join produced how many spurious tuples?', opts: ['0', '1', '2', '4'], a: 2, why: '4 joined tuples, of which 2 were in the original.' },
+  { q: 'A lossy decomposition…', opts: ['loses tuples in the join', 'adds tuples that were never in the relation', 'always has fewer attributes', 'cannot be joined'], a: 1, why: 'Every original tuple always comes back; the problem is the extra (spurious) ones.' },
+]);
+ask('#try1', { q: 'If employee had 3 rows all named Kim (with different addresses) and we split it the same way, how many tuples would the join produce?', a: 9, hint: 'Each of the 3 (ID, Kim) rows joins with every Kim row on the right.', why: '3 × 3 = 9 tuples, of which 6 are spurious.' });
+</script>
+</body>
+</html>

@@ -1,0 +1,344 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CHECK Constraints · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 06 (Ishrak) · Chapter 5 · Slides 24–36 · Textbook §7.2</div>
+<h1>CHECK Constraints: Attribute-Based and Tuple-Based</h1>
+<p class="lede">A CHECK constraint states any condition you could write after WHERE, and the DBMS refuses rows that make it false. This chapter covers CHECK on one attribute and on a whole tuple, the logic trick for turning "if P then Q" into a CHECK, what happens with NULL, and why the slides' CHECKs with subqueries are standard SQL that Oracle does not accept.</p>
+
+<h2>1. The CHECK clause (slides 24–25)</h2>
+<p>The syntax is <code>CHECK (&lt;condition&gt;)</code>, where the condition is "a condition that must hold". Slide 24 adds: conditions are like the predicates written after a WHERE clause. You may use comparisons, AND/OR/NOT, BETWEEN, IN, LIKE, IS NULL, and arithmetic.</p>
+<p>Slide 25 lists three levels, which the next sections (and Chapter 6) take in turn:</p>
+<dl class="def">
+  <dt>Attribute-based CHECK</dt>
+  <dd>Written with one column. Constrains the values of that column. Checked when a row is inserted or that column is updated.</dd>
+  <dt>Tuple-based CHECK</dt>
+  <dd>Written as a separate element of CREATE TABLE. May mention any columns of the table. Checked when a row is inserted or any column of a row is updated.</dd>
+  <dt>Database-level CHECK (assertion)</dt>
+  <dd>A separate schema object, <code>CREATE ASSERTION</code>, whose condition may involve several tables (Chapter 6).</dd>
+</dl>
+<p>When a row makes the condition <em>false</em>, the statement is rejected. Oracle's message is <code>ORA-02290: check constraint (SCHEMA.NAME) violated</code>.</p>
+<div class="q">
+<h4>Question: what does a CHECK do with NULL?</h4>
+<p>A comparison with NULL is neither true nor false but UNKNOWN. A CHECK rejects a row only when its condition is <em>false</em>, so a row that makes it UNKNOWN is <strong>accepted</strong>. For example, with <code>CHECK (speed &gt;= 2.0)</code>, a laptop with speed NULL is accepted. (A WHERE clause behaves the other way round: it keeps only the rows where the condition is true.) If NULL must be forbidden too, add NOT NULL, or write <code>CHECK (speed IS NOT NULL AND speed &gt;= 2.0)</code>.</p>
+</div>
+
+<h2>2. Attribute-based CHECK (slides 26–28)</h2>
+<pre>CREATE TABLE myTable (
+  attrib1 type1 CHECK (&lt;condition&gt;),
+  attrib2 type2,
+  attrib3 type3 CHECK (&lt;condition&gt;)
+);</pre>
+<p>Slide 27: in <code>Laptop(model, speed, ram, hd, screen, price)</code>, "the speed of a laptop must be at least 2.0":</p>
+<pre>CREATE TABLE Laptop (
+  model  CHAR(4) PRIMARY KEY,
+  speed  NUMBER(3,2) CHECK (speed &gt;= 2.0),
+  ram    INT,  hd INT,  screen NUMBER(3,1),  price NUMBER(7,2)
+);</pre>
+<p>(<code>NUMBER(3,2)</code> means 3 significant digits, 2 after the decimal point: values up to 9.99. The slide's schema line writes "sc" for screen.) The animation inserts the textbook's ten laptops into this table:</p>
+<figure class="wide"><span class="anim-tag">Animation</span><div id="a27"></div></figure>
+<p>Slide 28: in <code>Printer(model, type, price)</code>, "the only types of printers are laser, ink-jet and bubble-jet":</p>
+<pre>type CHAR(20) CHECK (type IN ('laser', 'ink-jet', 'bubble-jet'))</pre>
+<p>A list of allowed values like this is the usual way to declare a small fixed domain in Oracle (there is no ENUM type). Watch out for CHAR here: Oracle pads <code>CHAR(20)</code> with blanks, but compares CHAR values with blank-padded semantics, so 'laser' still matches. VARCHAR2(20) avoids the question.</p>
+<p>In Oracle, a CHECK written as a column constraint may mention <em>only its own column</em>; <code>speed NUMBER CHECK (speed &gt; 0 OR price &lt; 500)</code> gives <code>ORA-02438: Column check constraint cannot reference other columns</code>. Such conditions are tuple-based (section 4).</p>
+<div id="p1"></div>
+
+<h2>3. A CHECK with a subquery (slides 29–30)</h2>
+<p>Slide 29 shows the Product table next to PC and Laptop and states: "a model of a product must also be the model of a PC, a laptop or a printer". Slide 30 writes it as an attribute-based CHECK with a subquery:</p>
+<pre>CREATE TABLE Product (
+  maker CHAR(1),
+  model CHAR(4) CHECK (model IN (SELECT model FROM PC
+                                 UNION SELECT model FROM Laptop
+                                 UNION SELECT model FROM Printer)),
+  type  VARCHAR2(10)
+);</pre>
+<p>(The slide is missing the final closing parenthesis of the CHECK; it is added above.) This looks like a foreign key, but it cannot be one: a foreign key references one table, and here the model may be in any of three. It is a referential-integrity rule that only a subquery can express.</p>
+<p>The SQL standard allows this. <strong>Oracle does not</strong>: any subquery inside CHECK gives <code>ORA-02251: subquery not allowed here</code>. SQLite refuses it too (<code>subqueries prohibited in CHECK constraints</code>). In Oracle such rules need a trigger (Lec 12). Even in the standard, a CHECK with a subquery is only a partial guarantee:</p>
+<div class="q">
+<h4>Question: does slide 30's CHECK guarantee the rule at all times?</h4>
+<p>No. An attribute-based CHECK is evaluated only when a Product row is inserted or its model is updated. If later someone deletes PC 1001, the Product row (A, 1001, pc) now violates the rule, but no Product row changed, so the CHECK is never re-evaluated and the deletion is accepted. That is why slide 50 says CHECK constraints are "not guaranteed to hold if there is a subquery". A foreign key would block that delete; an assertion (Chapter 6) would too.</p>
+</div>
+<div id="p2"></div>
+
+<h2>4. Tuple-based CHECK (slides 31–34)</h2>
+<pre>CREATE TABLE myTable (
+  attrib1 type1,
+  attrib2 type2, …
+  CHECK (&lt;condition&gt;)
+);</pre>
+<p>The CHECK now stands on its own in the list, so its condition may use every column of the row. It is checked for a row whenever that row is inserted or updated.</p>
+<h3>From "if … then …" to a CHECK</h3>
+<p>Business rules usually come as implications: "if P then Q". A CHECK needs a plain condition, so the slides use the logical equivalence</p>
+<p class="formula">P → Q &nbsp;≡&nbsp; ¬P ∨ Q</p>
+<p>An implication is false in exactly one case: P true and Q false. ¬P ∨ Q is also false in exactly that case. In words: <em>either the "if" part does not apply, or the "then" part holds.</em></p>
+<div class="tbl"><table>
+<tr><th>P</th><th>Q</th><th>P → Q</th><th>¬P ∨ Q</th><th>row accepted?</th></tr>
+<tr><td>true</td><td>true</td><td>true</td><td>true</td><td class="good">yes</td></tr>
+<tr><td>true</td><td>false</td><td>false</td><td>false</td><td class="bad">no</td></tr>
+<tr><td>false</td><td>true</td><td>true</td><td>true</td><td class="good">yes</td></tr>
+<tr><td>false</td><td>false</td><td>true</td><td>true</td><td class="good">yes</td></tr>
+</table></div>
+<p>To write ¬P, negate the comparison: ¬(speed &lt; 2.0) is speed &gt;= 2.0; ¬(a = b) is a &lt;&gt; b; ¬(x AND y) is ¬x OR ¬y (De Morgan). If the "then" part is itself an OR, the result is one long OR: P → (Q ∨ R) ≡ ¬P ∨ Q ∨ R.</p>
+
+<p><strong>Slide 32.</strong> "If the head of the department's gender is male, then his name must not begin with 'Ms.'." P = gender is male, Q = name NOT LIKE 'Ms.%'. The slide writes ¬P as <code>gender = 'F'</code>, which is correct as long as gender is only ever 'M' or 'F' (with a NULL gender the row is accepted anyway, since the OR is then UNKNOWN or true). The safest form of ¬P is <code>gender &lt;&gt; 'M'</code>.</p>
+<pre>CREATE TABLE Department (
+  …,
+  PRIMARY KEY …,
+  FOREIGN KEY …,
+  CHECK (gender = 'F' OR name NOT LIKE 'Ms.%')
+);</pre>
+<p>(The slide puts the rule in Department, as if Department stored its head's name and gender; in the textbook the same example belongs to MovieStar(name, address, gender). The idea is the same. "PRIMAR KEY" is again a typo for PRIMARY KEY.)</p>
+
+<p><strong>Slide 33.</strong> "A PC with a processor speed less than 2.0 must not sell for more than $800." P = speed &lt; 2.0, Q = price ≤ 800 ("not more than 800"):</p>
+<pre>CREATE TABLE PC (
+  …,
+  CHECK (speed &gt;= 2.0 OR price &lt;= 800)
+);</pre>
+<figure class="wide"><span class="anim-tag">Animation</span><div id="a33"></div></figure>
+
+<p><strong>Slide 34.</strong> "A laptop with a screen size less than 15 inches must have at least a 40 GB hard disk or sell for less than $1000." P = screen &lt; 15, Q = hd ≥ 40, R = price &lt; 1000; P → (Q ∨ R) ≡ ¬P ∨ Q ∨ R:</p>
+<pre>CREATE TABLE Laptop (
+  …,
+  CHECK (screen &gt;= 15 OR hd &gt;= 40 OR price &lt; 1000)
+);</pre>
+<p>The slide writes <code>CREATE TABLE PC</code> here; it must be Laptop, since PC has no screen column.</p>
+
+<h3>Tool: turn an implication into a CHECK</h3>
+<p>Type the "if" part P (one comparison, or several joined by AND) and the "then" part Q. The tool negates P, builds the CHECK, and lets you test a row.</p>
+<figure><span class="anim-tag">Interactive</span><div id="tool"></div></figure>
+
+<h2>5. A tuple-based CHECK across tables (slides 35–36)</h2>
+<p>"If the relation Product mentions a model and its type, then this model must appear in the relation appropriate to that type." Slide 35 shows the data; slide 36 writes a tuple-based CHECK on Product with three subqueries:</p>
+<pre>CREATE TABLE Product (
+  …,
+  CHECK (   (type = 'pc'      AND model IN (SELECT model FROM PC))
+         OR (type = 'laptop'  AND model IN (SELECT model FROM Laptop))
+         OR (type = 'printer' AND model IN (SELECT model FROM Printer)))
+);</pre>
+<p>Read it as: the row is fine if it is a pc that is in PC, or a laptop that is in Laptop, or a printer that is in Printer. It is stronger than slide 30's rule: slide 30 accepts (A, 1001, laptop) because 1001 is in PC, but slide 36 rejects it because 1001 is not in Laptop. Like slide 30, it is standard SQL that Oracle refuses (ORA-02251), and it is only checked when Product changes. The same rule as an assertion is slide 47 in the next chapter. Below, the condition is used the only way the playground (and Oracle) allows: as a query that looks for rows breaking it. On the textbook data there are none; add a bad row and run again.</p>
+<div id="p3"></div>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+<h3>Write it yourself</h3>
+<p>Exercises of the form "list the rows that violate…" practise the <em>negation</em> of a CHECK: a row violates <code>CHECK (c)</code> exactly when <code>NOT (c)</code> is true. The CREATE TABLE exercises end with a line that copies test rows into your table with <code>INSERT OR IGNORE</code>: this is a <em>SQLite-only</em> helper that silently skips the rows your CHECK rejects, so the checker can see which rows your constraint lets through. (Oracle has no INSERT OR IGNORE.)</p>
+<div id="c1"></div><div id="c2"></div><div id="c3"></div><div id="c4"></div><div id="c5"></div><div id="c6"></div>
+
+<h3>Exam questions</h3>
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2012–13 · 5 marks</div>
+  <div class="exam-q"><p>Give an example of a CHECK constraint and discuss why it is used.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+  <p>A CHECK constraint attaches a condition (like a WHERE predicate) to a column or a table. The DBMS evaluates it for every inserted or updated row and rejects the statement if the condition is false (a NULL result, UNKNOWN, is accepted).</p>
+<pre>CREATE TABLE Laptop (
+  model  CHAR(4) PRIMARY KEY,
+  speed  NUMBER(3,2) CHECK (speed &gt;= 2.0),                  -- attribute-based
+  ram    INT,
+  hd     INT          CHECK (hd &gt; 0),
+  screen NUMBER(3,1),
+  price  NUMBER(7,2),
+  CONSTRAINT small_screen_rule
+    CHECK (screen &gt;= 15 OR hd &gt;= 40 OR price &lt; 1000)        -- tuple-based
+);
+INSERT INTO Laptop VALUES ('2099', 1.5, 512, 60, 15.4, 900);
+-- ORA-02290: check constraint (SCHEMA.SYS_C00…) violated   (speed &lt; 2.0)</pre>
+  <p><strong>Why it is used.</strong> (1) It enforces <em>domain</em> rules and business rules that data types alone cannot express: ranges (speed ≥ 2.0), allowed values (type IN ('laser', 'ink-jet', 'bubble-jet')), and relationships between columns of one row ("small-screen laptops need a 40 GB disk or a price under $1000", written with P → Q ≡ ¬P ∨ Q). (2) The rule lives in the schema, so it holds no matter which program or user changes the data; no application can forget it. (3) It is declarative and cheap: the DBMS checks only the changed row, which is faster and more reliable than code in triggers or applications. (4) It documents the meaning of the data in the schema itself. Limits: in Oracle a CHECK may not contain a subquery, so rules involving other rows or tables need triggers (or assertions in standard SQL).</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 20-21 5c · 5 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-2 | 2020–21 · 15 marks</div>
+  <div class="exam-q"><p>Replace the below UNIQUE constraint using a CHECK constraint.</p>
+<pre>CREATE TABLE MyTable(
+  …
+  head INT UNIQUE,
+  …
+);</pre></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+  <p>UNIQUE on head means: no two rows have the same non-NULL head (NULLs may repeat). A CHECK can say "there is no head value that occurs more than once" with a subquery over the same table. In standard SQL:</p>
+<pre>CREATE TABLE MyTable (
+  …
+  head INT,
+  …
+  CONSTRAINT head_unique CHECK (
+    NOT EXISTS (SELECT head
+                FROM MyTable
+                WHERE head IS NOT NULL
+                GROUP BY head
+                HAVING COUNT(*) &gt; 1)
+  )
+);</pre>
+  <p>How it works: when a row is inserted or updated, the condition is evaluated on the table <em>including</em> the new row. If the new head equals an existing one, that head's group has COUNT(*) = 2, the subquery returns it, NOT EXISTS is false, and the statement is rejected. <code>WHERE head IS NOT NULL</code> keeps the UNIQUE behaviour for NULLs (GROUP BY would otherwise put all NULLs in one group and reject a second NULL).</p>
+  <p>An equivalent attribute-based form counts the rows with the current row's value; the outer row must be referred to by the table name, and the subquery's copy needs an alias:</p>
+<pre>head INT CHECK (head IS NULL OR
+                1 = (SELECT COUNT(*) FROM MyTable M WHERE M.head = MyTable.head))</pre>
+  <p>Because the only table in the subquery is MyTable itself, and the check runs on every insert or update of MyTable, this CHECK is fully equivalent to UNIQUE (deleting rows can never create a duplicate). <strong>In Oracle neither version can be created</strong>: subqueries in CHECK give ORA-02251. In practice you keep UNIQUE (or a unique index); the question tests the standard-SQL semantics.</p>
+  <p>Note: the CSE 215 bank's answer writes <code>WHERE M.head = head</code>. An unqualified column name in a subquery refers to the nearest table that has such a column, which is M itself, so the condition reads M.head = M.head: it counts every non-NULL row of the table, and the CHECK would reject the second row inserted even when the heads differ. The outer row must be written <code>MyTable.head</code>. The marks also differ between the banks (5 in DB QB, 15 in the CSE 215 bank).</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2011–12 · 5 marks (part a of a 20-mark question; part b is in Chapter 6)</div>
+  <div class="exam-q"><p>A database schema consists of four relations: Product(maker, model, type), PC(model, speed, ram, hd, price), Laptop(model, speed, ram, hd, screen, price), Printer(model, color, type, price).</p>
+  <p>(a) Write the following check constraints: (i) The model number of a product must be a 7-digit number. (ii) A PC with a processor speed less than 2.0 GHz must have at least 512 MB RAM or sell for less than $800.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+  <p><strong>(i)</strong> This is a rule on one attribute of Product, so an attribute-based CHECK. If model is stored as a number, "7 digits" means between 1,000,000 and 9,999,999:</p>
+<pre>CREATE TABLE Product (
+  maker VARCHAR2(20),
+  model NUMBER(7) PRIMARY KEY CHECK (model BETWEEN 1000000 AND 9999999),
+  type  VARCHAR2(10)
+);</pre>
+  <p>If model is a string (so leading zeros such as '0012345' count), use Oracle's regular expressions:</p>
+<pre>model CHAR(7) CHECK (REGEXP_LIKE(model, '^[0-9]{7}$'))</pre>
+  <p>Note: the bank's alternative <code>model LIKE '[0-9][0-9]…'</code> is SQL Server syntax. Oracle's LIKE knows only % and _, so in Oracle that pattern matches only the literal text "[0-9][0-9]…" and every real model would be rejected.</p>
+  <p><strong>(ii)</strong> If P = speed &lt; 2.0 then (Q = ram ≥ 512 or R = price &lt; 800). P → (Q ∨ R) ≡ ¬P ∨ Q ∨ R, a tuple-based CHECK on PC:</p>
+<pre>CREATE TABLE PC (
+  model CHAR(4) PRIMARY KEY,
+  speed NUMBER(3,2), ram INT, hd INT, price NUMBER(7,2),
+  CONSTRAINT slow_pc_rule CHECK (speed &gt;= 2.0 OR ram &gt;= 512 OR price &lt; 800)
+);
+-- or on an existing table:
+ALTER TABLE PC ADD CONSTRAINT slow_pc_rule CHECK (speed &gt;= 2.0 OR ram &gt;= 512 OR price &lt; 800);</pre>
+  <p>Check with a row: (1.8 GHz, 256 MB, $850): speed ≥ 2.0 false, ram ≥ 512 false, price &lt; 800 false → rejected. (1.8, 256, $700) → accepted (cheap). All 13 PCs of the textbook data satisfy it. Exercise 5 above tests this constraint.</p>
+  </div></details>
+</div>
+
+<div class="key"><p><strong>Summary:</strong> <code>CHECK (condition)</code> rejects rows that make the condition false (UNKNOWN passes). Attribute-based CHECKs sit on one column and are checked when that column changes; tuple-based CHECKs sit in the table and may use all columns of the row. Translate "if P then Q" as <code>¬P OR Q</code>. The slides' CHECKs with subqueries (30, 36) are standard SQL; Oracle rejects them (ORA-02251), and even in the standard they are only checked when their own table changes.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/sqlplay.js"></script>
+<script src="lecture.js"></script>
+<script>
+// slide 27: attribute check on laptop speeds
+(() => {
+  const steps = [], ok = [];
+  const fig = (cur, verdict) => recTable(null, LAPS.map((r, i) => ({ cells: [r[0], r[1].toFixed(2), r[5]].map(String),
+    cls: i === cur ? (verdict ? 'new' : 'del') : i < cur ? (ok[i] ? 'new' : 'del') : '', side: i <= cur ? (r[1] >= 2 ? `${r[1].toFixed(2)} ≥ 2.0 ✓` : `${r[1].toFixed(2)} &lt; 2.0 ✗`) : '' })), ['model', 'speed', 'price']);
+  steps.push({ html: '<pre style="margin:0 0 10px">speed NUMBER(3,2) CHECK (speed &gt;= 2.0)</pre>' + recTable(null, LAPS.map(r => ({ cells: [r[0], r[1].toFixed(2), r[5]].map(String) })), ['model', 'speed', 'price']), cap: 'We INSERT the ten laptops one by one. For each row the DBMS evaluates the condition on the speed value only.' });
+  LAPS.forEach((r, i) => { const v = r[1] >= 2; ok[i] = v; steps.push({ html: '<pre style="margin:0 0 10px">speed NUMBER(3,2) CHECK (speed &gt;= 2.0)</pre>' + fig(i, v), cap: `Laptop ${r[0]}: speed ${r[1].toFixed(2)} ${v ? '≥ 2.0, condition true: <span class="good">inserted</span>' : '&lt; 2.0, condition false: <span class="bad">rejected</span> (ORA-02290)'}.` }); });
+  steps.push({ html: '<pre style="margin:0 0 10px">speed NUMBER(3,2) CHECK (speed &gt;= 2.0)</pre>' + fig(LAPS.length, true), cap: `Result: ${ok.filter(Boolean).length} laptops accepted, ${ok.filter(x => !x).length} rejected. Under this rule the textbook's data could not be loaded as it is.` });
+  stepper('#a27', steps, { interval: 1500 });
+})();
+// slide 33: tuple check on PCs
+(() => {
+  const ev = r => ({ np: r[1] >= 2, q: r[4] <= 800 });
+  const fig = cur => '<pre style="margin:0 0 10px">CHECK (speed &gt;= 2.0 OR price &lt;= 800)</pre>' + recTable(null, PCS.map((r, i) => {
+    const e = ev(r), v = e.np || e.q;
+    return { cells: [r[0], r[1].toFixed(2), String(r[4])], cls: i === cur ? (v ? 'hl' : 'del') : i < cur && !v ? 'del' : '',
+      side: i <= cur ? `${e.np ? 'T' : 'F'} OR ${e.q ? 'T' : 'F'} = ${v ? '<b>T</b>' : '<b style="color:var(--red)">F</b>'}` : '' };
+  }), ['model', 'speed', 'price']);
+  const steps = [{ html: fig(-1), cap: 'P = speed &lt; 2.0, Q = price ≤ 800. The CHECK is ¬P ∨ Q: <code>speed &gt;= 2.0 OR price &lt;= 800</code>. Each of the 13 PCs is tested; the side column shows (speed ≥ 2.0) OR (price ≤ 800).' }];
+  PCS.forEach((r, i) => { const e = ev(r), v = e.np || e.q;
+    steps.push({ html: fig(i), cap: `PC ${r[0]}: speed ${r[1].toFixed(2)}, price ${r[4]}. ` + (e.np ? 'Speed is at least 2.0, so the rule does not apply (¬P true): accepted.' : e.q ? 'Slow (P true), but price ≤ 800 (Q true): accepted.' : 'Slow (P true) <b>and</b> price &gt; 800 (Q false): the only false case of P → Q. <span class="bad">Rejected</span>.') }); });
+  steps.push({ html: fig(PCS.length), cap: 'Only PC 1011 (1.86 GHz, $959) breaks the rule.' });
+  stepper('#a33', steps, { interval: 1500 });
+})();
+
+// implication → CHECK tool
+(() => {
+  const host = $('#tool');
+  host.innerHTML = `<form class="bp-form"><label>if P: <input data-p value="screen < 15" style="width:16em"></label><label>then Q: <input data-q value="hd >= 40 OR price < 1000" style="width:18em"></label><button type="submit">Build CHECK</button></form>
+    <div data-out></div>
+    <form class="bp-form" data-t><label>test row (col=value, …): <input data-row value="screen=13.3, hd=32, price=1200" style="width:22em"></label><button type="submit">Test</button></form><div data-tr></div>`;
+  const flip = { '<': '>=', '>=': '<', '>': '<=', '<=': '>', '=': '<>', '<>': '=', '!=': '=' };
+  const neg1 = c => {
+    let m;
+    c = c.trim();
+    if ((m = c.match(/^(.+?)\s+not\s+(like|in|between)\s+(.+)$/i))) return `${m[1]} ${m[2].toUpperCase()} ${m[3]}`;
+    if ((m = c.match(/^(.+?)\s+(like|in|between)\s+(.+)$/i))) return `${m[1]} NOT ${m[2].toUpperCase()} ${m[3]}`;
+    if ((m = c.match(/^(.+?)\s+is\s+not\s+null$/i))) return `${m[1]} IS NULL`;
+    if ((m = c.match(/^(.+?)\s+is\s+null$/i))) return `${m[1]} IS NOT NULL`;
+    if ((m = c.match(/^(.+?)\s*(<>|!=|<=|>=|<|>|=)\s*(.+)$/))) return `${m[1].trim()} ${flip[m[2]]} ${m[3].trim()}`;
+    return null;
+  };
+  let cur = null;
+  const esc = s => s.replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+  const build = () => {
+    const out = host.querySelector('[data-out]'), P = host.querySelector('[data-p]').value, Q = host.querySelector('[data-q]').value.trim();
+    if (/\bor\b/i.test(P.replace(/between\s+\S+\s+and/ig, ''))) { out.innerHTML = '<p class="sq-msg err">P may contain AND but not OR (the tool negates simple comparisons only). Split an OR in P into separate rules.</p>'; cur = null; return; }
+    const parts = /\bbetween\b/i.test(P) ? [P] : P.split(/\s+and\s+/i), negs = parts.map(neg1);   // BETWEEN x AND y stays whole
+    if (!Q || negs.some(n => !n)) { out.innerHTML = '<p class="sq-msg err">Write P as comparisons like <code>speed &lt; 2.0</code>, <code>type = \'pc\'</code>, <code>name LIKE \'Ms.%\'</code>, joined by AND, and give a non-empty Q.</p>'; cur = null; return; }
+    const cond = [...negs, Q].join(' OR '), check = `CHECK (${cond})`;
+    cur = { negs, Q, cond, check };
+    out.innerHTML = `<p>¬P = ${negs.map(n => `<code>${esc(n)}</code>`).join(' OR ')}${parts.length > 1 ? ' (De Morgan: ¬(a AND b) = ¬a OR ¬b)' : ''}</p><pre>${esc(check)}</pre>`;
+  };
+  host.querySelector('form').addEventListener('submit', e => { e.preventDefault(); build(); });
+  host.querySelector('[data-t]').addEventListener('submit', async e => {
+    e.preventDefault(); const tr = host.querySelector('[data-tr]');
+    if (!cur) return tr.innerHTML = '<p class="sq-msg err">Build a valid CHECK first.</p>';
+    const pairs = host.querySelector('[data-row]').value.split(',').map(s => s.split('=').map(x => x.trim()));
+    if (pairs.some(p => p.length !== 2 || !/^[A-Za-z_]\w*$/.test(p[0]) || p[1] === '')) return tr.innerHTML = '<p class="sq-msg err">Write the row as <code>col=value, col=value</code>, e.g. <code>speed=1.8, price=900</code>. Quote strings: <code>name=\'Ms. X\'</code>.</p>';
+    try {
+      const sel = 'SELECT ' + pairs.map(([c, v]) => `${v} AS ${c}`).join(', ');
+      const db = await newDB('');
+      const r = db.exec(sqlCompat(`SELECT CASE WHEN ${cur.cond} THEN 'TRUE' WHEN NOT (${cur.cond}) THEN 'FALSE' ELSE 'UNKNOWN' END FROM (${sel})`))[0].values[0][0];
+      db.close();
+      tr.innerHTML = `<p>Condition is <b>${r}</b>: the row is ${r === 'FALSE' ? '<span class="bad">rejected</span>' : '<span class="good">accepted</span>'}${r === 'UNKNOWN' ? ' (UNKNOWN passes a CHECK)' : ''}.</p>`;
+    } catch (err) { tr.innerHTML = `<p class="sq-msg err">Could not evaluate: ${esc(err.message)}. Does the row give a value for every column the CHECK uses?</p>`; }
+  });
+  build();
+})();
+
+sqlPlay('#p1', { setup: "CREATE TABLE Printer (\n  model CHAR(4) PRIMARY KEY,\n  type  VARCHAR2(20) CHECK (type IN ('laser', 'ink-jet', 'bubble-jet')),\n  price NUMBER(7,2) CHECK (price > 0)\n);",
+  query: "INSERT INTO Printer VALUES ('3001', 'ink-jet', 99);     -- OK\nINSERT INTO Printer VALUES ('3009', NULL, 150);        -- OK: NULL type is UNKNOWN\nINSERT INTO Printer VALUES ('3010', 'dot-matrix', 80); -- rejected",
+  note: 'SQLite names the failed condition: <code>CHECK constraint failed: type IN (…)</code>. Oracle: <code>ORA-02290: check constraint (SCHEMA.SYS_C00…) violated</code>.' });
+sqlPlay('#p2', { setup: PCDB.replace(/CREATE TABLE Product[^\n]*\n/, '').replace(/INSERT INTO Product[^\n]*\n/g, ''),
+  query: "CREATE TABLE Product (\n  maker CHAR(1),\n  model CHAR(4) CHECK (model IN (SELECT model FROM PC\n                                 UNION SELECT model FROM Laptop\n                                 UNION SELECT model FROM Printer)),\n  type VARCHAR2(10)\n);",
+  note: 'Rejected, as in Oracle. What you <em>can</em> run is the condition as a query: <code>SELECT model FROM PC UNION SELECT model FROM Laptop UNION SELECT model FROM Printer;</code> lists the allowed models.' });
+sqlPlay('#p3', { setup: PCDB, query: "-- products that break slide 36's rule (NOT of the CHECK condition)\nSELECT * FROM Product\nWHERE NOT (   (type = 'pc'      AND model IN (SELECT model FROM PC))\n           OR (type = 'laptop'  AND model IN (SELECT model FROM Laptop))\n           OR (type = 'printer' AND model IN (SELECT model FROM Printer)));\n-- then try:  INSERT INTO Product VALUES ('Z', '1001', 'laptop');  and run the query again",
+  note: 'The tables here have no foreign keys, so bad rows can be inserted freely.' });
+
+flashcards('#cards', [
+  { f: 'CHECK (condition)', b: 'Rejects an inserted/updated row if the condition is FALSE. UNKNOWN (NULL) passes.' },
+  { f: 'Attribute-based CHECK', b: 'Written with one column; checked when that column is inserted or updated. In Oracle it may mention only that column.' },
+  { f: 'Tuple-based CHECK', b: 'Written as a table element; may use all columns; checked on insert/update of the row.' },
+  { f: 'P → Q', b: '≡ ¬P ∨ Q. False only when P is true and Q is false.' },
+  { f: 'ORA-02290', b: 'check constraint violated.' },
+  { f: 'ORA-02251', b: 'subquery not allowed here: Oracle forbids subqueries in CHECK.' },
+  { f: 'ORA-02438', b: 'Column check constraint cannot reference other columns: use a table-level CHECK.' },
+]);
+quiz('#quiz', [
+  { q: 'Table has <code>price NUMBER CHECK (price &gt; 0)</code>. Which INSERT succeeds?', opts: ['price = 0', 'price = -5', 'price = NULL', 'none of these'], a: 2, why: 'NULL > 0 is UNKNOWN, and a CHECK only rejects FALSE.' },
+  { q: '"If a laptop costs more than $2000, its RAM must be at least 1024." The correct CHECK is…', opts: ['CHECK (price > 2000 AND ram >= 1024)', 'CHECK (price <= 2000 OR ram >= 1024)', 'CHECK (price > 2000 OR ram >= 1024)', 'CHECK (price <= 2000 AND ram < 1024)'], a: 1, why: 'P → Q ≡ ¬P ∨ Q with P = price > 2000, Q = ram ≥ 1024.' },
+  { q: 'Which rule can NOT be a CHECK in Oracle?', opts: ['speed ≥ 2.0', 'type is laser, ink-jet or bubble-jet', 'every Product model appears in PC, Laptop or Printer', 'screen ≥ 15 or hd ≥ 40 or price < 1000'], a: 2, why: 'It needs a subquery over other tables (ORA-02251). Standard SQL allows it; Oracle needs a trigger.' },
+  { q: 'Slide 30\'s CHECK (model IN (SELECT … FROM PC …)) is in force. Someone deletes PC 1001 while Product still lists 1001. In standard SQL…', opts: ['the delete is rejected', 'the delete succeeds and the rule is now broken', 'Product 1001 is deleted too', 'model 1001 is set to NULL'], a: 1, why: 'The CHECK belongs to Product and is evaluated only when Product rows change. That is why slide 50 says it is not guaranteed with a subquery.' },
+  { q: 'What is ¬(speed &lt; 2.0 AND ram &lt; 512)?', opts: ['speed >= 2.0 AND ram >= 512', 'speed >= 2.0 OR ram >= 512', 'speed > 2.0 OR ram > 512', 'speed < 2.0 OR ram < 512'], a: 1, why: 'De Morgan: negate each comparison and swap AND for OR.' },
+  { q: 'Which Department row is rejected by <code>CHECK (gender = \'F\' OR name NOT LIKE \'Ms.%\')</code>?', opts: ["('Ms. Rahman', 'F')", "('Mr. Karim', 'M')", "('Ms. Hasan', 'M')", "('Ms. Ali', NULL)"], a: 2, why: 'Male and named Ms.…: both disjuncts false. With gender NULL the first disjunct is UNKNOWN and the second FALSE, so the result is UNKNOWN: accepted.' },
+]);
+ask('#try1', { q: 'How many of the textbook\'s 10 laptops violate slide 27\'s rule speed ≥ 2.0?', a: 5, why: 'Laptops 2002 (1.73), 2003 (1.80), 2007 (1.83), 2008 and 2009 (1.60).' });
+
+const IGN = (t, src) => `<br><i>End your answer with:</i> <code>INSERT OR IGNORE INTO ${t} SELECT * FROM ${src};</code>`;
+sqlCheck('#c1', { setup: PCDB,
+  task: 'Easy. List model and speed of every laptop that would break slide 27\'s CHECK (speed &gt;= 2.0).',
+  solution: 'SELECT model, speed FROM Laptop WHERE NOT (speed >= 2.0);' });
+sqlCheck('#c2', { setup: PCDB + "CREATE TABLE PrinterIn AS SELECT * FROM Printer;\nINSERT INTO PrinterIn VALUES ('3008', 'F', 'dot-matrix', 60);\nINSERT INTO PrinterIn VALUES ('3009', 'T', 'bubble-jet', 70);",
+  check: 'state', table: 'Printer2',
+  task: 'Create Printer2(model CHAR(4) PRIMARY KEY, color CHAR(1), type VARCHAR2(10), price NUMBER(7,2)) with slide 28\'s attribute-based CHECK on type. (PrinterIn holds test rows, including two invented ones.)' + IGN('Printer2', 'PrinterIn'),
+  solution: "CREATE TABLE Printer2 (\n  model CHAR(4) PRIMARY KEY,\n  color CHAR(1),\n  type  VARCHAR2(10) CHECK (type IN ('laser', 'ink-jet', 'bubble-jet')),\n  price NUMBER(7,2)\n);\nINSERT OR IGNORE INTO Printer2 SELECT * FROM PrinterIn;" });
+sqlCheck('#c3', { setup: PCDB,
+  task: 'List the model, speed and price of every PC that breaks slide 33\'s rule (a PC with speed below 2.0 must not sell for more than $800).',
+  hint: 'The violating rows satisfy P AND NOT Q.',
+  solution: 'SELECT model, speed, price FROM PC WHERE speed < 2.0 AND price > 800;' });
+sqlCheck('#c4', { setup: PCDB + "CREATE TABLE LaptopIn AS SELECT * FROM Laptop;\nINSERT INTO LaptopIn VALUES ('2011', 1.80, 512, 32, 13.3, 1200);\nINSERT INTO LaptopIn VALUES ('2012', 1.60, 512, 32, 14.0, 799);\nINSERT INTO LaptopIn VALUES ('2013', 2.20, 1024, 32, 15.6, 1500);",
+  check: 'state', table: 'Laptop2',
+  task: 'Create Laptop2(model, speed, ram, hd, screen, price), same types as Laptop, with slide 34\'s rule as a tuple-based CHECK. (LaptopIn holds the textbook rows plus three invented ones.)' + IGN('Laptop2', 'LaptopIn'),
+  solution: "CREATE TABLE Laptop2 (\n  model CHAR(4) PRIMARY KEY, speed NUMBER(3,2), ram INT, hd INT,\n  screen NUMBER(3,1), price NUMBER(7,2),\n  CHECK (screen >= 15 OR hd >= 40 OR price < 1000)\n);\nINSERT OR IGNORE INTO Laptop2 SELECT * FROM LaptopIn;" });
+sqlCheck('#c5', { setup: PCDB + "CREATE TABLE PCIn AS SELECT * FROM PC;\nINSERT INTO PCIn VALUES ('1014', 1.80, 256, 80, 850);\nINSERT INTO PCIn VALUES ('1015', 1.80, 256, 80, 700);\nINSERT INTO PCIn VALUES ('1016', 1.50, 512, 80, 990);",
+  check: 'state', table: 'PC2',
+  task: 'Exam level (CSE 303 2011–12, a-ii). Create PC2(model, speed, ram, hd, price), same types as PC, with the CHECK "a PC with speed less than 2.0 must have at least 512 MB RAM or sell for less than $800", named <code>slow_pc_rule</code>. (PCIn: textbook rows plus three invented ones.)' + IGN('PC2', 'PCIn'),
+  solution: "CREATE TABLE PC2 (\n  model CHAR(4) PRIMARY KEY, speed NUMBER(3,2), ram INT, hd INT, price NUMBER(7,2),\n  CONSTRAINT slow_pc_rule CHECK (speed >= 2.0 OR ram >= 512 OR price < 800)\n);\nINSERT OR IGNORE INTO PC2 SELECT * FROM PCIn;" });
+sqlCheck('#c6', { setup: "CREATE TABLE MyTable (id INT PRIMARY KEY, head INT);\nINSERT INTO MyTable VALUES (1, 10);\nINSERT INTO MyTable VALUES (2, 20);\nINSERT INTO MyTable VALUES (3, 10);\nINSERT INTO MyTable VALUES (4, NULL);\nINSERT INTO MyTable VALUES (5, NULL);\nINSERT INTO MyTable VALUES (6, 30);\nINSERT INTO MyTable VALUES (7, 30);\nINSERT INTO MyTable VALUES (8, 30);",
+  task: 'Exam level (the UNIQUE-by-CHECK question). MyTable was filled without any constraint. Write the subquery of the CHECK from the worked answer below: list every non-NULL head value that occurs more than once, with how many times it occurs.',
+  solution: 'SELECT head, COUNT(*)\nFROM MyTable\nWHERE head IS NOT NULL\nGROUP BY head\nHAVING COUNT(*) > 1;' });
+</script>
+</body>
+</html>

@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Locks and the Locking Scheduler · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 02 (Sukarna) · Chapter 6 · Slides 30–35 · Book §18.3.1–18.3.2</div>
+<h1>Locks and the Locking Scheduler</h1>
+<p class="lede">The precedence-graph test checks a finished schedule. A real scheduler must decide request by request, and the usual way is locking. This chapter introduces the simplest lock, the two rules for using locks properly, and the locking scheduler, and shows that proper locking alone still does not guarantee serializability.</p>
+
+<h2>1. Locks (slide 30)</h2>
+<p>A scheduler cannot wait until a schedule is complete and then draw its precedence graph: it must decide, as each request arrives, whether to let it through. The most common method is <b class="term">locking</b>. Before reading or writing an element, a transaction must obtain a lock on it; while one transaction holds the lock, the scheduler keeps other transactions away from that element.</p>
+<dl class="def">
+  <dt>Lock</dt><dd>A permission, recorded by the scheduler, for one transaction to access one database element. In this chapter there is only one kind of lock, needed for any access at all (Lec 03 adds shared and exclusive locks).</dd>
+  <dt>Lock table</dt><dd>The scheduler's record of which transaction holds a lock on which element (and, later, who is waiting).</dd>
+  <dt>l<sub>i</sub>(X)</dt><dd>Transaction T<sub>i</sub> requests a lock on X.</dd>
+  <dt>u<sub>i</sub>(X)</dt><dd>Transaction T<sub>i</sub> releases (“unlocks”) its lock on X.</dd>
+</dl>
+<figure>
+<svg viewBox="0 0 560 210" width="560" role="img" aria-label="Scheduler with lock table">
+  <text x="300" y="20" text-anchor="middle" class="lbl">requests from transactions</text>
+  <path d="M300 26 V58" class="s-fg" marker-end="url(#m-fg)"/>
+  <rect class="cell-hl" x="220" y="62" width="160" height="46" rx="4"/><text x="300" y="90" text-anchor="middle" class="big">Scheduler</text>
+  <rect class="cell" x="30" y="62" width="120" height="46" rx="4"/><text x="90" y="84" text-anchor="middle" class="big">lock table</text><text x="90" y="100" text-anchor="middle" class="lbl">(X, T) pairs</text>
+  <path d="M152 78 H216" class="s-fg" marker-end="url(#m-fg)"/><path d="M218 92 H154" class="s-fg" marker-end="url(#m-fg)"/>
+  <path d="M300 108 V150" class="s-fg" marker-end="url(#m-fg)"/>
+  <text x="312" y="134" class="lbl">serializable schedule of actions</text>
+  <rect class="cell-plain" x="240" y="154" width="120" height="40" rx="4"/><text x="300" y="179" text-anchor="middle" class="big">buffers</text>
+</svg>
+<figcaption><b>Figure 1.</b> A scheduler that consults and updates a lock table (textbook Fig. 18.11).</figcaption>
+</figure>
+
+<h2>2. Using locks properly (slides 31–32)</h2>
+<p>Locks only help if transactions and the scheduler use them properly. Two rules:</p>
+<dl class="def">
+  <dt>R1, consistency of transactions</dt><dd>Actions and locks must relate: (1) a transaction may read or write an element only if it was granted a lock on it earlier and has not released it since; (2) every lock a transaction takes, it must later release.<br>Formally: whenever T<sub>i</sub> has an action r<sub>i</sub>(X) or w<sub>i</sub>(X), there is a previous l<sub>i</sub>(X) with no u<sub>i</sub>(X) in between, and there is a later u<sub>i</sub>(X).</dd>
+  <dt>R2, legality of schedules</dt><dd>Locks must mean what they say: no two transactions may hold a lock on the same element at the same time.<br>Formally: if l<sub>i</sub>(X) is followed later by l<sub>j</sub>(X) (j ≠ i), then u<sub>i</sub>(X) appears somewhere between them.</dd>
+</dl>
+<p>R1 is a property of each transaction by itself; R2 is a property of the schedule (the interleaving). The slide ends with a warning: <strong>a legal schedule is not necessarily conflict-serializable.</strong> Section 3 shows why.</p>
+
+<h2>3. Slide 33: legal and consistent, yet not serializable</h2>
+<p>The transactions of Chapter 2 with locks added (textbook Example 18.10):</p>
+<pre>T₁: l₁(A); r₁(A); A := A+100; w₁(A); u₁(A); l₁(B); r₁(B); B := B+100; w₁(B); u₁(B);
+T₂: l₂(A); r₂(A); A := A*2;   w₂(A); u₂(A); l₂(B); r₂(B); B := B*2;   w₂(B); u₂(B);</pre>
+<figure>
+<span class="anim-tag">Animation</span>
+<div id="f12"></div>
+<figcaption><b>Figure 2.</b> The slide's schedule (textbook Fig. 18.12) with the values of A and B.</figcaption>
+</figure>
+
+<div class="q">
+<h4>Slide 33 questions: why is each transaction consistent, and why is the schedule legal?</h4>
+<p><strong>Consistent:</strong> every read and write of A by T₁ (r₁(A), w₁(A)) lies between l₁(A) and u₁(A), and every access to B between l₁(B) and u₁(B); each lock is later released. The same holds for T₂. So both satisfy R1.</p>
+<p><strong>Legal:</strong> the two transactions never hold a lock on the same element at once. T₂'s l₂(A) comes after u₁(A), and T₁'s l₁(B) comes after u₂(B). So R2 holds.</p>
+<p><strong>Yet it is not serializable:</strong> from A = B = 25 it ends with A = 250, B = 150. T₁ went first on A but T₂ went first on B; the locks only protected each single access, not the transaction as a whole. In conflict terms, w₁(A) before r₂(A) gives T₁ → T₂, and w₂(B) before r₁(B) gives T₂ → T₁: a cycle. The missing ingredient is two-phase locking (Chapter 7).</p>
+</div>
+
+<h2>4. The locking scheduler (slides 34–35)</h2>
+<dl class="def">
+  <dt>Locking scheduler</dt><dd>Grants a lock request if and only if granting it keeps the schedule legal. If a request cannot be granted, the requesting transaction is <b>delayed</b>: it waits, and its later actions wait with it, until the lock becomes available; then the lock is granted and the transaction resumes.</dd>
+</dl>
+<p>With one kind of lock, the lock table can be thought of as a relation <code>Locks(element, transaction)</code> containing a pair (X, T) for each lock T currently holds. Granting l<sub>i</sub>(X) is legal exactly when no pair (X, T<sub>j</sub>) with j ≠ i is present. Unlocking deletes the pair.</p>
+
+<p>Slide 35 changes the transactions slightly: each locks B <em>before</em> unlocking A (textbook Example 18.11).</p>
+<pre>T₁: l₁(A); r₁(A); A := A+100; w₁(A); l₁(B); u₁(A); r₁(B); B := B+100; w₁(B); u₁(B);
+T₂: l₂(A); r₂(A); A := A*2;   w₂(A); l₂(B); u₂(A); r₂(B); B := B*2;   w₂(B); u₂(B);</pre>
+<p>Watch the scheduler process the requests in the slide's order. The right side shows the lock table and each transaction's state:</p>
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="f13"></div>
+<figcaption><b>Figure 3.</b> The locking scheduler delays l₂(B) (textbook Fig. 18.13). A delayed request is granted when the lock is released, and the waiting transaction's held-back actions then run.</figcaption>
+</figure>
+
+<div class="q">
+<h4>Slide 35 question: why is the lock l₂(B) denied?</h4>
+<p>When T₂ asks for B, the lock table already contains (B, T₁): T₁ locked B before it unlocked A. Granting l₂(B) would let two transactions hold a lock on B at once, breaking legality (R2). So the scheduler denies the request and T₂ waits. T₁ goes on to read and write B (B = 125) and executes u₁(B). Now B is free, l₂(B) is granted, T₂ releases A and doubles B to 250. Because T₂ was forced to wait, it multiplied B after T₁ added 100, exactly as on A, and the final state A = B = 250 is consistent: it equals the serial schedule (T₁, T₂).</p>
+</div>
+
+<h2>5. Try the locking scheduler</h2>
+<p>Type lock, read, write and unlock actions (<code>l1(A) r1(A) u1(A)</code> …) in the order transactions issue them. The scheduler grants or denies each lock, delays a waiting transaction's later actions, resumes it when the lock is freed, flags actions without a lock (R1 violations), and reports a deadlock if waiting transactions wait for each other. Below the input it tells you whether the reads and writes that reached the database form a conflict-serializable schedule.</p>
+<figure class="wide">
+<span class="anim-tag">Interactive</span>
+<div id="tool"></div>
+</figure>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+
+<h3>Exam questions</h3>
+<p>Exam questions on locking ask about two-phase locking, so they are answered in <a href="07-two-phase-locking.html">Chapter 7</a> and in Lec 03.</p>
+
+<div class="key"><p><strong>Summary:</strong> a transaction locks an element before using it and unlocks it later (consistency, R1); no two transactions may hold a lock on the same element at once (legality, R2). The locking scheduler grants a lock only if the schedule stays legal and otherwise delays the requester until the lock is released. Consistent transactions in a legal schedule can still produce a non-serializable result if a transaction unlocks one element and later locks another.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="lecture.js"></script>
+<script>
+{
+  const T = (t, html, ex, cap) => ({ t, html, ex: ex || ['', ''], cap });
+  stepper('#f12', CC.growSteps([1, 2], [
+    T(1, 'l₁(A); r₁(A);'), T(1, 'A := A+100;'), T(1, 'w₁(A); u₁(A);', ['125', ''], 'T₁ locks A, adds 100 (A = 125) and unlocks A.'),
+    T(2, 'l₂(A); r₂(A);'), T(2, 'A := A*2;'), T(2, 'w₂(A); u₂(A);', ['250', ''], 'A is free, so T₂ locks it, doubles it (A = 250), unlocks.'),
+    T(2, 'l₂(B); r₂(B);'), T(2, 'B := B*2;'), T(2, 'w₂(B); u₂(B);', ['', '50'], 'B is free, so T₂ locks B and doubles it: B = 50. T₂ is done.'),
+    T(1, 'l₁(B); r₁(B);'), T(1, 'B := B+100;'), T(1, 'w₁(B); u₁(B);', ['', '150'], 'T₁ locks B and adds 100: B = 150. <b>Final A = 250, B = 150.</b> Every lock rule was obeyed, yet the result is inconsistent.'),
+  ], { extra: ['A', 'B'], init: { t: 0, html: '', ex: ['25', '25'] }, startCap: 'A = B = 25. Every access is protected by a lock.' }));
+}
+stepper('#f13', CC.lockSteps(CC.parse('l1(A) r1(A) w1(A) l1(B) u1(A) l2(A) r2(A) w2(A) l2(B) r1(B) w1(B) u1(B) u2(A) r2(B) w2(B) u2(B)').acts).steps, { interval: 2300 });
+CC.lockTool('#tool', 'l1(A) r1(A) w1(A) u1(A) l2(A) r2(A) w2(A) u2(A) l2(B) r2(B) w2(B) u2(B) l1(B) r1(B) w1(B) u1(B)');
+flashcards('#cards', [
+  { f: 'lᵢ(X) / uᵢ(X)', b: 'Tᵢ requests a lock on X / releases its lock on X.' },
+  { f: 'Consistency of transactions (R1)', b: 'Read or write X only while holding a lock on X; release every lock taken.' },
+  { f: 'Legality of schedules (R2)', b: 'Between lᵢ(X) and a later lⱼ(X) (j ≠ i) there must be uᵢ(X).' },
+  { f: 'Locking scheduler', b: 'Grants a lock iff the schedule stays legal; otherwise delays the requester until the lock is free.' },
+  { f: 'Lock table (one lock type)', b: 'A relation Locks(element, transaction) of the locks currently held.' },
+  { f: 'Legal ⇒ serializable?', b: 'No. Fig. 18.12 is legal and consistent but ends with A = 250, B = 150.' },
+]);
+quiz('#quiz', [
+  { q: 'Which sequence makes T₁ inconsistent?', opts: ['l₁(A) r₁(A) u₁(A)', 'l₁(A) u₁(A) r₁(A)', 'l₁(A) r₁(A) w₁(A) u₁(A)', 'l₁(A) l₁(B) r₁(B) u₁(B) u₁(A)'], a: 1, why: 'r₁(A) comes after u₁(A), so T₁ reads without holding the lock.' },
+  { q: 'l₁(A); l₂(A); u₁(A) … is…', opts: ['legal', 'illegal: T₂ locks A while T₁ still holds it', 'inconsistent', 'a deadlock'], a: 1, why: 'There is no u₁(A) between l₁(A) and l₂(A).' },
+  { q: 'What does the locking scheduler do with a lock request that would make the schedule illegal?', opts: ['Aborts the transaction', 'Grants it anyway', 'Delays the transaction until the lock is released', 'Skips the action'], a: 2, why: 'Locking schedulers delay; they do not abort in response to an ungrantable lock.' },
+  { q: 'In Fig. 18.13, why does the final state come out consistent?', opts: ['T₂ was aborted', 'T₂ had to wait for B until T₁ finished with it, so T₁ came first on both A and B', 'Locks were not used', 'B was never written'], a: 1, why: 'The delay forced the same order on B as on A.' },
+]);
+ask('#try1', { q: 'In Fig. 18.13, what is the value of B right after T₁\'s u₁(B) (initially 25)?', a: 125, why: 'T₁ added 100 to 25 before T₂ could lock B.' });
+</script>
+</body>
+</html>

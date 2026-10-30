@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Case Studies: Reading Requirements · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 07 (Ishrak) · Chapter 5 · Slides 42–60</div>
+<h1>Five Case Studies, and When a Relationship Becomes an Entity</h1>
+<p class="lede">Five short requirements, each drawn step by step: course registration, departments offering courses, advising, library loans and product reviews. Then the rules for reading multiplicity from sentences, for placing attributes on relationships, and for promoting a relationship to an entity set.</p>
+
+<h2>1. Case study 1: course registration (slides 42–47)</h2>
+<blockquote class="q" style="border-color:var(--line)"><p><em>A university stores students and courses. Each student has a student ID, name, and department. Each course has a course code, title, and credits. Students enroll in courses each semester and receive a grade.</em></p></blockquote>
+<p>The slides follow the workflow of Chapter 4 exactly: start with the nouns, then decide which facts describe nouns and which describe associations.</p>
+<figure class="wide"><span class="anim-tag">Animation</span><div id="cs1"></div></figure>
+<ul>
+<li><strong>Step 1 (slide 43):</strong> Student and Course are things we store. <em>Semester</em> may be an attribute or an entity, depending on the domain: if the university only needs the label "January 2025", it is an attribute; if semesters have their own facts (start date, end date, registration deadline), Semester becomes an entity set (Chapter 2, Principle 4).</li>
+<li><strong>Step 2 (slide 44):</strong> the verb phrase "enroll in" connects Student and Course. Name the diamond so it reads naturally: Student <em>enrolls</em> Course.</li>
+<li><strong>Step 3 (slide 45):</strong> student_id, name; course_code, title as entity attributes (department and credits are omitted on the slide for space; they belong to Student and Course). <em>Semester</em> and <em>grade</em> go on enrolls: the grade belongs to the enrollment, not to Student or Course alone.</li>
+<li><strong>Step 4 (slide 46):</strong> one student can enroll in many courses, and one course can have many students, so both connectors stay plain: many-to-many.</li>
+</ul>
+<h3>Testing the ERD (slide 47)</h3>
+<p>Try concrete examples. <em>Amina enrolls in CSE101 and CSE103. Rahim also enrolls in CSE101.</em></p>
+<ul>
+<li>Can one student connect to multiple courses? Yes: (Amina, CSE101) and (Amina, CSE103) are two pairs.</li>
+<li>Can one course connect to multiple students? Yes: (Amina, CSE101) and (Rahim, CSE101).</li>
+<li>Can each enrollment have its own semester and grade? Yes: each pair carries its own values.</li>
+</ul>
+<div class="q">
+<h4>Question (worked answer): can Amina take CSE101 twice, failing in January and passing in July?</h4>
+<p>Not with this diagram. A relationship set is a <em>set</em> of pairs, so the pair (Amina, CSE101) can appear only once, with one semester and one grade. To record retakes we need the semester to be part of what identifies an enrollment. Two fixes: make Semester an entity set and enrolls a three-way relationship (Student, Course, Semester; Chapter 6), or turn the enrollment into an entity set whose key includes the semester (section 6 below). This is precisely the kind of problem step 6, "test with scenarios", is meant to catch.</p>
+</div>
+
+<h2>2. Case study 2: department offers courses (slides 48–49)</h2>
+<blockquote class="q" style="border-color:var(--line)"><p><em>Each course is offered by exactly one department. A department can offer many courses. A department has a department ID and name.</em></p></blockquote>
+<figure><div id="cs2"></div><figcaption>Slide 49. The arrowhead points to Department because each Course has one Department.</figcaption></figure>
+<p>Entity sets Department and Course; relationship offeredBy. "Each course is offered by exactly one department": fix a course, at most one department, so the arrow goes into Department. "Exactly" adds that every course has one; that is the participation constraint, recorded as a design note (or a double line from Course in Chen's notation, Chapter 10).</p>
+
+<h2>3. Case study 3: advising (slides 50–51)</h2>
+<blockquote class="q" style="border-color:var(--line)"><p><em>Students are assigned advisors. An advisor is a faculty member. A student has exactly one advisor, but a faculty member can advise many students. Store the date from which advising started.</em></p></blockquote>
+<figure><div id="cs3"></div><figcaption>Slide 51: for each Student, there is at most one Faculty advisor.</figcaption></figure>
+<p>"An advisor is a faculty member" tells us that Advisor is not a separate entity set: advisors are entities of Faculty, playing the role of advisor in the relationship <em>advises</em>. The date describes the advising assignment, so <em>start_date</em> is a relationship attribute. The arrow into Faculty says a student has at most one advisor. (Slides 94–96 repeat this case as the practice task; see Chapter 9.)</p>
+
+<h2>4. Case study 4: library loans (slides 52–53)</h2>
+<blockquote class="q" style="border-color:var(--line)"><p><em>A member can borrow many books. A book can be borrowed by many members over time. For each loan, store issue date, due date, and return date.</em></p></blockquote>
+<figure><div id="cs4"></div><figcaption>Slide 53: the three dates describe the borrowing event, so they attach to borrows.</figcaption></figure>
+<p>"Over time" makes the relationship many-to-many: at any moment a book is with at most one member, but across the years it is borrowed by many. The dates are facts about one loan.</p>
+<div class="q">
+<h4>Question (worked answer): the same member borrows the same book twice. What happens?</h4>
+<p>As with retakes in case study 1, the pair (member, book) can appear only once in the relationship set, so the second loan would overwrite the first. If the library must keep loan history, the loan should become an entity set Loan (with its own loan_id, or with issue_date as part of its identity) connected to Member and Book; see section 6. The slide's simpler diagram is fine for a system that records only the current or latest loan.</p>
+</div>
+
+<h2>5. Case study 5: product reviews (slides 54–55)</h2>
+<blockquote class="q" style="border-color:var(--line)"><p><em>Customers review products. A customer may review many products. A product may receive many reviews. A customer can review the same product only once. Each review has rating and comment.</em></p></blockquote>
+<figure><div id="cs5"></div><figcaption>Slide 55. Design note: one Customer can review the same Product at most once.</figcaption></figure>
+<p>Here the "only once" rule is satisfied automatically: a relationship set contains each (customer, product) pair at most once. The slide still writes it as a <b class="term">design note</b>, because a reader of the diagram might otherwise not realise it is a requirement, and because it will become the primary key (customer_id, product_id) of the Reviews table (Chapter 11). Rating and comment are relationship attributes.</p>
+
+<h2>6. Rules distilled from the cases (slides 56–60)</h2>
+<h3>Reading multiplicity from sentences (slide 56)</h3>
+<div class="tbl"><table>
+<tr><th>Sentence</th><th>ERD decision</th></tr>
+<tr><td>Each course has one department.</td><td>Arrow toward Department.</td></tr>
+<tr><td>A department has many courses.</td><td>Plain connector toward Course.</td></tr>
+<tr><td>A student enrolls in many courses.</td><td>Plain connector toward Course.</td></tr>
+<tr><td>A passport belongs to one person.</td><td>Arrow toward Person.</td></tr>
+</table></div>
+<p>The pattern: "each X has <strong>one</strong> Y" puts an arrow into Y; "X has <strong>many</strong> Y" leaves the line into Y plain. Note that every sentence talks about one side only; you need a sentence (or an assumption) for each side.</p>
+
+<h3>When to use a relationship attribute (slide 57)</h3>
+<p>Ask whether the fact describes an entity or an association. <em>grade</em> describes Student taking Course; <em>start_date</em> describes Faculty advising Student; <em>return_date</em> describes Member borrowing Book. Rule of thumb: <strong>if the fact only makes sense after two or more entities are connected, put it on the relationship.</strong></p>
+
+<h3>When to create a new entity set (slides 58–59)</h3>
+<p>Create an entity set when the thing has its own identity, when it has many attributes, or when it connects to other relationships. Slide 58's example: if Enrollment has grade, semester, payment status, retake status and approval history, it may deserve its own entity set. Slide 59 shows the change:</p>
+<figure class="wide"><span class="anim-tag">Animation</span><div id="promote"></div></figure>
+<p>After the change, <em>Enrollment</em> is an entity set connected to Student and to Course by two binary relationships. Each enrollment belongs to exactly one student and one course (arrows from Enrollment's relationships into Student and Course), while a student has many enrollments. Unlike the old relationship, two enrollments may now have the same student and course, as long as they differ in semester. This is the same move as converting a multi-way relationship to binary ones (Chapter 6, slides 69–70).</p>
+
+<h3>Step-by-step habit (slide 60)</h3>
+<ul>
+<li>Do not try to draw the final ERD immediately.</li>
+<li>First draw entity sets and relationships only.</li>
+<li>Add attributes after the structure feels right.</li>
+<li>Add multiplicity last, after asking concrete domain questions.</li>
+<li>Keep design notes for rules that the diagram cannot express clearly.</li>
+</ul>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+
+<h3>Exam questions</h3>
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2015–16 · 7 marks</div>
+  <div class="exam-q"><p>East West Property Development is a construction company of Bashundhara Group with over 1000 employees. A customer can hire the company for more than one project, and employees sometimes work on more than one project at a time. Equipment is assigned to only one project. Draw an E-R diagram for this company indicating cardinality.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><strong>Entity sets:</strong> Customer, Project, Employee, Equipment. <strong>Relationships</strong> from the verbs: <em>hires</em> (Customer–Project), <em>worksOn</em> (Employee–Project), <em>assignedTo</em> (Equipment–Project).</p>
+    <p><strong>Cardinalities, sentence by sentence (slide 56 method):</strong></p>
+    <ul>
+    <li>"A customer can hire the company for more than one project": plain line into Project. <em>Assumption:</em> a project is commissioned by one customer, so an arrow into Customer. hires is one-to-many from Customer to Project (Customer 1 : N Project).</li>
+    <li>"Employees sometimes work on more than one project at a time": plain line into Project. A project obviously needs many employees: plain line into Employee. worksOn is many-to-many (M : N). A useful attribute is <em>hours</em> per (employee, project).</li>
+    <li>"Equipment is assigned to only one project": arrow into Project; a project uses many pieces of equipment. assignedTo is many-to-one from Equipment to Project (N : 1).</li>
+    </ul>
+    <p>Attributes are not given, so the keys are assumed identifiers.</p>
+    <figure class="wide"><div id="exEW"></div><figcaption>Arrows mark the "one" side; the Chen labels 1/N/M say the same thing.</figcaption></figure>
+  </div></details>
+</div>
+
+<div class="key">
+<p><strong>Summary:</strong> nouns become entity sets, verbs relationships, and facts that only make sense for a pair (grade, start_date, the loan dates, rating) go on the relationship. Read each multiplicity sentence one side at a time. Keep rules the diagram cannot show as design notes. When an association gains identity, many attributes or relationships of its own, or must repeat for the same pair, promote it to an entity set.</p>
+</div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="lecture.js"></script>
+<script>
+const CS1 = { n: [['Student', 'E', 0, 0], ['enrolls', 'R', 200, 0], ['Course', 'E', 400, 0]],
+  a: [['Student', '_student_id', -60, -60], ['Student', 'name', 55, -60], ['Course', '_course_code', -45, -60], ['Course', 'title', 70, -60], ['enrolls', 'semester', -50, 62], ['enrolls', 'grade', 55, 62]],
+  l: [['Student', 'enrolls'], ['Course', 'enrolls']] };
+erdSteps('#cs1', CS1, [
+  { set: ['Student', 'Course'], cap: 'Step 1 (slide 43): candidate entity sets Student and Course.' },
+  { add: ['enrolls'], cap: 'Step 2 (slide 44): the verb phrase "enroll in" becomes the relationship enrolls.' },
+  { add: ['Student.student_id', 'Student.name', 'Course.course_code', 'Course.title'], cap: 'Step 3 (slide 45): entity attributes, keys underlined.' },
+  { add: ['enrolls.semester', 'enrolls.grade'], hl: ['enrolls.semester', 'enrolls.grade'], cap: 'Semester and grade belong to the enrollment, not to Student or Course alone.' },
+  { add: [], hl: ['Student-enrolls', 'Course-enrolls'], cap: 'Step 4 (slide 46): many courses per student and many students per course: both connectors stay plain, many-to-many.' },
+]);
+$('#cs2').innerHTML = erd({ n: [['Course', 'E', 0, 0], ['offeredBy', 'R', 190, 0, 'offered\nBy'], ['Department', 'E', 380, 0]], a: [['Course', '_course_code', 0, -60], ['Department', '_dept_id', 0, -60]], l: [['Course', 'offeredBy'], ['Department', 'offeredBy', { one: true }]] });
+$('#cs3').innerHTML = erd({ n: [['Student', 'E', 0, 0], ['advises', 'R', 180, 0], ['Faculty', 'E', 360, 0]], a: [['advises', 'start_date', 0, 62]], l: [['Student', 'advises'], ['Faculty', 'advises', { one: true }]] });
+$('#cs4').innerHTML = erd({ n: [['Member', 'E', 0, 0], ['borrows', 'R', 200, 0], ['Book', 'E', 400, 0]], a: [['borrows', 'issue_date', -100, 55], ['borrows', 'due_date', 0, 75], ['borrows', 'return_date', 105, 55]], l: [['Member', 'borrows'], ['Book', 'borrows']] });
+$('#cs5').innerHTML = erd({ n: [['Customer', 'E', 0, 0], ['reviews', 'R', 190, 0], ['Product', 'E', 380, 0]], a: [['reviews', 'rating', -50, 62], ['reviews', 'comment', 55, 62]], l: [['Customer', 'reviews'], ['Product', 'reviews']] });
+const PRO = { n: [['Student', 'E', 0, 0], ['takes', 'R', 170, 0], ['Course', 'E', 340, 0], ['Student2', 'E', 560, -40, 'Student'], ['Course2', 'E', 820, -40, 'Course'], ['Enrollment', 'E', 690, 120], ['of', 'R', 600, 45], ['in', 'R', 780, 45]],
+  a: [['takes', 'grade', 0, 60], ['Enrollment', 'grade', -100, 50], ['Enrollment', 'semester', 100, 50], ['Enrollment', 'status', 0, 70]],
+  l: [['Student', 'takes'], ['Course', 'takes'], ['Enrollment', 'of'], ['Student2', 'of', { one: true }], ['Enrollment', 'in'], ['Course2', 'in', { one: true }]] };
+erdSteps('#promote', PRO, [
+  { set: ['Student', 'takes', 'Course', 'takes.grade'], cap: 'Before: a relationship takes with one attribute, grade.' },
+  { add: ['Student2', 'Course2', 'Enrollment', 'Enrollment.grade', 'Enrollment.semester', 'Enrollment.status'], hl: ['Enrollment'], cap: 'The association gains more facts (semester, status, …) and must repeat for retakes: make it an entity set Enrollment.' },
+  { add: ['of', 'in'], cap: 'Connect Enrollment to Student and Course. Each enrollment is of one student and in one course: arrows into Student and Course (as in slide 70).' },
+]);
+$('#exEW').innerHTML = erd({
+  n: [['Customer', 'E', 0, 0], ['hires', 'R', 0, 120], ['Project', 'E', 0, 240], ['worksOn', 'R', -230, 240], ['Employee', 'E', -460, 240], ['assignedTo', 'R', 230, 240, 'assigned\nTo'], ['Equipment', 'E', 460, 240]],
+  a: [['Customer', '_cust_id', -90, -40], ['Customer', 'name', 90, -40], ['Project', '_proj_id', -60, 60], ['Project', 'location', 60, 60],
+      ['Employee', '_emp_id', -60, -60], ['Employee', 'name', 60, -60], ['worksOn', 'hours', 0, 60], ['Equipment', '_eqp_id', -60, -60], ['Equipment', 'type', 60, -60]],
+  l: [['Customer', 'hires', { one: true, card: '1' }], ['Project', 'hires', { card: 'N' }], ['Employee', 'worksOn', { card: 'M' }], ['Project', 'worksOn', { card: 'N' }],
+      ['Equipment', 'assignedTo', { card: 'N' }], ['Project', 'assignedTo', { one: true, card: '1' }]],
+});
+flashcards('#cards', [
+  { f: '"Each course has one department"', b: 'Arrow toward Department.' },
+  { f: '"A department has many courses"', b: 'Plain connector toward Course.' },
+  { f: 'Relationship attribute rule', b: 'If the fact only makes sense after two or more entities are connected, put it on the relationship.' },
+  { f: 'Design note', b: 'A rule written beside the diagram because the notation cannot show it clearly, e.g. "every student has exactly one advisor".' },
+  { f: 'Promote a relationship to an entity set when…', b: 'it has its own identity, many attributes, or relationships of its own (or must repeat for the same pair).' },
+  { f: 'Can a relationship set hold the same pair twice?', b: 'No. It is a set, so retakes or repeat loans need the association to become an entity set or gain another participant.' },
+]);
+quiz('#quiz', [
+  { q: '"A student has exactly one advisor; a faculty member can advise many students." Where is the arrow?', opts: ['Into Student', 'Into Faculty', 'Both', 'None'], a: 1, why: 'Fix a student: at most one faculty advisor.' },
+  { q: 'Where does return_date belong in the library case?', opts: ['Member', 'Book', 'borrows', 'A new entity Date'], a: 2, why: 'It describes one borrowing event (slide 57).' },
+  { q: '"A customer can review the same product only once." How does the slide show it?', opts: ['An arrow into Product', 'A double diamond', 'A design note', 'A key on rating'], a: 2, why: 'Slide 55 writes it as a design note; the relationship set already allows each pair once.' },
+  { q: 'Which sign suggests that enrolls should become an entity set?', opts: ['It has one attribute', 'It is many-to-many', 'It has many attributes and must record retakes', 'It connects two entity sets'], a: 2, why: 'Slide 58: identity, many attributes, relationships of its own.' },
+  { q: 'In case study 1, "semester" is…', opts: ['always an entity set', 'always an attribute', 'an attribute or an entity, depending on the domain', 'a key of Course'], a: 2, why: 'Slide 43.' },
+]);
+ask('#try1', { q: '"Each employee works in one department; a department has many employees; store the date the employee joined the department." On which element does join_date go? (entity name or relationship)', a: ['relationship', 'worksin', 'works_in', 'the relationship'], hint: 'Does the date make sense for an employee alone, independent of the department?', why: 'It describes the employee–department assignment. (Because the relationship is many-to-one, it could also be stored with Employee when converted to tables, Chapter 11.)' });
+</script>
+</body>
+</html>

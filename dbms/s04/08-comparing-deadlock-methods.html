@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Comparing Deadlock Methods · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 04 (Sukarna) · Chapter 8 · Slides 30–33 · Book §19.2.5</div>
+<h1>Comparing Deadlock Methods, and Deadlocks in Real Databases</h1>
+<p class="lede">Wait-die, wound-wait, the waits-for graph and timeouts all handle deadlocks, but they differ in starvation, in how often they roll back, and in how much work each rollback throws away. This chapter goes through the slides' comparison point by point, measures it on the lecture's own examples, and summarises what SQL Server, Oracle and PostgreSQL actually do.</p>
+
+<h2>1. Starvation (slide 30)</h2>
+
+<dl class="def">
+  <dt>Starvation</dt><dd>A transaction is rolled back and restarted again and again, and never gets to finish.</dd>
+  <dt>No starvation</dt><dd>The guarantee that every transaction eventually completes.</dd>
+</dl>
+
+<p><strong>Wait-die and wound-wait have no starvation.</strong> In both schemes an older transaction kills a newer one, never the reverse. A killed transaction restarts with its <em>old</em> timestamp. Meanwhile time passes, older transactions finish, and new transactions arrive with larger timestamps. So the restarted transaction keeps getting relatively older until it is the oldest transaction in the system. The oldest transaction is never killed by anyone (nobody is older), so from then on it is guaranteed to complete.</p>
+
+<p><strong>The waits-for graph can starve a transaction</strong> if no extra measures are taken. The slide's scenario: a transaction is chosen as victim and rolled back; it restarts, falls into a deadlock again, is chosen as victim again, and so on. For example, with the rule "roll back the transaction whose request closes the cycle", a long transaction that always needs its last lock on a busy element can be the one that closes the cycle every time. Timeouts can starve a long transaction in the same way, since it is always the first to exceed the limit. Element ordering prevents deadlock but not starvation either: a transaction can keep losing the race for its first lock. Real systems add measures such as ageing the victim choice.</p>
+
+<h2>2. How often each scheme rolls back (slide 31)</h2>
+
+<ul>
+  <li><strong>Wait-die:</strong> the younger transaction is killed <em>when it asks</em> for a lock held by an older one. New transactions request their locks at their start, and most locks they want are held by older transactions, so this happens frequently. More rollbacks.</li>
+  <li><strong>Wound-wait:</strong> the younger transaction is killed when an <em>older</em> one asks for a lock the younger already holds. If transactions take their locks near their beginning, it is rare for an old transaction to be beaten to a lock by a newer one. Rollbacks are rare.</li>
+</ul>
+
+<h2>3. How much work a rollback wastes (slide 32)</h2>
+
+<ul>
+  <li><strong>Wait-die:</strong> the killed transaction is the one <em>asking</em> for a lock, presumably while it is still gathering locks at its beginning. It has done little, so little work is lost per rollback.</li>
+  <li><strong>Wound-wait:</strong> the killed transaction is a lock <em>holder</em>. It may have processed many actions and be close to the end, so a rollback can waste a lot of work.</li>
+</ul>
+<p>So wait-die has more but cheaper rollbacks, wound-wait fewer but more expensive ones. The textbook concludes that either may waste more work overall, depending on the mix of transactions. (The slide's title "Would-wait" is a typo for wound-wait.)</p>
+
+<h2>4. Measured on this lecture's examples</h2>
+<p>The table below is computed live by running the lecture's lock simulator on three action sequences, with no restarts. "Graph" means the waits-for graph with the textbook's rule (roll back the transaction whose request closes a cycle).</p>
+<div class="tbl" id="cmp"></div>
+<p>The middle row is the telling one. Fig. 19.8 has no deadlock at all (Chapter 6), so the graph method rolls back nothing, and neither does wound-wait. Wait-die still kills T<sub>2</sub> and T<sub>4</sub>, because each asked for A while the older T<sub>1</sub> held it. This is the textbook's point: <strong>wait-die and wound-wait sometimes roll back a transaction when there is really no deadlock</strong>, while with the waits-for graph every rollback corresponds to a real deadlock. On the other hand, they are much easier to implement: one comparison of two numbers per wait, instead of maintaining a graph and searching it for cycles.</p>
+
+<h2>5. All the methods side by side</h2>
+<div class="tbl"><table>
+  <tr><th>Method</th><th>Kind</th><th>Cost per wait</th><th>Rolls back without a real deadlock?</th><th>Starvation possible?</th></tr>
+  <tr><td>Timeout</td><td>detection</td><td>none (a timer)</td><td>yes (slow transactions)</td><td>yes</td></tr>
+  <tr><td>Waits-for graph, periodic</td><td>detection</td><td>none; cycle search every few seconds</td><td>no</td><td>yes, unless victims are chosen carefully</td></tr>
+  <tr><td>Waits-for graph, every request</td><td>prevention</td><td>cycle search on each wait</td><td>no</td><td>yes</td></tr>
+  <tr><td>Element ordering</td><td>prevention</td><td>none</td><td>never rolls back</td><td>yes</td></tr>
+  <tr><td>Wait-die</td><td>prevention</td><td>compare two timestamps</td><td>yes (often)</td><td>no</td></tr>
+  <tr><td>Wound-wait</td><td>prevention</td><td>compare two timestamps</td><td>yes (rarely)</td><td>no</td></tr>
+</table></div>
+
+<h2>6. Deadlocks in real databases (slide 33)</h2>
+<div class="tbl"><table>
+  <tr><th>System</th><th>What it does</th></tr>
+  <tr><td>SQL Server</td><td>A background deadlock monitor wakes every 5 seconds, and checks more often (down to about 100 ms) when deadlocks are frequent. It builds the waits-for graph, finds cycles, and chooses the victim with the lowest deadlock priority, then the one cheapest to roll back (least CPU/log cost). Pure detection: no wait-die or wound-wait.</td></tr>
+  <tr><td>Oracle</td><td>An immediate cycle check whenever a session has to wait for a lock: it walks the waits-for graph starting from the waiting session. The victim is the transaction that closed the cycle (the last one to request the conflicting lock); in practice Oracle rolls back that statement and reports an error.</td></tr>
+  <tr><td>PostgreSQL</td><td>A hybrid of timeout and graph: a waiting transaction first waits <code>deadlock_timeout</code> (default 1 s); only then does it run the waits-for-graph cycle check. If there is a cycle, a victim is aborted; if not, it simply keeps waiting. This avoids paying for the search on the many short waits that resolve themselves.</td></tr>
+</table></div>
+<p>Notice that none of the three uses timestamp prevention: since real deadlocks are rare, they prefer detection, which never rolls back a transaction unnecessarily. The textbook's "check on every request" corresponds to Oracle's approach, and "detect periodically" to SQL Server's.</p>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+
+<div class="key"><p><strong>Summary:</strong> wait-die and wound-wait never starve a transaction, because a killed transaction keeps its timestamp and eventually becomes the oldest; the waits-for graph and timeouts can starve one. Wait-die rolls back often but early (little work lost); wound-wait rolls back rarely but possibly late (much work lost). Timestamp schemes are cheap but sometimes abort without a real deadlock; the waits-for graph aborts only on real deadlocks, which is why SQL Server, Oracle and PostgreSQL all use graph-based detection (periodic, immediate, or after a timeout).</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="lecture.js"></script>
+<script>
+(() => {
+  const cases = [
+    ['Fig. 19.4 (deadlocks at step 8)', 'l1(A); r1(A); l2(C); r2(C); l3(B); r3(B); l4(D); r4(D); l2(A); l3(C); l4(A); l1(B)'],
+    ['Fig. 19.8 (no deadlock)', 'l1(A); r1(A); l2(A); l3(B); r3(B); l4(A); l3(C); w3(C); u3(B); u3(C); l1(B); w1(B); u1(A); u1(B); l2(C); r2(C); w2(A); u2(A); u2(C); l4(D); r4(D); w4(A); u4(A); u4(D)'],
+    ['Chapter 5 exam schedule (S/X locks)', 'r1(A); r2(B); w1(C); r3(D); w3(B); w2(C); w4(A); w1(D)'],
+  ];
+  const pol = [['prevent', 'Graph'], ['wait-die', 'Wait-die'], ['wound-wait', 'Wound-wait']];
+  const rb = (seq, p) => { const R = s4lockSim(s4parse(seq, 'lock').acts, { policy: p, victim: 'closer' });
+    const a = R.txns.filter(t => R.status[t] === 'aborted'); return a.length ? `${a.length}: ${a.map(s4T).join(', ')}` : '0'; };
+  document.querySelector('#cmp').innerHTML = `<table><tr><th>Actions</th>${pol.map(p => `<th>${p[1]}: rolled back</th>`).join('')}</tr>` +
+    cases.map(([n, s]) => `<tr><td>${n}</td>${pol.map(p => `<td>${rb(s, p[0])}</td>`).join('')}</tr>`).join('') + '</table>';
+})();
+flashcards('#cards', [
+  { f: 'Starvation', b: 'A transaction is rolled back and restarted over and over and never finishes.' },
+  { f: 'Why timestamps prevent starvation', b: 'A killed transaction keeps its old timestamp, eventually becomes the oldest, and the oldest is never killed.' },
+  { f: 'Wait-die: rollbacks', b: 'Frequent (young requester killed when asking), but early, so little work is wasted.' },
+  { f: 'Wound-wait: rollbacks', b: 'Rare (needs an old transaction beaten to a lock), but the victim may be nearly finished, wasting much work.' },
+  { f: 'Graph vs timestamps', b: 'Graph: rolls back only on real deadlocks, costlier to maintain. Timestamps: cheap, but sometimes roll back with no deadlock.' },
+  { f: 'PostgreSQL', b: 'Waits deadlock_timeout (1 s) first, then runs a waits-for-graph cycle check.' },
+]);
+quiz('#quiz', [
+  { q: 'Why can a transaction starve under the waits-for-graph method?', opts: ['Its timestamp is renewed', 'It can be chosen as victim every time it restarts', 'The graph never has cycles', 'It waits forever for an older transaction'], a: 1, why: 'Slide 30: rolled back, restarted, deadlocked again, rolled back again…' },
+  { q: 'Which scheme typically kills transactions that have done little work?', opts: ['Wound-wait', 'Wait-die', 'Timeout', 'Element ordering'], a: 1, why: 'The victim is the requester, usually at its start.' },
+  { q: 'Which scheme has fewer rollbacks if transactions take their locks at the beginning?', opts: ['Wait-die', 'Wound-wait', 'Both the same', 'Neither rolls back'], a: 1, why: 'An old transaction rarely finds its lock already taken by a newer one.' },
+  { q: 'Which system checks for a cycle immediately whenever a session has to wait?', opts: ['SQL Server', 'Oracle', 'PostgreSQL', 'None'], a: 1, why: 'Slide 33. SQL Server checks periodically; PostgreSQL after deadlock_timeout.' },
+  { q: 'SQL Server picks the victim by…', opts: ['oldest timestamp', 'lowest deadlock priority, then least cost', 'the transaction that closed the cycle', 'random choice'], a: 1, why: 'Slide 33.' },
+]);
+ask('#try1', { q: 'On Fig. 19.8 (no deadlock), how many transactions does wait-die roll back?', a: 2, why: 'T<sub>2</sub> and T<sub>4</sub> each ask for A while the older T<sub>1</sub> holds it, and die, although no deadlock would have formed.' });
+</script>
+</body>
+</html>

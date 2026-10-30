@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Log Records and Write-Ahead Logging · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 05 (Sukarna) · Chapter 4 · Slides 18–21 · Book §17.2.1</div>
+<h1>The Log: Log Records and Write-Ahead Logging</h1>
+<p class="lede">What the log manager writes, the four kinds of log record, why an undo log stores only old values and a redo log only new values, and the write-ahead logging principle that all three logging methods are built on.</p>
+
+<h2>1. The log and the log manager (slide 18)</h2>
+
+<dl class="def">
+  <dt>Log</dt><dd>An append-only file of <b class="term">log records</b>, each describing something a transaction has done. It is kept on non-volatile storage (log files on disk) and used to recover the database after a crash.</dd>
+  <dt>Log buffer</dt><dd>Memory blocks allocated for the log. New log records are first appended here, like any other block in memory.</dd>
+  <dt>FLUSH LOG</dt><dd>The command that makes the buffer manager copy to disk every log block that is new or has changed since it was last copied. Only after a flush is a log record safe from a crash.</dd>
+</dl>
+
+<p>The log manager maintains the log records, keeps them in log buffers, and sends them to disk “when needed” or “when feasible”. As the next chapters show, “when needed” is exactly what the logging rules define: certain log records must reach disk before certain other things happen. The log is what lets the database return to a consistent state after a crash.</p>
+
+<h2>2. Types of log record (slides 19–20)</h2>
+
+<dl class="def">
+  <dt>&lt;START T&gt;</dt><dd>Transaction T has begun.</dd>
+  <dt>&lt;COMMIT T&gt;</dt><dd>T has completed successfully and will make no more changes. Every change T made must end up on disk.</dd>
+  <dt>&lt;ABORT T&gt;</dt><dd>T could not complete successfully. No change T made may remain on disk.</dd>
+  <dt>&lt;T, X, v&gt;</dt><dd>An <b class="term">update record</b>: T has changed database element X. In an <b class="term">undo log</b>, v is the <em>previous (old)</em> value of X. In a <b class="term">redo log</b>, v is the <em>new</em> value. (Undo/redo logging, Lecture 06, uses &lt;T, X, v, w&gt; with both.)</dd>
+</dl>
+
+<p>Two facts about update records from slide 20 are easy to get wrong:</p>
+<ul>
+  <li>The update record is written in response to <strong>WRITE(X,t)</strong>, the change in the memory buffer, <em>not</em> to OUTPUT(X). The log describes changes as they happen in memory.</li>
+  <li>Changes normally happen in memory buffers first, so when the update record is written the disk usually still has the old value.</li>
+</ul>
+
+<div class="q">
+<h4>Slide 19 question: &lt;COMMIT T&gt; is written, but what if the buffers are not copied to disk?</h4>
+<p>A COMMIT record promises that T's changes are permanent, but the buffer manager decides on its own when to copy buffers to disk. A crash right after the COMMIT could lose changes that were still only in memory. The slide's answer: <em>the recovery manager ensures the changes will be reflected</em>. How it does so depends on the logging method. Undo logging (next chapter) forbids writing the COMMIT record to disk until all of T's changes are on disk, so the problem cannot arise. Redo logging (Lecture 06) lets the COMMIT go first and keeps the new values in the log, so recovery can write them again.</p>
+</div>
+
+<div class="q">
+<h4>Slide 19 question: what if the buffer manager writes updated buffers to disk before the transaction aborts?</h4>
+<p>Then the disk holds values written by a transaction that must leave no trace. Again <em>the recovery manager ensures the changes will not be reflected</em>: the update records on the log hold the old values, so recovery (or the abort itself) writes the old values back. Undo logging allows exactly this situation and repairs it; redo logging forbids it by never writing a change to disk before the COMMIT record.</p>
+</div>
+
+<div class="q">
+<h4>Slide 20 questions: why does an undo log not store the new value, and a redo log not the old value?</h4>
+<p>Each method only ever needs one of the two. <strong>Undo logging</strong> repairs a crash by <em>cancelling</em> incomplete transactions: it writes old values back. Its rules guarantee that committed transactions already have all their changes on disk, so the new value is never needed. <strong>Redo logging</strong> repairs a crash by <em>repeating</em> committed transactions: it writes new values. Its rules guarantee that an uncommitted transaction never wrote anything to disk, so there is never an old value to restore. Storing only what is needed keeps the log smaller. Undo/redo logging stores both and in exchange gets more freedom in when buffers may be written.</p>
+</div>
+
+<h2>3. Write-ahead logging (slide 21)</h2>
+
+<dl class="def">
+  <dt>Write-ahead logging (WAL)</dt><dd>The database must write a log record to stable storage <em>before</em> writing the corresponding changed data page to disk.</dd>
+</dl>
+
+<p>The slide's example: a transaction changes an account balance from 10,000 to 9,000. The DBMS first records the change in the log; the data page itself may reach disk much later. This ordering is what makes recovery possible in both directions:</p>
+<ul>
+  <li><strong>Crash before COMMIT:</strong> if the page with 9,000 did reach disk, the log record (which reached disk first) tells recovery the old value 10,000, so the incomplete transaction can be <em>undone</em>.</li>
+  <li><strong>Crash after COMMIT, page not yet on disk:</strong> the disk still shows 10,000, but the log has the change, so the committed transaction can be <em>redone</em>.</li>
+</ul>
+<p>Without WAL, a page could reach disk with no trace in the log; after a crash nobody would know it had to be undone. WAL is the main mechanism behind <b class="term">atomicity</b> (all or nothing) and <b class="term">durability</b> (committed changes survive crashes). Rule U1 of undo logging, rule R1 of redo logging and rule UR1 of undo/redo logging are all versions of WAL.</p>
+
+<figure>
+<span class="anim-tag">Animation</span>
+<div id="wal"></div>
+</figure>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+
+<div class="key"><p><strong>Summary:</strong> the log is an append-only file of &lt;START T&gt;, &lt;COMMIT T&gt;, &lt;ABORT T&gt; and update records &lt;T,X,v&gt;, written first to log buffers and made safe by FLUSH LOG. An update record answers a WRITE, not an OUTPUT. Undo logs keep old values, redo logs new values. Write-ahead logging: a change's log record reaches disk before the changed page does.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="lecture.js"></script>
+<script>
+(() => {
+  const fr = (mem, logb, logd, disk, hot) => {
+    const z = (x, t, rows, k) => `<rect x="${x}" y="24" width="250" height="${54 + rows.length * 22}" rx="6" class="cell-plain" ${k === 'mem' ? 'style="stroke-dasharray:5 3"' : ''}/><text x="${x + 10}" y="44" class="big">${t}</text>` +
+      rows.map((r, i) => `<rect x="${x + 10}" y="${56 + i * 22}" width="230" height="20" rx="3" class="${hot === r ? 'cell-hl' : 'cell'}"/><text x="${x + 18}" y="${70 + i * 22}" style="font-size:12px">${r.replace(/</g, '&lt;')}</text>`).join('');
+    return `<svg viewBox="0 0 560 170" width="560">${z(10, 'Memory (volatile)', [mem, ...logb], 'mem')}${z(300, 'Disk', [disk, ...logd], 'disk')}</svg>`;
+  };
+  stepper('#wal', [
+    { html: fr('page: balance = 10000', [], [], 'page: balance = 10000'), cap: 'The account page is in a memory buffer and on disk; balance 10,000.' },
+    { html: fr('page: balance = 9000', ['log: <T, bal, 10000, 9000>'], [], 'page: balance = 10000', 'page: balance = 9000'), cap: 'T sets the balance to 9,000 in the buffer. The log record is appended to the <b>log buffer</b>.' },
+    { html: fr('page: balance = 9000', [], ['log: <T, bal, 10000, 9000>'], 'page: balance = 10000', 'log: <T, bal, 10000, 9000>'), cap: '<b>Write-ahead:</b> the log record is flushed to disk first.' },
+    { html: fr('page: balance = 9000', [], ['log: <T, bal, 10000, 9000>'], 'page: balance = 9000', 'page: balance = 9000'), cap: 'Only now may the buffer manager write the changed page. Whenever a crash happens, the log on disk describes every change that can be on the disk, so it can be undone or redone.' },
+  ]);
+  flashcards('#cards', [
+    { f: '&lt;START T&gt;', b: 'T has begun.' }, { f: '&lt;COMMIT T&gt;', b: 'T finished successfully; its changes must be on disk.' },
+    { f: '&lt;ABORT T&gt;', b: 'T failed; none of its changes may remain on disk.' },
+    { f: '&lt;T,X,v&gt; in an undo log', b: 'T changed X; v is the OLD value.' }, { f: '&lt;T,X,v&gt; in a redo log', b: 'T changed X; v is the NEW value.' },
+    { f: 'FLUSH LOG', b: 'Copy all new or changed log blocks from memory to disk.' },
+    { f: 'Write-ahead logging', b: 'A change\'s log record must reach stable storage before the changed data page does.' },
+  ]);
+  quiz('#quiz', [
+    { q: 'An update record &lt;T,X,v&gt; is written in response to…', opts: ['INPUT(X)', 'WRITE(X,t)', 'OUTPUT(X)', 'COMMIT'], a: 1, why: 'The log records the change when it happens in the buffer, i.e. at WRITE.' },
+    { q: 'In an undo log, &lt;T,A,8&gt; means…', opts: ['A is now 8', 'A was 8 before T changed it', 'T read 8 from A', 'A is 8 on disk'], a: 1, why: 'Undo logs keep the old value, which is what an undo writes back.' },
+    { q: 'Write-ahead logging requires that…', opts: ['the COMMIT record be written first', 'the log record reach disk before the changed page', 'the page reach disk before the log record', 'the log be flushed at every WRITE'], a: 1, why: 'WAL: log first, data later.' },
+    { q: 'A log record that is only in the log buffer when the system crashes…', opts: ['is recovered from memory', 'is lost', 'is written by the recovery manager', 'is on disk anyway'], a: 1, why: 'The log buffer is in volatile memory. Only flushed log records survive.' },
+  ]);
+  ask('#try1', { q: 'Balance changes from 10000 to 9000 under an undo log. Which value appears in the update record?', a: 10000, why: 'Undo logs store the old value.' });
+})();
+</script>
+</body>
+</html>

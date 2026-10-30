@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Document Model and Duplication · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 02 (Ishrak) · Chapter 4 · Slides 9–10, 14–15</div>
+<h1>The Document Model and Duplication</h1>
+<p class="lede">The non-relational answer to the same CMS problem: keep each student and their enrollments together in one document. This chapter explains documents and embedding (slide 9), the duplication it causes (slide 10), how the same question is answered in each model (slide 14), and what happens when course information changes (slide 15). It ends with the exam question on redundancy and incompleteness.</p>
+
+<h2>1. Keep related data together (slide 9)</h2>
+
+<dl class="def">
+<dt>Document</dt><dd>A self-contained record stored as nested fields, usually in JSON (JavaScript Object Notation): <code>{ "field": value, … }</code>. A value may be a number, a string, another document, or an <b class="term">array</b> (a list in square brackets).</dd>
+<dt>Collection</dt><dd>A group of documents of the same kind, the document-model counterpart of a table. Documents in one collection need not have exactly the same fields.</dd>
+<dt>Embedding</dt><dd>Storing related data <em>inside</em> a document instead of in a separate table: the enrollments array inside the student document.</dd>
+<dt>Document database</dt><dd>A DBMS built around documents, such as MongoDB (slide 11).</dd>
+</dl>
+
+<p>Slide 9 stores Jalil as one document. The top-level fields hold the student information; the <code>enrollments</code> field holds an array, and each array element is a small document describing one enrollment, <em>including</em> the course's name and credits:</p>
+<pre>{
+  "sid": 2405190,
+  "name": "Jalil",
+  "email": "jalil@university.edu",
+  "enrollments": [
+    { "cid": 215, "cname": "DB",  "credits": 3, "term": "Jan26" },
+    { "cid": 205, "cname": "DLD", "credits": 3, "term": "Jan26" },
+    { "cid": 101, "cname": "SPL", "credits": 3, "term": "Jan25" }
+  ]
+}</pre>
+<p>Compare with the relational version: Jalil's facts were spread over one Students row, three Enrolled rows and three Courses rows. Here the student information and the enrollment list belong to <strong>the same document</strong>. The application can read Jalil's courses directly from the enrollments array, with no join. This is not a legal relational tuple (a relational cell must hold one atomic value, never a list), which is exactly why it needs a different model.</p>
+
+<figure>
+<svg id="split" role="img" aria-label="Relational rows versus one document"></svg>
+<figcaption><b>Figure 1.</b> Where Jalil's data lives. Relational: 7 rows in 3 tables, linked by IDs. Document: 1 document.</figcaption>
+</figure>
+
+<h2>2. Embedding is convenient, but may duplicate data (slide 10)</h2>
+
+<p>The slide lists both sides:</p>
+<div class="tbl"><table>
+<tr><th>Convenience</th><th>Possible duplication</th></tr>
+<tr><td>One document contains most of the needed information.</td><td>“DB” may appear in many student documents.</td></tr>
+<tr><td>Fewer joins are needed.</td><td>Its name and credits may be repeated.</td></tr>
+<tr><td>Reading one student's courses is straightforward.</td><td>Updating course information may require several documents.</td></tr>
+</table></div>
+<p>Write out all three students and the duplication is visible: “DB, 3 credits” is stored in Jalil's and Karim's documents; “SPL, 3 credits” in Jalil's and Faria's.</p>
+<figure>
+<svg id="dup" role="img" aria-label="Three student documents with repeated course details"></svg>
+<figcaption><b>Figure 2.</b> The whole CMS as three embedded documents. Orange: course details copied into more than one document.</figcaption>
+</figure>
+<p>The slide's summary: <strong>relational model: store the course once and reference it. Document model: course details may be embedded where they are used.</strong> Duplication in a document database is often <em>intentional</em>: it buys fast reads of the most common screen. The price is paid on updates (Section 4).</p>
+
+<p>Document databases also allow <b class="term">referencing</b>: store only <code>"cid": 215</code> in the enrollment and keep course details in a separate <code>courses</code> collection. That removes the duplication but brings back the lookup, which is a join done by the application or by the database's lookup operator. Choosing between embedding and referencing is the main design decision in a document database.</p>
+
+<h2>3. Same question, different access paths (slide 14)</h2>
+
+<p>Question: <strong>which courses did Jalil take in Jan26?</strong> Both models return DB and DLD, but they reach the answer differently. Step through them side by side.</p>
+
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="paths"></div>
+<figcaption><b>Figure 3.</b> Slide 14's two access paths, one step at a time.</figcaption>
+</figure>
+
+<p>In a document database the query might look like this (MongoDB shell syntax, for illustration only; it is not part of the course's Oracle SQL):</p>
+<pre>db.students.find(
+  { sid: 2405190 },
+  { name: 1,
+    enrollments: { $filter: { input: "$enrollments",
+                              cond: { $eq: ["$$this.term", "Jan26"] } } } }
+)</pre>
+<p>The relational version is the slide-8 join from <a href="02-relational-tables.html">Chapter 2</a>. The document path touches one document; the relational path touches three tables. That is why document stores are attractive for “show me everything about this one thing” screens.</p>
+
+<h2>4. What happens when course information changes? (slide 15)</h2>
+
+<p>Suppose the course name <b>DB</b> is changed to <b>Database Systems</b>.</p>
+<ul>
+<li><strong>Relational model:</strong> update the row for <code>cid = 215</code>. The course is stored once, and all enrollment links still point to the same course. <span class="good">One main update.</span>
+<pre>UPDATE Courses SET cname = 'Database Systems' WHERE cid = 215;</pre></li>
+<li><strong>Embedded document model:</strong> the old name may appear in many student documents. Each copied occurrence may need updating, and the application must prevent inconsistent copies. <span class="bad">Potentially many updates.</span></li>
+</ul>
+
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="rename"></div>
+<figcaption><b>Figure 4.</b> Renaming DB. One update in the relational model; one update per copy in the embedded model, and a missed copy leaves the data inconsistent.</figcaption>
+</figure>
+
+<p>This is the same redundancy-and-inconsistency problem as the file-processing system in <a href="../i01/02-files-vs-dbms.html">Lec 01</a>, now inside a database. The relational model avoids it by design; a document design accepts it in exchange for faster reads and must handle it in application code (or by choosing references instead of copies for data that changes).</p>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+
+<h3>Exam questions</h3>
+<div class="exam">
+  <div class="exam-src">DB QB · Jan 20 10 · 10 marks</div>
+  <div class="exam-q"><p>How redundancy and incompleteness can lead to a bad database design? Explain with appropriate example(s).</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+<p>A database design should store every fact exactly once (avoid <strong>redundancy</strong>) and should be able to record every fact the organization needs (avoid <strong>incompleteness</strong>). Silberschatz, <i>Database System Concepts</i> (§7.1) names these as the two major pitfalls of a bad design.</p>
+<p><strong>Redundancy</strong> means the same fact is stored in several places. Example: a single relation that records each enrollment together with the course's details,</p>
+<div class="tbl"><table>
+<tr><th>sid</th><th>name</th><th>cid</th><th>cname</th><th>credits</th><th>term</th></tr>
+<tr><td>2405190</td><td>Jalil</td><td>215</td><td>DB</td><td>3</td><td>Jan26</td></tr>
+<tr><td>2405191</td><td>Karim</td><td>215</td><td>DB</td><td>3</td><td>Jan26</td></tr>
+<tr><td>2405190</td><td>Jalil</td><td>205</td><td>DLD</td><td>3</td><td>Jan26</td></tr>
+</table></div>
+<p>“Course 215 is named DB and has 3 credits” is stored once per enrolled student, and Jalil's name once per course he takes. This leads to:</p>
+<ul>
+<li><strong>Wasted space</strong>: the same values repeated in many rows.</li>
+<li><strong>Update anomaly / inconsistency</strong>: renaming DB to “Database Systems” must change every row with cid 215; if one row is missed, the database states two different names for the same course.</li>
+<li><strong>Deletion anomaly</strong>: if Karim drops DB and Jalil drops DB, deleting their rows also deletes the only record that course 215 exists and has 3 credits.</li>
+</ul>
+<p><strong>Incompleteness</strong> means some facts cannot be represented at all. In the design above, course information exists only inside enrollment rows, so a <em>new course that no one has enrolled in yet</em> cannot be stored, unless we insert a row with NULL sid and term, which is awkward and breaks the key (sid, cid, term). Likewise a newly admitted student who has not registered for any course cannot be stored. The same happens in the embedded document design of slide 9: course details exist only inside student documents, so a course with no students has nowhere to live.</p>
+<p><strong>Good design</strong> splits the data into Students(<u>sid</u>, name, email), Courses(<u>cid</u>, cname, credits) and Enrolled(<u>sid, cid, term</u>), slides 5–6. Each fact is stored once (no redundancy), a course or student can exist with no enrollments (no incompleteness), and a join reassembles the combined view when needed. Normalization (Sukarna sir's Lec 01) gives the formal method for reaching such designs.</p>
+  </div></details>
+</div>
+
+<div class="key"><p><strong>Summary:</strong> a document database stores each item as a nested JSON document; embedding puts related data (Jalil's enrollments, with course names and credits) inside it. Reading one student's courses then needs no join, but course details are duplicated across documents, so renaming a course means updating every copy, and a missed copy makes the data inconsistent. The relational model stores each course once and references it, so the rename is one update; the cost is a join on reads.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="lecture.js"></script>
+<script>
+const docSVG = (x, y, w, lines, cls = 'cell', hl = []) => {
+  w = Math.max(w, Math.ceil(Math.max(...lines.map(l => l.length)) * 6.7) + 22);
+  let s = `<rect x="${x}" y="${y}" width="${w}" height="${14 + lines.length * 17}" rx="6" class="${cls}"/>`;
+  lines.forEach((l, i) => {
+    if (hl.includes(i)) s += `<rect x="${x + 4}" y="${y + 6 + i * 17}" width="${w - 8}" height="16" class="cell-hl" style="stroke:none"/>`;
+    s += T(x + 10, y + 19 + i * 17, l, { a: 'start', size: 11 }).replace('<text ', '<text xml:space="preserve" ');
+  });
+  return s;
+};
+// Figure 1
+(() => {
+  let s = T(160, 16, 'RELATIONAL: 7 rows, 3 tables', { cls: 'lbl', w: 1 }) + T(595, 16, 'DOCUMENT: 1 document', { cls: 'lbl', w: 1 });
+  s += tblSVG({ x: 10, y: 40, title: '', head: ['sid', 'name'], rows: [['2405190', 'Jalil']], w: [66, 52] });
+  s += T(70, 34, 'Students', { cls: 'lbl' });
+  s += tblSVG({ x: 10, y: 110, head: ['sid', 'cid', 'term'], rows: [['2405190', '215', 'Jan26'], ['2405190', '205', 'Jan26'], ['2405190', '101', 'Jan25']], w: [66, 40, 50] }) + T(88, 104, 'Enrolled', { cls: 'lbl' });
+  s += tblSVG({ x: 200, y: 110, head: ['cid', 'cname', 'credits'], rows: [['215', 'DB', '3'], ['205', 'DLD', '3'], ['101', 'SPL', '3']], w: [40, 50, 56] }) + T(273, 104, 'Courses', { cls: 'lbl' });
+  s += arrow(40, 108, 40, 87, { cls: 's-acc', m: 'm-acc' }) + arrow(168, 143, 198, 143, { cls: 's-acc', m: 'm-acc' });
+  s += `<line x1="370" y1="20" x2="370" y2="215" class="s-fg dash"/>`;
+  s += docSVG(390, 30, 320, ['{ sid: 2405190, name: "Jalil", email: …,', '  enrollments: [', '    { cid: 215, cname: "DB",  credits: 3, term: "Jan26" },', '    { cid: 205, cname: "DLD", credits: 3, term: "Jan26" },', '    { cid: 101, cname: "SPL", credits: 3, term: "Jan25" }', '  ] }']);
+  const el = $('#split'); el.setAttribute('viewBox', '0 0 810 225'); el.setAttribute('width', 810); el.innerHTML = s;
+})();
+// Figure 2
+const DOCS = cn => [
+  ['{ sid: 2405190, name: "Jalil",', '  enrollments: [', `   { cid: 215, cname: "${cn[0]}", credits: 3, term: "Jan26" },`, '   { cid: 205, cname: "DLD", credits: 3, term: "Jan26" },', '   { cid: 101, cname: "SPL", credits: 3, term: "Jan25" } ] }'],
+  ['{ sid: 2405191, name: "Karim",', '  enrollments: [', `   { cid: 215, cname: "${cn[1]}", credits: 3, term: "Jan26" } ] }`],
+  ['{ sid: 2505200, name: "Faria",', '  enrollments: [', '   { cid: 101, cname: "SPL", credits: 3, term: "Jan26" },', '   { cid: 102, cname: "SPL Lab", credits: 1.5, term: "Jan26" } ] }'],
+];
+(() => {
+  const D = DOCS(['DB', 'DB']);
+  let s = docSVG(10, 10, 420, D[0], 'cell', [2, 4]) + docSVG(10, 120, 420, D[1], 'cell', [2]) + docSVG(10, 190, 420, D[2], 'cell', [2]);
+  s += T(500, 60, '“DB, 3 credits”: 2 copies', { a: 'start', cls: 'lbl' }) + T(500, 78, '“SPL, 3 credits”: 2 copies', { a: 'start', cls: 'lbl' });
+  s += T(500, 110, 'Relational: each course stored', { a: 'start', cls: 'lbl' }) + T(500, 126, 'once in Courses', { a: 'start', cls: 'lbl' });
+  const el = $('#dup'); el.setAttribute('viewBox', '0 0 720 300'); el.setAttribute('width', 720); el.innerHTML = s;
+})();
+// Figure 3: access paths
+(() => {
+  const R = ['1. Find Jalil in Students.', '2. Match his sid in Enrolled.', '3. Keep rows where term = Jan26.', '4. Match each cid in Courses.'];
+  const D = ['1. Find Jalil\'s document.', '2. Open the enrollments array.', '3. Keep entries where term = Jan26.', '4. Read the embedded course information.'];
+  const F = k => {
+    let s = T(180, 16, 'Relational model', { w: 1, size: 13 }) + T(560, 16, 'Document model', { w: 1, size: 13 });
+    // relational mini tables
+    const sh = k >= 1 ? { 0: 'cell-hl' } : {};
+    const eh = {}; if (k >= 2) { eh[0] = eh[1] = 'cell-hl'; eh[2] = k >= 3 ? 'cell-del' : 'cell-hl'; }
+    const ch = k >= 4 ? { 0: 'cell-new', 1: 'cell-new' } : {};
+    s += tblSVG({ x: 10, y: 40, head: ['sid', 'name'], rows: [['2405190', 'Jalil'], ['2405191', 'Karim']], w: [64, 50], hl: sh });
+    let s2 = tblSVG({ x: 130, y: 40, head: ['sid', 'cid', 'term'], rows: [['2405190', '215', 'Jan26'], ['2405190', '205', 'Jan26'], ['2405190', '101', 'Jan25'], ['2405191', '215', 'Jan26']], w: [64, 36, 48], hl: eh });
+    s += s2;
+    s += tblSVG({ x: 290, y: 40, head: ['cid', 'cname'], rows: [['215', 'DB'], ['205', 'DLD'], ['101', 'SPL']], w: [36, 50], hl: ch });
+    s += `<line x1="390" y1="10" x2="390" y2="200" class="s-fg dash"/>`;
+    const dl = ['{ sid: 2405190, name: "Jalil",', '  enrollments: [', '   { cid: 215, cname: "DB", term: "Jan26" },', '   { cid: 205, cname: "DLD", term: "Jan26" },', '   { cid: 101, cname: "SPL", term: "Jan25" } ] }'];
+    let dh = []; if (k >= 2) dh = [2, 3, 4]; if (k >= 3) dh = [2, 3];
+    s += docSVG(405, 36, 320, dl, k >= 1 ? 'cell-hl' : 'cell', dh);
+    if (k >= 1) s += T(10, 180, R[k - 1], { a: 'start', size: 12, w: 1, cls: 'acc' }) + T(405, 180, D[k - 1], { a: 'start', size: 12, w: 1, cls: 'acc' });
+    if (k >= 4) s += T(380, 204, 'Both return DB and DLD.', { size: 12, w: 1, cls: 'grn' });
+    return svgWrap(760, 214, s, 'Two access paths');
+  };
+  stepper('#paths', [
+    { html: F(0), cap: 'The question: which courses did Jalil take in Jan26? Left, the relational tables; right, Jalil\'s document.' },
+    { html: F(1), cap: '<b>Step 1.</b> Relational: find Jalil\'s row in Students. Document: find Jalil\'s document (the whole document is now in hand).' },
+    { html: F(2), cap: '<b>Step 2.</b> Relational: match his sid in Enrolled (three rows). Document: open the enrollments array (three entries).' },
+    { html: F(3), cap: '<b>Step 3.</b> Both keep only term = Jan26: the Jan25 enrollment in 101 is dropped.' },
+    { html: F(4), cap: '<b>Step 4.</b> Relational: match each cid in Courses to get the names (a second join). Document: the names are already embedded. Both return <b>DB and DLD</b>; they organize and access the data differently.' },
+  ], { interval: 2600 });
+})();
+// Figure 4: rename
+(() => {
+  const F = k => {
+    const relName = k >= 1 ? 'Database Systems' : 'DB';
+    let s = T(150, 16, 'Relational', { w: 1, size: 13 }) + T(545, 16, 'Embedded documents', { w: 1, size: 13 });
+    s += tblSVG({ x: 20, y: 40, head: ['cid', 'cname', 'credits'], rows: [['101', 'SPL', '3'], ['215', relName, '3'], ['205', 'DLD', '3']], w: [40, 130, 56], hl: k >= 1 ? { 1: 'cell-new' } : {} }) + T(133, 34, 'Courses', { cls: 'lbl' });
+    s += T(20, 150, k >= 1 ? 'UPDATE Courses SET cname = …' : '', { a: 'start', size: 11 });
+    s += T(20, 168, k >= 1 ? '1 row updated. Every Enrolled row' : '', { a: 'start', size: 11, cls: 'grn' }) + T(20, 184, k >= 1 ? 'still points to cid 215.' : '', { a: 'start', size: 11, cls: 'grn' });
+    s += `<line x1="270" y1="10" x2="270" y2="250" class="s-fg dash"/>`;
+    const j = k >= 2 ? 'Database Systems' : 'DB', kk = k >= 3 && k < 4 ? 'DB' : k >= 4 ? 'Database Systems' : 'DB';
+    const jc = k >= 2 ? 'cell-new' : 'cell', kc = k === 3 ? 'cell-del' : k >= 4 ? 'cell-new' : 'cell';
+    s += docSVG(285, 30, 430, ['{ sid: 2405190, name: "Jalil", enrollments: [', `   { cid: 215, cname: "${j}", credits: 3, term: "Jan26" }, … ] }`], jc, k >= 2 ? [1] : []);
+    s += docSVG(285, 90, 430, ['{ sid: 2405191, name: "Karim", enrollments: [', `   { cid: 215, cname: "${kk}", credits: 3, term: "Jan26" } ] }`], kc, k >= 4 ? [1] : []);
+    s += T(285, 168, '… and every other student who took course 215', { a: 'start', cls: 'lbl' });
+    const msg = ['', '', 'Copy 1 of 2 updated.', 'Karim\'s copy was missed: two names for course 215!', 'All copies updated: 2 writes (n writes for n students).'][k];
+    if (msg) s += T(545, 200, msg, { size: 12, w: 1, cls: k === 3 ? 'red' : 'acc' });
+    return svgWrap(810, 220, s, 'Renaming a course in both models');
+  };
+  stepper('#rename', [
+    { html: F(0), cap: 'Before: the course name DB is stored once in Courses (left) and once in every enrolled student\'s document (right).' },
+    { html: F(1), cap: 'Relational: <code>UPDATE Courses SET cname = \'Database Systems\' WHERE cid = 215</code>. One row changes. Enrolled stores only cid 215, so every enrollment now shows the new name. <b>One main update.</b>' },
+    { html: F(2), cap: 'Document: the application must find every document whose enrollments mention cid 215. It updates Jalil\'s copy first.' },
+    { html: F(3), cap: 'If the application stops here (a bug, a crash, or a document it did not search for), Karim\'s copy still says DB. The data now holds <b>two different names for one course</b>: an inconsistent copy.' },
+    { html: F(4), cap: 'Done correctly, every copy is updated: one write per enrolled student, so <b>potentially many updates</b>. The application, not the data model, is responsible for keeping the copies the same.' },
+  ], { interval: 2600 });
+})();
+flashcards('#cards', [
+  { f: 'Document', b: 'A self-contained JSON record with nested fields and arrays.' },
+  { f: 'Collection', b: 'A group of documents of the same kind; the document counterpart of a table.' },
+  { f: 'Embedding', b: 'Storing related data inside the document (enrollments inside the student).' },
+  { f: 'Referencing', b: 'Storing only an ID (cid) and keeping the details in another collection.' },
+  { f: 'Duplication in documents', b: 'Embedded course details are repeated in every student that took the course.' },
+  { f: 'Update anomaly', b: 'A change to one fact must be applied to several copies; a missed copy leaves the data inconsistent.' },
+  { f: 'Incompleteness', b: 'A design that cannot record some facts, e.g. a course with no students when courses exist only inside enrollments.' },
+]);
+quiz('#quiz', [
+  { q: 'In slide 9\'s document, where is the name of course 215 stored?', opts: ['In a Courses table', 'Inside each enrollment entry of each student who took it', 'Nowhere; only cid is stored', 'In the email field'], a: 1,
+    why: 'Embedding copies cname and credits into each enrollment entry.' },
+  { q: 'Renaming course DB requires how many writes in the relational model?', opts: ['One per enrolled student', 'One', 'Two', 'None'], a: 1, why: 'Update the one Courses row with cid = 215.' },
+  { q: 'Which question is cheapest in the embedded document model?', opts: ['All courses Jalil took', 'All students who took DB', 'Total credits offered by the department', 'Renaming a course'], a: 0,
+    why: 'Everything about Jalil is in one document. Finding all students of DB means searching every document.' },
+  { q: 'Why might a document designer duplicate data on purpose?', opts: ['To save disk space', 'To make the most common read a single-document access', 'Because joins are impossible', 'To enforce foreign keys'], a: 1,
+    why: 'Slide 16: duplication may be intentional for faster access.' },
+  { q: 'With only embedded student documents, how would you store a new course that no one has taken yet?', opts: ['In any student\'s document', 'You cannot, without another collection: the design is incomplete', 'As a key–value pair inside Jalil', 'As a NULL student'], a: 1,
+    why: 'Course data exists only inside enrollments, so a course with none has nowhere to live: incompleteness.' },
+]);
+ask('#try1', { q: 'In Figure 2, how many documents must change if the credits of SPL (cid 101) change?', a: 2, why: 'Jalil (Jan25) and Faria (Jan26) both embed SPL.' });
+</script>
+</body>
+</html>

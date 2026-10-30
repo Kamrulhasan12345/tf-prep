@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WHERE and the Order of Evaluation · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="../i03/lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 04 (Ishrak) · Chapter 2 · Slides 12–18 · Book §6.1.2</div>
+<h1>WHERE, DISTINCT on Several Columns, and the Order of Evaluation</h1>
+<p class="lede">How DISTINCT works when several columns are selected, the WHERE clause, and the most useful mental model in SQL: a query is written SELECT–FROM–WHERE but evaluated FROM, then WHERE, then SELECT (then DISTINCT and ORDER BY). A labelled anatomy of a query and a step-through on a real table make the order concrete.</p>
+
+<h2>1. Duplicates from several columns (slides 12–15)</h2>
+<p>Slides 12–15 switch to the products database of the textbook, whose <code>Product(maker, model, type)</code> table lists 30 products of manufacturers A to H. (This is a different table from the 4-row Product of Chapter 1; the playground calls up the right one for each box.)</p>
+<div class="q">
+<h4>Slide 12's question (worked answer): what does <code>SELECT maker, type FROM Product</code> return?</h4>
+<p>One row for each of the 30 products, with only the maker and type columns. Projecting away <code>model</code>, which was the key, leaves many identical rows: A makes three PCs, so (A, pc) appears three times; (A, laptop) three times; (B, pc) three times; and so on (slide 13). The answer has 30 rows but only 13 different ones.</p>
+<p>With <code>SELECT DISTINCT maker, type</code> (slides 14–15), rows are duplicates only if they agree on <em>both</em> columns. (A, pc) and (A, laptop) differ in type, so both stay. The result is one row per (maker, type) combination: 13 rows.</p>
+</div>
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="a1"></div>
+</figure>
+<div id="p1"></div>
+
+<h2>2. The WHERE clause (slide 16)</h2>
+<pre>SELECT &lt;attributes&gt;          -- 3
+FROM   &lt;one or more relations&gt; -- 1
+WHERE  &lt;conditions&gt;          -- 2</pre>
+<dl class="def">
+  <dt>WHERE clause</dt>
+  <dd>A condition (also called a <b class="term">predicate</b>) tested on each row produced by FROM. Only rows for which the condition is TRUE reach the SELECT clause. This is relational-algebra selection (σ).</dd>
+</dl>
+<p>The numbers 3, 1, 2 that the slide writes next to the clauses are the order in which the DBMS (logically) uses them: first FROM, then WHERE, then SELECT. The order of writing is fixed by the grammar and differs from the order of evaluation.</p>
+
+<h2>3. Anatomy of a query</h2>
+<p>The figure labels every part of a complete single-table query with the clauses of this whole lecture. The circled numbers give the evaluation order.</p>
+<figure class="wide">
+<div id="anat"></div>
+<figcaption><b>Figure 1.</b> Anatomy of a single-table SELECT. Written order: SELECT, FROM, WHERE, ORDER BY. Evaluation order: FROM ①, WHERE ②, SELECT ③, DISTINCT ④, ORDER BY ⑤. Keywords are blue (DISTINCT and DESC, which modify a clause, in red).</figcaption>
+</figure>
+<div class="tbl"><table>
+<tr><th>Clause</th><th>Required?</th><th>Works on</th><th>Effect</th></tr>
+<tr><td><code>FROM</code></td><td>yes</td><td>tables</td><td>supplies the input rows</td></tr>
+<tr><td><code>WHERE</code></td><td>no</td><td>one row at a time</td><td>drops rows whose condition is not TRUE</td></tr>
+<tr><td><code>SELECT</code></td><td>yes</td><td>one row at a time</td><td>computes the output columns</td></tr>
+<tr><td><code>DISTINCT</code></td><td>no</td><td>the whole output</td><td>drops duplicate output rows</td></tr>
+<tr><td><code>ORDER BY</code></td><td>no</td><td>the whole output</td><td>sorts the output (Chapter 6)</td></tr>
+</table></div>
+<p>Two practical consequences of the evaluation order: WHERE can test a column that SELECT does not output (<code>SELECT pname FROM Product WHERE price &gt; 100</code> is fine), and ORDER BY, which comes last, sees the finished output.</p>
+
+<h2>4. The semantics as a loop (slides 17–18)</h2>
+<p>Slides 17 and 18 define exactly what a single-table query means, as a program:</p>
+<div class="figrow">
+<pre>-- SELECT a1,…,ak FROM R WHERE conditions
+Answer = {}
+for each x in R do
+    if conditions satisfied then
+        Answer = Answer + {(a1,…,ak)}
+return Answer</pre>
+<pre>-- SELECT DISTINCT a1,…,ak FROM R WHERE …
+Answer = {}
+for each x in R do
+    if conditions satisfied then
+        Answer = Answer ∪ {(a1,…,ak)}
+return Answer</pre>
+</div>
+<p>The only difference is the operator that adds a row. <code>+</code> is <b class="term">bag</b> addition: adding a row that is already present makes a second copy. <code>∪</code> is <b class="term">set</b> union: adding a row that is already present changes nothing. So DISTINCT turns the bag of answers into a set.</p>
+<p>The loop is the <em>meaning</em> of the query, not necessarily how the DBMS runs it: the optimizer may use an index to skip rows, or remove duplicates by sorting at the end. Every method must produce the same answer as this loop.</p>
+<p>The animation runs the loop, clause by clause, on slide 3's Product table for a query that uses every clause of this lecture:</p>
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="a2"></div>
+</figure>
+<div id="p2"></div>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div><div id="try2"></div>
+<h3>SQL exercises</h3>
+<p>These use the textbook's products database: <code>Product(maker, model, type)</code>, <code>PC(model, speed, ram, hd, price)</code>, <code>Laptop(model, speed, ram, hd, screen, price)</code>, <code>Printer(model, color, type, price)</code>.</p>
+<div id="c1"></div><div id="c2"></div><div id="c3"></div><div id="c4"></div><div id="c5"></div>
+
+<div class="key"><p><strong>Summary:</strong> DISTINCT removes rows that are equal in <em>all</em> selected columns. WHERE keeps only rows whose condition is TRUE. A query is written SELECT, FROM, WHERE, ORDER BY but evaluated FROM → WHERE → SELECT → DISTINCT → ORDER BY. Its meaning is a loop over the rows of the table that adds the selected values of each qualifying row to the answer, as a bag (+) or, with DISTINCT, as a set (∪).</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/sqlplay.js"></script>
+<script src="../i03/lecture.js"></script>
+<script>
+document.querySelector('#anat').innerHTML = anatomySVG();
+// SELECT DISTINCT maker, type on the first 14 Product rows (makers A–D)
+(() => {
+  const rows = [['A', 1001, 'pc'], ['A', 1002, 'pc'], ['A', 1003, 'pc'], ['A', 2004, 'laptop'], ['A', 2005, 'laptop'], ['A', 2006, 'laptop'], ['B', 1004, 'pc'], ['B', 1005, 'pc'], ['B', 1006, 'pc'], ['B', 2007, 'laptop'], ['C', 1007, 'pc'], ['D', 1008, 'pc'], ['D', 1009, 'pc'], ['D', 1010, 'pc']];
+  selectAnim('#a1', { name: 'Product (first 14 of 30 rows)', head: ['maker', 'model', 'type'], rows, cols: [0, 2], distinct: true,
+    sql: [['select', 'SELECT DISTINCT maker, type'], ['from', 'FROM   Product;']] });
+})();
+selectAnim('#a2', { name: 'Product', head: GIZ_HEAD, rows: GIZ_ROWS, cols: [2], distinct: true, perRow: true, order: [[2, 'DESC']],
+  where: { test: r => r[1] < 200, why: r => `${r[1]} &lt; 200` },
+  sql: [['select', 'SELECT DISTINCT category'], ['from', 'FROM     Product'], ['where', 'WHERE    price < 200'], ['order', 'ORDER BY category DESC;']] });
+sqlPlay('#p1', { setup: PCS, query: 'SELECT DISTINCT maker, type\nFROM   Product;', note: 'Remove DISTINCT to see all 30 rows with their duplicates.' });
+sqlPlay('#p2', { setup: GIZ, query: 'SELECT DISTINCT category\nFROM     Product\nWHERE    price < 200\nORDER BY category DESC;', note: 'Change one clause at a time and predict the answer before you run it.' });
+flashcards('#cards', [
+  { f: 'WHERE', b: 'Condition tested on each row from FROM; only TRUE rows go on.' },
+  { f: 'Predicate', b: 'Another word for a condition, e.g. price > 100.' },
+  { f: 'Evaluation order', b: 'FROM → WHERE → SELECT → DISTINCT → ORDER BY.' },
+  { f: 'Written order', b: 'SELECT, FROM, WHERE, ORDER BY.' },
+  { f: 'Answer + {t}', b: 'Bag addition: duplicates kept (plain SELECT).' },
+  { f: 'Answer ∪ {t}', b: 'Set union: duplicates ignored (SELECT DISTINCT).' },
+  { f: 'DISTINCT on several columns', b: 'Rows are duplicates only if equal in every selected column.' },
+]);
+quiz('#quiz', [
+  { q: 'Which clause is evaluated first?', opts: ['SELECT', 'WHERE', 'FROM', 'ORDER BY'], a: 2, why: 'FROM supplies the rows that everything else works on.' },
+  { q: 'Is <code>SELECT pname FROM Product WHERE price &gt; 100</code> legal even though price is not selected?', opts: ['Yes: WHERE is evaluated before SELECT', 'No: WHERE can only use selected columns', 'Only with DISTINCT', 'Only in Oracle'], a: 0, why: 'WHERE sees whole rows of the FROM table.' },
+  { q: 'How many rows does <code>SELECT DISTINCT maker, type FROM Product</code> return on the textbook data?', opts: ['8', '13', '30', '3'], a: 1, why: 'A pc, A laptop, B pc, B laptop, C pc, D pc, D printer, E pc, E laptop, E printer, F laptop, G laptop, H printer.' },
+  { q: 'In slide 18, why does ∪ replace +?', opts: ['To sort the answer', 'Because DISTINCT makes the answer a set', 'To join two tables', 'Because of NULLs'], a: 1, why: '∪ ignores an element that is already present.' },
+  { q: 'A query has no ORDER BY. In what order are the rows returned?', opts: ['Insertion order', 'Primary-key order', 'Not defined', 'Alphabetical'], a: 2, why: 'Without ORDER BY the order is whatever the chosen method produces.' },
+]);
+ask('#try1', { q: 'How many rows does <code>SELECT DISTINCT type FROM Product</code> return on the textbook data?', a: 3, why: 'pc, laptop, printer.' });
+ask('#try2', { q: 'How many rows does <code>SELECT DISTINCT maker FROM Product WHERE type = \'laptop\'</code> return?', a: 5, why: 'A, B, E, F, G make laptops.' });
+chk('#c1', PCS, '<b>Easy (slide 14).</b> Show each (maker, type) combination once.', 'SELECT DISTINCT maker, type FROM Product;');
+chk('#c2', PCS, '<b>WHERE.</b> Show the makers of printers, each once.', "SELECT DISTINCT maker FROM Product WHERE type = 'printer';");
+chk('#c3', PCS, '<b>WHERE on a number.</b> Which PC models have a speed of at least 3.00? Show model and speed. (Textbook Exercise 2.4.1a.)', 'SELECT model, speed FROM PC WHERE speed >= 3.00;');
+chk('#c4', PCS, '<b>Unselected column in WHERE.</b> Show the model numbers of all laptops whose screen is larger than 15 inches (do not output the screen size).', 'SELECT model FROM Laptop WHERE screen > 15;');
+chk('#c5', PCS, '<b>Exam style.</b> Show the different RAM sizes of PCs that cost less than $700, each once, largest first. (ORDER BY ram DESC sorts largest first.)', 'SELECT DISTINCT ram\nFROM PC\nWHERE price < 700\nORDER BY ram DESC;', { ordered: true, hint: 'FROM PC, WHERE price &lt; 700, SELECT DISTINCT ram, ORDER BY ram DESC.' });
+</script>
+</body>
+</html>

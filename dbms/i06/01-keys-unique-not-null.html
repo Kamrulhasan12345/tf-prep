@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Keys, UNIQUE and NOT NULL · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 06 (Ishrak) · Chapter 1 · Slides 1–9 · Textbook §2.3.6, §7.1</div>
+<h1>Why Constraints? Keys, UNIQUE and NOT NULL</h1>
+<p class="lede">A constraint is a rule the DBMS checks on every change. This chapter explains why we want such rules, defines superkeys, candidate keys and primary keys, and shows how Oracle declares PRIMARY KEY, UNIQUE and NOT NULL, as column constraints and as table constraints. It ends with the subtle point of slide 9: two UNIQUE columns are not the same as one UNIQUE pair.</p>
+
+<h2>1. The need for constraints (slides 1–3)</h2>
+<p>The lecture's outline (slide 2) lists five topics, which are also the chapters of this lecture: the need for constraints, foreign-key constraints, attribute-based constraints, tuple-based constraints and assertions. (The title slide says "CSE 303, Lecture 09, Chapter 7": the slides come from an earlier course, and Chapter 7 is the chapter "Constraints and Triggers" of the textbook by Garcia-Molina, Ullman and Widom.)</p>
+<p>Slide 3 gives the reason in three lines. There are <em>certain properties we would like our database to hold</em>: every employee has a different id, a department's head is a real employee, a price is never negative. Every INSERT, UPDATE or DELETE can <em>break these properties</em>, either by a typing mistake or by a bug in some program. So we <em>build handlers into the database definition</em>: we write the rules into the CREATE TABLE statement, and from then on the DBMS itself refuses any change that would break them. No application program can forget the rule, because the rule lives in the database.</p>
+<dl class="def">
+  <dt>Integrity constraint</dt>
+  <dd>A condition that every legal state of the database must satisfy. The DBMS checks it whenever a modification could violate it, and rejects (rolls back) the offending statement.</dd>
+  <dt>Column constraint (inline constraint)</dt>
+  <dd>A constraint written directly after a column's data type, e.g. <code>name CHAR(30) PRIMARY KEY</code>. It can only talk about that one column.</dd>
+  <dt>Table constraint (out-of-line constraint)</dt>
+  <dd>A constraint written as a separate item in the column list, e.g. <code>PRIMARY KEY(name, address)</code>. It may involve several columns. Oracle's documentation calls the two forms <i>inline</i> and <i>out-of-line</i>.</dd>
+</dl>
+
+<h2>2. Keys: the fundamental constraint</h2>
+<p>Slides 4–9 call keys "the fundamental constraint", because the relational model identifies a row only by its values. Before the syntax, here are the four words you need. (Sukarna sir's <a href="../s01/03-keys-and-superkeys.html">Lec 01, Chapter 3</a> treats keys through functional dependencies.)</p>
+<dl class="def">
+  <dt>Superkey</dt>
+  <dd>A set of attributes whose values can never be the same in two different rows. Any set that contains a superkey is also a superkey.</dd>
+  <dt>Candidate key (key)</dt>
+  <dd>A <em>minimal</em> superkey: remove any attribute and it stops being a superkey.</dd>
+  <dt>Primary key</dt>
+  <dd>The one candidate key the designer chooses as the main identifier of the rows. Declared with <code>PRIMARY KEY</code>. Its columns may not be NULL.</dd>
+  <dt>Alternate key (unique key)</dt>
+  <dd>Any other candidate key. Declared with <code>UNIQUE</code>.</dd>
+</dl>
+<p>Whether a set is a key is a fact about the <em>meaning</em> of the data (the schema), not about the rows that happen to be in the table today. A sample of rows can only <em>disprove</em> a key: if two rows agree on a set, it is not a superkey. The animation applies this to the MovieStar table of the slides, with some sample rows, under the textbook's assumption that no two stars share a name, and with the extra assumption of slide 6 that no two stars share an address.</p>
+<figure>
+<span class="anim-tag">Animation</span>
+<div id="anat"></div>
+<figcaption><b>Figure 1.</b> Anatomy of the keys of MovieStar(name, address, gender).</figcaption>
+</figure>
+
+<h2>3. Declaring a PRIMARY KEY (slide 4)</h2>
+<p>Slide 4 declares name as the primary key in the two equivalent ways:</p>
+<div class="figrow">
+<pre>-- column constraint
+CREATE TABLE MovieStar (
+  name    CHAR(30) PRIMARY KEY,
+  address VARCHAR2(255),
+  gender  CHAR(1)
+);</pre>
+<pre>-- table constraint
+CREATE TABLE MovieStar (
+  name    CHAR(30),
+  address VARCHAR2(255),
+  gender  CHAR(1),
+  PRIMARY KEY (name)
+);</pre>
+</div>
+<p>The slides write <code>VARCHAR(255)</code>. Oracle accepts VARCHAR as a synonym, but the Oracle type is <code>VARCHAR2</code>, so this book writes VARCHAR2. <code>CHAR(30)</code> is a fixed-length string: Oracle pads it with blanks to 30 characters.</p>
+<p>Once the key is declared, Oracle rejects two kinds of rows: a row whose name is already in the table (<code>ORA-00001: unique constraint (…) violated</code>) and a row whose name is NULL (<code>ORA-01400: cannot insert NULL into (…"NAME")</code>). Try both:</p>
+<div id="p1"></div>
+
+<h2>4. UNIQUE (slides 5–6)</h2>
+<p>UNIQUE is written exactly like PRIMARY KEY, as a column constraint or a table constraint (slide 5). It says: no two rows may have the same non-NULL value here. Slide 5 claims that "the only difference between UNIQUE and PRIMARY KEY is that UNIQUE allows NULL values". That is the difference you notice first, but there are two more:</p>
+<div class="tbl"><table>
+<tr><th></th><th>PRIMARY KEY</th><th>UNIQUE</th></tr>
+<tr><td>Duplicate values</td><td>not allowed</td><td>not allowed (among non-NULL values)</td></tr>
+<tr><td>NULL</td><td>not allowed (implies NOT NULL)</td><td>allowed, even in many rows</td></tr>
+<tr><td>How many per table</td><td>at most one</td><td>any number (slide 6)</td></tr>
+<tr><td>Foreign keys</td><td>the default target: <code>REFERENCES Employee</code> means its primary key</td><td>may be referenced, but the column must be named</td></tr>
+<tr><td>Index Oracle builds</td><td colspan="2">a unique B-tree index on the key columns, in both cases (see <a href="../l15/01-what-is-an-index.html">Lec 15</a>)</td></tr>
+</table></div>
+<p>Why may a UNIQUE column hold many NULLs? NULL means "unknown". Two unknown addresses are not known to be equal, so they do not count as duplicates. Slide 6 shows that UNIQUE may be used "for any number of attributes": name and address are each unique on their own.</p>
+<div id="p2"></div>
+
+<h2>5. NOT NULL (slide 7)</h2>
+<p><code>NOT NULL</code> forbids NULL in one column. Slide 7 combines it with UNIQUE: <code>name CHAR(30) UNIQUE NOT NULL</code>. A column that is UNIQUE and NOT NULL behaves exactly like a primary key column, except that it is not <em>the</em> primary key. This is the usual way to declare an alternate key.</p>
+<pre>CREATE TABLE MovieStar (
+  name    CHAR(30) UNIQUE NOT NULL,
+  address VARCHAR2(255) UNIQUE,
+  gender  CHAR(1)
+);</pre>
+<p>In Oracle, NOT NULL can only be written as a column constraint. There is no table-level <code>NOT NULL(name)</code>; the table-level equivalent is <code>CHECK (name IS NOT NULL)</code>, which is the CHECK constraint of <a href="05-check-constraints.html">Chapter 5</a>.</p>
+<div id="p3"></div>
+
+<h2>6. Keys made of several columns (slide 8)</h2>
+<p>A combination of attributes can be the primary key or be unique. This needs the table-constraint form, because a column constraint can only mention its own column:</p>
+<div class="figrow">
+<pre>CREATE TABLE MovieStar (
+  name    CHAR(30),
+  address VARCHAR2(255),
+  gender  CHAR(1),
+  PRIMARY KEY (name, address)
+);</pre>
+<pre>CREATE TABLE MovieStar (
+  name    CHAR(30),
+  address VARCHAR2(255),
+  gender  CHAR(1),
+  UNIQUE (name, address)
+);</pre>
+</div>
+<p>The slide writes <code>PRIMAR KEY</code>; that is a typo for <code>PRIMARY KEY</code>, and Oracle would report a syntax error. With a composite primary key, slide 8 adds, "none of the attributes can be NULL": both name and address become NOT NULL.</p>
+<p>Two rows may now share a name, provided their addresses differ: two different stars called "Mark Hamill" are fine if they live at different addresses. Writing <code>name CHAR(30) PRIMARY KEY, address VARCHAR2(255) PRIMARY KEY</code> would be an error (<code>ORA-02260: table can have only one primary key</code>), because each column constraint tries to declare its own primary key.</p>
+
+<h2>7. Two UNIQUE columns are not one UNIQUE pair (slide 9)</h2>
+<p>Slide 9 puts two declarations side by side and says they are not the same:</p>
+<div class="figrow">
+<pre>-- (a) two separate keys
+CREATE TABLE MovieStar (
+  name    CHAR(30) UNIQUE,
+  address VARCHAR2(255) UNIQUE,
+  gender  CHAR(1)
+);</pre>
+<pre>-- (b) one key made of two columns
+CREATE TABLE MovieStar (
+  name    CHAR(30),
+  address VARCHAR2(255),
+  gender  CHAR(1),
+  UNIQUE (name, address)
+);</pre>
+</div>
+<div class="q">
+<h4>Question (slide 9): why are these two declarations different?</h4>
+<p>(a) declares <strong>two keys</strong>: {name} is a key and {address} is a key. No name may repeat, and no address may repeat.</p>
+<p>(b) declares <strong>one key</strong>, {name, address}. Only the <em>combination</em> may not repeat. A name may appear twice with different addresses, and an address may appear twice with different names.</p>
+<p>So (a) is the <em>stronger</em> rule: every table that satisfies (a) also satisfies (b) (if the names already differ, the pairs differ), but not the other way round. In the language of section 2: under (a), {name, address} is a superkey that is not minimal, so it is not a candidate key. The animation feeds the same four INSERT statements to both tables.</p>
+</div>
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="s9"></div>
+</figure>
+<p><strong>A detail where Oracle differs from the standard.</strong> For a composite UNIQUE key, Oracle treats rows whose key columns are <em>all</em> NULL as never conflicting, but rows that are NULL in some key columns and <em>equal in the others</em> do conflict: inserting ('Ann', NULL) twice into table (b) gives ORA-00001 in Oracle. Standard SQL, PostgreSQL and SQLite (the playground) accept both rows. The playground also has one quirk of its own: SQLite lets a NULL into a PRIMARY KEY column unless the column is also declared NOT NULL. Oracle never does. When the playground accepts a NULL key, remember that Oracle would raise ORA-01400.</p>
+<div id="p4"></div>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+<h3>Write it yourself</h3>
+<p>The first three exercises check the <em>structure</em> of the table you create: the checker reads the database catalogue and lists the primary key, the UNIQUE keys, the NOT NULL columns and the columns. Data types are not compared.</p>
+<div id="c1"></div><div id="c2"></div><div id="c3"></div><div id="c4"></div><div id="c5"></div>
+
+<h3>Exam questions</h3>
+<div class="exam">
+  <div class="exam-src">DB QB · 21-22 4a · 3 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-2 | 2021–22 · 3 marks &nbsp;|&nbsp; BUET QBank · CSE 303 | L-3/T-1 | 2012–13 · 5 marks</div>
+  <div class="exam-q"><p>What is the difference between UNIQUE key and Primary key? (2012–13 wording: What are the differences between UNIQUE and PRIMARY KEY constraints in SQL?)</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+  <p>Both constraints say that no two rows of the table may have the same value in the key column(s), and in Oracle both are enforced with a unique index. They differ in four ways:</p>
+  <ol>
+    <li><strong>NULL values.</strong> A PRIMARY KEY column can never be NULL (PRIMARY KEY implies NOT NULL; Oracle raises ORA-01400). A UNIQUE column may be NULL, and several rows may have NULL there, because NULL means "unknown" and two unknowns are not known to be equal.</li>
+    <li><strong>Number per table.</strong> A table has at most one primary key. It may have any number of UNIQUE constraints (one for each alternate key).</li>
+    <li><strong>Role.</strong> The primary key is the chosen main identifier of a row. A UNIQUE constraint declares an alternate (candidate) key. To make a UNIQUE column behave like a key fully, add NOT NULL.</li>
+    <li><strong>Foreign keys.</strong> A foreign key may reference either, but <code>REFERENCES T</code> without a column list refers to T's primary key.</li>
+  </ol>
+<pre>CREATE TABLE Employee (
+  emp_id   NUMBER(6)     PRIMARY KEY,          -- unique, never NULL, only one per table
+  email    VARCHAR2(50)  UNIQUE NOT NULL,      -- alternate key
+  passport VARCHAR2(20)  UNIQUE,               -- unique when present; many NULLs allowed
+  name     VARCHAR2(40)  NOT NULL
+);
+INSERT INTO Employee VALUES (1, 'a@x.com', NULL, 'Ann');   -- OK
+INSERT INTO Employee VALUES (2, 'b@x.com', NULL, 'Bob');   -- OK: two NULL passports
+INSERT INTO Employee VALUES (NULL, 'c@x.com', 'P1', 'Cy'); -- ORA-01400 (NULL primary key)
+INSERT INTO Employee VALUES (3, 'a@x.com', 'P2', 'Di');    -- ORA-00001 (duplicate email)</pre>
+  <p>Note: the CSE 215 bank's answer says a primary key creates a <em>clustered</em> index and UNIQUE a non-clustered one. That is true of SQL Server and MySQL/InnoDB, not of Oracle: an ordinary Oracle table is a heap, and both constraints get an ordinary unique B-tree index. (Only an index-organized table stores rows in primary-key order.)</p>
+  </div></details>
+</div>
+
+<div class="key"><p><strong>Summary:</strong> Constraints are rules written into the schema and enforced by the DBMS on every change. A superkey never repeats; a candidate key is a minimal superkey; the primary key is the chosen candidate key and is never NULL; other candidate keys are declared UNIQUE (usually with NOT NULL). Single-column constraints can be written inline; multi-column keys need the table-constraint form. Two UNIQUE columns are two keys, which is stronger than one UNIQUE pair.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/sqlplay.js"></script>
+<script src="lecture.js"></script>
+<script>
+const STARS = [['Carrie Fisher', '123 Maple St', 'F'], ['Mark Hamill', '456 Oak Rd', 'M'], ['Harrison Ford', '789 Palm Dr', 'M'], ['Emma Watson', '12 Elm Ln', 'F']];
+const H = ['name', 'address', 'gender'], W = [150, 130, 80];
+stepper('#anat', [
+  { html: gridSVG(H, STARS, { w: W }), cap: 'MovieStar(name, address, gender) with four rows. Assumptions: no two stars share a name, and no two stars share an address. Which sets of columns are keys?' },
+  { html: gridSVG(H, STARS, { w: W, colCls: { 2: 'cell-del' }, tags: { 2: 'not a key' } }), cap: '{gender}: Mark Hamill and Harrison Ford are both M. Two rows agree, so {gender} is <b>not a superkey</b>.' },
+  { html: gridSVG(H, STARS, { w: W, colCls: { 0: 'cell-hl' }, tags: { 0: 'candidate key' } }), cap: '{name}: no two stars share a name, so {name} is a superkey. It has one attribute, so nothing can be removed: it is <b>minimal</b>, a <b>candidate key</b>.' },
+  { html: gridSVG(H, STARS, { w: W, colCls: { 0: 'cell-hl', 2: 'cell-hl' }, tags: { 0: 'superkey', 2: '(extra)' } }), cap: '{name, gender} is also a superkey (it contains {name}), but it is <b>not minimal</b>: drop gender and it is still a superkey. Superkeys = candidate keys + anything added to them.' },
+  { html: gridSVG(H, STARS, { w: W, colCls: { 1: 'cell-hl' }, tags: { 1: 'candidate key' } }), cap: '{address}: under the slide-6 assumption no address repeats, so {address} is a second candidate key.' },
+  { html: gridSVG(H, STARS, { w: W, colCls: { 0: 'cell-new', 1: 'cell-hl' }, tags: { 0: 'PRIMARY KEY', 1: 'UNIQUE (alternate key)' } }), cap: 'The designer picks one candidate key as the <b>primary key</b> (name) and declares every other candidate key <b>UNIQUE</b> (address). Superkeys here: every set containing name or address, i.e. 6 of the 7 non-empty subsets (all except {gender}).' },
+]);
+
+sqlPlay('#p1', { setup: 'CREATE TABLE MovieStar (\n  name CHAR(30) PRIMARY KEY,\n  address VARCHAR2(255),\n  gender CHAR(1)\n);\nINSERT INTO MovieStar VALUES (\'Carrie Fisher\', \'123 Maple St\', \'F\');',
+  query: "-- the statements run in order; the first works, the second breaks the key\nINSERT INTO MovieStar VALUES ('Mark Hamill', '456 Oak Rd', 'M');      -- OK\nINSERT INTO MovieStar VALUES ('Carrie Fisher', '9 Other St', 'F');    -- duplicate key",
+  note: 'The second INSERT fails with SQLite\'s message <code>UNIQUE constraint failed: MovieStar.name</code>; Oracle says <code>ORA-00001: unique constraint (SCHEMA.SYS_C007123) violated</code>, where SYS_C… is the name Oracle invented for the unnamed constraint (Chapter 7 shows how to name it). The first INSERT succeeded before the error, so Show tables lists Mark Hamill.' });
+sqlPlay('#p2', { setup: 'CREATE TABLE MovieStar (\n  name CHAR(30) UNIQUE,\n  address VARCHAR2(255) UNIQUE,\n  gender CHAR(1)\n);',
+  query: "INSERT INTO MovieStar VALUES ('Ann', NULL, 'F');\nINSERT INTO MovieStar VALUES ('Bob', NULL, 'M');   -- second NULL address: allowed\nINSERT INTO MovieStar VALUES (NULL, NULL, 'M');    -- NULL name: allowed by UNIQUE\nSELECT * FROM MovieStar;",
+  note: 'Three rows, two NULL addresses, one NULL name: UNIQUE never compares NULLs. Now add <code>INSERT INTO MovieStar VALUES (\'Cy\', \'1 Main St\', \'M\');</code> and <code>INSERT INTO MovieStar VALUES (\'Di\', \'1 Main St\', \'F\');</code>: the second one fails, because a non-NULL address repeats.' });
+sqlPlay('#p3', { setup: 'CREATE TABLE MovieStar (\n  name CHAR(30) UNIQUE NOT NULL,\n  address VARCHAR2(255) UNIQUE,\n  gender CHAR(1)\n);',
+  query: "INSERT INTO MovieStar VALUES (NULL, '1 Main St', 'M');",
+  note: 'SQLite: <code>NOT NULL constraint failed: MovieStar.name</code>. Oracle: <code>ORA-01400: cannot insert NULL into ("SCHEMA"."MOVIESTAR"."NAME")</code>.' });
+sqlPlay('#p4', { setup: 'CREATE TABLE StarA (name CHAR(30) UNIQUE, address VARCHAR2(255) UNIQUE, gender CHAR(1));\nCREATE TABLE StarB (name CHAR(30), address VARCHAR2(255), gender CHAR(1), UNIQUE (name, address));',
+  query: "INSERT INTO StarB VALUES ('Ann', 'X', 'F');\nINSERT INTO StarB VALUES ('Ann', 'Y', 'F');   -- fine in StarB\nINSERT INTO StarB VALUES ('Bob', 'X', 'M');   -- fine in StarB\nSELECT * FROM StarB;\n-- now change every StarB above to StarA, press Reset, and run again",
+  note: 'StarA is declaration (a) of slide 9, StarB is declaration (b).' });
+
+// slide 9 animation: same INSERTs into both tables
+(() => {
+  const rows = [['Ann', 'X'], ['Ann', 'Y'], ['Bob', 'X'], ['Ann', 'X']];
+  const A = [], B = [], steps = [];
+  const fig = (a, b, ca, cb) => `<div class="figrow"><div><div class="figlabel">(a) name UNIQUE, address UNIQUE</div>${recTable(null, a.map((r, i) => ({ cells: r, cls: ca[i] })), ['name', 'address'])}</div>` +
+    `<div><div class="figlabel">(b) UNIQUE(name, address)</div>${recTable(null, b.map((r, i) => ({ cells: r, cls: cb[i] })), ['name', 'address'])}</div></div>`;
+  steps.push({ html: fig([], [], {}, {}), cap: 'Both tables start empty. We run the same four INSERTs on each.' });
+  rows.forEach(r => {
+    const aBad = A.some(x => x[0] === r[0]) ? 'name ' + r[0] + ' repeats' : A.some(x => x[1] === r[1]) ? 'address ' + r[1] + ' repeats' : '';
+    const bBad = B.some(x => x[0] === r[0] && x[1] === r[1]) ? 'pair repeats' : '';
+    const a = [...A, r], b = [...B, r];
+    steps.push({ html: fig(a, b, { [a.length - 1]: aBad ? 'del' : 'new' }, { [b.length - 1]: bBad ? 'del' : 'new' }),
+      cap: `<code>INSERT … ('${r[0]}', '${r[1]}')</code>. Table (a): ${aBad ? `<span class="bad">rejected</span>, ${aBad}` : '<span class="good">accepted</span>'}. Table (b): ${bBad ? `<span class="bad">rejected</span>, the pair (${r[0]}, ${r[1]}) is already there` : '<span class="good">accepted</span>'}.` });
+    if (!aBad) A.push(r); if (!bBad) B.push(r);
+  });
+  steps.push({ html: fig(A, B, {}, {}), cap: `End: (a) kept ${A.length} row, (b) kept ${B.length} rows. Declaration (a) is stricter.` });
+  stepper('#s9', steps, { interval: 2400 });
+})();
+
+flashcards('#cards', [
+  { f: 'Integrity constraint', b: 'A rule every legal database state must satisfy; the DBMS rejects changes that break it.' },
+  { f: 'Superkey', b: 'A set of attributes that can never be equal in two different rows.' },
+  { f: 'Candidate key', b: 'A minimal superkey: no attribute can be removed.' },
+  { f: 'Primary key', b: 'The chosen candidate key. Unique and NOT NULL; at most one per table.' },
+  { f: 'UNIQUE', b: 'Declares an alternate key: no repeated non-NULL values; NULLs allowed; many per table.' },
+  { f: 'Column vs table constraint', b: 'Column: written after one column\'s type. Table: separate item, may list several columns.' },
+  { f: 'ORA-00001', b: 'Oracle error: unique constraint violated (duplicate key value).' },
+  { f: 'ORA-01400', b: 'Oracle error: cannot insert NULL into a NOT NULL or primary-key column.' },
+]);
+quiz('#quiz', [
+  { q: 'Which statement about PRIMARY KEY and UNIQUE is false?', opts: ['A table can have several UNIQUE constraints', 'A UNIQUE column may contain several NULLs', 'A table can have two PRIMARY KEY constraints if they are on different columns', 'A primary-key column cannot be NULL'], a: 2, why: 'At most one primary key per table. A key on several columns is still one primary key, declared as PRIMARY KEY(a, b).' },
+  { q: 'MovieStar is declared with <code>name CHAR(30) UNIQUE, address VARCHAR2(255) UNIQUE</code>. It holds (Ann, X). Which INSERT succeeds?', opts: ["('Ann', 'Y', 'F')", "('Bob', 'X', 'M')", "('Bob', 'Y', 'M')", 'none of them'], a: 2, why: 'Two separate keys: the name must be new and the address must be new. Only (Bob, Y) is new in both.' },
+  { q: 'The same table is declared with <code>UNIQUE(name, address)</code> instead. Which INSERT fails?', opts: ["('Ann', 'Y', 'F')", "('Bob', 'X', 'M')", "('Ann', 'X', 'M')", "('Bob', 'Y', 'M')"], a: 2, why: 'Only the pair must be new. (Ann, X) is already there; gender is not part of the key.' },
+  { q: 'Why does the composite key on slide 8 need the table-constraint form?', opts: ['Column constraints are not allowed in Oracle', 'A column constraint can only refer to its own column', 'Table constraints are checked faster', 'Because CHAR columns cannot have column constraints'], a: 1, why: 'An inline constraint belongs to one column. Writing PRIMARY KEY after two columns declares two primary keys, which is an error (ORA-02260).' },
+  { q: 'R(a, b, c) has candidate keys {a} and {b}. How many superkeys does it have?', opts: ['2', '4', '6', '7'], a: 2, why: 'All non-empty subsets of {a,b,c} that contain a or b: 7 subsets minus {c} = 6.' },
+  { q: 'Where can NOT NULL be written in Oracle?', opts: ['Only as a column constraint', 'Only as a table constraint', 'Both', 'Only in ALTER TABLE'], a: 0, why: 'NOT NULL is inline only. The out-of-line equivalent is CHECK (col IS NOT NULL).' },
+]);
+ask('#try1', { q: 'Under declaration (b) of slide 9, UNIQUE(name, address), the table holds (Ann, X), (Ann, Y), (Bob, X). How many of these 4 INSERTs are accepted, run in order: (Bob, Y), (Ann, X), (Cy, X), (Bob, Y)?', a: 2, why: 'Accepted: (Bob, Y) and (Cy, X). Rejected: (Ann, X) is already present, and the second (Bob, Y) repeats the pair just inserted.' });
+
+sqlCheck('#c1', { setup: '', check: 'state', table: KEYS('MovieStar'),
+  task: 'Easy. Create MovieStar(name CHAR(30), address VARCHAR2(255), gender CHAR(1)) with <b>name</b> as the primary key (slide 4, either form).',
+  solution: 'CREATE TABLE MovieStar (\n  name CHAR(30) PRIMARY KEY,\n  address VARCHAR2(255),\n  gender CHAR(1)\n);' });
+sqlCheck('#c2', { setup: '', check: 'state', table: KEYS('MovieStar'),
+  task: 'Create MovieStar exactly as on slide 7: name is UNIQUE and NOT NULL, address is UNIQUE, gender is unconstrained. No primary key.',
+  solution: 'CREATE TABLE MovieStar (\n  name CHAR(30) UNIQUE NOT NULL,\n  address VARCHAR2(255) UNIQUE,\n  gender CHAR(1)\n);' });
+sqlCheck('#c3', { setup: '', check: 'state', table: KEYS('MovieStar'),
+  task: 'Create MovieStar with the <b>pair</b> (name, address) as the primary key (slide 8, spelled correctly).',
+  solution: 'CREATE TABLE MovieStar (\n  name CHAR(30),\n  address VARCHAR2(255),\n  gender CHAR(1),\n  PRIMARY KEY (name, address)\n);' });
+sqlCheck('#c4', { setup: "CREATE TABLE MovieStar (name CHAR(30), address VARCHAR2(255), gender CHAR(1));\nINSERT INTO MovieStar VALUES ('Ann', 'X', 'F');\nINSERT INTO MovieStar VALUES ('Ann', 'Y', 'F');\nINSERT INTO MovieStar VALUES ('Bob', 'Z', 'M');\nINSERT INTO MovieStar VALUES ('Cy', 'X', 'M');\nINSERT INTO MovieStar VALUES ('Bob', 'W', 'M');\nINSERT INTO MovieStar VALUES ('Di', NULL, 'F');",
+  task: 'This MovieStar table was created without constraints. Before adding <code>UNIQUE(name)</code> we must find the rows in the way. List the <b>names</b> that occur more than once (one row per name). <i>(Uses GROUP BY … HAVING, taught in Lec 10.)</i>',
+  hint: 'SELECT name FROM MovieStar GROUP BY name HAVING COUNT(*) > 1',
+  solution: 'SELECT name\nFROM MovieStar\nGROUP BY name\nHAVING COUNT(*) > 1;' });
+sqlCheck('#c5', { setup: '', check: 'state', table: KEYS('Student'),
+  task: 'Exam level. Create Student(id NUMBER(7), name VARCHAR2(40), email VARCHAR2(50), phone VARCHAR2(15), hall VARCHAR2(30)) where id is the primary key, every student must have a name, email is an alternate key that every student must have, phone is unique when given, and the pair (hall, name) is unique.',
+  solution: 'CREATE TABLE Student (\n  id    NUMBER(7) PRIMARY KEY,\n  name  VARCHAR2(40) NOT NULL,\n  email VARCHAR2(50) UNIQUE NOT NULL,\n  phone VARCHAR2(15) UNIQUE,\n  hall  VARCHAR2(30),\n  UNIQUE (hall, name)\n);' });
+</script>
+</body>
+</html>

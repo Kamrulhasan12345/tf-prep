@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ORC and Parquet · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 14 · Chapter 11 · Slide 31</div>
+<h1>Columnar File Formats: ORC and Parquet</h1>
+<p class="lede">Column storage is not only inside databases. Big-data systems store columnar data in ordinary files, using formats such as ORC and Parquet. This chapter explains what is inside such a file.</p>
+
+<h2>1. Columnar storage inside a file</h2>
+
+<p>Chapters 9 and 10 described column storage inside a database system. In big-data processing (for example Apache Spark, Hive or Presto analysing terabytes of logs), data often lives as plain files in a distributed file system rather than inside a DBMS. Two file formats bring the columnar idea to those files:</p>
+
+<dl class="def">
+  <dt>ORC (Optimized Row Columnar)</dt><dd>Developed for Apache Hive. Despite “Row” in the name, the data is stored column by column.</dd>
+  <dt>Parquet</dt><dd>Apache Parquet, the most widely used columnar file format today, supported by almost every big-data and analytics tool.</dd>
+</dl>
+
+<p>Both are <b class="term">columnar file representations</b>: one file holds a table, but inside it the values are grouped by column, compressed, and stored so that a reader can load only the columns a query needs. They are very popular for big-data applications for the reasons from Chapter 10: analytics reads a few columns of a huge number of rows, and data is mostly written once and then only read.</p>
+
+<h2>2. Stripes: how ORC organises a file</h2>
+
+<p>A big-data file can be hundreds of gigabytes. Turning the <em>whole</em> file into four giant columns would be impractical: you would have to hold everything in memory before writing anything, and reconstructing one row would mean jumping across the entire file. ORC solves this by working in pieces:</p>
+
+<ol>
+  <li>Take a run of consecutive rows (tuples) that together occupy several hundred megabytes.</li>
+  <li>Convert just that run into columnar form: all its values of column 1, then all of column 2, and so on, each compressed.</li>
+  <li>This columnar piece is called a <b class="term">stripe</b>. Each stripe is around 250&nbsp;MB.</li>
+  <li>The file is a sequence of stripes, one after another.</li>
+</ol>
+
+<figure>
+<svg id="orc" viewBox="0 0 700 270" width="700" role="img" aria-label="ORC file made of stripes, each stripe holding columns">
+  <text x="10" y="18" class="lbl">ORC FILE</text>
+  <g id="stripes"></g>
+</svg>
+<figcaption><b>Figure 1.</b> An ORC file is a sequence of stripes (about 250&nbsp;MB each). Inside each stripe, the stripe's rows are stored column by column. A small index and footer describe the stripe, and a file footer at the end describes the whole file.</figcaption>
+</figure>
+
+<p>So ORC is <em>columnar inside each stripe</em>, but the stripes themselves follow row order. That combines the advantages of both:</p>
+<ul>
+  <li>A query that needs only ID and salary reads just those two column chunks from each stripe and skips the rest (reduced I/O, as in Chapter 9).</li>
+  <li>Rebuilding a row only needs data from one stripe, not from the whole file.</li>
+  <li>A writer can produce the file stripe by stripe, without holding everything in memory.</li>
+  <li>Each stripe also stores small statistics, such as the minimum and maximum value of each column. A query looking for <code>salary &gt; 100000</code> can skip an entire stripe whose maximum salary is 90000 without reading it.</li>
+</ul>
+
+<p>Parquet uses the same design under a different name: its stripes are called <b class="term">row groups</b>, and each column's piece inside a row group is a <b class="term">column chunk</b>.</p>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+
+<div class="key">
+<p><strong>Summary:</strong> ORC and Parquet are file formats that store tables in columnar form, widely used in big-data processing. ORC breaks the rows into stripes of about 250&nbsp;MB, and stores each stripe column by column, so readers can load only the columns they need while rows stay easy to rebuild.</p>
+</div>
+</main>
+<script src="../assets/book.js"></script>
+<script>
+(() => {
+  const cols = [['ID', 'cell'], ['Name', 'cell-plain'], ['Dept', 'cell-new'], ['Salary', 'cell-hl']];
+  let s = '';
+  for (let k = 0; k < 3; k++) {
+    const y = 28 + k * 72;
+    s += `<rect class="cell-plain" x="10" y="${y}" width="680" height="62" rx="4"/>`;
+    s += `<text x="20" y="${y + 18}" class="big">Stripe ${k + 1}</text><text x="20" y="${y + 36}" class="lbl">rows ${k * 2}M–${k * 2 + 2}M</text><text x="20" y="${y + 52}" class="lbl">≈ 250 MB</text>`;
+    s += `<rect class="cell-plain" x="130" y="${y + 10}" width="60" height="42"/><text x="160" y="${y + 35}" text-anchor="middle" class="lbl">index</text>`;
+    cols.forEach(([n, c], i) => {
+      const x = 196 + i * 112;
+      s += `<rect class="${c}" x="${x}" y="${y + 10}" width="106" height="42"/><text x="${x + 53}" y="${y + 35}" text-anchor="middle" style="font-size:12px">all ${n}s</text>`;
+    });
+    s += `<rect class="cell-plain" x="${196 + 4 * 112}" y="${y + 10}" width="38" height="42"/><text x="${196 + 4 * 112 + 19}" y="${y + 35}" text-anchor="middle" class="lbl">ftr</text>`;
+  }
+  s += `<text x="350" y="260" text-anchor="middle" class="lbl">… more stripes …  then the file footer</text>`;
+  document.querySelector('#stripes').innerHTML = s;
+})();
+</script>
+<script>
+flashcards('#cards', [
+  { f: 'ORC', b: 'Optimized Row Columnar: a columnar file format from Apache Hive.' },
+  { f: 'Parquet', b: 'Apache Parquet: the most widely used columnar file format.' },
+  { f: 'Stripe', b: 'In ORC, a run of rows (several hundred MB of tuples) converted to column-by-column form; about 250 MB each.' },
+  { f: 'Row group / column chunk', b: 'Parquet’s names for a stripe and for one column’s piece of it.' },
+  { f: 'Stripe statistics', b: 'Per-column minimum and maximum in each stripe, letting a reader skip stripes that cannot match.' },
+]);
+quiz('#quiz', [
+  { q: 'Inside an ORC stripe, data is stored…', opts: ['row by row', 'column by column', 'sorted by key', 'as a B+ tree'], a: 1, why: 'Each stripe is a columnar representation of its rows.' },
+  { q: 'Why does ORC use stripes instead of one columnar layout for the whole file?', opts: ['To allow updates', 'A writer can produce the file piece by piece, and a row is rebuilt from one stripe', 'Stripes are smaller than blocks', 'To store indexes'], a: 1, why: 'Whole-file columns would need everything in memory and make row reconstruction span the whole file.' },
+  { q: 'A stripe’s max salary is 90000. Query: salary > 100000. What happens?', opts: ['The stripe is read fully', 'The stripe is skipped', 'Only its index is updated', 'The query fails'], a: 1, why: 'No row in that stripe can match, so it need not be read.' },
+  { q: 'Why are ORC and Parquet popular for big-data analytics?', opts: ['They support fast single-row updates', 'Analytics reads a few columns of many rows, and data is written once then only read', 'They store rows contiguously', 'They need no compression'], a: 1,
+    why: 'The same reasons column stores suit data warehouses (Chapter 10).' },
+]);
+ask('#try1', { q: 'A 1 GB (1000 MB) ORC file uses 250 MB stripes. How many stripes does it have?', a: 4, why: '1000 ÷ 250 = 4.' });
+</script>
+</body>
+</html>

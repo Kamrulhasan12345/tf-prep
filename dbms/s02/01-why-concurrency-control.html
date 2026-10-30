@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Why Concurrency Control · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 02 (Sukarna) · Chapter 1 · Slides 2–5 · Book §18 intro, §18.1.1</div>
+<h1>Why Databases Need Concurrency Control</h1>
+<p class="lede">Two transactions that each add 100 to the same value can leave the database 100 short. This chapter shows exactly how, introduces the scheduler that prevents it, and defines a schedule, the object the rest of this lecture studies.</p>
+
+<h2>1. Transactions running at the same time</h2>
+
+<p>A database serves many users at once. Each user's unit of work is a <b class="term">transaction</b>, and the DBMS runs many transactions concurrently: while one waits for a disk read, another uses the CPU. This is good for speed, but it creates a new danger, because transactions can touch the same data.</p>
+
+<dl class="def">
+  <dt>Transaction</dt><dd>A sequence of database actions (reads and writes, plus local computation) that must behave as one indivisible unit of work. Example: “move 100 from account A to account B”.</dd>
+  <dt>Database element</dt><dd>A unit of data the DBMS reads or writes as a whole and can lock: a tuple, a disk block, or a whole relation. The slides write elements as single letters: A, B, X.</dd>
+  <dt>READ(X, t) and WRITE(X, t)</dt><dd>READ(X, t) copies element X into the transaction's local variable t. WRITE(X, t) copies t back into X. Local variables such as t and s belong to one transaction only; other transactions cannot see them.</dd>
+</dl>
+
+<h3>Slide 2: the lost update</h3>
+<p>Two transactions do the same thing to the same element X:</p>
+<pre>T₁: READ(X,t);  t := t + 100;  WRITE(X,t)
+T₂: READ(X,t);  t := t + 100;  WRITE(X,t)</pre>
+<p>(The slide writes the middle step as “A := A + 100”. It means the local variable: t := t + 100. Each transaction has its own private t.)</p>
+<p>Start with X = 1000. If T₁ runs completely and then T₂ runs, T₂ reads 1100 and writes 1200. That is the correct answer: two increments of 100. Now let the operating system interleave them so that T₁'s read happens immediately after T₂'s read, exactly as the slide asks:</p>
+
+<figure>
+<span class="anim-tag">Animation</span>
+<div id="lost"></div>
+<figcaption><b>Figure 1.</b> The lost update. Each column is one transaction; time goes down. The X column is the value of X in the shared buffer; t₁ and t₂ are the two private copies of t.</figcaption>
+</figure>
+
+<div class="q">
+<h4>Slide 2 question: what happens when READ(X,t) of T₁ happens immediately after READ(X,t) of T₂?</h4>
+<p>Both reads see X = 1000, because neither transaction has written yet. Each transaction then adds 100 to its own private copy, so both compute 1100. Whichever transaction writes second simply overwrites the first one's 1100 with another 1100. The final value is <strong>1100 instead of 1200</strong>: one update has been lost. No single step was wrong; the problem is purely the <em>order</em> in which the steps of the two transactions were mixed. The database is now in an <b class="term">inconsistent state</b>, a state that no correct execution could produce.</p>
+</div>
+
+<h2>2. Concurrency control and the scheduler (slides 3–4)</h2>
+
+<p>The slides compare this with threads in an operating system: two threads that update shared memory need a lock, semaphore or mutex, or they corrupt it. A DBMS has the same need, and the component that supplies the control is the <b class="term">scheduler</b>.</p>
+
+<dl class="def">
+  <dt>Concurrency control</dt><dd>The work of making sure the database stays consistent while transactions execute concurrently.</dd>
+  <dt>Scheduler</dt><dd>The DBMS component that receives every read and write request from transactions and decides the order in which they actually reach the database buffers. It may execute a request at once, delay it, or (in some methods) abort the transaction that made it.</dd>
+  <dt>Transaction manager</dt><dd>The component that starts transactions and passes their read/write requests to the scheduler.</dd>
+</dl>
+
+<figure>
+<svg viewBox="0 0 560 250" width="560" role="img" aria-label="Transaction manager sends requests to the scheduler, which sends reads and writes to the buffers">
+  <rect class="cell" x="170" y="10" width="190" height="44" rx="4"/><text x="265" y="37" text-anchor="middle" class="big">Transaction manager</text>
+  <path d="M265 54 V96" class="s-fg" marker-end="url(#m-fg)"/><text x="280" y="80" class="lbl">read/write requests</text>
+  <rect class="cell-hl" x="170" y="100" width="190" height="44" rx="4"/><text x="265" y="127" text-anchor="middle" class="big">Scheduler</text>
+  <path d="M265 144 V186" class="s-fg" marker-end="url(#m-fg)"/><text x="280" y="170" class="lbl">reads and writes (now, later, or never)</text>
+  <g id="buf"></g>
+  <text x="120" y="215" text-anchor="end" class="lbl">buffers in</text><text x="120" y="229" text-anchor="end" class="lbl">main memory</text>
+</svg>
+<figcaption><b>Figure 2.</b> Slide 4's picture (the textbook's Fig. 18.1). Every request passes through the scheduler before it touches the buffers.</figcaption>
+</figure>
+
+<p>Slide 4 lists the scheduler's two choices for each request:</p>
+<ol>
+  <li><strong>Case 1, execute now.</strong> If the request is safe, the scheduler passes it straight to the buffers.</li>
+  <li><strong>Case 2, delay.</strong> If executing it now could lead to an inconsistent state, because another transaction is using the same element, the scheduler holds the request back until it is safe.</li>
+</ol>
+<p>In Figure 1, a scheduler would have delayed T₁'s read until T₂ had written X. Then T₁ would read 1100 and write 1200. The rest of this lecture and the next one is about <em>how</em> the scheduler decides: first the theory of which orders are safe (serializability), then the practical mechanisms (locks, timestamps).</p>
+
+<h2>3. What a schedule is (slide 5)</h2>
+
+<dl class="def">
+  <dt>Schedule</dt><dd>A sequence of the important database actions (reads and writes) of one or more transactions, in the order the scheduler lets them happen. Actions of <em>different</em> transactions may be interleaved in any order the scheduler chooses, but the actions of <em>one</em> transaction always stay in that transaction's own order.</dd>
+</dl>
+<p>Think of transactions as programs and the schedule as the order in which a multitasking operating system runs their instructions: it can switch between programs at any point, but it never runs the instructions of one program out of order. The purpose of a schedule is the safe execution of concurrent transactions.</p>
+
+<p>Slide 5 adds two assumptions that the whole chapter uses (textbook §18.1.1):</p>
+<ul>
+  <li><strong>Reads and writes happen in main-memory buffers, not on disk.</strong> When the buffers are written to disk is the DBMS's own business (the buffer and log managers decide; that is Lec 05–06). So the values shown in schedules are buffer values.</li>
+  <li><strong>A buffer is shared.</strong> Once some transaction T brings element A into a buffer, other transactions read and write that same buffer copy. This is exactly why the interleaving in Figure 1 matters.</li>
+</ul>
+
+<h2>4. The three classic anomalies</h2>
+<p>The lost update is one of three standard ways a badly interleaved schedule goes wrong. The other two appear later in these notes (dirty reads in the timestamp chapter, unrepeatable reads in the isolation-level chapter), but exam questions ask for all three together, so here they are side by side.</p>
+
+<dl class="def">
+  <dt>Lost update (write–write)</dt><dd>Two transactions read the same value and both write a new value computed from it. The second write overwrites the first, so the first transaction's change disappears. (Figure 1.)</dd>
+  <dt>Dirty read (write–read on uncommitted data)</dt><dd>T₂ reads a value that T₁ has written but not committed. If T₁ then aborts, its write is undone, and T₂ has used a value that officially never existed.</dd>
+  <dt>Unrepeatable read (read–write)</dt><dd>T₁ reads X, then T₂ changes X and commits, then T₁ reads X again and sees a different value inside the same transaction.</dd>
+</dl>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+<div id="try2"></div>
+
+<h3>Exam questions</h3>
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2016–17 · 9 marks</div>
+  <div class="exam-q"><p>Discuss three problems of non-serializable execution with necessary examples.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+  <p>A non-serializable execution is an interleaving of transactions whose effect is not the effect of running them one after another in any order. Three classic problems:</p>
+  <p><strong>1. Lost update.</strong> Account A = 1000. T₁ withdraws 100, T₂ deposits 500.</p>
+  <div class="tbl"><table><tr><th>time</th><th>T₁</th><th>T₂</th><th>A in buffer</th></tr>
+  <tr><td>1</td><td>READ(A,t) → t = 1000</td><td></td><td>1000</td></tr>
+  <tr><td>2</td><td></td><td>READ(A,s) → s = 1000</td><td>1000</td></tr>
+  <tr><td>3</td><td>t := t − 100; WRITE(A,t)</td><td></td><td>900</td></tr>
+  <tr><td>4</td><td></td><td>s := s + 500; WRITE(A,s)</td><td>1500</td></tr></table></div>
+  <p>Final A = 1500, but either serial order gives 1400. T₁'s withdrawal is lost because T₂ wrote a value computed from a stale read.</p>
+  <p><strong>2. Dirty read.</strong> T₁ transfers 100 from A to B: it writes A = 900, then fails before finishing and aborts, so A is restored to 1000. In between, T₂ reads A = 900 and B and computes the bank's total, which is 100 too low. T₂ read a value that was never committed, so its result matches no serial execution (in a serial execution T₂ sees either 1000 before T₁ or nothing of T₁ at all, since T₁ aborted).</p>
+  <p><strong>3. Unrepeatable read.</strong> T₁ reads the number of free seats, 10, and shows it to a customer. T₂ books a seat (writes 9) and commits. T₁ reads the seats again before booking and sees 9. Inside one transaction the same read returned two different values. In any serial order T₁ would see the same value both times.</p>
+  <p>All three are prevented by a scheduler that only allows serializable schedules (Chapter 2), for example with two-phase locking (Chapter 7).</p>
+  </div></details>
+</div>
+
+<div class="key"><p><strong>Summary:</strong> concurrent transactions share buffers, so the order in which their reads and writes interleave can produce states no correct execution would, such as a lost update (1100 instead of 1200). The scheduler sees every read and write request and either executes it, delays it, or aborts the requester, to keep the database consistent. A schedule is the resulting sequence of actions: transactions may be interleaved, but each transaction's own actions keep their order.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="lecture.js"></script>
+<script>
+// buffer strip under the scheduler
+(() => { let s = ''; for (let i = 0; i < 9; i++) s += `<rect class="cell-plain" x="${150 + i * 26}" y="190" width="26" height="44"/>`; document.querySelector('#buf').innerHTML = s; })();
+
+const R = (t, html, ex, cap) => ({ t, html, ex, cap });
+stepper('#lost', CC.growSteps([1, 2], [
+  R(2, 'READ(X,t)', ['1000', '', '1000'], 'T₂ reads X into its private t₂: t₂ = 1000.'),
+  R(1, 'READ(X,t)', ['1000', '1000', '1000'], 'Immediately after, T₁ reads X: t₁ = 1000. Both transactions now hold the same old value.'),
+  R(1, 't := t+100', ['1000', '1100', '1000'], 'T₁ computes t₁ = 1100. This only changes T₁\'s private variable.'),
+  R(2, 't := t+100', ['1000', '1100', '1100'], 'T₂ computes t₂ = 1100, from the same old 1000.'),
+  R(1, 'WRITE(X,t)', ['1100', '1100', '1100'], 'T₁ writes X = 1100.'),
+  R(2, 'WRITE(X,t)', ['1100', '1100', '1100'], 'T₂ writes X = 1100 over T₁\'s value. <b>Final X = 1100, not 1200:</b> T₁\'s update is lost.'),
+], { extra: ['X', 't₁', 't₂'], startCap: 'X = 1000 in the buffer. Both transactions want to add 100, so the correct final value is 1200.', init: { t: 0, html: '', ex: ['1000', '', ''] } }));
+
+flashcards('#cards', [
+  { f: 'Transaction', b: 'A sequence of reads, writes and local computation that must act as one unit of work.' },
+  { f: 'Lost update', b: 'Two transactions read the same value and both write; the second write overwrites the first, so one change disappears.' },
+  { f: 'Scheduler', b: 'Receives every read/write request and decides to execute it, delay it, or abort the requester, so the database stays consistent.' },
+  { f: 'Concurrency control', b: 'Keeping the database consistent while transactions run concurrently.' },
+  { f: 'Schedule', b: 'The sequence of actions of several transactions in the order they happen; each transaction\'s own actions keep their order.' },
+  { f: 'Dirty read', b: 'Reading a value written by a transaction that has not committed (and may still abort).' },
+  { f: 'Unrepeatable read', b: 'A transaction reads the same element twice and gets different values because another transaction changed it in between.' },
+]);
+quiz('#quiz', [
+  { q: 'In slide 2, why is the final value 1100?', opts: ['The WRITE of T₁ failed', 'Both transactions read X before either wrote it, so both computed 1100 from 1000', 'The scheduler aborted T₂', 'X was never written to disk'], a: 1, why: 'Each transaction computed its new value from the same old value 1000. The second write overwrote the first.' },
+  { q: 'Which choice can a scheduler make about a request?', opts: ['Only execute it immediately', 'Execute it now, or delay it until it is safe', 'Reorder the actions inside one transaction', 'Change the value being written'], a: 1, why: 'Slide 4: execute immediately when safe, otherwise delay. It may never reorder one transaction\'s own actions.' },
+  { q: 'In a schedule, which order is fixed?', opts: ['The order of all actions of all transactions', 'The order of actions within each single transaction', 'Reads before writes', 'Lower-numbered transactions first'], a: 1, why: 'Different transactions can be interleaved freely, but each transaction\'s own actions keep their order.' },
+  { q: 'The slides assume reads and writes happen…', opts: ['directly on disk', 'in shared main-memory buffers', 'in each transaction\'s private copy of the database', 'in the log'], a: 1, why: 'Slide 5: reads and writes are on buffers, and a buffer brought in by T can be read or written by other transactions too.' },
+  { q: 'T₂ reads a value that T₁ wrote, and T₁ later aborts. This is a…', opts: ['lost update', 'dirty read', 'unrepeatable read', 'deadlock'], a: 1, why: 'Reading uncommitted data is a dirty read.' },
+]);
+ask('#try1', { q: 'X = 500. T₁ and T₂ each do READ(X,t); t := t + 50; WRITE(X,t), interleaved as r₁, r₂, w₁, w₂. What is the final X?', a: 550, why: 'Both read 500 and both write 550; one +50 is lost (the correct result is 600).' });
+ask('#try2', { q: 'Same transactions, but run serially (T₁ then T₂), starting from X = 500. Final X?', a: 600, why: 'T₂ reads 550 and writes 600.' });
+</script>
+</body>
+</html>

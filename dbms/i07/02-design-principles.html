@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Relationship Attributes and Design Principles · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 07 (Ishrak) · Chapter 2 · Slides 15–24</div>
+<h1>Relationship Attributes and Design Principles</h1>
+<p class="lede">Where does a fact belong: on an entity, on a relationship, or in an entity set of its own? This chapter answers that question with the slides' rules of thumb and the four design principles of Part 2: represent the domain, avoid duplication, choose the right element, do not overcomplicate.</p>
+
+<h2>1. Relationship attributes (slide 15)</h2>
+<p>A relationship can have its own attributes. Such an attribute <em>belongs to the association, not to either entity alone</em>. The standard example is a grade:</p>
+<figure><div id="grade"></div><figcaption>Slide 15: <em>grade</em> hangs off the diamond <em>enrolls</em>.</figcaption></figure>
+<p>Why not put grade on Student? A student has many grades, one per course, so "Amina's grade" is not one value. Why not on Course? A course has many grades, one per student. The value is fixed only when <em>both</em> the student and the course are fixed: Amina in CSE101 got an A. That is exactly the definition of an attribute of the relationship: for each pair in the relationship set there is one value.</p>
+<div class="formula">for each pair (student, course) in enrolls → exactly one grade</div>
+<p>Chapter 6 states the same test for relationships with three or more entity sets (slide 68): <em>after fixing all entities connected by the relationship, is there one value for this attribute?</em> If yes, the attribute belongs on the relationship.</p>
+
+<h2>2. Entity or attribute? (slides 16–18)</h2>
+<p>Some facts can be drawn as simple attributes; some deserve their own entity set. The choice depends on <em>what the system must remember</em>. Slide 16 gives the question to ask:</p>
+<div class="q" style="border-color:var(--accent)"><h4 style="color:var(--accent)">Ask</h4><p>Is this just one descriptive value, or is it an object we need to describe, count, reuse, or connect?</p></div>
+<p>An employee's <em>name</em> and <em>salary</em> are single descriptive values, so they stay as attributes (left figure below). Addresses are different. Slide 17 shows what goes wrong when an employee may have several addresses and we keep them as attributes: we invent <code>addr1</code>, <code>addr2</code>, <code>addr3</code>.</p>
+<figure><div class="figrow"><div id="emp1"></div><div id="emp2"></div></div>
+<figcaption><b>Left:</b> slide 16, simple descriptive facts stay as attributes. <b>Right:</b> slide 17, repeated attributes for several addresses.</figcaption></figure>
+<p>That design has three problems:</p>
+<ol>
+<li><strong>How many address attributes should we create?</strong> Three is too few for someone with four addresses and wasteful (mostly empty) for everyone with one. There is no right number, so the design is not stable.</li>
+<li><strong>It hides facts about each address.</strong> An address has internal structure (street, city, postal code). With <code>addr1</code> as one string we cannot ask "which employees live in Dhaka?" reliably.</li>
+<li><strong>Queries become awkward.</strong> "Find the employee living at 12 Lake Road" must check addr1 OR addr2 OR addr3.</li>
+</ol>
+<p>Slide 18's fix is to <strong>model repeating values as entities</strong>. Make Address an entity set with attributes street, city and postal code, and connect it to Employee with a relationship <em>addrOf</em>. Now an employee can have any number of addresses, each address is described properly, and an address can even be shared by two employees who live together.</p>
+<figure><span class="anim-tag">Animation</span><div id="addr"></div></figure>
+<div class="key"><p><strong>Rule of thumb (slide 18):</strong> use a new entity set when several values may exist, or when the value has useful internal structure. If we need to store several values or describe the value itself, choose an entity.</p></div>
+<p>Chapter 10 shows a lighter alternative from the textbook, the <em>multivalued attribute</em> (a double oval), and Chapter 11 shows that both designs turn into the same kind of extra table.</p>
+
+<h2>3. Design principles (slides 19–20)</h2>
+<p>ER diagrams are not only about notation. A diagram should represent what is actually true in the domain, the same fact should not be modeled in several ways, and each kind of fact should use the right element (entity set, relationship or attribute). The guiding question for every fact: <em>what does this fact mean in the real world, and where does it naturally belong in the ER model?</em> The slides give four principles, which match the design principles in the textbook (Garcia-Molina et al., §4.2: faithfulness, avoiding redundancy, simplicity, choosing the right kind of element).</p>
+
+<h3>Principle 1: represent the domain (slide 21)</h3>
+<figure><div class="figrow"><div id="p1a"></div><div id="p1b"></div></div></figure>
+<p>Draw a relationship only when that association is actually true and useful for the system to remember. A store's database records which <em>person</em> made which <em>purchase</em> of which <em>product</em>: that is a real, useful fact. A relationship <em>isPresident</em> between Person and Country may be true in the world, but a shop has no use for it, and if we drew it we would have to keep it correct. The textbook calls this <b class="term">faithfulness</b>: the design must be faithful to the requirements, neither missing what they need nor adding what they do not. Faithfulness also covers multiplicity: if the real rule is "a course can have several instructors", the diagram must not say one.</p>
+
+<h3>Principle 2: avoid duplication (slide 22)</h3>
+<figure><div id="p2"></div><figcaption>Slide 22: Movie has an attribute studioName <em>and</em> a relationship ownedBy to Studio, which has its own name.</figcaption></figure>
+<p>If <em>ownedBy</em> already connects a movie to its studio, storing <em>studioName</em> on Movie repeats the same fact. Redundancy has two costs. It wastes space, and, worse, the two copies can disagree: if a studio is renamed and only one copy is updated, the database contradicts itself. The fix is simple: delete the attribute studioName from Movie; the studio's name is reachable through ownedBy.</p>
+
+<h3>Principle 3: choose the right element (slide 23)</h3>
+<figure><span class="anim-tag">Animation</span><div id="p3"></div></figure>
+<p>Here the relationship <em>purchase</em> carries <em>personName</em> and <em>personAddr</em>. These two attributes describe a person, not a purchase, so they indicate a <strong>missing Person entity set</strong>. With the attributes on the relationship, a person who buys ten things has their address stored ten times (duplication again), and a person who has not bought anything yet cannot be stored at all. The animation repairs the design by making Person an entity set and connecting it to purchase; <em>date</em> stays on purchase because it really describes one purchase.</p>
+
+<h3>Principle 4: do not overcomplicate (slide 24)</h3>
+<figure><div id="p4"></div><figcaption>Slide 24: Date is made an entity set with a single attribute <em>date</em>.</figcaption></figure>
+<p>The opposite mistake is to create an entity set for every value. A date may simply be an attribute of a relationship. Here Date adds structure without adding meaning: an entity set with one attribute and no relationships of its own is just a value dressed up as a box. Make Date an entity only if dates have their own facts or relationships (for example a calendar of holidays with a name and a flag "office closed"). The principle: <em>model enough structure to capture meaning</em>, and no more. The textbook's version is <b class="term">simplicity counts</b>.</p>
+
+<div class="q">
+<h4>Question (worked answer): Principles 3 and 4 seem to pull in opposite directions. How do we decide?</h4>
+<p>Use slide 16's question for each fact. personName and personAddr are facts <em>about something else</em> (a person) that has its own identity and appears in many purchases: that something deserves an entity set (Principle 3). The date is one value that describes the purchase itself and has nothing further to say about it: it stays an attribute (Principle 4). In short, promote a value to an entity set when it has its own attributes, identity or relationships; keep it as an attribute when it is a single descriptive value.</p>
+</div>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+
+<h3>Exam questions</h3>
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 215 | L-2/T-2 | 2018–19 · 10 marks</div>
+  <div class="exam-q"><p>How can redundancy and incompleteness lead to a bad database design? Explain with appropriate examples.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><strong>Redundancy</strong> means the same fact is stored more than once (Principle 2). Example: a single table <code>Emp_Dept(emp_id, emp_name, dept_id, dept_name)</code> stores the department name once per employee of that department.</p>
+    <div class="tbl"><table><tr><th>emp_id</th><th>emp_name</th><th>dept_id</th><th>dept_name</th></tr>
+    <tr><td>E101</td><td>Alice</td><td>D01</td><td>Engineering</td></tr><tr><td>E102</td><td>Bob</td><td>D02</td><td>Marketing</td></tr><tr><td>E103</td><td>Charlie</td><td>D01</td><td>Engineering</td></tr></table></div>
+    <p>It causes three anomalies. <em>Update anomaly:</em> renaming D01 must change every Engineering row; if one row is missed the data contradicts itself. <em>Insertion anomaly:</em> a new department D03 Finance with no employees cannot be stored, because every row needs an emp_id (the key). <em>Deletion anomaly:</em> deleting Bob, the only Marketing employee, also deletes the fact that D02 is called Marketing. It also wastes space. In ER terms the department name is a fact about a Department, so Department should be its own entity set connected to Employee by worksIn; the schema becomes <code>Department(dept_id, dept_name)</code> and <code>Employee(emp_id, emp_name, dept_id → Department)</code>, where each department name is stored once.</p>
+    <p><strong>Incompleteness</strong> means the design cannot record facts the requirements need (a failure of Principle 1, faithfulness). Examples: (1) an Employee entity with attributes addr1, addr2 cannot store a fourth address (slide 17); (2) a Patient table with one column <code>prescribed_drug</code> cannot store a patient taking three drugs, nor the date, dose or prescribing doctor of each prescription, so history is lost every time the column is overwritten; (3) an enrollment design without a semester attribute cannot record that a student retook a course. Incompleteness forces users to cram several values into one column (breaking first normal form), invent dummy values, or lose information.</p>
+    <p>The fix for incompleteness is to model the missing structure: a Prescription relationship between Patient and Drug (and Doctor) with attributes date and dose, or an Address entity set. A good design is therefore both <em>non-redundant</em> (each fact once) and <em>complete</em> (every required fact has a place).</p>
+    <figure><div id="exInc"></div><figcaption>The complete design for the prescription example: each prescription is one (patient, drug) pair with its own date and dose.</figcaption></figure>
+  </div></details>
+</div>
+
+<div class="key">
+<p><strong>Summary:</strong> a fact that is fixed only when two or more entities are paired belongs on the relationship. Promote a value to an entity set when several values may exist, when it has internal structure, or when it connects to other things; keep single descriptive values as attributes. Represent only true and useful facts, store each fact once, put each fact on the right element, and add no structure that carries no meaning.</p>
+</div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="lecture.js"></script>
+<script>
+const two = (A, R, B, extra = {}) => ({ n: [[A, 'E', 0, 0], [R, 'R', 175, 0], [B, 'E', 350, 0]], l: [[A, R, extra.la || {}], [B, R, extra.lb || {}]], a: extra.a || [] });
+$('#grade').innerHTML = erd(two('Student', 'enrolls', 'Course', { a: [['enrolls', 'grade', 0, 65]] }));
+$('#emp1').innerHTML = erd({ n: [['Employee', 'E', 0, 0]], a: [['Employee', 'name', -70, -55], ['Employee', 'salary', 70, -55]] });
+$('#emp2').innerHTML = erd({ n: [['Employee', 'E', 0, 0]], a: [['Employee', 'addr1', -75, -55], ['Employee', 'addr2', 75, -55], ['Employee', 'addr3', 0, 65]] });
+const ADDR = { n: [['Employee', 'E', 0, 240], ['addrOf', 'R', 0, 130], ['Address', 'E', 0, 30], ['Employee2', 'E', 0, 240, 'Employee']],
+  a: [['Employee', 'addr1', -110, -10], ['Employee', 'addr2', 110, -10], ['Employee', 'addr3', 0, 60], ['Address', 'street', -120, -40], ['Address', 'city', 0, -60], ['Address', 'postal_code', 125, -40]],
+  l: [['Address', 'addrOf'], ['Employee2', 'addrOf']] };
+erdSteps('#addr', ADDR, [
+  { set: ['Employee', 'Employee.addr1', 'Employee.addr2', 'Employee.addr3'], cap: 'Slide 17\'s design: one attribute per address. How many should there be?' },
+  { set: ['Employee', 'Employee.addr1', 'Employee.addr2', 'Employee.addr3'], hl: ['Employee.addr1', 'Employee.addr2', 'Employee.addr3'], cap: 'The repeated attributes are the warning sign: several values of the same kind, each with hidden structure (street, city, postal code).' },
+  { set: ['Employee2', 'Address', 'Address.street', 'Address.city', 'Address.postal_code'], hl: ['Address'], cap: 'Make Address an entity set. Its structure becomes attributes: street, city, postal_code.' },
+  { add: ['addrOf'], hl: ['addrOf'], cap: 'Connect it with the relationship addrOf. Now an employee can have any number of addresses (slide 18).' },
+]);
+$('#p1a').innerHTML = erd(two('Product', 'purchase', 'Person'));
+$('#p1b').innerHTML = erd(two('Person', 'isPresident', 'Country'));
+$('#p2').innerHTML = erd({ ...two('Movie', 'ownedBy', 'Studio', { lb: { one: true }, a: [['Movie', 'studioName', 0, 65], ['Studio', 'name', 0, 65]] }) }, { hl: ['Movie.studioName'] });
+const P3 = { n: [['Product', 'E', 0, 0], ['purchase', 'R', 190, 0], ['Store', 'E', 380, 0], ['Person', 'E', 190, 150]],
+  a: [['purchase', 'date', 0, -65], ['purchase', 'personName', -85, 62], ['purchase', 'personAddr', 85, 62], ['Person', 'name', -95, 40], ['Person', 'addr', 95, 40]],
+  l: [['Product', 'purchase'], ['Store', 'purchase'], ['Person', 'purchase']] };
+erdSteps('#p3', P3, [
+  { set: ['Product', 'purchase', 'Store', 'purchase.date', 'purchase.personName', 'purchase.personAddr'], cap: 'Slide 23: purchase carries date, personName and personAddr.' },
+  { add: [], hl: ['purchase.personName', 'purchase.personAddr'], cap: 'personName and personAddr describe a <em>person</em>, not a purchase. They point to a missing entity set.' },
+  { set: ['Product', 'purchase', 'Store', 'purchase.date', 'Person', 'Person.name', 'Person.addr'], hl: ['Person'], cap: 'Repaired: Person is an entity set with name and addr, connected to purchase. A person\'s address is now stored once, and date stays on purchase.' },
+]);
+$('#p4').innerHTML = erd({ n: [['Product', 'E', 0, 0], ['Store', 'E', 300, 0], ['purchase', 'R', 150, 55], ['Person', 'E', 0, 115], ['Date', 'E', 300, 115]],
+  a: [['Date', 'date', 105, 0]], l: [['Product', 'purchase'], ['Store', 'purchase'], ['Person', 'purchase'], ['Date', 'purchase']] }, { hl: ['Date'] });
+$('#exInc').innerHTML = erd({ n: [['Patient', 'E', 0, 0], ['prescribed', 'R', 200, 0], ['Drug', 'E', 400, 0]],
+  a: [['Patient', '_patient_id', -40, -60], ['Drug', '_drug_code', 40, -60], ['prescribed', 'date', -55, 62], ['prescribed', 'dose', 55, 62]], l: [['Patient', 'prescribed'], ['Drug', 'prescribed']] });
+
+flashcards('#cards', [
+  { f: 'Relationship attribute', b: 'A fact whose value is fixed only once the related entities are fixed, e.g. grade on enrolls.' },
+  { f: 'When to make a value an entity', b: 'When several values may exist, when it has internal structure, or when it connects to other things.' },
+  { f: 'Principle 1', b: 'Represent the domain: draw only associations that are true and useful to remember (faithfulness).' },
+  { f: 'Principle 2', b: 'Avoid duplication: model each fact once (studioName on Movie repeats ownedBy).' },
+  { f: 'Principle 3', b: 'Choose the right element: personName on purchase reveals a missing Person entity set.' },
+  { f: 'Principle 4', b: 'Do not overcomplicate: a Date entity with one attribute adds structure without meaning.' },
+]);
+quiz('#quiz', [
+  { q: 'A library stores the date on which a member borrowed a book. Where does borrow_date go?', opts: ['On Member', 'On Book', 'On the relationship borrows', 'In a new entity set Date'], a: 2, why: 'It is fixed only when a member and a book are paired: a relationship attribute.' },
+  { q: 'An Employee entity has phone1, phone2, phone3. Which principle does the slide use to fix it?', opts: ['Do not overcomplicate', 'Model repeating values as entities', 'Represent the domain', 'Avoid duplication'], a: 1, why: 'Slides 17–18: several values of the same kind become an entity set (or, in Chapter 10, a multivalued attribute).' },
+  { q: 'Movie has attribute studioName and relationship ownedBy to Studio. What should change?', opts: ['Remove ownedBy', 'Remove studioName from Movie', 'Add studioName to Studio', 'Nothing'], a: 1, why: 'ownedBy already gives the studio, so studioName repeats the same fact (Principle 2).' },
+  { q: 'Why is an entity set Date with the single attribute date a poor choice in slide 24?', opts: ['Dates cannot be keys', 'It adds structure without adding meaning', 'Dates must be strings', 'Relationships cannot have dates'], a: 1, why: 'It has no facts or relationships of its own (Principle 4).' },
+  { q: 'Which fact is best modeled as an entity set?', opts: ['An employee\'s salary', 'A student\'s date of birth', 'A department with a name, a building and a head', 'A product\'s price'], a: 2, why: 'A department has its own attributes and relationships; the others are single descriptive values.' },
+]);
+ask('#try1', { q: 'Customers rate products from 1 to 5, at most once per product. On which element does <code>rating</code> go? (type the element: customer, product or relationship)', a: ['relationship', 'the relationship', 'rates', 'reviews'], hint: 'For one customer there are many ratings; for one product there are many ratings.', why: 'The rating is fixed only for a (customer, product) pair, so it belongs on the relationship (slides 54–55).' });
+</script>
+</body>
+</html>

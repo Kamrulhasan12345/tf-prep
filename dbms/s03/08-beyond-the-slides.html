@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Exam Topics Beyond the Slides · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="../s02/lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 03 (Sukarna) · Chapter 8 · Book §19.1.3, §18.6, §18.7</div>
+<h1>Exam Topics Beyond the Slides</h1>
+<p class="lede">Past concurrency-control papers also ask about three things Lec 02–03's slides do not teach: strict two-phase locking and cascading rollback, locking at several granularities, and locking B-tree nodes with the tree protocol. Each gets a short textbook-based explanation here, followed by its exam questions.</p>
+
+<h2>1. Strict 2PL and cascading rollback (textbook §19.1)</h2>
+<p>Lec 04 covers this in full; here is what the exam questions need.</p>
+<dl class="def">
+  <dt>Dirty data</dt><dd>A value written by a transaction that has not yet committed.</dd>
+  <dt>Cascading rollback</dt><dd>When T aborts, every transaction U that read dirty data written by T must also be rolled back (it used a value that is being undone), then every transaction that read from U, and so on.</dd>
+  <dt>Recoverable schedule</dt><dd>Each transaction commits only after every transaction it read from has committed. (Otherwise a committed transaction might depend on one that later aborts.)</dd>
+  <dt>ACR schedule (avoids cascading rollback)</dt><dd>Transactions read only values written by committed transactions. Every ACR schedule is recoverable.</dd>
+  <dt>Strict two-phase locking</dt><dd>A transaction must not release any exclusive lock (any lock that allows writing) until it has committed or aborted, and the commit or abort log record has been flushed to disk. Strict 2PL transactions are 2PL.</dd>
+</dl>
+<p>Basic 2PL allows cascading rollback: T₁ may write A, unlock A in its shrinking phase, T₂ reads A, and then T₁ aborts. Strict 2PL stops this by keeping the write lock until the outcome of T₁ is known.</p>
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div class="figrow"><div><div class="figlabel">basic 2PL: T₂ reads dirty A</div><div id="b2pl"></div></div><div><div class="figlabel">strict 2PL: T₂ waits for T₁'s outcome</div><div id="s2pl"></div></div></div>
+</figure>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 23-24 5b · 5 marks (Compulsory) &nbsp;|&nbsp; DB QB · 22-23 1d · 5 marks (Compulsory) &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-1 | 2023–24 · 5 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-1 | 2022–23 · 5 marks</div>
+  <div class="exam-q"><p>(23-24) Show that a "strict" two-phase locking (2PL) schedule avoids cascading rollback.<br>(22-23) Show that a schedule satisfying strict 2PL (two-phase locking) is ACR (avoids cascading rollback).</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+  <p><b>Claim.</b> In a schedule of strict 2PL transactions, no transaction reads dirty data; hence the schedule is ACR, and no abort can force another rollback.</p>
+  <p><b>Proof.</b> Suppose transaction U reads element X, and the value it reads was written by another transaction T: so w<sub>T</sub>(X) precedes r<sub>U</sub>(X).</p>
+  <ol>
+    <li>By consistency, T held an exclusive lock on X when it executed w<sub>T</sub>(X), and U holds a shared (or exclusive) lock on X when it executes r<sub>U</sub>(X).</li>
+    <li>By legality, these locks cannot be held at the same time (X is incompatible with S and X). So T must release its exclusive lock on X, u<sub>T</sub>(X), before U's lock on X is granted, and therefore before r<sub>U</sub>(X).</li>
+    <li>By strictness, T releases its exclusive lock on X only after it has committed or aborted. If T aborted, its write of X was undone before the release, so U would not read T's value at all. Hence T had <b>committed</b> before r<sub>U</sub>(X).</li>
+  </ol>
+  <p>So every value any transaction reads was written by a committed transaction: the schedule is ACR. If some transaction aborts, nobody has read its writes, so no other transaction needs to roll back: no cascading rollback. (The schedule is also recoverable, since ACR implies recoverable, and conflict-serializable, since strict 2PL transactions are 2PL.)</p>
+  <p><b>Example.</b> T₁: xl₁(A); w₁(A); … and T₂: sl₂(A); r₂(A). Under strict 2PL, sl₂(A) is denied until T₁ commits (or aborts and restores A), so T₂ never sees T₁'s uncommitted A (right animation above).</p>
+  </div></details>
+</div>
+
+<h2>2. Locks at several granularities (textbook §18.6)</h2>
+<p>A “database element” can be a whole relation, a block, or a tuple. Large elements mean few locks but little concurrency (one deposit at a time if the whole accounts relation is locked); small elements mean much concurrency but many locks to manage. Some applications need both: tuple locks for updates, and a relation-wide lock for an audit that reads every account.</p>
+<p>Mixing sizes naively is unsafe: a shared lock on the relation for the audit must not coexist with exclusive locks on some of its tuples. The <b class="term">warning protocol</b> solves this with intention locks IS and IX (“I intend to lock something below in S / X mode”):</p>
+<ol>
+  <li>To lock any element in S or X, start at the root of the hierarchy (relation → blocks → tuples).</li>
+  <li>At the element you want, request S or X.</li>
+  <li>At each element above it, request IS (if you will want S below) or IX (if X below), and go down only once it is granted.</li>
+</ol>
+<div class="tbl"><table style="width:auto;text-align:center"><tr><th>held \ requested</th><th>IS</th><th>IX</th><th>S</th><th>X</th></tr>
+<tr><th>IS</th><td>Yes</td><td>Yes</td><td>Yes</td><td>No</td></tr><tr><th>IX</th><td>Yes</td><td>Yes</td><td>No</td><td>No</td></tr><tr><th>S</th><td>Yes</td><td>No</td><td>Yes</td><td>No</td></tr><tr><th>X</th><td>No</td><td>No</td><td>No</td><td>No</td></tr></table></div>
+<p>Two transactions that intend to work on different parts (IS/IX, IX/IX) can coexist at the relation and sort out real conflicts at the tuple level; an S lock on the whole relation excludes any intention to write below it (IX), and an X lock on it excludes everything. Insertions are treated as writes of the whole relation to avoid phantoms (§18.6.3).</p>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2013–14 · 5 marks</div>
+  <div class="exam-q"><p>What are the tradeoffs of locking with multiple granularities?</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+  <ul>
+    <li><b>Coarse granules (relations, files)</b>: few locks to request and store, small lock-table, cheap for transactions that touch much of the data (scans, audits, aggregations); but low concurrency, because transactions that touch different tuples of the same relation still block each other (e.g., only one deposit at a time on a locked accounts relation).</li>
+    <li><b>Fine granules (tuples)</b>: maximum concurrency for transactions touching few tuples; but many lock requests and a large lock table (memory and CPU overhead), and a scan of a big relation must take thousands of locks.</li>
+    <li><b>Multiple granularity</b> lets each transaction choose: a scan takes one S lock on the relation, an update takes IX on the relation and X on one tuple. The cost is extra intention locks (every lock request must lock all ancestors in IS/IX first, top-down, and release bottom-up), a more complex compatibility matrix and group modes (e.g., SIX), and choosing the right level (systems may “escalate” many tuple locks to one relation lock). Phantoms still need care: inserting a tuple must be treated as a write of the relation (or of an index range).</li>
+  </ul>
+  <p>Example (textbook Example 18.21): T₁ reads the King Kong tuples (IS on Movie, S on each tuple) while T₂ updates Gone With the Wind (IX on Movie, X on that tuple). IS and IX are compatible, so both run concurrently; with only a relation-level lock one would wait.</p>
+  </div></details>
+</div>
+
+<h2>3. Locking B-trees: the tree protocol (textbook §18.7)</h2>
+<p>Treat each node of a B-tree (or B+ tree) as a lockable element. Every index operation starts at the root. Under 2PL a transaction cannot unlock the root until it has acquired all its locks, and since an insert or delete might split or merge nodes all the way up, a modifying transaction needs at least an update lock on the root. So <strong>only one modifying transaction at a time can use the index</strong>: 2PL serializes all index updates at the root.</p>
+<p>Usually, though, a transaction can tell after one step that the root will not change: if it inserts and the child it moves to is not full, the split cannot reach the root (for a delete: the child has more than the minimum number of keys). It would like to release the root immediately, which 2PL forbids. The <b class="term">tree protocol</b> allows it:</p>
+<ol>
+  <li>A transaction's first lock may be on any node of the tree (in a B-tree, the root).</li>
+  <li>Each later lock may be acquired only while the transaction holds a lock on the node's <em>parent</em>.</li>
+  <li>Nodes may be unlocked at any time.</li>
+  <li>A node that was unlocked may not be relocked by the same transaction.</li>
+</ol>
+<p>Transactions are consistent and schedules legal, but they need not be 2PL. Every legal schedule of such transactions is still serializable: if two transactions both lock some node, the one that locked it first must lock every common node first (it is always ahead on the shared path from the top), so the precedence relation “locks a common node first” has no cycles. In practice this is “lock coupling” or “crabbing”: lock the child, then release the parent if the child is safe.</p>
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="crab"></div>
+<figcaption><b>Figure 2.</b> Lock coupling. T₁ (blue) inserts into leaf D, T₂ (green) inserts into leaf G. Each releases the parent as soon as the child is known to be safe, so T₂ enters the tree long before T₁ finishes.</figcaption>
+</figure>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 215 | L-2/T-2 | 2017–18 · 7 marks</div>
+  <div class="exam-q"><p>“Two-phase locking is efficient for B+ tree index structure” — Justify this statement using illustrative examples.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+  <p>The statement is <b>not true</b> as written; the justification shows why, and what is used instead.</p>
+  <ul>
+    <li>Every search, insert or delete enters a B+ tree at the root. Under 2PL a transaction may not unlock the root until its lock point, i.e. until it has acquired every lock it needs, usually at commit.</li>
+    <li>An insert or delete might split or merge nodes up to the root, so it needs an update or exclusive lock on the root. Hence under 2PL <b>at most one updating transaction can use the index at a time</b>; all others wait at the root. Example: T₁ inserts key 15 and holds X on the root while it works on a leaf; T₂, inserting key 90 into a completely different leaf, waits for T₁ to commit.</li>
+    <li>But in the usual case the root is never modified: if the child T₁ visits is not full, no split can propagate upward, so the root lock could be released at once. 2PL forbids that.</li>
+  </ul>
+  <p>The efficient approach is the <b>tree protocol</b> (lock coupling): lock a node only while holding its parent; release a node as soon as it cannot change (the child is safe); never relock. In Figure 2, T₂ starts as soon as T₁ has released the root, and the two inserts proceed in parallel in different subtrees. The tree protocol is not 2PL, yet it guarantees serializability, because transactions that meet in the tree always meet in the same order along every shared path.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2013–14 · 15 marks</div>
+  <div class="exam-q"><p>Why does two-phase locking not work for B+ tree index structures? Write down the rules for accessing tree-structured data that ensure a serial order of transactions in a schedule.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+  <p><b>Why 2PL does not work well.</b> All accesses to a B+ tree begin at the root. Any insert or delete may in principle rewrite the root (splits and merges propagate upward), so a modifying transaction must lock the root in update or exclusive mode, and under 2PL it cannot release that lock until it has taken all its locks (in practice, until commit). So only one transaction that is not read-only can be in the index at any time: the root becomes a bottleneck and the index is effectively single-user. 2PL is correct but gives almost no concurrency. Releasing the root early, when the child visited is safe (not full for inserts, more than minimally full for deletes), would fix that, but it violates 2PL.</p>
+  <p><b>Tree protocol rules</b> (one lock mode; consistent transactions; legal schedules; no 2PL requirement):</p>
+  <ol>
+    <li>A transaction's first lock may be at any node of the tree.</li>
+    <li>Subsequent locks may be acquired only if the transaction currently holds a lock on the parent node.</li>
+    <li>Nodes may be unlocked at any time.</li>
+    <li>A transaction may not relock a node it has unlocked, even if it still holds the node's parent.</li>
+  </ol>
+  <p><b>Why a serial order exists.</b> Say T<sub>i</sub> &lt;<sub>S</sub> T<sub>j</sub> if they lock a common node and T<sub>i</sub> locks it first. If T<sub>i</sub> and T<sub>j</sub> lock several common nodes, then the highest common node is locked first by one of them, say T<sub>i</sub>; to reach any lower common node, T<sub>j</sub> must pass through its parent while T<sub>i</sub> is ahead on the same path, so T<sub>i</sub> locks every common node first. Hence the relation is consistent on every node, its precedence graph is acyclic (textbook §18.7.3), and any topological order is an equivalent serial order.</p>
+  <p>Example (textbook Fig. 18.31): T₁ locks A, B, then C, unlocks A, then locks D (allowed: it holds B, D's parent); it is not 2PL, but the schedule is serializable.</p>
+  </div></details>
+</div>
+
+<div class="key"><p><strong>Summary:</strong> strict 2PL holds write locks until commit or abort, so nobody reads uncommitted data and aborts never cascade. Multiple-granularity locking uses intention locks (IS, IX) on ancestors so that relation, block and tuple locks can coexist; it trades lock overhead against concurrency. 2PL serializes all updates of a B-tree at its root; the tree protocol (lock a node only while holding its parent, unlock any time, never relock) releases ancestors early and still guarantees serializability.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../s02/lecture.js"></script>
+<script>
+stepper('#b2pl', CC.lockSteps(CC.parse('xl1(A) w1(A) u1(A) sl2(A) r2(A) a1').acts).steps.map((s, i, a) => i === a.length - 1 ? { ...s, cap: s.cap + ' <b class="bad">T₂ read T₁\'s dirty A, so T₂ must be rolled back too: a cascading rollback.</b>' } : s), { interval: 2300 });
+stepper('#s2pl', CC.lockSteps(CC.parse('xl1(A) w1(A) sl2(A) a1 r2(A) u2(A)').acts).steps.map((s, i, a) => i === a.length - 1 ? { ...s, cap: s.cap + ' T₂ read A only after T₁\'s abort undid its write: no cascade.' } : s), { interval: 2300 });
+// lock coupling animation on a small tree
+(() => {
+  const N = { A: [300, 30], B: [160, 110], C: [440, 110], D: [80, 190], E: [240, 190], F: [360, 190], G: [520, 190] };
+  const E = [['A', 'B'], ['A', 'C'], ['B', 'D'], ['B', 'E'], ['C', 'F'], ['C', 'G']];
+  const draw = (t1, t2) => {
+    let s = E.map(([p, c]) => `<path d="M${N[p][0]} ${N[p][1] + 14} L${N[c][0]} ${N[c][1] - 14}" class="s-fg"/>`).join('');
+    for (const [k, [x, y]] of Object.entries(N)) {
+      const a = t1.includes(k), b = t2.includes(k);
+      s += `<rect x="${x - 34}" y="${y - 14}" width="68" height="28" rx="4" class="${a ? 'cell' : b ? 'cell-new' : 'cell-plain'}" ${a || b ? 'style="stroke-width:2.5"' : ''}/><text x="${x}" y="${y + 5}" text-anchor="middle" class="big">${k}</text>`;
+      if (a) s += `<text x="${x}" y="${y - 20}" text-anchor="middle" class="lbl acc">T₁</text>`;
+      if (b) s += `<text x="${x}" y="${y - 20}" text-anchor="middle" class="lbl grn">T₂</text>`;
+    }
+    return `<svg viewBox="0 0 600 220" width="600" role="img" aria-label="B-tree with locks">${s}</svg>`;
+  };
+  stepper('#crab', [
+    { html: draw(['A'], []), cap: 'T₁ (insert into D) locks the root A. Under 2PL it would keep this lock until commit.' },
+    { html: draw(['A', 'B'], []), cap: 'T₁ locks B while holding its parent A (rule 2). B is not full, so a split below cannot reach A.' },
+    { html: draw(['B'], []), cap: 'T₁ <b>releases A</b> at once (rule 3). Not 2PL, but allowed by the tree protocol.' },
+    { html: draw(['B'], ['A']), cap: 'T₂ (insert into G) can now lock the root.' },
+    { html: draw(['B', 'D'], ['A', 'C']), cap: 'T₁ locks leaf D while holding B; T₂ locks C while holding A.' },
+    { html: draw(['D'], ['C']), cap: 'D and C are safe, so T₁ releases B and T₂ releases A.' },
+    { html: draw(['D'], ['C', 'G']), cap: 'T₂ locks G. Both inserts proceed in parallel in different leaves. Neither may relock a node it released (rule 4).' },
+  ]);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Exam Topics Beyond the Slides · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 04 (Sukarna) · Chapter 9 · Beyond the slides · Book §6.6, §17.1</div>
+<h1>Exam Topics Beyond the Slides: ACID, Transaction States, Buffers and Isolation Levels</h1>
+<p class="lede">The question banks for this lecture also ask about the ACID properties, the states of a transaction, how data moves between disk, buffers and a transaction, and the SQL isolation levels. The Lec 04 slides do not teach these, but the questions keep appearing, so each topic is taught briefly here and then every such question is answered.</p>
+
+<h2>1. Transactions and the ACID properties</h2>
+
+<p>A <b class="term">transaction</b> is a sequence of database operations that the system treats as one logical unit of work, such as "transfer 100 taka from account A to account B": read A, subtract 100, write A, read B, add 100, write B, commit. The DBMS promises four properties for every transaction, known by their initials as ACID.</p>
+
+<dl class="def">
+  <dt>Atomicity ("all or nothing")</dt><dd>Either all of the transaction's operations take effect, or none of them do. If it fails half-way, its partial changes are undone. Enforced by the <b>recovery manager</b> using the log (undo), and by rollback on abort.</dd>
+  <dt>Consistency</dt><dd>A transaction run alone on a consistent database leaves it consistent: all integrity constraints (keys, foreign keys, CHECK constraints, business rules such as "A + B is unchanged by a transfer") hold before and after. Ensured by the <b>application programmer</b> writing correct transactions and by the DBMS checking declared constraints.</dd>
+  <dt>Isolation</dt><dd>Concurrent transactions do not see each other's intermediate states; the result of a concurrent execution is as if the transactions ran one at a time in some order (serializability). Enforced by the <b>scheduler</b> (concurrency control: locking, timestamps, validation).</dd>
+  <dt>Durability</dt><dd>Once a transaction has committed, its effects survive any later failure (crash, power loss). Enforced by the <b>recovery manager</b>: the commit record and the changes are in the log on stable storage before the commit is acknowledged, and recovery redoes committed work.</dd>
+</dl>
+
+<p><strong>Why concurrent execution needs them.</strong> Running transactions concurrently raises throughput (one transaction uses the CPU while another waits for disk) and lowers waiting time. But interleaving creates anomalies that a serial execution never has: <em>lost updates</em> (two transfers both read A = 500, each subtracts, the second write overwrites the first), <em>dirty reads</em> (Chapter 1), <em>unrepeatable reads</em> (a value changes between two reads of the same transaction), and <em>phantoms</em> (new rows appear in a repeated query). Isolation rules these out; atomicity makes sure an aborted transaction (including one killed by the scheduler for a deadlock) leaves no trace; durability makes sure a crash in the middle of many interleaved transactions loses none of the committed ones; and together they preserve consistency.</p>
+
+<h2>2. Transaction states</h2>
+
+<p>The textbook used for the first half of the course (Silberschatz) describes the life of a transaction as five states:</p>
+<dl class="def">
+  <dt>Active</dt><dd>The initial state; the transaction stays here while it executes its operations.</dd>
+  <dt>Partially committed</dt><dd>After its final statement has executed. Its output may still be only in main memory, so a failure could still prevent it from committing.</dd>
+  <dt>Committed</dt><dd>After successful completion: enough information (the commit log record) is on stable storage that its updates can be recreated after a crash.</dd>
+  <dt>Failed</dt><dd>After it is discovered that normal execution can no longer proceed (logical error, constraint violation, deadlock victim, system failure).</dd>
+  <dt>Aborted</dt><dd>After the transaction has been rolled back and the database restored to its state before the transaction started. The system then either <b>restarts</b> it (if the cause was not its own logic, for example a deadlock or hardware failure) or <b>kills</b> it (internal logical error).</dd>
+</dl>
+<p>A transaction that has committed or aborted is said to be <b>terminated</b>. Step through the diagram:</p>
+
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="states"></div>
+</figure>
+
+<h2>3. Disk, buffers and the transaction's workspace (textbook §17.1)</h2>
+
+<p>Data lives in three places: the database on <b>disk</b>, <b>buffers</b> in main memory (a pool of disk blocks managed by the buffer manager), and the transaction's own <b>local workspace</b> (its program variables). Four primitive operations move data between them:</p>
+<div class="tbl"><table>
+  <tr><th>Operation</th><th>Moves</th><th>Issued by</th></tr>
+  <tr><td>INPUT(X)</td><td>disk block containing X → buffer</td><td>buffer manager</td></tr>
+  <tr><td>READ(X, t)</td><td>X in buffer → local variable t (does INPUT(X) first if X's block is not in a buffer)</td><td>transaction</td></tr>
+  <tr><td>WRITE(X, t)</td><td>local variable t → X in buffer (INPUT(X) first if needed). The buffer is now "dirty"; the disk is unchanged.</td><td>transaction</td></tr>
+  <tr><td>OUTPUT(X)</td><td>buffer containing X → disk</td><td>buffer manager (at its own time, or when the log/recovery rules require)</td></tr>
+</table></div>
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="buf"></div>
+</figure>
+<p>The key point for this lecture: a WRITE changes only the buffer. Another transaction reading X reads the buffer, which is why dirty data "may be in buffers, on disk, or both" (Chapter 1). OUTPUT happens later and independently, which is why recovery needs the log.</p>
+
+<h2>4. SQL isolation levels (textbook §6.6)</h2>
+
+<p>Full serializability costs concurrency, so SQL lets a transaction choose a weaker <b>isolation level</b>, declared with <code>SET TRANSACTION ISOLATION LEVEL …</code>. The levels are defined by which anomalies (phenomena) they allow:</p>
+<div class="tbl"><table>
+  <tr><th>Level</th><th>Dirty read</th><th>Non-repeatable read</th><th>Phantom</th><th>Typical lock implementation</th></tr>
+  <tr><td>READ UNCOMMITTED ("dirty reads")</td><td>possible</td><td>possible</td><td>possible</td><td>reads take no locks; writes hold X locks to commit</td></tr>
+  <tr><td>READ COMMITTED</td><td>no</td><td>possible</td><td>possible</td><td>X locks to commit (strict); S locks released right after each read</td></tr>
+  <tr><td>REPEATABLE READ</td><td>no</td><td>no</td><td>possible</td><td>S and X locks on rows held to commit (rigorous 2PL on rows)</td></tr>
+  <tr><td>SERIALIZABLE (default in the standard)</td><td>no</td><td>no</td><td>no</td><td>rigorous 2PL plus locks on ranges / predicates</td></tr>
+</table></div>
+<dl class="def">
+  <dt>Non-repeatable (unrepeatable) read</dt><dd>T reads a row, another transaction updates it and commits, and T reads the row again and sees a different value.</dd>
+  <dt>Phantom</dt><dd>T runs a query twice; between the runs another transaction inserts (or deletes) rows satisfying the query's condition and commits, so the second run sees new "phantom" rows.</dd>
+</dl>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+
+<h3>Exam questions</h3>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 20-21 2c · 5 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-2 | 2020–21 · 5 marks</div>
+  <div class="exam-q"><p>Explain ACID properties of transaction with an example.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+  <p>Example transaction T: transfer 100 from A to B. Initially A = 500, B = 200, total 700.</p>
+  <pre>T: read(A); A := A - 100; write(A); read(B); B := B + 100; write(B); commit</pre>
+  <ul>
+    <li><strong>Atomicity:</strong> if the system crashes after write(A) but before write(B), A = 400 and B = 200 and 100 has vanished. Atomicity requires that the recovery manager undo write(A) (using the old value 500 from the log), so either both writes happen or neither.</li>
+    <li><strong>Consistency:</strong> the rule "A + B is unchanged by a transfer" holds before (700) and after (400 + 300 = 700). Writing T correctly is the programmer's job; declared constraints (e.g., CHECK (balance ≥ 0)) are enforced by the DBMS, which aborts T if they fail.</li>
+    <li><strong>Isolation:</strong> another transaction that computes A + B between write(A) and write(B) would see 400 + 200 = 600, a state that never "officially" existed. The scheduler (e.g., strict 2PL) makes it wait until T commits, so the result is as if the two ran one after the other.</li>
+    <li><strong>Durability:</strong> once T commits and the user is told "transfer done", A = 400 and B = 300 must survive a crash a moment later, even if the buffers had not yet been written to disk. The commit record and the new values are in the log on disk, and recovery redoes them.</li>
+  </ul>
+  <p>The question bank's answer is correct. It also draws a state diagram, which is covered by the transaction-states question below.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">DB QB · Jan 20 1a · 10 + 5 marks &nbsp;|&nbsp; BUET QBank · CSE 303 | L-3/T-1 | 2016–17 · 8 marks (also 2017–18, 2018–19)</div>
+  <div class="exam-q"><p>Explain the ACID properties of a transaction with an example. Why are these properties essential for the concurrent execution of transactions? (CSE 303 2016–17: "Briefly explain each of the ACID properties in DBMS.")</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+  <p><strong>The properties</strong> (with the transfer example of the previous question): Atomicity, all of T's actions happen or none (undo on failure, by the recovery manager); Consistency, T takes a consistent database to a consistent one (A + B preserved; programmer plus constraint checking); Isolation, concurrent execution is equivalent to some serial one (scheduler); Durability, committed effects survive failures (log on stable storage, redo).</p>
+  <p><strong>Why they are essential for concurrency.</strong> The DBMS interleaves the actions of many transactions to use the CPU and disks in parallel. Without the properties, interleaving would produce:</p>
+  <ul>
+    <li><em>Lost update</em> (needs isolation): T<sub>1</sub> and T<sub>2</sub> both read A = 500, T<sub>1</sub> writes 400, T<sub>2</sub> writes 450; T<sub>1</sub>'s withdrawal is lost. Serializable scheduling forbids this.</li>
+    <li><em>Dirty read and cascading effects</em> (needs isolation and atomicity): T<sub>2</sub> reads T<sub>1</sub>'s uncommitted A, then T<sub>1</sub> aborts (it may even be aborted by the scheduler itself as a deadlock victim). Atomicity must erase T<sub>1</sub>, and the scheduler must keep T<sub>2</sub> from building on its value (ACR / strict 2PL, Chapters 2–3).</li>
+    <li><em>Inconsistent analysis</em> (isolation): a report summing all balances while transfers run sees money "in flight".</li>
+    <li><em>Crash with many transactions in progress</em> (atomicity + durability): after the crash, the half-done transactions must be undone and every committed one preserved, otherwise the interleaved state is meaningless. The recovery manager can do this only if the schedule is recoverable.</li>
+  </ul>
+  <p>Consistency is the goal; atomicity, isolation and durability are what let the system keep it while transactions overlap and fail. The question bank's answer is correct.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2013–14 · 8 marks &nbsp;|&nbsp; BUET QBank · CSE 303 | L-3/T-1 | 2011–12 · 12 marks</div>
+  <div class="exam-q"><p>(2013–14) What do you mean by the ACID properties of a DBMS? Give real-life examples (one for each property) showing the necessity of these properties.<br>(2011–12) What do you mean by the ACID properties in a DBMS? Give one example of each property of the ACID.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+  <p>ACID: the four guarantees a DBMS gives every transaction (definitions in section 1). One real-life example each:</p>
+  <ul>
+    <li><strong>Atomicity, ATM withdrawal/transfer:</strong> moving 500 from A to B is two updates. If the power fails after the debit, atomicity rolls the debit back, so money is not destroyed.</li>
+    <li><strong>Consistency, bank constraint:</strong> rule "balance ≥ 0" (a CHECK constraint). A withdrawal of 500 from an account holding 300 would violate it, so the transaction is rejected and aborted, and the database never records −200.</li>
+    <li><strong>Isolation, airline seat booking:</strong> two customers try to book the last seat at the same time. Without isolation both read "1 seat free" and both book it. With isolation (e.g., the first booking holds an exclusive lock on the seat row until commit) the second sees the seat taken.</li>
+    <li><strong>Durability, online payment:</strong> the shop shows "payment successful", then the server crashes. Durability guarantees that after restart the order and payment are still recorded, because the commit record was on disk before the success message.</li>
+  </ul>
+  <p>The question bank's answers are correct.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2012–13 · 5 marks</div>
+  <div class="exam-q"><p>Which two ACID properties are maintained by the Recovery Manager of a DBMS?</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+  <p><strong>Atomicity and durability.</strong></p>
+  <ul>
+    <li><strong>Atomicity:</strong> after a crash (or an abort) the recovery manager <em>undoes</em> the changes of every transaction that did not commit, using old values in the undo or undo/redo log, so incomplete transactions leave no trace.</li>
+    <li><strong>Durability:</strong> it <em>redoes</em> (or has already forced to disk, depending on the logging method) the changes of every transaction whose commit record is in the log, so committed work survives even if those changes were only in buffers at the time of the crash.</li>
+  </ul>
+  <p>Isolation is maintained by the scheduler (concurrency-control manager), and consistency by correct transactions plus integrity checking. The question bank's answer is correct.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2010–11 · 5 marks</div>
+  <div class="exam-q"><p>Explain the transaction states with the state diagram.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+  <p>The diagram is the animation in section 2. The states and transitions:</p>
+  <ul>
+    <li><strong>Active → Partially committed</strong> when the last statement has executed.</li>
+    <li><strong>Partially committed → Committed</strong> when the commit log record has been written to stable storage, so the updates can be reconstructed after any crash.</li>
+    <li><strong>Active → Failed</strong> on an error: constraint violation, user abort, deadlock victim, system failure.</li>
+    <li><strong>Partially committed → Failed</strong> if a failure occurs before the commit record reaches stable storage (for example, the log write fails or the system crashes).</li>
+    <li><strong>Failed → Aborted</strong> after rollback: all the transaction's changes are undone. Then the system restarts it (if the failure was external, e.g., deadlock or hardware) or kills it (if its own logic is wrong).</li>
+  </ul>
+  <p>Committed and aborted are the terminal states. Note: the question bank's answer says a committed transaction has "all its updates permanently stored in non-volatile storage". Strictly, committing only requires the <em>log</em> (including the commit record) to be on stable storage; the data blocks themselves may be written later, and redo recreates them after a crash.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 215 | L-2/T-2 | 2020–21 · 10 marks</div>
+  <div class="exam-q"><p>Show the relationship among memory buffer, transaction work area and disk storage. Explain how data A is read from disk for a transaction and data B is written to the disk for a transaction.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+  <p>The relationship is drawn in the animation of section 3: disk ⇄ buffer via INPUT/OUTPUT (buffer manager), buffer ⇄ transaction work area via READ/WRITE (transaction). A transaction never touches the disk directly.</p>
+  <p><strong>Reading A:</strong> the transaction issues READ(A, t). If the block containing A is not in a buffer, the buffer manager first performs INPUT(A), copying the block from disk into a free buffer frame (evicting another block if needed). Then the value of A is copied from the buffer into the local variable t in the transaction's work area.</p>
+  <p><strong>Writing B:</strong> the transaction computes the new value in a local variable u and issues WRITE(B, u). If B's block is not in a buffer, it is first brought in with INPUT(B). The value is copied from u into the buffer, which is now dirty; the disk still holds the old B. Later the buffer manager issues OUTPUT(B), copying the block to disk, either when it needs the frame, at a checkpoint, or when the logging rules require it (e.g., redo logging writes the log and commit record first; undo logging forces data before the commit record). Before that OUTPUT, the log record for the change must already be on disk (write-ahead logging), so that a crash can be recovered from.</p>
+  <p>The question bank's answer is correct.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 21-22 6c · 15 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-2 | 2021–22 · 15 marks</div>
+  <div class="exam-q"><p>The SQL standard defines three weak isolation levels: dirty reads, read committed, and repeatable reads. Compare these three levels with illustrative examples.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+  <p>"Dirty reads" is the textbook's name for READ UNCOMMITTED. All three are weaker than SERIALIZABLE; they differ in which anomalies they allow (table in section 4). Account A starts at 100.</p>
+  <p><strong>READ UNCOMMITTED (dirty reads allowed).</strong> T<sub>2</sub> may read data written by uncommitted transactions.</p>
+  <div class="tbl"><table class="s4-sch"><tr><th>T<sub>1</sub></th><th>T<sub>2</sub> (read uncommitted)</th></tr><tr><td>write(A) = 500</td><td></td></tr><tr><td></td><td>read(A) → 500 <b>(dirty)</b></td></tr><tr><td>abort (A back to 100)</td><td></td></tr><tr><td></td><td>commit, having used 500</td></tr></table></div>
+  <p><strong>READ COMMITTED.</strong> T<sub>2</sub> reads only committed values, so the dirty read above is impossible (T<sub>2</sub> waits for T<sub>1</sub>'s exclusive lock, or sees the last committed version). But reading the same item twice can give different answers:</p>
+  <div class="tbl"><table class="s4-sch"><tr><th>T<sub>1</sub></th><th>T<sub>2</sub> (read committed)</th></tr><tr><td></td><td>read(A) → 100</td></tr><tr><td>write(A) = 500; commit</td><td></td></tr><tr><td></td><td>read(A) → 500 <b>(non-repeatable read)</b></td></tr></table></div>
+  <p><strong>REPEATABLE READ.</strong> Rows T<sub>2</sub> has read stay locked (or its snapshot is kept) until T<sub>2</sub> commits, so T<sub>1</sub>'s update of A must wait and T<sub>2</sub> sees 100 both times. But new rows can still appear:</p>
+  <div class="tbl"><table class="s4-sch"><tr><th>T<sub>1</sub></th><th>T<sub>2</sub> (repeatable read)</th></tr><tr><td></td><td>SELECT COUNT(*) FROM account WHERE branch = 'Dhaka' → 5</td></tr><tr><td>INSERT a new Dhaka account; commit</td><td></td></tr><tr><td></td><td>same query → 6 <b>(phantom)</b></td></tr></table></div>
+  <p><strong>Comparison.</strong> Read uncommitted allows dirty reads, non-repeatable reads and phantoms; read committed prevents dirty reads only; repeatable read also prevents non-repeatable reads but allows phantoms; only serializable prevents all three. Each stronger level holds more locks for longer, so it gives more consistency and less concurrency. In GMUW's terms, read committed corresponds to strict locking of writes with short read locks, and repeatable read to rigorous locking of the tuples read. The question bank's answer is correct.</p>
+  </div></details>
+</div>
+
+<div class="key"><p><strong>Summary:</strong> ACID = atomicity (all or nothing, recovery manager), consistency (constraints preserved, programmer + DBMS checks), isolation (serializable interleaving, scheduler), durability (committed work survives, recovery manager). A transaction moves Active → Partially committed → Committed, or into Failed → Aborted (then restart or kill). Transactions READ/WRITE buffers; the buffer manager does INPUT/OUTPUT to disk. SQL's weaker isolation levels trade anomalies (dirty reads, non-repeatable reads, phantoms) for concurrency.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="lecture.js"></script>
+<script>
+// ---- transaction state diagram (animated) ----
+const ST = { act: [80, 140, 'Active'], pc: [320, 55, 'Partially committed'], com: [580, 55, 'Committed'], fail: [320, 225, 'Failed'], ab: [580, 225, 'Aborted'] };
+const ED = [['act', 'pc', 'last statement done'], ['pc', 'com', 'COMMIT on disk'], ['act', 'fail', 'error / abort'], ['pc', 'fail', 'failure before commit'], ['fail', 'ab', 'rollback done']];
+function stateSVG(on, edge) {
+  let s = '';
+  for (const [a, b, lab] of ED) {
+    const [x1, y1] = ST[a], [x2, y2] = ST[b], hot = edge === a + b, dx = x2 - x1, dy = y2 - y1, d = Math.hypot(dx, dy);
+    const sx = x1 + dx / d * 62, sy = y1 + dy / d * 24, ex = x2 - dx / d * 66, ey = y2 - dy / d * 27;
+    s += `<path d="M${sx} ${sy} L${ex} ${ey}" class="${hot ? 's-red' : 's-fg'}" marker-end="url(#${hot ? 'm-red' : 'm-fg'})"/>`;
+    const mx = (sx + ex) / 2, my = (sy + ey) / 2;
+    const [lx, ly, an] = a === 'pc' && b === 'fail' ? [mx + 8, my + 4, 'start'] : a === 'act' && b === 'pc' ? [mx - 8, my - 8, 'end'] : a === 'act' && b === 'fail' ? [mx - 8, my + 16, 'end'] : [mx, my - 7, 'middle'];
+    s += `<text x="${lx}" y="${ly}" text-anchor="${an}" class="lbl${hot ? ' red' : ''}">${lab}</text>`;
+  }
+  for (const k in ST) {
+    const [x, y, n] = ST[k];
+    s += `<rect x="${x - 62}" y="${y - 22}" width="124" height="44" rx="22" class="${on === k ? (k === 'com' ? 'cell-new' : k === 'ab' || k === 'fail' ? 'cell-del' : 'cell-hl') : 'cell'}"${on === k ? ' style="stroke-width:2.5"' : ''}/>`;
+    const parts = n.split(' ');
+    s += parts.length > 1 ? `<text x="${x}" y="${y - 3}" text-anchor="middle" class="big" style="font-size:12px">${parts[0]}</text><text x="${x}" y="${y + 13}" text-anchor="middle" class="big" style="font-size:12px">${parts[1]}</text>`
+                          : `<text x="${x}" y="${y + 5}" text-anchor="middle" class="big">${n}</text>`;
+  }
+  return `<svg viewBox="0 0 660 280" width="660" role="img" aria-label="transaction state diagram">${s}</svg>`;
+}
+stepper('#states', [
+  { html: stateSVG(null), cap: 'The five states. Committed and Aborted are terminal. Follow three lives of the transfer transaction T.' },
+  { html: stateSVG('act'), cap: '<b>Path 1.</b> T starts and is <b>active</b>: it reads A, writes A − 100, reads B, writes B + 100 (in buffers, logged).' },
+  { html: stateSVG('pc', 'actpc'), cap: 'Its last statement has executed: <b>partially committed</b>. The changes may exist only in memory; a crash now would still undo T.' },
+  { html: stateSVG('com', 'pccom'), cap: 'The COMMIT record reaches the log on disk: <b>committed</b>. Durability now guarantees the transfer survives any crash.' },
+  { html: stateSVG('act'), cap: '<b>Path 2.</b> T is active again, but A holds only 50, and a CHECK (balance ≥ 0) constraint is violated by A − 100.' },
+  { html: stateSVG('fail', 'actfail'), cap: 'Normal execution cannot continue: <b>failed</b>. (Being chosen as a deadlock victim also leads here.)' },
+  { html: stateSVG('ab', 'failab'), cap: 'All of T\'s changes are undone using the log: <b>aborted</b>. A logical error like this one means T is killed; after a deadlock or hardware failure T would be restarted.' },
+  { html: stateSVG('pc', 'actpc'), cap: '<b>Path 3.</b> T finished its statements and is partially committed…' },
+  { html: stateSVG('fail', 'pcfail'), cap: '…but the system crashes before the COMMIT record is on disk: <b>failed</b>. On restart, recovery treats T as incomplete…' },
+  { html: stateSVG('ab', 'failab'), cap: '…and rolls it back: <b>aborted</b>. Since the cause was external, T can be restarted.' },
+], { interval: 2400 });
+
+// ---- disk / buffer / workspace (animated) ----
+function bufSVG(st) {
+  const box = (x, y, w, h, t) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="6" class="cell-plain" style="fill:none"/><text x="${x + 8}" y="${y + 16}" class="lbl">${t}</text>`;
+  const cell = (x, y, lab, v, cls) => `<rect x="${x}" y="${y}" width="110" height="26" class="${cls || 'cell'}"/><text x="${x + 8}" y="${y + 17}" style="font-size:12px">${lab} = ${v}</text>`;
+  let s = box(10, 10, 170, 150, 'TRANSACTION WORK AREA') + box(260, 10, 170, 150, 'BUFFERS (main memory)') + box(510, 10, 170, 150, 'DISK');
+  s += cell(540, 50, 'A', st.dA, st.hot === 'dA' ? 'cell-hl' : '') + cell(540, 100, 'B', st.dB, st.hot === 'dB' ? 'cell-new' : '');
+  if (st.bA) s += cell(290, 50, 'A', st.bA, st.hot === 'bA' ? 'cell-hl' : '');
+  if (st.bB) s += cell(290, 100, 'B', st.bB, st.hot === 'bB' ? 'cell-del' : '');
+  if (st.t) s += cell(40, 50, 't', st.t, st.hot === 't' ? 'cell-hl' : '');
+  if (st.u) s += cell(40, 100, 'u', st.u, st.hot === 'u' ? 'cell-hl' : '');
+  const arr = (x1, x2, y, lab, on) => on ? `<path d="M${x1} ${y} H${x2}" class="s-red" marker-end="url(#m-red)"/><text x="${(x1 + x2) / 2}" y="${y - 6}" text-anchor="middle" class="red" style="font-size:11px;font-weight:600">${lab}</text>` : '';
+  s += arr(538, 404, 63, 'INPUT(A)', st.op === 'inA') + arr(288, 154, 63, 'READ(A,t)', st.op === 'rdA') + arr(152, 286, 113, 'WRITE(B,u)', st.op === 'wrB') + arr(402, 536, 113, 'OUTPUT(B)', st.op === 'outB') + arr(538, 404, 113, 'INPUT(B)', st.op === 'inB');
+  return `<svg viewBox="0 0 690 170" width="690" role="img" aria-label="disk, buffers and work area">${s}</svg>`;
+}
+const B0 = { dA: 500, dB: 200 };
+stepper('#buf', [
+  { html: bufSVG(B0), cap: 'Start: A = 500 and B = 200 are only on disk.' },
+  { html: bufSVG({ ...B0, bA: 500, op: 'inA', hot: 'bA' }), cap: 'T asks to read A. A\'s block is not in memory, so the buffer manager performs <b>INPUT(A)</b>: disk block → buffer.' },
+  { html: bufSVG({ ...B0, bA: 500, t: 500, op: 'rdA', hot: 't' }), cap: '<b>READ(A, t)</b>: the value is copied from the buffer into T\'s local variable t.' },
+  { html: bufSVG({ ...B0, bA: 500, t: 500, bB: 200, u: 300, op: 'inB', hot: 'u' }), cap: 'T computes u = 300 for B. B\'s block is brought in with INPUT(B) so it can be updated.' },
+  { html: bufSVG({ ...B0, bA: 500, t: 500, bB: 300, u: 300, op: 'wrB', hot: 'bB' }), cap: '<b>WRITE(B, u)</b>: the buffer now holds B = 300 (a dirty buffer). <b>The disk still says 200.</b> Other transactions reading B would see 300.' },
+  { html: bufSVG({ ...B0, dB: 300, bA: 500, t: 500, bB: 300, u: 300, op: 'outB', hot: 'dB' }), cap: 'Later, the buffer manager performs <b>OUTPUT(B)</b>: buffer → disk. With write-ahead logging, B\'s log record must be on disk before this happens.' },
+], { interval: 2400 });
+
+flashcards('#cards', [
+  { f: 'Atomicity', b: 'All or nothing. Recovery manager undoes incomplete transactions.' },
+  { f: 'Consistency', b: 'Constraints hold before and after each transaction. Programmer + DBMS constraint checks.' },
+  { f: 'Isolation', b: 'Concurrent execution equivalent to a serial one. Scheduler / concurrency control.' },
+  { f: 'Durability', b: 'Committed effects survive failures. Recovery manager with the log on stable storage.' },
+  { f: 'Partially committed', b: 'Last statement executed, but the commit record is not yet on stable storage.' },
+  { f: 'Aborted → ?', b: 'Restart (external cause: deadlock, hardware) or kill (logical error).' },
+  { f: 'WRITE vs OUTPUT', b: 'WRITE copies a local variable into the buffer; OUTPUT copies the buffer to disk later.' },
+  { f: 'Phantom', b: 'New rows matching a query appear when the transaction repeats the query.' },
+]);
+quiz('#quiz', [
+  { q: 'Which ACID property is enforced by concurrency control?', opts: ['Atomicity', 'Consistency', 'Isolation', 'Durability'], a: 2, why: 'The scheduler makes interleavings serializable.' },
+  { q: 'After WRITE(B, u) and before OUTPUT(B), where is the new value of B?', opts: ['Only on disk', 'In the buffer (and the local variable), not on disk', 'Only in the log', 'Nowhere'], a: 1, why: 'WRITE changes the buffer; OUTPUT writes it to disk later.' },
+  { q: 'A transaction chosen as a deadlock victim goes through…', opts: ['Active → Failed → Aborted, then restart', 'Active → Committed', 'Partially committed → Committed', 'Failed → Active'], a: 0, why: 'The cause is external, so it is restarted after rollback.' },
+  { q: 'Which level prevents non-repeatable reads but allows phantoms?', opts: ['Read uncommitted', 'Read committed', 'Repeatable read', 'Serializable'], a: 2, why: 'Row locks are kept, but new rows are not locked.' },
+  { q: 'Which two properties does the recovery manager maintain?', opts: ['A and C', 'A and D', 'C and I', 'I and D'], a: 1, why: 'Undo gives atomicity; redo (or forced writes) gives durability.' },
+]);
+ask('#try1', { q: 'A = 500, B = 200. A transfer of 100 from A to B crashes after write(A) and before write(B), and the system had no atomicity. What total A + B would the database show?', a: 600, why: 'A = 400 but B is still 200: 100 has vanished. Atomicity undoes write(A) so the total stays 700.' });
+</script>
+</body>
+</html>

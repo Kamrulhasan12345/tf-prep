@@ -1,0 +1,344 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DBMS Architecture and Abstraction · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 01–02 (Ishrak) · Chapter 6 · Exam topics beyond the slides</div>
+<h1>Exam Topics Beyond the Slides: DBMS Architecture and Abstraction</h1>
+<p class="lede">Lectures 01–02 explain why a DBMS exists and how data is modeled, but past exams also ask about how a DBMS is organized: levels of abstraction and data independence, schema versus instance, DDL versus DML, the data dictionary, the internal components of a DBMS, 2-tier and 3-tier architectures, and derived attributes. This chapter teaches each topic from the standard textbook account (Silberschatz, <i>Database System Concepts</i>, Ch. 1) and answers every such question in the banks.</p>
+
+<h2>1. Data abstraction: three levels</h2>
+
+<p>A DBMS stores data in complicated structures (blocks, slotted pages, B+ trees, hash files) so that it can be fast. Most users should never see those structures. The DBMS therefore hides them behind simpler descriptions of the same data. This hiding is called <b class="term">data abstraction</b>, and the standard design (the ANSI/SPARC <b class="term">three-schema architecture</b>) has three levels:</p>
+
+<dl class="def">
+<dt>Physical level (internal schema)</dt><dd>The lowest level: <em>how</em> the data is actually stored. Files, record layouts, block sizes, indexes, compression, which disk. Example: “Students is a heap file in tablespace USERS with a B+ tree index on sid.” See <a href="../l14/01-files-and-records.html">Lec 14</a> and <a href="../l15/01-what-is-an-index.html">Lec 15</a>.</dd>
+<dt>Logical level (conceptual schema)</dt><dd>The middle level: <em>what</em> data is stored and how it is related, for the whole database. Example: Students(sid, name, email, dob), Courses(cid, cname, credits), Enrolled(sid, cid, term), with keys and constraints. Database designers and administrators work here, with DDL.</dd>
+<dt>View level (external schemas)</dt><dd>The highest level: each group of users sees only the part of the database it needs, possibly reshaped. Example: an advisor's view shows name and email of students in one department; the accounts office's view shows sid and fee balance. There are many views, one logical schema and one physical schema.</dd>
+<dt>Mapping</dt><dd>The DBMS's record of how one level is built from the level below: the external/logical mapping (each view's definition) and the logical/physical mapping (which file and structure holds each table).</dd>
+</dl>
+
+<p><strong>Why use data abstraction?</strong> (1) <em>Simplicity</em>: users and programmers work with tables and views instead of bytes and pointers. (2) <em>Security</em>: a view shows a user only the rows and columns they may see. (3) <em>Data independence</em>: a change at one level can be absorbed by a mapping instead of rippling up to every program (next section). (4) <em>Efficiency without effort</em>: the DBMS can choose and change efficient storage behind the scenes.</p>
+
+<h2>2. Data independence</h2>
+
+<dl class="def">
+<dt>Physical data independence</dt><dd>The ability to change the physical schema (add an index, reorganize a file, move a table to faster disks) without changing the logical schema, and therefore without changing application programs. Only the logical/physical mapping changes.</dd>
+<dt>Logical data independence</dt><dd>The ability to change the logical schema (add a column, add a table, split a table) without changing the external views, and therefore without changing programs that use those views. Only the external/logical mapping changes. It is harder to achieve, because programs depend directly on the logical structure.</dd>
+</dl>
+
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="levels"></div>
+<figcaption><b>Figure 1.</b> The three-schema architecture. Step through a physical change and a logical change, and see which levels are affected.</figcaption>
+</figure>
+
+<p>Lec 01 slide 16 (“ALTER TABLE … controlled”) and Lec 14–15 (indexes and file organizations that can be changed under running applications) are both instances of data independence. The file-processing system of <a href="../i01/02-files-vs-dbms.html">Lec 01 Chapter 2</a> had none: every program depended on the physical file format.</p>
+
+<h2>3. Schema versus instance, DDL versus DML</h2>
+
+<dl class="def">
+<dt>Schema (intension)</dt><dd>The design of the database: relation names, attributes, domains, keys, constraints. Changes rarely. Stored as metadata in the data dictionary.</dd>
+<dt>Instance (extension)</dt><dd>The data actually in the database at one moment. Changes with every insert, update and delete.</dd>
+<dt>DDL (data-definition language)</dt><dd>The part of SQL that defines and changes the schema: <code>CREATE</code>, <code>ALTER</code>, <code>DROP</code>, <code>TRUNCATE</code>, <code>RENAME</code>, and in Oracle also <code>GRANT</code>/<code>REVOKE</code>. Executing DDL updates the data dictionary.</dd>
+<dt>DML (data-manipulation language)</dt><dd>The part of SQL that reads and changes the instance: <code>SELECT</code>, <code>INSERT</code>, <code>UPDATE</code>, <code>DELETE</code>, <code>MERGE</code>. DML runs inside transactions and can be rolled back.</dd>
+</dl>
+<p>An analogy: the schema is the blueprint of a house; the instance is the furniture and people inside it today. Run the DDL and DML below; afterwards the second query reads Oracle's data dictionary view of the table's columns (that view is Oracle-only, so in the playground it is replaced by SQLite's equivalent, <code>pragma_table_info</code>).</p>
+<div id="ddl"></div>
+<p>In Oracle every DDL statement performs an implicit <code>COMMIT</code> before and after it runs, so DDL cannot be rolled back and it also commits any pending DML. (PostgreSQL, by contrast, can roll back most DDL inside a transaction.)</p>
+
+<h2>4. The data dictionary</h2>
+
+<p>A DBMS stores data about the data, called <b class="term">metadata</b>, in the <b class="term">data dictionary</b> (or <b class="term">system catalog</b>). It is itself a set of relations, which the DBMS reads before every statement: does this table exist, what are its columns and types, is this user allowed, which indexes can be used, how many rows are there. Silberschatz's dictionary schema is</p>
+<pre>Relation_metadata (relation_name, number_of_attributes, storage_organization, location)
+Attribute_metadata(relation_name, attribute_name, domain_type, position, length)
+User_metadata     (user_name, encrypted_password, group)
+Index_metadata    (relation_name, index_name, index_type, index_attributes)
+View_metadata     (view_name, definition)</pre>
+<p>plus integrity constraints and statistics (number of tuples, distinct values) for the optimizer. In Oracle the dictionary is read through views such as <code>USER_TABLES</code>, <code>USER_TAB_COLUMNS</code>, <code>USER_CONSTRAINTS</code>, <code>USER_INDEXES</code> and <code>USER_VIEWS</code>:</p>
+<pre>SELECT column_name, data_type, data_length, nullable
+FROM   user_tab_columns
+WHERE  table_name = 'STUDENTS'
+ORDER  BY column_id;</pre>
+<p>Lec 14 (<a href="../l14/08-data-dictionary.html">the data dictionary chapter</a>) shows how the dictionary itself is stored.</p>
+
+<h2>5. Components of a DBMS</h2>
+
+<p>Inside, a DBMS has two main modules on top of the stored data (Silberschatz §1.8):</p>
+<ul>
+<li>The <b class="term">query processor</b> turns SQL into actions: the <b>DDL interpreter</b> records definitions in the data dictionary; the <b>DML compiler</b> translates a query into an evaluation plan, and its <b>query optimizer</b> picks the cheapest of the equivalent plans; the <b>query evaluation engine</b> executes the plan.</li>
+<li>The <b class="term">storage manager</b> is the interface between the stored data and the query processor: the <b>authorization and integrity manager</b> checks permissions and constraints; the <b>transaction manager</b> (concurrency-control manager plus recovery manager) keeps the database consistent despite concurrency and crashes; the <b>file manager</b> allocates disk space and the structures that represent data on disk; the <b>buffer manager</b> fetches blocks from disk into main memory and decides which to keep.</li>
+<li>On <b class="term">disk</b>: the <b>data files</b>, the <b>data dictionary</b>, the <b>indices</b>, and <b>statistical data</b> about the stored data.</li>
+</ul>
+<p>The people around it: <b>naive users</b> (students, bank tellers) use application interfaces; <b>application programmers</b> write those programs; <b>sophisticated users</b> (analysts) write queries in query tools; the <b>database administrator (DBA)</b> defines schemas, storage, authorization and backups using administration tools.</p>
+
+<figure class="wide">
+<svg id="comp" role="img" aria-label="DBMS components block diagram"></svg>
+<figcaption><b>Figure 2.</b> Block diagram of DBMS components and their interactions (after Silberschatz, Fig. 1.5). Arrows show the flow of requests from users down to disk; the dashed arrow shows the DDL interpreter writing definitions into the data dictionary.</figcaption>
+</figure>
+
+<h2>6. Two-tier and three-tier architectures</h2>
+
+<p>Lec 01 slide 11 showed an application in front of the DBMS. Where that application runs gives two standard architectures:</p>
+<dl class="def">
+<dt>Two-tier architecture (client–server)</dt><dd>The application runs on the user's machine (the client) and talks directly to the database server, sending SQL through an API such as ODBC or JDBC. The client holds both the user interface and the business logic (a “fat client”).</dd>
+<dt>Three-tier architecture</dt><dd>The client is only a user interface (a browser or thin app). It talks (over HTTP) to an <b class="term">application server</b>, which holds the business logic and is the only part that sends SQL to the database server. BIIS, Pathao and every web application work this way.</dd>
+</dl>
+
+<figure class="wide">
+<svg id="tiers" role="img" aria-label="Two-tier and three-tier architectures"></svg>
+<figcaption><b>Figure 3.</b> Left: two-tier. Right: three-tier.</figcaption>
+</figure>
+
+<div class="tbl"><table>
+<tr><th></th><th>Two-tier</th><th>Three-tier</th></tr>
+<tr><td>Business logic</td><td>On every client</td><td>On the application server</td></tr>
+<tr><td>Who sends SQL</td><td>Each client, directly</td><td>Only the application server</td></tr>
+<tr><td>Security</td><td>Database reachable from every client; credentials on clients</td><td>Database hidden behind the application server</td></tr>
+<tr><td>Scalability</td><td>One database connection per client</td><td>Application servers share a pool of connections and can be added as load grows</td></tr>
+<tr><td>Changing the logic</td><td>Reinstall on every client</td><td>Change the server once</td></tr>
+<tr><td>Typical use</td><td>Small LANs, desktop tools, labs</td><td>Web and mobile applications</td></tr>
+</table></div>
+
+<h2>7. Derived attributes</h2>
+
+<dl class="def">
+<dt>Stored attribute</dt><dd>An attribute whose value is kept in the database, such as a student's date of birth.</dd>
+<dt>Derived attribute</dt><dd>An attribute whose value is computed from other stored data whenever it is needed, such as age (from date of birth and today's date) or a student's total credits (from Enrolled and Courses). In an ER diagram it is drawn with a dashed ellipse.</dd>
+</dl>
+<p>Storing age would make it wrong one year later unless something updates every row on every birthday. Deriving it means it is computed at query time from the current date, so it is always current. In Oracle a view can expose it as if it were a column; the playground fixes the date with a value so the result is reproducible, and the comment shows the live version.</p>
+<div id="age"></div>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+
+<h3>Exam questions</h3>
+<div class="exam">
+  <div class="exam-src">DB QB · 24-25 6c · 5 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-1 | 2024–25 · 5 marks</div>
+  <div class="exam-q"><p>Draw the diagram of 2-tier and 3-tier database architectures.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+<figure><svg id="tiersA" role="img" aria-label="Two-tier and three-tier architectures"></svg></figure>
+<p><strong>2-tier:</strong> the client machine runs the user interface and the application (business logic), and connects directly to the database server through a standard API (ODBC/JDBC), sending SQL. Simple and fast for a small number of users, but each client needs its own connection and database credentials, and changing the logic means updating every client.</p>
+<p><strong>3-tier:</strong> the client runs only the presentation layer (browser or thin app) and sends requests (HTTP) to an application server, which holds the business logic, issues SQL to the database server and returns results. The database is not exposed to clients, connections are pooled, the middle tier can be replicated for scale, and logic changes are made in one place; the cost is an extra layer to build and run.</p>
+<p>The bank's diagrams are correct; its claim that 2-tier is “difficult to scale beyond 100 users” is a rule of thumb, not a fixed limit.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 24-25 7a · 8 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-1 | 2024–25 · 8 marks</div>
+  <div class="exam-q"><p>Why do we use data abstraction? Describe different data abstraction levels.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+<p><strong>Why.</strong> A DBMS uses complex storage structures for efficiency. Data abstraction hides that complexity behind simpler descriptions, so that (1) users and programmers work with tables and views, not files and pointers; (2) each user group sees only the data it needs (security and simplicity through views); (3) changes at a lower level do not force changes at higher levels (physical and logical data independence); (4) the DBMS can choose and change efficient storage freely.</p>
+<p><strong>Levels</strong> (three-schema architecture, Figure 1):</p>
+<ol>
+<li><strong>Physical (internal) level</strong>: how data is stored: files, record formats, indexes, blocks. Example: Students stored as a heap file with a B+ tree index on sid.</li>
+<li><strong>Logical (conceptual) level</strong>: what data is stored and the relationships among it, for the whole database: relations, attributes, keys, constraints. Example: Students(sid, name, email, dob), Enrolled(sid, cid, term) with sid referencing Students.</li>
+<li><strong>View (external) level</strong>: the part of the database a particular user group sees. Example: an advisor's view (sid, name, email) of CSE students only; the accounts view (sid, fee_due). Many views exist over one logical schema.</li>
+</ol>
+<p>The DBMS keeps two mappings, external/logical and logical/physical. Changing the physical level only changes the lower mapping (physical data independence); adding to the logical level only changes the upper mapping (logical data independence).</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 23-24 2b · 10 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-1 | 2023–24 · 10 marks; CSE 303 | L-3/T-1 | 2014–15 · 7 marks</div>
+  <div class="exam-q"><p>Why does it yield current values when derived attributes are not stored in database? Discuss with an example.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+<p>A derived attribute is computed from stored attributes (and possibly the current date) each time it is requested, instead of being stored. Because the computation runs at query time, it always uses the <em>current</em> values of its inputs, so the result is current. A stored copy, in contrast, is correct only at the moment it was written; when its inputs change (another birthday passes, a new enrollment is added), the stored value becomes stale unless every change also updates it. Not storing it also removes redundancy: the fact exists only once (date of birth), so it cannot contradict itself.</p>
+<p><strong>Example.</strong> Student(sid, name, dob) with derived attribute age. If age = 20 were stored for a student born 15 May 2002 when inserted on 1 June 2022, the database would still say 20 on 29 October 2026, when the student is 24. Deriving it:</p>
+<pre>CREATE OR REPLACE VIEW student_profile AS
+SELECT sid, name, dob,
+       FLOOR(MONTHS_BETWEEN(SYSDATE, dob) / 12) AS age
+FROM   student;</pre>
+<p>Every query on <code>student_profile</code> recomputes age from <code>SYSDATE</code>: on 29 Oct 2026 it gives FLOOR(293.45 / 12) = FLOOR(24.45) = 24, and on 15 May 2027 it gives 25 with no update. Another example: total credits of a student, derived as <code>SUM(credits)</code> over Enrolled ⋈ Courses, automatically reflects a newly added enrollment.</p>
+<p>The trade-off: deriving costs computation on every read, so a value that is expensive to compute and read very often is sometimes stored deliberately (and kept up to date by a trigger). In an ER diagram a derived attribute is drawn as a dashed ellipse.</p>
+<p>Note: the bank's SQL uses <code>DATEDIFF(DAY, …)</code>, which is SQL Server syntax; in Oracle use <code>MONTHS_BETWEEN</code> as above.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2011–12 · 15 marks</div>
+  <div class="exam-q"><p>Show the major components and their interactions in a DBMS. Briefly explain the functionalities of major components.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+<p>Draw Figure 2. Then explain:</p>
+<p><strong>Query processor.</strong> <em>DDL interpreter</em>: interprets DDL statements and records the definitions (schemas, constraints, authorizations) in the data dictionary. <em>DML compiler</em>: translates a DML query into an evaluation plan of low-level operations; its <em>query optimizer</em> chooses the lowest-cost plan among equivalent ones, using statistics and available indices. <em>Query evaluation engine</em>: executes the plan, requesting data from the storage manager.</p>
+<p><strong>Storage manager.</strong> <em>Authorization and integrity manager</em>: checks that the user has the needed privileges and that changes satisfy integrity constraints. <em>Transaction manager</em>: ensures atomicity and durability despite failures (recovery manager) and correct interleaving of concurrent transactions (concurrency-control manager). <em>File manager</em>: allocates disk space and manages the data structures that represent data on disk. <em>Buffer manager</em>: fetches blocks from disk into main memory, decides which blocks to cache and which to write back.</p>
+<p><strong>Disk storage.</strong> <em>Data files</em> (the tables), <em>data dictionary</em> (metadata), <em>indices</em> (fast access by key), <em>statistical data</em> (sizes and value distributions, used by the optimizer).</p>
+<p><strong>Interactions.</strong> A user's query arrives through an application or query tool, is compiled and optimized by the query processor (consulting the dictionary), and executed by the evaluation engine, which calls the storage manager; the storage manager checks authorization, runs the work as a transaction, and reads/writes blocks through the buffer and file managers. DDL from the DBA goes through the DDL interpreter into the dictionary.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2010–11 · 14 marks</div>
+  <div class="exam-q"><p>Show the block diagram of database management system components.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+<p>The block diagram is Figure 2, in four layers:</p>
+<ol>
+<li><strong>Users and interfaces</strong>: naive users → application interfaces; application programmers → application programs; sophisticated users → query tools; DBA → administration tools.</li>
+<li><strong>Query processor</strong>: DDL interpreter, DML compiler and optimizer, query evaluation engine.</li>
+<li><strong>Storage manager</strong>: authorization and integrity manager, transaction manager, file manager, buffer manager.</li>
+<li><strong>Disk storage</strong>: data files, data dictionary, indices, statistical data.</li>
+</ol>
+<p>Requests flow downward (query → plan → block reads) and results flow back up. The functions of each block are as in the previous answer.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2010–11 · 7 marks</div>
+  <div class="exam-q"><p>Discuss ‘Schema versus Data’ and ‘DDL versus DML’.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+<p><strong>Schema versus data.</strong> The schema is the description of the database: relation names, attributes and their domains, keys and constraints, e.g. <code>Employee(emp_id NUMBER PRIMARY KEY, name VARCHAR2(50), salary NUMBER(10,2))</code>. It is designed once, changes rarely, and is stored as metadata in the data dictionary. The data (the <em>instance</em>) is the set of tuples stored at a given moment, e.g. (101, Alice, 75000), (102, Bob, 68000); it changes with every insert, update and delete. Schema = intension, instance = extension. Every instance must satisfy the schema's constraints.</p>
+<p><strong>DDL versus DML.</strong> DDL defines and changes the schema: <code>CREATE TABLE</code>, <code>ALTER TABLE</code>, <code>DROP TABLE</code>, <code>TRUNCATE</code>; it is used mainly by designers and DBAs and its effect is recorded in the data dictionary. DML reads and changes the instance: <code>SELECT</code>, <code>INSERT</code>, <code>UPDATE</code>, <code>DELETE</code>; it is used by applications and users, runs inside transactions, and can be rolled back. In Oracle, DDL statements commit implicitly and cannot be rolled back.</p>
+<pre>CREATE TABLE employee (emp_id NUMBER PRIMARY KEY, name VARCHAR2(50), salary NUMBER(10,2));  -- DDL
+INSERT INTO employee VALUES (101, 'Alice', 75000);                                         -- DML
+UPDATE employee SET salary = 80000 WHERE emp_id = 101;                                      -- DML</pre>
+<p>The bank's answer is correct; its statement that DDL cannot be rolled back holds for Oracle and MySQL, not for PostgreSQL.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2010–11 · 10 marks</div>
+  <div class="exam-q"><p>Explain the data dictionary schema for DBMS. List the advantages and disadvantages for storing a relational database as follows: (a) Store each relation in one file. (b) Store multiple relations in one file.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+<p><strong>Data dictionary.</strong> The DBMS stores metadata as relations of its own (Section 4): relation metadata (name, number of attributes, storage organization, location), attribute metadata (relation, attribute, domain type, position, length), user metadata (name, encrypted password, group), index metadata (relation, index name, type, attributes), view metadata (name, definition), plus integrity constraints and statistics. The query processor reads it to check names, types, permissions and available indexes before running any statement, and the DDL interpreter writes to it.</p>
+<p><strong>(a) Each relation in its own file.</strong> Advantages: simple to implement (the OS file system does space management); every record in a file has the same format, so fixed-length layouts and free lists are easy; a scan of one relation reads only that relation's blocks; a table can be dropped, copied or backed up as one file. Disadvantages: a large database has many files (OS limits, file-system overhead, small tables waste a partly filled block each); records that are often used together (a department and its instructors) live in different files, so a join needs blocks from several places; the DBMS has less control over placement.</p>
+<p><strong>(b) Several relations in one file</strong> (multitable clustering, <a href="../l14/07-multitable-clustering.html">Lec 14</a>). Advantages: related records can be placed in the same block (each department followed by its instructors), so the common join reads fewer blocks; few large files, managed by the DBMS itself, which can control placement and allocation. Disadvantages: a scan of one relation must read blocks that also contain other relations' records (slower, e.g. reading all departments); records of different formats in one file make space management and free space reuse harder; the DBMS must implement its own file organization.</p>
+<p>The bank's answer covers the same points correctly.</p>
+  </div></details>
+</div>
+
+<div class="key"><p><strong>Summary:</strong> data abstraction has three levels: physical (how data is stored), logical (what is stored, for the whole database) and view (what each user group sees), linked by two mappings. Physical data independence means storage changes do not affect the logical schema; logical data independence means logical changes do not affect views. The schema is the stable design; the instance is today's data. DDL changes the schema; DML reads and changes the data. The data dictionary stores metadata as relations. A DBMS consists of a query processor (DDL interpreter, DML compiler and optimizer, evaluation engine) and a storage manager (authorization and integrity, transactions, files, buffers) over data files, dictionary, indices and statistics. Two-tier: clients send SQL directly; three-tier: an application server sits between clients and the database. Derived attributes are computed at query time and so are always current.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/sqlplay.js"></script>
+<script src="lecture.js"></script>
+<script>
+// Figure 1: levels and independence
+(() => {
+  const F = o => {
+    let s = '';
+    const lab = (y, t, sub) => T(10, y, t, { a: 'start', w: 1, size: 13 }) + T(10, y + 16, sub, { a: 'start', cls: 'lbl' });
+    s += lab(50, 'View level', '(external schemas)') + lab(175, 'Logical level', '(conceptual schema)') + lab(300, 'Physical level', '(internal schema)');
+    s += box(190, 30, 170, 54, 'Advisor view', ['sid, name, email'], o.v1 || 'cell') + box(390, 30, 170, 54, 'Accounts view', ['sid, fee_due'], o.v2 || 'cell') + box(590, 30, 130, 54, '…', ['more views'], 'cell-plain');
+    s += `<rect x="190" y="150" width="530" height="58" rx="6" class="${o.lg || 'cell'}"/>` + T(455, 172, 'Students(sid, name, email, dob, fee_due' + (o.addr ? ', address' : '') + ')', { size: 12, w: 1 }) + T(455, 192, 'Courses(cid, cname, credits) · Enrolled(sid, cid, term)', { cls: 'lbl' });
+    s += `<rect x="190" y="275" width="530" height="58" rx="6" class="${o.ph || 'cell'}"/>` + T(455, 297, 'Students: heap file, B+ tree on sid' + (o.idx ? ', hash index on email' : ''), { size: 12 }) + T(455, 317, o.ssd ? 'tablespace moved to SSD' : 'tablespace USERS on HDD, 8 KB blocks', { cls: 'lbl' });
+    s += T(740, 122, 'external/logical', { a: 'start', cls: 'lbl ' + (o.m1 ? 'red' : '') }) + T(740, 136, 'mapping', { a: 'start', cls: 'lbl ' + (o.m1 ? 'red' : '') });
+    s += T(740, 245, 'logical/physical', { a: 'start', cls: 'lbl ' + (o.m2 ? 'red' : '') }) + T(740, 259, 'mapping', { a: 'start', cls: 'lbl ' + (o.m2 ? 'red' : '') });
+    [275, 475].forEach(x => { s += `<path d="M${x} 86 V146" class="${o.m1 ? 's-red' : 's-fg'} dash"/>`; });
+    s += `<path d="M455 210 V271" class="${o.m2 ? 's-red' : 's-fg'} dash"/>`;
+    s += `<path d="M300 350 h310 v12 a155 12 0 0 1 -310 0 z" class="cell-plain"/>` + T(455, 368, 'disk', { cls: 'lbl' });
+    if (o.msg) s += T(455, 398, o.msg, { size: 12, w: 1, cls: o.mc || 'acc' });
+    return svgWrap(860, 410, s, 'Three-schema architecture');
+  };
+  stepper('#levels', [
+    { html: F({}), cap: 'Three levels. Many <b>views</b> at the top, one <b>logical schema</b> in the middle, one <b>physical schema</b> at the bottom. The dashed lines are the two <b>mappings</b> the DBMS keeps.' },
+    { html: F({ ph: 'cell-hl', idx: 1, ssd: 1, m2: 1, msg: 'Physical change: only the logical/physical mapping is updated.' }), cap: '<b>Physical change.</b> The DBA adds a hash index on email and moves Students to faster SSD storage. The physical schema changes and the DBMS updates the logical/physical mapping. The logical schema is untouched, so every view and every program keeps working, only faster. This is <b>physical data independence</b>.' },
+    { html: F({ lg: 'cell-hl', addr: 1, m1: 1, msg: 'Logical change: views are redefined over the new schema; they look the same.' }), cap: '<b>Logical change.</b> A column <code>address</code> is added to Students (Lec 01 slide 16). The logical schema changes, but the Advisor and Accounts views still show exactly the same columns: the external/logical mapping absorbs the change. Programs that use the views do not change. This is <b>logical data independence</b>.' },
+    { html: F({ lg: 'cell-del', v1: 'cell-del', m1: 1, msg: 'Its limit: dropping email breaks the Advisor view, which must change.', mc: 'red' }), cap: 'Logical independence has a limit: if a change <em>removes</em> data a view needs (dropping <code>email</code>), the view and its programs must change. That is why logical data independence is harder to achieve than physical.' },
+  ], { interval: 3000 });
+})();
+sqlPlay('#ddl', {
+  setup: '',
+  query: `-- DDL: define the schema
+CREATE TABLE employee (
+  emp_id NUMBER PRIMARY KEY,
+  name   VARCHAR2(50),
+  salary NUMBER(10,2)
+);
+-- DML: create and change the instance
+INSERT INTO employee VALUES (101, 'Alice', 75000);
+INSERT INTO employee VALUES (102, 'Bob', 68000);
+UPDATE employee SET salary = 80000 WHERE emp_id = 101;
+SELECT * FROM employee;`,
+  note: 'Then replace everything with <code>SELECT name, type, pk FROM pragma_table_info(\'employee\');</code> to read the schema back from the catalog (SQLite\'s version of Oracle\'s <code>USER_TAB_COLUMNS</code>).',
+});
+// Figure 2: components
+(() => {
+  let s = '';
+  const users = [['Naive users', '(students, tellers)'], ['Application', 'programmers'], ['Sophisticated', 'users (analysts)'], ['Database', 'administrator']];
+  const tools = [['Application', 'interfaces'], ['Application', 'programs'], ['Query', 'tools'], ['Administration', 'tools']];
+  users.forEach(([a, b], i) => { s += box(20 + i * 190, 10, 160, 46, a, [b], 'cell-plain'); });
+  tools.forEach(([a, b], i) => { s += box(20 + i * 190, 84, 160, 46, a, [b]); s += arrow(100 + i * 190, 58, 100 + i * 190, 81); });
+  // query processor
+  s += `<rect x="10" y="160" width="760" height="130" rx="8" class="cell-hl"/>` + T(22, 180, 'QUERY PROCESSOR', { a: 'start', w: 1, size: 12 });
+  s += box(40, 192, 200, 40, 'DDL interpreter', [], 'cell') + box(290, 192, 220, 40, 'DML compiler & optimizer', [], 'cell') + box(290, 242, 220, 40, 'Query evaluation engine', [], 'cell');
+  s += arrow(670, 132, 160, 189) + arrow(100, 132, 380, 189) + arrow(290, 132, 400, 189) + arrow(480, 132, 420, 189);
+  s += arrow(400, 233, 400, 240);
+  // storage manager
+  s += `<rect x="10" y="310" width="760" height="120" rx="8" class="cell-new"/>` + T(22, 330, 'STORAGE MANAGER', { a: 'start', w: 1, size: 12 });
+  s += box(40, 340, 220, 36, 'Authorization & integrity', [], 'cell') + box(290, 340, 200, 36, 'Transaction manager', [], 'cell') + box(520, 340, 220, 36, 'Buffer manager', [], 'cell');
+  s += box(290, 386, 200, 36, 'File manager', [], 'cell');
+  s += arrow(400, 284, 400, 337);
+  s += arrow(492, 404, 520, 380, {});
+  // disk
+  s += `<rect x="10" y="450" width="760" height="80" rx="8" class="cell-plain"/>` + T(22, 470, 'DISK STORAGE', { a: 'start', w: 1, size: 12 });
+  [['Data files', 110], ['Data dictionary', 290], ['Indices', 470], ['Statistical data', 650]].forEach(([t, x]) => {
+    s += `<path d="M${x - 70} 482 v30 a70 9 0 0 0 140 0 v-30" class="cell"/><ellipse cx="${x}" cy="482" rx="70" ry="9" class="cell"/>` + T(x, 508, t, { size: 12, w: 1 });
+  });
+  s += arrow(390, 424, 390, 448) + arrow(630, 378, 630, 448);
+  s += `<path d="M40 212 H24 V440 H230 V470" class="s-acc dash" marker-end="url(#m-acc)"/>`;
+  const el = $('#comp'); el.setAttribute('viewBox', '0 0 780 540'); el.setAttribute('width', 780); el.innerHTML = s;
+})();
+// Figure 3: tiers
+const tiersSVG = () => {
+  let s = T(170, 18, 'TWO-TIER', { w: 1, size: 13 }) + T(560, 18, 'THREE-TIER', { w: 1, size: 13 });
+  // two-tier
+  s += `<rect x="40" y="34" width="260" height="130" rx="8" class="cell-plain"/>` + T(50, 52, 'client machine', { a: 'start', cls: 'lbl' });
+  s += box(60, 62, 220, 40, 'User interface', [], 'cell') + box(45, 112, 250, 40, 'Application + business logic', [], 'cell-hl');
+  s += arrow(170, 166, 170, 230, { label: 'SQL via ODBC / JDBC', dx: 6, dy: 0, lcls: 'lbl' }).replace('text-anchor="middle"', 'text-anchor="start"');
+  s += `<rect x="40" y="234" width="260" height="76" rx="8" class="cell-plain"/>` + T(50, 252, 'database server', { a: 'start', cls: 'lbl' }) + box(60, 262, 220, 40, 'DBMS + database', [], 'cell-new');
+  s += `<line x1="350" y1="30" x2="350" y2="440" class="s-fg dash"/>`;
+  // three-tier
+  s += `<rect x="430" y="34" width="260" height="76" rx="8" class="cell-plain"/>` + T(440, 52, 'client (browser / app)', { a: 'start', cls: 'lbl' }) + box(450, 62, 220, 40, 'User interface only', [], 'cell');
+  s += arrow(560, 112, 560, 176, { label: 'HTTP / HTTPS', dx: 6, dy: 0, lcls: 'lbl' }).replace('text-anchor="middle"', 'text-anchor="start"');
+  s += `<rect x="430" y="180" width="260" height="76" rx="8" class="cell-plain"/>` + T(440, 198, 'application server', { a: 'start', cls: 'lbl' }) + box(450, 208, 220, 40, 'Business logic', [], 'cell-hl');
+  s += arrow(560, 258, 560, 322, { label: 'SQL (connection pool)', dx: 6, dy: 0, lcls: 'lbl' }).replace('text-anchor="middle"', 'text-anchor="start"');
+  s += `<rect x="430" y="326" width="260" height="76" rx="8" class="cell-plain"/>` + T(440, 344, 'database server', { a: 'start', cls: 'lbl' }) + box(450, 354, 220, 40, 'DBMS + database', [], 'cell-new');
+  s += T(170, 340, 'tier 1: client', { cls: 'lbl' }) + T(170, 356, 'tier 2: database', { cls: 'lbl' });
+  s += T(560, 425, 'tiers: presentation · application · data', { cls: 'lbl' });
+  return svgWrap(720, 440, s, 'Two-tier and three-tier architectures');
+};
+$('#tiers').outerHTML = tiersSVG(); $('#tiersA').outerHTML = tiersSVG();
+sqlPlay('#age', {
+  setup: `CREATE TABLE student (sid NUMBER(7) PRIMARY KEY, name VARCHAR2(30), dob DATE);
+INSERT INTO student VALUES (2405190, 'Jalil', DATE '2002-05-15');
+INSERT INTO student VALUES (2505200, 'Faria', DATE '2006-11-02');`,
+  query: `CREATE OR REPLACE VIEW student_profile AS
+SELECT sid, name, dob,
+       FLOOR(MONTHS_BETWEEN(DATE '2026-10-29', dob) / 12) AS age
+       -- live version: FLOOR(MONTHS_BETWEEN(SYSDATE, dob) / 12)
+FROM student;
+
+SELECT * FROM student_profile;`,
+  note: 'Change the fixed date to <code>DATE \'2027-05-15\'</code> and run again: Jalil turns 25 with no UPDATE to any stored row.',
+});
+flashcards('#cards', [
+  { f: 'Physical level', b: 'How data is stored: files, records, indexes.' },
+  { f: 'Logical level', b: 'What data is stored and how it is related, for the whole database.' },
+  { f: 'View level', b: 'The part of the database one user group sees.' },
+  { f: 'Physical data independence', b: 'Change storage without changing the logical schema or programs.' },
+  { f: 'Logical data independence', b: 'Change the logical schema without changing views or programs that use them.' },
+  { f: 'Schema vs instance', b: 'Design (stable) vs the data at one moment (changing).' },
+  { f: 'DDL vs DML', b: 'DDL defines the schema (CREATE, ALTER, DROP); DML reads and changes data (SELECT, INSERT, UPDATE, DELETE).' },
+  { f: 'Data dictionary', b: 'The system catalog: metadata about relations, attributes, users, indexes, views and statistics, stored as relations.' },
+  { f: 'Query optimizer', b: 'Part of the DML compiler that picks the cheapest evaluation plan.' },
+  { f: 'Three-tier architecture', b: 'Client (UI) → application server (business logic) → database server.' },
+]);
+quiz('#quiz', [
+  { q: 'Adding an index on Students.email without changing any program shows…', opts: ['logical data independence', 'physical data independence', 'a derived attribute', 'a two-tier architecture'], a: 1, why: 'Only the physical level changed.' },
+  { q: 'Which is DDL?', opts: ['UPDATE', 'SELECT', 'ALTER TABLE', 'DELETE'], a: 2, why: 'ALTER TABLE changes the schema.' },
+  { q: 'Which component decides whether a query uses an index?', opts: ['Buffer manager', 'Query optimizer', 'DDL interpreter', 'File manager'], a: 1, why: 'The optimizer chooses among evaluation plans.' },
+  { q: 'Which component brings disk blocks into main memory?', opts: ['Buffer manager', 'Transaction manager', 'Query evaluation engine', 'Authorization manager'], a: 0, why: 'The buffer manager fetches and caches blocks.' },
+  { q: 'In a three-tier web application, who sends SQL to the database?', opts: ['The browser', 'The application server', 'The user', 'The DBA'], a: 1, why: 'Only the middle tier talks to the database.' },
+  { q: 'Why is a derived age always current?', opts: ['It is updated by a nightly job', 'It is computed from dob and today\'s date at query time', 'Oracle stores it twice', 'It is a primary key'], a: 1, why: 'Nothing is stored that could become stale.' },
+  { q: 'Which level has many schemas?', opts: ['Physical', 'Logical', 'View', 'None'], a: 2, why: 'There is one physical and one logical schema, but many external views.' },
+]);
+</script>
+</body>
+</html>

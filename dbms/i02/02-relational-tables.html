@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Relational Tables and Joins · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 02 (Ishrak) · Chapter 2 · Slides 5–8 · Book §2.2</div>
+<h1>Relational Tables and Joins</h1>
+<p class="lede">Slides 5–8 build the course-management example as three relational tables, show how an enrollment row points to a student and a course, and answer “which courses did Jalil take in Jan26?” with a three-table join. This chapter names every part of a relation precisely, animates the lookup and the join, and lets you run the slide's query.</p>
+
+<h2>1. The entity tables (slide 5)</h2>
+
+<p>Slide 5 shows two tables, each representing one type of entity:</p>
+<div id="ent"></div>
+<p>The slide adds two notes: <strong>sid uniquely identifies each student</strong>, and <strong>cid uniquely identifies each course</strong>. No two students share an sid, so knowing an sid tells you exactly which student is meant. This property makes sid a <b class="term">key</b> (Chapter 3).</p>
+
+<h2>2. The vocabulary of a relation</h2>
+
+<p>The relational model has precise names for the parts of a table. Exams use them, and so does every later lecture.</p>
+
+<figure class="wide">
+<svg id="anatomy" role="img" aria-label="Parts of a relation labelled on the Students table"></svg>
+<figcaption><b>Figure 1.</b> Anatomy of a relation, on slide 5's Students table.</figcaption>
+</figure>
+
+<dl class="def">
+<dt>Relation</dt><dd>A table. Formally, a set of tuples that all have the same attributes. Students is a relation.</dd>
+<dt>Attribute</dt><dd>A named column of a relation: sid, name, email. Attribute names label the header row.</dd>
+<dt>Tuple</dt><dd>A row of a relation: one record, such as (2405190, Jalil, jalil@university.edu). It has exactly one value for each attribute.</dd>
+<dt>Domain</dt><dd>The set of values an attribute may take, its type. The domain of sid is 7-digit student numbers (in Oracle, <code>NUMBER(7)</code>); the domain of credits is positive numbers such as 1.5 or 3. Values must be <b class="term">atomic</b>: a single value, not a list or a nested record.</dd>
+<dt>Degree (arity)</dt><dd>The number of attributes. Students has degree 3; Enrolled also has degree 3.</dd>
+<dt>Cardinality</dt><dd>The number of tuples currently in the relation. Students has cardinality 3, Courses 4, Enrolled 6. Cardinality changes with every insert and delete; degree changes only when the structure changes.</dd>
+<dt>Relation schema</dt><dd>The relation's name and its list of attributes (with domains): <code>Students(sid, name, email)</code>. The schema is the design and changes rarely.</dd>
+<dt>Relation instance</dt><dd>The set of tuples in the relation at one moment. The instance changes all the time; the schema stays.</dd>
+<dt>Database schema</dt><dd>The set of all relation schemas: Students(sid, name, email), Courses(cid, cname, credits), Enrolled(sid, cid, term).</dd>
+</dl>
+
+<p>Three properties follow from “a relation is a <em>set</em> of tuples” (the textbook, §2.2.5–2.2.6):</p>
+<ul>
+<li><strong>Row order does not matter.</strong> Listing Faria first gives the same relation.</li>
+<li><strong>Column order does not matter</strong>, as long as each value stays with its attribute name. (Students(name, sid, email) is the same relation.)</li>
+<li><strong>No two tuples are identical.</strong> A set has no duplicates. (SQL tables actually allow duplicate rows unless a key forbids them; the textbook calls these <em>bags</em>.)</li>
+</ul>
+
+<h2>3. Connecting the tables (slides 6–7)</h2>
+
+<p>Enrollments are a relationship between students and courses, so they get their own table. Each row of <b>Enrolled(sid, cid, term)</b> represents one student–course enrollment:</p>
+<ul>
+<li><code>Enrolled.sid</code> refers to <code>Students.sid</code>.</li>
+<li><code>Enrolled.cid</code> refers to <code>Courses.cid</code>.</li>
+</ul>
+<p>A column that refers to the key of another table is a <b class="term">foreign key</b>. To read an Enrolled row, you follow each value to the row it refers to. Slide 7 does this for the first row (2405190, 215, Jan26). Step through it:</p>
+
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="follow"></div>
+<figcaption><b>Figure 2.</b> Slides 6–7: following the IDs of one Enrolled row.</figcaption>
+</figure>
+
+<p>The meaning of the row: <strong>Jalil enrolled in DB during Jan26.</strong> Notice what the Enrolled row does <em>not</em> store: Jalil's name or email, or the course's name or credits. Those facts live once, in Students and Courses. The Enrolled row stores only the two IDs and the one fact that belongs to the enrollment itself (the term).</p>
+
+<div class="q">
+<h4>Why does Enrolled need the term column?</h4>
+<p>Look at the full table on slide 6: Jalil (2405190) appears with course 101 in Jan25 and with courses 215 and 205 in Jan26. Without the term, we could not tell <em>when</em> he took each course, and a student who retakes a course in a later term would produce two identical (sid, cid) rows. With the term, (sid, cid, term) identifies one enrollment.</p>
+</div>
+
+<h2>4. Combining tables with a join (slide 8)</h2>
+
+<p><strong>Question: which courses did Jalil take in the Jan26 term?</strong> No single table answers it: names are in Students, enrollments in Enrolled, course names in Courses. The slide's SQL:</p>
+<pre>SELECT s.name, c.cname, e.term
+FROM Students s
+JOIN Enrolled e ON s.sid = e.sid
+JOIN Courses c ON e.cid = c.cid
+WHERE s.sid = 2405190
+  AND e.term = 'Jan26';</pre>
+<p>Read it clause by clause:</p>
+<ul>
+<li><code>FROM Students s</code> starts from Students and gives it the short name (<b class="term">alias</b>) <code>s</code>. In Oracle a table alias is written directly after the table name, without <code>AS</code>.</li>
+<li><code>JOIN Enrolled e ON s.sid = e.sid</code> pairs each student row with each enrollment row that has the same sid.</li>
+<li><code>JOIN Courses c ON e.cid = c.cid</code> extends each pair with the course row whose cid matches.</li>
+<li><code>WHERE …</code> keeps only combinations for student 2405190 in term Jan26.</li>
+<li><code>SELECT s.name, c.cname, e.term</code> outputs three columns.</li>
+</ul>
+<p>(The slide prints the string as <code>’Jan26’</code> with typographic quotes; in real SQL they must be plain apostrophes, <code>'Jan26'</code>.)</p>
+
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="join"></div>
+<figcaption><b>Figure 3.</b> “The DBMS follows the IDs and joins three tables to construct the answer.” The result has two rows: (Jalil, DB, Jan26) and (Jalil, DLD, Jan26).</figcaption>
+</figure>
+
+<p>Run the slide's query yourself, then change <code>'Jan26'</code> to <code>'Jan25'</code>, or the sid to 2505200 (Faria):</p>
+<div id="play"></div>
+
+<h3>Try it: queries on the CMS tables</h3>
+<p>Each box checks your answer against the correct result. They go from one table to the full three-table join.</p>
+<div id="c1"></div>
+<div id="c2"></div>
+<div id="c3"></div>
+<div id="c4"></div>
+<div id="c5"></div>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+<div id="try2"></div>
+
+<div class="key"><p><strong>Summary:</strong> a relation is a table: attributes are its columns, tuples its rows, each attribute has a domain of atomic values, degree counts attributes and cardinality counts tuples. The schema (name and attributes) is stable; the instance (current tuples) changes. Students and Courses are entity tables; Enrolled is a relationship table whose sid and cid are foreign keys referring to them. A join follows these IDs to reassemble facts stored in separate tables, as in the slide-8 query that returns DB and DLD for Jalil in Jan26.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/sqlplay.js"></script>
+<script src="lecture.js"></script>
+<script>
+const ST = [['2405190', 'Jalil', 'jalil@university.edu'], ['2405191', 'Karim', 'karim@university.edu'], ['2505200', 'Faria', 'faria@university.edu']];
+const CO = [['101', 'SPL', '3'], ['215', 'DB', '3'], ['205', 'DLD', '3'], ['102', 'SPL Lab', '1.5']];
+const EN = [['2405190', '215', 'Jan26'], ['2405190', '205', 'Jan26'], ['2405191', '215', 'Jan26'], ['2505200', '101', 'Jan26'], ['2405190', '101', 'Jan25'], ['2505200', '102', 'Jan26']];
+const wS = [72, 60, 160], wC = [44, 70, 58], wE = [72, 44, 56];
+document.querySelector('#ent').innerHTML = '<figure>' + svgWrap(620, 140,
+  tblSVG({ x: 20, y: 24, title: 'Students', head: ['sid', 'name', 'email'], rows: ST, w: wS }) +
+  tblSVG({ x: 400, y: 24, title: 'Courses', head: ['cid', 'cname', 'credits'], rows: CO, w: wC }), 'Students and Courses') +
+  '<figcaption>Slide 5: “Each table represents one type of entity.”</figcaption></figure>';
+// Figure 1: anatomy
+(() => {
+  const x = 230, y = 70;
+  let s = tblSVG({ x, y, head: ['sid', 'name', 'email'], rows: ST, w: wS, hl: { 1: 'cell-new' } });
+  s += T(x, y - 34, 'Students', { a: 'start', w: 1, size: 15 }) + T(x + 84, y - 34, '← relation name', { a: 'start', cls: 'lbl acc' });
+  // attributes brace on top
+  s += `<path d="M${x} ${y - 6} h${292}" class="s-acc"/>` + T(x + 146, y - 12, 'attributes (columns) · degree = 3', { cls: 'lbl acc' });
+  // tuple arrow
+  s += arrow(x - 10, y + 59, x - 60, y + 59, { cls: 's-grn', m: 'm-grn' }) + T(x - 66, y + 56, 'a tuple (row)', { a: 'end', cls: 'lbl grn' }) + T(x - 66, y + 70, '= one student', { a: 'end', cls: 'lbl grn' });
+  // cardinality brace on right
+  const xr = x + 300;
+  s += `<path d="M${xr} ${y + 22} h6 v66 h-6" class="s-red"/>` + T(xr + 12, y + 52, 'cardinality = 3', { a: 'start', cls: 'lbl red' }) + T(xr + 12, y + 66, '(number of tuples)', { a: 'start', cls: 'lbl red' });
+  // domain
+  s += `<path d="M${x + 36} ${y + 92} v26" class="s-fg dash"/>` + T(x + 36, y + 132, 'domain of sid: 7-digit numbers, NUMBER(7)', { cls: 'lbl', a: 'start' });
+  s += T(x + 36, y + 148, 'each value is atomic (one value per cell)', { cls: 'lbl', a: 'start' });
+  // schema / instance
+  s += T(20, 250, 'schema:', { a: 'start', w: 1 }) + T(90, 250, 'Students(sid, name, email)   ← stays the same', { a: 'start' });
+  s += T(20, 272, 'instance:', { a: 'start', w: 1 }) + T(90, 272, 'the 3 rows above, today   ← changes with every insert/delete', { a: 'start' });
+  const el = $('#anatomy'); el.setAttribute('viewBox', '0 0 720 290'); el.setAttribute('width', 720); el.innerHTML = s;
+})();
+// Figure 2: follow the IDs
+(() => {
+  const F = (k) => {
+    const e = tblSVG({ x: 20, y: 30, title: 'Enrolled', head: ['sid', 'cid', 'term'], rows: EN, w: wE, hl: { 0: 'cell-hl' } });
+    const st = tblSVG({ x: 320, y: 30, title: 'Students', head: ['sid', 'name', 'email'], rows: ST, w: wS, hl: k >= 1 ? { 0: 'cell-new' } : {} });
+    const co = tblSVG({ x: 320, y: 150, title: 'Courses', head: ['cid', 'cname', 'credits'], rows: CO, w: wC, hl: k >= 2 ? { 1: 'cell-new' } : {} });
+    let s = e + st + co;
+    if (k >= 1) s += arrow(194, 63, 316, 63, { cls: 's-red', m: 'm-red', label: '1: follow sid', lcls: 'lbl red' });
+    if (k >= 2) s += `<path d="M194 68 C 250 68, 260 205, 316 205" class="s-red" marker-end="url(#m-red)"/>` + T(262, 136, '2: follow cid', { cls: 'lbl red', a: 'start' });
+    if (k >= 3) s += `<rect x="510" y="165" width="200" height="56" rx="6" class="cell-new"/>` + T(610, 188, 'Jalil enrolled in DB', { w: 1, size: 13 }) + T(610, 208, 'during the Jan26 term', { size: 12 });
+    return svgWrap(720, 262, s, 'Following foreign keys');
+  };
+  stepper('#follow', [
+    { html: F(0), cap: 'Take the first row of Enrolled: <b>(2405190, 215, Jan26)</b>. On its own it is just three values.' },
+    { html: F(1), cap: '<b>Step 1: follow sid.</b> 2405190 refers to Students.sid. The matching student is <b>Jalil</b>, jalil@university.edu.' },
+    { html: F(2), cap: '<b>Step 2: follow cid.</b> 215 refers to Courses.cid. The matching course is <b>DB</b>, 3 credits.' },
+    { html: F(3), cap: 'Put together: 2405190 → Jalil, 215 → DB, Jan26 → term. <b>Jalil enrolled in DB during the Jan26 term.</b>' },
+  ], { interval: 2400 });
+})();
+// Figure 3: the join
+(() => {
+  const F = (k) => {
+    const stHl = k >= 1 ? { 0: 'cell-hl' } : {};
+    const enHl = {};
+    if (k >= 2) EN.forEach((r, i) => { if (r[0] === '2405190') enHl[i] = k >= 3 && r[2] !== 'Jan26' ? 'cell-del' : 'cell-hl'; });
+    const coHl = k >= 4 ? { 1: 'cell-new', 2: 'cell-new' } : {};
+    let s = tblSVG({ x: 10, y: 30, title: 'Students s', head: ['sid', 'name'], rows: ST.map(r => r.slice(0, 2)), w: [72, 60], hl: stHl });
+    s += tblSVG({ x: 190, y: 30, title: 'Enrolled e', head: ['sid', 'cid', 'term'], rows: EN, w: wE, hl: enHl });
+    s += tblSVG({ x: 410, y: 30, title: 'Courses c', head: ['cid', 'cname'], rows: CO.map(r => r.slice(0, 2)), w: [44, 70], hl: coHl });
+    if (k >= 5) s += tblSVG({ x: 580, y: 30, title: 'Result', head: ['name', 'cname', 'term'], rows: [['Jalil', 'DB', 'Jan26'], ['Jalil', 'DLD', 'Jan26']], w: [50, 50, 56], hl: { 0: 'cell-new', 1: 'cell-new' } });
+    const msg = ['', 'WHERE s.sid = 2405190', 'ON s.sid = e.sid', 'AND e.term = \'Jan26\'', 'ON e.cid = c.cid', 'SELECT s.name, c.cname, e.term'][k];
+    if (msg) s += T(380, 220, msg, { size: 13, w: 1, cls: 'acc' });
+    return svgWrap(750, 236, s, 'Three-table join');
+  };
+  stepper('#join', [
+    { html: F(0), cap: 'The three tables. The answer needs a name (Students), enrollments (Enrolled) and course names (Courses).' },
+    { html: F(1), cap: 'Keep only the student with <b>sid = 2405190</b>: Jalil.' },
+    { html: F(2), cap: 'Join with Enrolled <b>ON s.sid = e.sid</b>: Jalil matches three enrollment rows (215 Jan26, 205 Jan26, 101 Jan25).' },
+    { html: F(3), cap: 'Apply <b>e.term = \'Jan26\'</b>: the Jan25 enrollment in course 101 is dropped (red). Two rows remain, with cid 215 and 205.' },
+    { html: F(4), cap: 'Join with Courses <b>ON e.cid = c.cid</b>: 215 → DB and 205 → DLD.' },
+    { html: F(5), cap: 'Output the selected columns. <b>Result: (Jalil, DB, Jan26) and (Jalil, DLD, Jan26)</b>, exactly the slide\'s answer. (The DBMS may do these steps in a different order; the optimizer chooses. The result is the same.)' },
+  ], { interval: 2600 });
+})();
+sqlPlay('#play', { setup: CMS, query: `SELECT s.name, c.cname, e.term
+FROM Students s
+JOIN Enrolled e ON s.sid = e.sid
+JOIN Courses c ON e.cid = c.cid
+WHERE s.sid = 2405190
+  AND e.term = 'Jan26';`, note: 'Press <b>Show tables</b> to see all three tables.' });
+sqlCheck('#c1', { setup: CMS, task: '1. List the name and email of every student.', solution: 'SELECT name, email FROM Students;', hint: 'One table, two columns, no WHERE.' });
+sqlCheck('#c2', { setup: CMS, task: '2. List the cid and cname of courses worth fewer than 3 credits.', solution: 'SELECT cid, cname FROM Courses WHERE credits < 3;', hint: 'WHERE credits &lt; 3' });
+sqlCheck('#c3', { setup: CMS, task: '3. List the sid and term of every enrollment in course 215.', solution: 'SELECT sid, term FROM Enrolled WHERE cid = 215;', hint: 'Only the Enrolled table is needed.' });
+sqlCheck('#c4', { setup: CMS, task: '4. List the names of students who have ever enrolled in the course named DLD.', solution: `SELECT s.name FROM Students s JOIN Enrolled e ON s.sid = e.sid JOIN Courses c ON e.cid = c.cid WHERE c.cname = 'DLD';`, hint: 'The course is given by name, so you need Courses as well as Enrolled and Students.' });
+sqlCheck('#c5', { setup: CMS, task: '5. For every enrollment in term Jan26, list the student\'s name, the course name and its credits.', solution: `SELECT s.name, c.cname, c.credits FROM Students s JOIN Enrolled e ON s.sid = e.sid JOIN Courses c ON e.cid = c.cid WHERE e.term = 'Jan26';`, hint: 'The slide-8 query without the sid condition, selecting credits instead of term.' });
+flashcards('#cards', [
+  { f: 'Relation', b: 'A table: a set of tuples with the same attributes.' },
+  { f: 'Tuple', b: 'A row: one record, with one value per attribute.' },
+  { f: 'Attribute', b: 'A named column, e.g. sid.' },
+  { f: 'Domain', b: 'The set of allowed (atomic) values of an attribute, its type.' },
+  { f: 'Degree', b: 'Number of attributes (columns). Students: 3.' },
+  { f: 'Cardinality', b: 'Number of tuples (rows) right now. Enrolled: 6.' },
+  { f: 'Schema vs instance', b: 'Schema: Students(sid, name, email), the stable design. Instance: the tuples present at one moment.' },
+  { f: 'Foreign key', b: 'A column that refers to the key of another table, e.g. Enrolled.sid → Students.sid.' },
+  { f: 'Join', b: 'Combining rows of tables whose values match, e.g. ON s.sid = e.sid.' },
+]);
+quiz('#quiz', [
+  { q: 'What are the degree and cardinality of slide 6\'s Enrolled table?', opts: ['3 and 6', '6 and 3', '3 and 3', '2 and 6'], a: 0,
+    why: 'Three attributes (sid, cid, term) and six tuples.' },
+  { q: 'Inserting a new course changes Courses\'…', opts: ['degree', 'cardinality', 'schema', 'domain'], a: 1,
+    why: 'Inserting adds a tuple, so the cardinality grows from 4 to 5. The schema and degree are unchanged.' },
+  { q: 'Which value is not allowed in a relational cell?', opts: ['NULL', '1.5', 'the list [215, 205]', "'Jan26'"], a: 2,
+    why: 'Values must be atomic. A list of courses belongs in separate Enrolled rows (or, in a document model, in an array).' },
+  { q: 'What does Enrolled.cid refer to?', opts: ['Students.sid', 'Courses.cid', 'Enrolled.term', 'Nothing'], a: 1, why: 'Slide 6: Enrolled.cid refers to Courses.cid.' },
+  { q: 'How many rows does the slide-8 query return if the term is changed to \'Jan25\'?', opts: ['0', '1', '2', '3'], a: 1,
+    why: 'Jalil has one Jan25 enrollment, course 101 (SPL).' },
+  { q: 'Which pair describes the same relation?', opts: ['Students with rows in a different order', 'Students with one row duplicated', 'Students with email removed', 'Students with a new column'], a: 0,
+    why: 'A relation is a set of tuples, so row order does not matter. Duplicates or changed columns make it different.' },
+]);
+ask('#try1', { q: 'How many students are enrolled in course 215 (any term)?', a: 2, why: 'Rows (2405190, 215) and (2405191, 215): Jalil and Karim.' });
+ask('#try2', { q: 'What is the cardinality of the result of the slide-8 query?', a: 2, why: 'Two tuples: DB and DLD.' });
+</script>
+</body>
+</html>

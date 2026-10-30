@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Enforcing a Foreign Key · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 06 (Ishrak) · Chapter 3 · Slides 14–21 · Textbook §7.1.2</div>
+<h1>Enforcing a Foreign Key: Six Kinds of Change</h1>
+<p class="lede">Once Department.head references Employee.id, every INSERT, UPDATE and DELETE on either table might break the link. This chapter goes through the six cases of slides 14–21, animates each of the slides' statements, and explains which ones are always safe, which ones the DBMS must check, and why plain rejection is sometimes the wrong answer.</p>
+
+<h2>1. What happens next? (slide 14)</h2>
+<p>A foreign key connects two tables, and three kinds of modification (INSERTION, UPDATE, DELETION) can hit either table. That gives six cases. The question in each case is the same: <em>can this change leave a Department row whose head matches no Employee?</em></p>
+<div class="tbl"><table>
+<tr><th>Change</th><th>on the foreign table (Department)</th><th>on the master table (Employee)</th></tr>
+<tr><td>INSERT</td><td class="bad">check: the new head must exist (slide 15)</td><td class="good">always safe (slide 18)</td></tr>
+<tr><td>UPDATE</td><td class="bad">check if head changes: the new head must exist (slide 16)</td><td class="bad">check if id changes: no Department row may still use the old id (slide 19)</td></tr>
+<tr><td>DELETE</td><td class="good">always safe (slide 17)</td><td class="bad">check: no Department row may use the deleted id (slide 20)</td></tr>
+</table></div>
+<p>Notice the pattern. On the child side, danger comes from <em>new</em> references (insert, or change the reference). On the parent side, danger comes from <em>removing</em> a referenced key (delete, or change the key). The two "always safe" cases are the mirror images: removing a reference, and adding a key nobody refers to yet.</p>
+<p>All animations start from the slides' data: Employee ids 1–4; Department (CSE, 2), (EEE, 4), (ME, 1).</p>
+
+<h2>2. INSERT into the foreign table (slide 15)</h2>
+<p><code>INSERT INTO Department VALUES ('CE', 3)</code> is <span class="good">OK</span>: employee 3 exists. <code>INSERT INTO Department VALUES ('CE', 5)</code> is <span class="bad">REJECTED</span>: there is no employee 5. Each animation below runs the two statements of its slide one after the other, each on the original data.</p>
+<figure class="wide"><span class="anim-tag">Animation</span><div id="a15"></div></figure>
+
+<h2>3. UPDATE on the foreign table (slide 16)</h2>
+<p><code>UPDATE Department SET head = 3 WHERE name = 'CSE'</code> is <span class="good">OK</span> (employee 3 exists). <code>SET head = 7</code> is <span class="bad">REJECTED</span>. An update that changes the foreign-key column is checked exactly like an insert of the new value. An update of the <code>name</code> column would not be checked at all, since name is not part of the foreign key.</p>
+<figure class="wide"><span class="anim-tag">Animation</span><div id="a16"></div></figure>
+
+<h2>4. DELETE from the foreign table (slide 17)</h2>
+<p>"NO WORRIES, always permitted." Deleting a Department row removes a reference; it cannot create a dangling one. (If some <em>third</em> table referenced Department, deleting from Department would be the master-table case for that other foreign key. Each foreign key is checked on its own.)</p>
+<figure class="wide"><span class="anim-tag">Animation</span><div id="a17"></div></figure>
+
+<h2>5. INSERT into the master table (slide 18)</h2>
+<p>Also always permitted, as far as this foreign key is concerned: a new employee is a new possible target, and no existing Department row can point at an id that did not exist until now. The insert still has to pass Employee's own constraints, of course: a duplicate id breaks the primary key (ORA-00001).</p>
+<figure class="wide"><span class="anim-tag">Animation</span><div id="a18"></div></figure>
+
+<h2>6. UPDATE on the master table (slide 19)</h2>
+<p><code>UPDATE Employee SET id = 8 WHERE id = 3</code> is <span class="good">OK</span>: nobody refers to employee 3. <code>UPDATE Employee SET id = 9 WHERE id = 4</code> is <span class="bad">REJECTED</span>: EEE's head is 4, and after the update there would be no employee 4. Changing other Employee columns (name, address) is never a problem.</p>
+<figure class="wide"><span class="anim-tag">Animation</span><div id="a19"></div></figure>
+
+<h2>7. DELETE from the master table (slide 20)</h2>
+<p><code>DELETE FROM Employee WHERE id = 3</code> is <span class="good">OK</span>; <code>DELETE FROM Employee WHERE id = 4</code> is <span class="bad">REJECTED</span>, again because of EEE. In Oracle the message is <code>ORA-02292: integrity constraint (…) violated - child record found</code>. Compare it with the child-side error <code>ORA-02291: … parent key not found</code>: 02291 means "you pointed at a parent that is not there", 02292 means "you removed a parent that still has children". SQLite uses the same text, <code>FOREIGN KEY constraint failed</code>, for both.</p>
+<figure class="wide"><span class="anim-tag">Animation</span><div id="a20"></div></figure>
+<p>Run the six cases yourself. Each statement is a separate run; press Reset between experiments to get the original rows back.</p>
+<div id="p1"></div>
+
+<h2>8. Rethink before rejection (slide 21)</h2>
+<p>Slide 21 repeats the two rejected master-table statements and asks us to think again. Rejecting is safe, but it is not always what the users want:</p>
+<div class="q">
+<h4>Question (slide 21): is rejecting <code>UPDATE Employee SET id = 9 WHERE id = 4</code> and <code>DELETE FROM Employee WHERE id = 4</code> the right behaviour?</h4>
+<p><strong>The update.</strong> Employee D is still the same person and still heads EEE; only D's id number changed (say, after a re-numbering of staff ids). The sensible result is that EEE's head becomes 9 too. Rejecting forces the user to do it by hand in three steps: insert a copy of D with id 9, point EEE at 9, delete the old row 4. (Exercise 4 below makes you do exactly this.)</p>
+<p><strong>The delete.</strong> If D retires (or leaves temporarily), EEE still exists, it just has no head for now. The sensible result is that EEE's head becomes NULL, meaning "unknown / none". Rejecting forces the user to set EEE's head to NULL first and then delete D.</p>
+<p>So the DBMS should let the designer choose, per foreign key, what to do with the children when a parent's key is updated or deleted. These choices are the <b class="term">referential actions</b> of the next chapter: ON UPDATE CASCADE and ON DELETE SET NULL (slide 22).</p>
+</div>
+
+<h2>9. Try any statement: the foreign-key explorer</h2>
+<p>Pick a statement, fill in a (and b where the statement needs it), choose the referential actions, and press Run it. With both actions on NO ACTION you get the behaviour of this chapter; the other settings preview <a href="04-referential-actions.html">Chapter 4</a>. Try the four statements of slides 19–20 with each setting.</p>
+<figure class="wide"><span class="anim-tag">Interactive</span><div id="tool"></div></figure>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+<h3>Write it yourself</h3>
+<p>All exercises use the slides' tables with the plain foreign key (no referential actions). Exercises 3 and 4 are checked on the final contents of <em>both</em> tables.</p>
+<div id="c1"></div><div id="c2"></div><div id="c3"></div><div id="c4"></div><div id="c5"></div>
+
+<div class="key"><p><strong>Summary:</strong> A foreign key can be broken in four of the six cases: INSERT or UPDATE of the reference in the child (Oracle ORA-02291, parent key not found), and UPDATE or DELETE of a referenced key in the parent (ORA-02292, child record found). Deleting a child row and inserting a parent row are always safe. By default the DBMS rejects the violating statement; for parent updates and deletes that is often too strict, which motivates referential actions.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/sqlplay.js"></script>
+<script src="lecture.js"></script>
+<script>
+const two = (a, b) => [...fkSteps(a), ...fkSteps(b)];
+stepper('#a15', two({ t: 'insDept', name: 'CE', head: 3 }, { t: 'insDept', name: 'CE', head: 5 }), { interval: 2600 });
+stepper('#a16', two({ t: 'updDept', name: 'CSE', head: 3 }, { t: 'updDept', name: 'CSE', head: 7 }), { interval: 2600 });
+stepper('#a17', fkSteps({ t: 'delDept', name: 'EEE' }), { interval: 2600 });
+stepper('#a18', two({ t: 'insEmp', row: [5, 'E', 'V', 'F'] }, { t: 'insEmp', row: [2, 'F', 'U', 'M'] }), { interval: 2600 });
+stepper('#a19', two({ t: 'updEmp', from: 3, to: 8 }, { t: 'updEmp', from: 4, to: 9 }), { interval: 2600 });
+stepper('#a20', two({ t: 'delEmp', id: 3 }, { t: 'delEmp', id: 4 }), { interval: 2600 });
+fkExplorer('#tool');
+sqlPlay('#p1', { setup: ED, query: "-- slide 15\nINSERT INTO Department VALUES ('CE', 5);\n-- other cases to paste here:\n--   UPDATE Department SET head = 7 WHERE name = 'CSE';\n--   DELETE FROM Department WHERE name = 'EEE';\n--   INSERT INTO Employee VALUES (5, 'E', 'V', 'F');\n--   UPDATE Employee SET id = 9 WHERE id = 4;\n--   DELETE FROM Employee WHERE id = 4;",
+  note: 'SQLite reports every foreign-key violation as <code>FOREIGN KEY constraint failed</code>. In Oracle the child-side cases give ORA-02291 (parent key not found) and the parent-side cases ORA-02292 (child record found).' });
+
+flashcards('#cards', [
+  { f: 'ORA-02291', b: 'Parent key not found: a child row (insert/update) points at a key that does not exist.' },
+  { f: 'ORA-02292', b: 'Child record found: you tried to delete or re-key a parent row that is still referenced.' },
+  { f: 'Always-safe changes', b: 'DELETE from the child table; INSERT into the parent table.' },
+  { f: 'Changes that need a check', b: 'Child INSERT, child UPDATE of the FK, parent UPDATE of the key, parent DELETE.' },
+  { f: 'Default policy', b: 'Reject the violating statement (NO ACTION / RESTRICT). The table is left unchanged.' },
+  { f: 'Referential action', b: 'A rule declared with the FK saying what to do with children when a parent is deleted/updated: CASCADE, SET NULL.' },
+]);
+quiz('#quiz', [
+  { q: 'Which statement can never violate the foreign key Department.head → Employee.id?', opts: ["INSERT INTO Department VALUES ('CE', 3)", 'DELETE FROM Employee WHERE id = 3', "DELETE FROM Department WHERE name = 'ME'", 'UPDATE Employee SET id = 8 WHERE id = 3'], a: 2, why: 'Deleting a child row only removes a reference. The other three happen to succeed on this data, but each one can fail on other data, so the DBMS must check them.' },
+  { q: '<code>UPDATE Employee SET name = \'Z\' WHERE id = 4</code>. What happens?', opts: ['Rejected, EEE references employee 4', 'Accepted; name is not the referenced column', 'Accepted, and EEE is updated', 'Rejected with ORA-02291'], a: 1, why: 'Only changes to the referenced key (id) matter.' },
+  { q: 'Which Oracle error do you get for <code>DELETE FROM Employee WHERE id = 2</code> (no referential action)?', opts: ['ORA-00001', 'ORA-02291', 'ORA-02292', 'ORA-01400'], a: 2, why: 'CSE still points at employee 2: child record found.' },
+  { q: 'After <code>DELETE FROM Employee WHERE id = 3</code> succeeds, which statement is now rejected?', opts: ["INSERT INTO Department VALUES ('CE', 3)", "INSERT INTO Department VALUES ('CE', 4)", "INSERT INTO Department VALUES ('CE', NULL)", "UPDATE Department SET head = 1 WHERE name = 'CSE'"], a: 0, why: 'Employee 3 no longer exists, so a new reference to 3 is dangling.' },
+  { q: 'Slide 21 says "rethink before rejection". Why?', opts: ['Rejection can corrupt the data', 'Sometimes the intended result is to update or null out the children, and rejection forces manual multi-step work', 'Oracle cannot reject updates', 'Rejection is slower than cascading'], a: 1, why: 'Rejection is always safe but often not what the user means; referential actions encode the intended repair.' },
+]);
+ask('#try1', { q: 'Starting from the slide data, how many of these succeed (each on the original data)? (a) INSERT Department (CE, 1); (b) UPDATE Department SET head = 6 WHERE name = \'ME\'; (c) DELETE FROM Employee WHERE id = 1; (d) UPDATE Employee SET id = 7 WHERE id = 3; (e) DELETE FROM Department WHERE name = \'CSE\'.', a: 3, why: '(a) OK, employee 1 exists; (b) rejected, no employee 6; (c) rejected, ME references 1; (d) OK, nobody references 3; (e) OK, always. Three succeed.' });
+
+const BOTH = "(SELECT 'Employee' AS t, id AS a, name AS b FROM Employee UNION ALL SELECT 'Department', name, head FROM Department)";
+sqlCheck('#c1', { setup: ED, check: 'state', table: 'Department',
+  task: 'Easy. Add the new department CE, headed by employee C (id 3).',
+  solution: "INSERT INTO Department VALUES ('CE', 3);" });
+sqlCheck('#c2', { setup: ED, check: 'state', table: 'Department',
+  task: 'Employee D (id 4) should now head ME as well as EEE. Change the data accordingly.',
+  solution: "UPDATE Department SET head = 4 WHERE name = 'ME';" });
+sqlCheck('#c3', { setup: ED, check: 'state', table: BOTH,
+  task: 'Employee B (id 2) leaves the university. Employee A (id 1) takes over B\'s department. Remove B. Use the statements in an order the foreign key accepts.',
+  hint: 'First point CSE at 1, then delete employee 2.',
+  solution: "UPDATE Department SET head = 1 WHERE name = 'CSE';\nDELETE FROM Employee WHERE id = 2;" });
+sqlCheck('#c4', { setup: ED, check: 'state', table: BOTH,
+  task: 'Exam level (slide 21 by hand). Employee D\'s id must change from 4 to 9, and EEE must keep D as its head. There is no ON UPDATE CASCADE, so <code>UPDATE Employee SET id = 9 WHERE id = 4</code> is rejected. Do it in steps.',
+  hint: 'Insert a copy of D with id 9, repoint EEE, then delete row 4.',
+  solution: "INSERT INTO Employee SELECT 9, name, address, gender FROM Employee WHERE id = 4;\nUPDATE Department SET head = 9 WHERE head = 4;\nDELETE FROM Employee WHERE id = 4;" });
+sqlCheck('#c5', { setup: ED + "INSERT INTO Department VALUES ('URP', NULL);",
+  task: 'Exam level. List the ids of the employees that can be deleted <b>without</b> violating the foreign key (Department now also has a row (URP, NULL)).',
+  hint: 'Careful: <code>id NOT IN (SELECT head FROM Department)</code> returns nothing when the subquery contains a NULL. Filter the NULLs out, or use NOT EXISTS.',
+  solution: 'SELECT id\nFROM Employee\nWHERE id NOT IN (SELECT head FROM Department WHERE head IS NOT NULL);' });
+</script>
+</body>
+</html>

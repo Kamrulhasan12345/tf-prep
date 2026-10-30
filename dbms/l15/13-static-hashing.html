@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Static Hashing · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<style>
+.hx-form label { display: inline-flex; gap: 6px; align-items: center; }
+.hx-form input.sm { width: 4.5em; }
+.hx-form input.keys { width: min(30em, 100%); }
+.hx-msg { color: var(--red); font-weight: 600; min-height: 1.2em; margin-bottom: 6px; }
+</style>
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 15 · Chapter 13 · Beyond the slides (asked in exams)</div>
+<h1>Static Hashing</h1>
+<p class="lede">Slide 5 named the second basic kind of index, the hash index, and then the lecture moved on to B+ trees. Exams ask about hashing anyway. This chapter explains hash file organization and hash indices (Silberschatz §14.5, Garcia-Molina §14.3.1–14.3.4), what makes a hash function good, why buckets overflow and how overflows are handled, and why a fixed number of buckets eventually fails.</p>
+
+<h2>1. Hashing instead of searching</h2>
+
+<p>Every index so far kept search keys in sorted order and found a key by searching: binary search in a sorted index, or a walk down a B+ tree. Hashing skips the search. A function computes, straight from the key, where the record lives.</p>
+
+<dl class="def">
+<dt>Bucket</dt><dd>A unit of storage that holds one or more records. Usually one disk block, possibly with more blocks chained to it.</dd>
+<dt>Hash function <i>h</i></dt><dd>A function from the set <i>K</i> of all search-key values to the set <i>B</i> of bucket addresses, <i>h</i>: <i>K</i> → {0, 1, …, <i>n<sub>B</sub></i> − 1}.</dd>
+<dt>Hash file organization</dt><dd>The records themselves are stored in the buckets: record with key <i>K</i> lives in bucket <i>h</i>(<i>K</i>).</dd>
+<dt>Hash index</dt><dd>An index whose entries (search key, record pointer) are stored in buckets by hashing the search key. The records themselves can be stored in any order.</dd>
+<dt>Static hashing</dt><dd>Hashing with a fixed number of buckets <i>n<sub>B</sub></i>, chosen when the file is created.</dd>
+</dl>
+
+<p>The three operations are short:</p>
+<ul>
+<li><strong>Insert</strong> a record with key <i>K</i>: compute <i>h</i>(<i>K</i>) and store the record in that bucket (if there is space).</li>
+<li><strong>Look up</strong> key <i>K</i>: compute <i>h</i>(<i>K</i>) and search that one bucket. The search must compare the keys of the records in the bucket, because two different keys can hash to the same bucket (a <b class="term">collision</b>).</li>
+<li><strong>Delete</strong>: look the record up and remove it from its bucket.</li>
+</ul>
+
+<p>Here is a hash index on the ID of the instructor relation with 8 buckets, 2 entries per bucket, and <i>h</i>(ID) = ID mod 8. Each entry is (ID, pointer to the instructor record); the pointers are left out of the drawing.</p>
+
+<figure>
+<div id="instr"></div>
+<figcaption><b>Figure 1.</b> Hash index on instructor.ID, h(ID) = ID mod 8, capacity 2. Buckets 2, 3 and 4 are empty, while buckets 5 and 7 need overflow blocks (dashed). Twelve IDs into eight buckets of two should fit easily; the distribution does not cooperate.</figcaption>
+</figure>
+
+<p>Silberschatz makes one more remark worth knowing for short questions: a hash index is only ever useful as a <em>secondary</em> index. If the file itself is organized by hashing on that key, the file already is the hash structure, and a separate hash index adds nothing. The term hash index is therefore used both for separate secondary hash structures and for hash-organized files.</p>
+
+<h2>2. What makes a hash function good</h2>
+
+<p>The worst possible hash function sends every key to the same bucket; a lookup then has to scan everything. The ideal one spreads the keys out so that each bucket gets about the same number of records. Silberschatz names two properties:</p>
+<dl class="def">
+<dt>Uniform</dt><dd>Each bucket is assigned the same number of search-key values from the set of <em>all possible</em> values.</dd>
+<dt>Random</dt><dd>Each bucket gets about the same number of values from the keys that <em>actually</em> occur, whatever their pattern. The hash value should not be correlated with any visible ordering of the keys, such as alphabetical order or the length of the name.</dd>
+</dl>
+<p>Two bad examples from the textbook make the difference clear. Hashing instructor names into 26 buckets by first letter is simple, but not uniform in practice: far more names start with B or R than with Q or X. Hashing salaries into buckets of 10,000-wide ranges (0–9,999, 10,000–19,999, …) is uniform over all possible salaries, but not random: real salaries cluster in a few middle ranges.</p>
+
+<p>Typical hash functions do arithmetic on the binary representation of the key:</p>
+<ul>
+<li><strong>Division:</strong> <i>h</i>(<i>K</i>) = <i>K</i> mod <i>n<sub>B</sub></i>. Choose <i>n<sub>B</sub></i> prime, or at least not a power of 2: <i>K</i> mod 8 keeps only the last 3 bits of <i>K</i>, so any pattern in those bits (many IDs ending in odd digits, say) goes straight into the bucket numbers. That is what happened in Figure 1.</li>
+<li><strong>Strings:</strong> treat the characters as numbers and combine them, for example Java's <i>s</i>[0]·31<sup><i>n</i>−1</sup> + <i>s</i>[1]·31<sup><i>n</i>−2</sup> + … + <i>s</i>[<i>n</i>−1], then take the result mod <i>n<sub>B</sub></i>. Every character influences the bucket.</li>
+<li><strong>Multiplication:</strong> <i>h</i>(<i>K</i>) = ⌊<i>n<sub>B</sub></i> · frac(<i>K</i> · <i>A</i>)⌋ for a constant 0 &lt; <i>A</i> &lt; 1 (Knuth suggests <i>A</i> ≈ 0.618). Here a power-of-2 <i>n<sub>B</sub></i> is fine.</li>
+</ul>
+<p>Whatever the formula, a practical check is to hash a sample of the real keys and look at the bucket counts.</p>
+
+<h2>3. Bucket overflow</h2>
+
+<p>A <b class="term">bucket overflow</b> happens when a record hashes to a bucket that has no space left. There are two causes:</p>
+<ol>
+<li><strong>Insufficient buckets.</strong> The number of buckets must satisfy <i>n<sub>B</sub></i> &gt; <i>n<sub>r</sub></i> / <i>f<sub>r</sub></i>, where <i>n<sub>r</sub></i> is the number of records and <i>f<sub>r</sub></i> is the number of records per bucket. If the file grows past what was planned, overflow is unavoidable.</li>
+<li><strong>Skew.</strong> Some buckets receive more records than others, either because many records have the <em>same</em> search key (duplicates always hash together) or because the hash function distributes the actual keys unevenly.</li>
+</ol>
+<p>To leave room for skew, Silberschatz suggests allocating extra buckets with a <b class="term">fudge factor</b> <i>d</i>, typically about 0.2:</p>
+<div class="formula">n<sub>B</sub> = (n<sub>r</sub> / f<sub>r</sub>) × (1 + d)</div>
+<p>Example: 10,000 records, 20 per block, <i>d</i> = 0.2 gives 500 × 1.2 = 600 buckets. About 20% of the space is deliberately empty; that is the price of fewer overflows.</p>
+
+<h3>3.1 Overflow chaining (closed addressing)</h3>
+<p>Even with a fudge factor, some bucket will overflow eventually. The standard solution in databases is <b class="term">overflow chaining</b>: when bucket <i>b</i> is full, allocate an <b class="term">overflow bucket</b> and link it to <i>b</i>; when that is full, link another, forming a chain. A lookup reads the primary bucket and then every block in its chain. Silberschatz calls this <b class="term">closed addressing</b> (some books say closed hashing), because a record always stays in the bucket <i>h</i>(<i>K</i>) chose for it.</p>
+
+<figure>
+<span class="anim-tag">Animation</span>
+<div id="chain"></div>
+<figcaption><b>Figure 2.</b> Static hashing with overflow chaining: 4 buckets of 2 records, h(K) = K mod 4, inserting 40, 21, 33, 10, 14, 15 and then 18. The counter shows how many blocks a lookup of the newest key reads.</figcaption>
+</figure>
+
+<h3>3.2 Open addressing</h3>
+<p>The alternative keeps the set of buckets fixed and allows no chains. When <i>h</i>(<i>K</i>) is full, the record goes into some <em>other</em> bucket chosen by a probe rule. With <b class="term">linear probing</b> that is the next bucket with space: (<i>h</i>(<i>K</i>) + 1) mod <i>n<sub>B</sub></i>, then + 2, and so on. In Figure 2, key 18 would go to bucket 3 (which has one free slot) instead of an overflow block. Silberschatz calls this <b class="term">open addressing</b> (or open hashing). Be careful: in data-structures courses "open hashing" usually means chaining. State the mechanism, not just the name.</p>
+<p>Open addressing is used in compilers and assemblers, but databases avoid it. Lookups of a missing key must keep probing until an empty slot proves the key absent, deletion is awkward (a removed record can break other records' probe sequences), and each probe may be another random disk read.</p>
+
+<h3>3.3 Try it yourself</h3>
+<figure>
+<span class="anim-tag">Interactive</span>
+<div id="tool"></div>
+<figcaption><b>Figure 3.</b> Static hash file with overflow chaining. Enter non-negative integer keys, the number of buckets and the bucket capacity.</figcaption>
+</figure>
+
+<h2>4. Cost, and why static hashing is not enough</h2>
+<p>With a good hash function and no overflow, a lookup reads exactly <strong>one block</strong>, independent of the file size: better than the 3 or 4 levels of a B+ tree. An insertion or deletion is one read and one write. Overflow chains add one read per chain block.</p>
+<p>Hashing has two weaknesses compared with B+ trees:</p>
+<ul>
+<li><strong>No range queries.</strong> A good hash function scatters neighbouring keys on purpose, so <code>WHERE salary BETWEEN 60000 AND 80000</code> cannot use a hash index: it would have to try every possible value or scan every bucket. B+ trees keep keys in order and answer ranges directly.</li>
+<li><strong>A fixed <i>n<sub>B</sub></i> fits only one size of file.</strong> Size the buckets for today's file and the chains grow as the file grows, so performance degrades. Size them for the future and space is wasted now. Rebuilding with a new <i>n<sub>B</sub></i> and a new hash function means rehashing every record, which is expensive and blocks access while it runs.</li>
+</ul>
+<p>The second problem is solved by <b class="term">dynamic hashing</b>, which changes the number of buckets gradually: extendible hashing and linear hashing, the topic of the next chapter.</p>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+<div id="try2"></div>
+<div id="try3"></div>
+
+<h3>Exam questions</h3>
+
+<div class="exam">
+<div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2016–17 · 6 marks</div>
+<div class="exam-q"><p>What is the key property of a good hash function? How can you choose such a function?</p></div>
+<details><summary>Show worked answer</summary><div class="exam-a">
+<p><strong>Key property:</strong> the hash function must distribute the search keys evenly over the buckets, so that every bucket receives about the same number of records and a lookup reads about one block. Silberschatz splits this into two properties:</p>
+<ul>
+<li><strong>Uniform:</strong> each bucket is assigned the same number of values from the set of all possible search-key values.</li>
+<li><strong>Random:</strong> in the average case each bucket gets the same number of the keys that actually occur, regardless of how those keys are distributed. The bucket number should not depend on any visible order of the keys.</li>
+</ul>
+<p>It must also be deterministic (the same key always gives the same bucket) and cheap to compute.</p>
+<p><strong>Choosing one:</strong></p>
+<ol>
+<li>Use all of the key. Hashing names by their first letter is uniform over the alphabet but not random over real names (many B and R names, few Q and X). Hashing salaries by 10,000-wide range is uniform but not random (salaries cluster in a few ranges).</li>
+<li>For integer keys, use the division method h(K) = K mod n<sub>B</sub> with n<sub>B</sub> a prime not close to a power of 2. With n<sub>B</sub> = 8 the bucket is just the last 3 bits of K, and any pattern in those bits shows up as skew (Figure 1: twelve instructor IDs leave three of eight buckets empty).</li>
+<li>For strings, combine every character's code, for example s[0]·31<sup>n−1</sup> + … + s[n−1], mod n<sub>B</sub>; or use the multiplication method ⌊n<sub>B</sub> · frac(K·A)⌋ with A ≈ 0.618, which also works when n<sub>B</sub> is a power of 2.</li>
+<li>Test it: hash a sample of the real keys and check that the bucket counts are close to equal.</li>
+</ol>
+<p>The question-bank answer is correct; its mention of cryptographic hashes (SHA-256 and similar) is fine but unnecessary for a DBMS, where speed matters more than unpredictability.</p>
+</div></details>
+</div>
+
+<div class="exam">
+<div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2010–11 · 10 marks</div>
+<div class="exam-q"><p>Describe static hash file organization with an example. How can bucket overflows be handled?</p></div>
+<details><summary>Show worked answer</summary><div class="exam-a">
+<p><strong>Static hash file organization.</strong> The file is divided into a fixed number n<sub>B</sub> of buckets (each one or more disk blocks), chosen when the file is created. A hash function h maps every search-key value to a bucket number 0 … n<sub>B</sub> − 1. A record with key K is stored in bucket h(K); to find it, compute h(K) and search only that bucket. Different keys can collide in the same bucket, so the search compares keys inside the bucket. A lookup costs one block read when there is no overflow.</p>
+<p><strong>Example.</strong> n<sub>B</sub> = 4 buckets of 2 records, h(K) = K mod 4. Insert 40, 21, 33, 10, 14, 15: h = 0, 1, 1, 2, 2, 3, giving bucket 0 = [40], 1 = [21, 33], 2 = [10, 14], 3 = [15]. Inserting 18 (h = 2) finds bucket 2 full: a bucket overflow (Figure 2 animates all of this).</p>
+<p><strong>Why overflows happen:</strong> too few buckets for the number of records (n<sub>B</sub> ≤ n<sub>r</sub>/f<sub>r</sub>), or skew (duplicate keys, or a hash function that spreads the actual keys unevenly). Allocating n<sub>B</sub> = (n<sub>r</sub>/f<sub>r</sub>)(1 + d) buckets with fudge factor d ≈ 0.2 reduces overflows but cannot rule them out.</p>
+<p><strong>Handling overflows:</strong></p>
+<ol>
+<li><strong>Overflow chaining (closed addressing):</strong> link an overflow bucket to the full bucket and put the record there; further overflows extend the chain. Key 18 goes to an overflow block chained to bucket 2. A lookup in bucket 2 now reads 2 blocks. This is what database systems use.</li>
+<li><strong>Open addressing (linear probing):</strong> put the record in the next bucket with space, (h(K) + 1) mod n<sub>B</sub>, … ; key 18 would go to bucket 3. No chains, but lookups and deletions get complicated and may read many buckets, so databases avoid it.</li>
+<li><strong>Change the structure:</strong> when chains get long, rebuild with more buckets and a new hash function, or use dynamic hashing (extendible or linear hashing), which adds buckets gradually.</li>
+</ol>
+<p>The question-bank answer is correct; its quadratic probing and double hashing are further open-addressing variants.</p>
+</div></details>
+</div>
+
+<div class="key"><p><strong>Summary:</strong> A hash function maps each search key to one of n<sub>B</sub> buckets, so a lookup reads one bucket instead of searching. A good hash function is uniform and random; use all of the key and a prime number of buckets for the division method. Buckets overflow because there are too few of them or because of skew; databases handle this with overflow chains (closed addressing) rather than open addressing. Hashing cannot answer range queries, and a fixed number of buckets degrades as the file grows, which motivates dynamic hashing.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script>
+// Static hash file: each bucket is an array of keys; slots beyond cap are overflow blocks.
+function shSVG(bk, cap, hl = {}) {
+  const SW = 66, SH = 32, RH = 46, X = 90, y0 = 30;
+  let s = `<text x="10" y="18" class="lbl">bucket</text><text x="${X}" y="18" class="lbl">primary block, then overflow blocks (dashed)</text>`, right = X + cap * SW;
+  bk.forEach((b, k) => {
+    const y = y0 + k * RH, nblk = Math.max(1, Math.ceil(b.length / cap));
+    s += `<text x="20" y="${y + 21}" class="big">${k}</text>`;
+    let bx = X;
+    for (let q = 0; q < nblk; q++) {
+      if (q) s += `<path d="M${bx - 26} ${y + SH / 2} H${bx - 3}" class="s-fg" marker-end="url(#m-fg)"/>`;
+      for (let j = 0; j < cap; j++) {
+        const v = b[q * cap + j], cls = v == null ? 'cell-plain' : v === hl.key ? 'cell-new' : 'cell';
+        s += `<rect class="${cls}" x="${bx + j * SW}" y="${y}" width="${SW}" height="${SH}"${q ? ' style="stroke-dasharray:4 3"' : ''}/>`;
+        if (v != null) s += `<text x="${bx + j * SW + SW / 2}" y="${y + 21}" text-anchor="middle" style="font-size:12.5px">${v}</text>`;
+      }
+      bx += cap * SW + 26;
+    }
+    right = Math.max(right, bx - 26);
+    if (hl.bucket === k) s += `<rect x="${X - 4}" y="${y - 4}" width="${cap * SW + 8}" height="${SH + 8}" rx="3" class="s-acc" style="stroke-width:2.5;fill:none"/>`;
+  });
+  const W = Math.max(right + 40, 420), H = y0 + bk.length * RH;
+  return `<svg viewBox="0 0 ${W} ${H}" width="${W}" role="img" aria-label="static hash file">${s}</svg>`;
+}
+// steps for inserting keys one by one
+function shSteps(keys, M, cap) {
+  const bk = Array.from({ length: M }, () => []), steps = [];
+  steps.push({ html: shSVG(bk, cap), cap: `${M} empty buckets, ${cap} record${cap > 1 ? 's' : ''} per block, h(K) = K mod ${M}.` });
+  for (const k of keys) {
+    const b = Number(BigInt(k) % BigInt(M)), full = bk[b].length >= cap && bk[b].length % cap === 0;
+    bk[b].push(k);
+    const blocks = Math.ceil(bk[b].length / cap);
+    steps.push({ html: shSVG(bk.map(x => [...x]), cap, { key: k, bucket: b }),
+      cap: `Insert <b>${k}</b>: h(${k}) = ${k} mod ${M} = <b>${b}</b>. ` + (full ? `Bucket ${b}'s last block is full, so a new <b>overflow block</b> is chained to it.` : bk[b].length > cap ? `It goes into bucket ${b}'s overflow block, which still has space.` : `Bucket ${b} has space.`) +
+        ` A lookup of ${k} now reads <b>${blocks}</b> block${blocks > 1 ? 's' : ''}.` });
+  }
+  const used = bk.reduce((a, x) => a + Math.max(1, Math.ceil(x.length / cap)), 0), ovf = used - M;
+  const avg = keys.length ? (bk.reduce((a, x) => a + x.reduce((c, _, i) => c + Math.floor(i / cap) + 1, 0), 0) / keys.length) : 0;
+  steps[steps.length - 1].cap += ` <br>Totals: ${keys.length} records, ${M} buckets, ${ovf} overflow block${ovf === 1 ? '' : 's'}; average successful lookup reads ${+avg.toFixed(2)} blocks.`;
+  return steps;
+}
+$('#instr').innerHTML = (() => {
+  const ids = INSTR.map(r => +r[0]), bk = Array.from({ length: 8 }, () => []);
+  ids.forEach(i => bk[i % 8].push(i));
+  return shSVG(bk, 2);
+})();
+stepper('#chain', shSteps([40, 21, 33, 10, 14, 15, 18], 4, 2), { interval: 2200 });
+
+(() => {
+  const host = $('#tool');
+  host.innerHTML = `<form class="bp-form hx-form"><label>Keys <input class="keys" name="keys" value="40 21 33 10 14 15 18" autocomplete="off" spellcheck="false"></label>
+    <label>Buckets M <input class="sm" name="M" value="4"></label><label>Capacity <input class="sm" name="cap" value="2"></label><button type="submit">Animate</button></form>
+    <div class="hx-msg" aria-live="polite"></div><div class="hx-st"></div>`;
+  const f = host.querySelector('form'), msg = host.querySelector('.hx-msg');
+  const run = () => {
+    msg.textContent = '';
+    const toks = f.elements.keys.value.split(/[\s,;]+/).filter(Boolean), M = +f.elements.M.value, cap = +f.elements.cap.value;
+    const bad = toks.find(t => !/^\d+$/.test(t));
+    if (!toks.length) return msg.textContent = 'Type at least one key.';
+    if (bad) return msg.textContent = `"${bad}" is not a non-negative whole number.`;
+    if (toks.length > 40) return msg.textContent = 'Please use at most 40 keys.';
+    if (!(Number.isInteger(M) && M >= 1 && M <= 16)) return msg.textContent = 'Use between 1 and 16 buckets.';
+    if (!(Number.isInteger(cap) && cap >= 1 && cap <= 5)) return msg.textContent = 'Capacity must be a whole number from 1 to 5.';
+    stepper(host.querySelector('.hx-st'), shSteps(toks, M, cap), { interval: 2200 });
+  };
+  f.addEventListener('submit', e => { e.preventDefault(); run(); });
+  run();
+})();
+
+flashcards('#cards', [
+  { f: 'Bucket', b: 'Unit of storage for a hash structure: one block, possibly with overflow blocks chained to it.' },
+  { f: 'Hash function', b: 'h: search keys → {0, …, n<sub>B</sub> − 1}. Record with key K lives in (or is indexed in) bucket h(K).' },
+  { f: 'Uniform', b: 'Each bucket gets the same number of values from the set of all possible keys.' },
+  { f: 'Random', b: 'Each bucket gets about the same number of the keys that actually occur, regardless of their pattern.' },
+  { f: 'Two causes of bucket overflow', b: 'Insufficient buckets (n<sub>B</sub> ≤ n<sub>r</sub>/f<sub>r</sub>) and skew (duplicate keys or uneven hashing).' },
+  { f: 'Fudge factor d', b: 'Extra buckets for skew: n<sub>B</sub> = (n<sub>r</sub>/f<sub>r</sub>)(1 + d), d ≈ 0.2.' },
+  { f: 'Overflow chaining (closed addressing)', b: 'Full bucket gets a linked chain of overflow buckets. Standard in databases.' },
+  { f: 'Open addressing', b: 'No chains: a record that does not fit goes to another bucket chosen by probing (e.g. the next one). Avoided in databases.' },
+]);
+quiz('#quiz', [
+  { q: 'Which query can a hash index on salary NOT help with?', opts: ['salary = 80000', 'salary BETWEEN 60000 AND 80000', 'Checking whether some instructor earns exactly 72000', 'Finding all instructors with salary 40000'], a: 1, why: 'Hashing scatters neighbouring values on purpose, so a range has no single bucket. Point queries are what hashing is for.' },
+  { q: 'Hashing names into 26 buckets by first letter is…', opts: ['uniform and random', 'uniform over the alphabet, but not random over real names', 'random but not uniform', 'perfect'], a: 1, why: 'Every letter gets one bucket, but real names are unevenly spread over first letters.' },
+  { q: 'Why is K mod 8 a poor hash function?', opts: ['8 is too small', 'It uses only the last 3 bits of K, so patterns in those bits become skew', 'It is too slow', 'It is not deterministic'], a: 1, why: 'Division by a power of 2 keeps only the low-order bits. Prefer a prime number of buckets.' },
+  { q: 'A bucket with one overflow block. How many blocks does a lookup of a key stored in the overflow block read?', opts: ['1', '2', '3', 'All buckets'], a: 1, why: 'The primary block, then the chained overflow block.' },
+  { q: 'Which statement about static hashing is true?', opts: ['The number of buckets grows automatically', 'Performance degrades as the file grows past its planned size', 'It supports range scans efficiently', 'It never needs overflow handling'], a: 1, why: 'n<sub>B</sub> is fixed, so a growing file means longer overflow chains.' },
+]);
+ask('#try1', { q: 'A file will hold 12,000 records, 30 records fit in a bucket, and we use a fudge factor d = 0.2. How many buckets should static hashing allocate?', a: 480, hint: 'n<sub>B</sub> = (n<sub>r</sub>/f<sub>r</sub>)(1 + d).', why: '12000 / 30 = 400; 400 × 1.2 = 480.' });
+ask('#try2', { q: 'With the hash index of Figure 1 (h(ID) = ID mod 8), which bucket holds instructor 98345?', a: 1, hint: '98345 = 8 × 12293 + ?', why: '98345 mod 8 = 1.' });
+ask('#try3', { q: 'In Figure 2\'s final state (4 buckets, capacity 2), linear probing is used instead of chaining. Which bucket does 18 go to?', a: 3, hint: 'Bucket 2 is full; try the next one.', why: 'h(18) = 2 is full ([10, 14]); bucket 3 holds only 15, so 18 goes to bucket 3.' });
+</script>
+</body>
+</html>

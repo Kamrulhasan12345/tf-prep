@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Relations on Disk and Head Movement · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 13 · Chapter 4 · Slide 11 · Book §13.3.2</div>
+<h1>Placing Relations on Disk and Counting Seeks</h1>
+<p class="lede">Slide 11's Question w1-2 puts the ideas of Chapter 3 to work: why the DBMS reads blocks, where three relations land on the tracks, and how many seeks three queries cost. Also the exam question on head movement between relations.</p>
+
+<h2>1. Why placement matters</h2>
+
+<p>Chapter 3 showed that a seek costs milliseconds while reading the next track costs almost nothing extra. A full scan such as <code>SELECT * FROM sale</code> reads every block of the relation. If the relation sits on consecutive tracks, the head seeks once to its first track and then moves track by track while reading: that is a <b class="term">sequential</b> scan. The expensive moments are the jumps from where the head is now to the start of the next relation. Counting those jumps is what slide 11 asks for.</p>
+
+<dl class="def">
+  <dt>Head movement</dt><dd>The sequence of tracks the head visits, and the total number of tracks it crosses.</dd>
+  <dt>Seek (in these questions)</dt><dd>A long arm movement to a track that is not the next one. Moving from a track to the adjacent track while scanning is not counted as a separate seek (slide 9: in a sequential pattern, a seek is required only for the first block).</dd>
+</dl>
+<p>The textbook makes the same point in §13.3.2: store data that is accessed together on one cylinder or on adjacent cylinders, and after the first seek the disk can run at its full transfer rate.</p>
+
+<div class="q">
+<h4>Question w1-2 (worked answer)</h4>
+<p><em>Disk storage size: tracks 1–20,000 hold 20.48 GB; tracks 20,001–40,000 hold 10.24 GB. The relations customer, product and sale (10.24 GB each) are stored consecutively on the disk platter starting from track number 1 and platter number 1. The queries Q1 <code>SELECT * FROM SALE</code>, Q2 <code>SELECT * FROM CUSTOMER</code>, Q3 <code>SELECT * FROM PRODUCT</code> are executed consecutively. (a) Explain why block is used in DBMS instead of segment to READ/WRITE to disk. (b) Find the starting track number of relations customer, product and sale. (c) Explain the disk head movement and the number of seeks to process the three queries. The initial head position was in track 1.</em></p>
+
+<p><strong>(a) Why blocks.</strong> A <em>block</em> is a fixed-size run of consecutive sectors (4–16 KB) that is always read or written as a unit. The DBMS uses it, and neither single sectors nor large variable-size segments, because:</p>
+<ul>
+  <li>Every disk request pays a seek and a rotational latency of several milliseconds, and moving 4 KB takes only a few hundredths of a millisecond. Reading a whole block per request spreads that fixed cost over many records. A single 512-byte sector would need eight times as many requests for the same data.</li>
+  <li>Blocks have one fixed size, so a block number is enough to compute a block's address, free space is managed simply, and one block fits exactly one frame of the main-memory buffer. Variable-size segments would fragment the disk and the buffer and make allocation and replacement complicated.</li>
+  <li>A large segment would often transfer bytes the query does not need and waste buffer space; the block size is the balance point named on slide 9 (smaller blocks mean more transfers, larger blocks waste space).</li>
+</ul>
+
+<p><strong>(b) Starting tracks.</strong> First find how much one track holds in each range:</p>
+<div class="tbl"><table>
+<tr><th>Tracks</th><th>Size</th><th>Per track</th></tr>
+<tr><td>1 – 20,000</td><td class="num">20.48 GB</td><td class="num">20.48 GB ÷ 20,000 = 1.024 MB</td></tr>
+<tr><td>20,001 – 40,000</td><td class="num">10.24 GB</td><td class="num">10.24 GB ÷ 20,000 = 0.512 MB</td></tr>
+</table></div>
+<p>The relations are stored in the order listed, starting at track 1:</p>
+<ul>
+  <li><strong>customer</strong> starts at <strong>track 1</strong>. It needs 10.24 GB ÷ 1.024 MB = 10,000 tracks: tracks 1–10,000.</li>
+  <li><strong>product</strong> starts at <strong>track 10,001</strong> and also needs 10,000 tracks: 10,001–20,000.</li>
+  <li><strong>sale</strong> starts at <strong>track 20,001</strong>. The tracks there hold only 0.512 MB, so it needs 10.24 GB ÷ 0.512 MB = 20,000 tracks: 20,001–40,000.</li>
+</ul>
+<p>(The given sizes are those of one surface of the disk in Question w1-1: 20,000 × 2000 × 512 bytes = 20.48 GB. If a relation were instead laid out cylinder by cylinder across all 10 surfaces, the starting cylinders would be 1, 1001 and 2001. The slide's wording, “starting from track number 1 and platter number 1”, describes the track-by-track layout used here.)</p>
+
+<figure>
+<span class="anim-tag">Animation</span>
+<div id="w12"></div>
+</figure>
+
+<p><strong>(c) Head movement and seeks</strong> (step through the animation):</p>
+<ol>
+  <li><strong>Q1, sale:</strong> the head is at track 1 and sale starts at 20,001: <strong>seek 1</strong>, crossing 20,000 tracks. Then sale is read sequentially from 20,001 to 40,000 (19,999 track-to-track steps, no further seeks).</li>
+  <li><strong>Q2, customer:</strong> the head is at track 40,000 and customer starts at track 1: <strong>seek 2</strong>, back across 39,999 tracks. Customer is read sequentially from 1 to 10,000.</li>
+  <li><strong>Q3, product:</strong> the head is at track 10,000 and product starts at the very next track, 10,001. Only a one-track step is needed, so <strong>no real seek</strong>. Product is read from 10,001 to 20,000.</li>
+</ol>
+<p><strong>Number of seeks = 2</strong> (3 if the one-track step to product is also counted). The head crosses 20,000 + 19,999 + 39,999 + 9,999 + 1 + 9,999 = <strong>99,997 tracks</strong> in total, of which 60,000 are seek movement (20,000 + 39,999 + 1) and the rest is reading.</p>
+<p>Lesson: the order of the queries matters. Running them in storage order (customer, product, sale) would need <strong>no seek at all</strong> (the head starts on track 1) and only 39,999 track steps. This is the idea behind disk-arm scheduling (Chapter 9).</p>
+</div>
+
+<h2>2. Try other request orders</h2>
+<p>The scheduling tool from Chapter 9 can replay any sequence of start positions. Here it is set up for the exam question below (FCFS: queries served in the order given). Change the queue to <code>1, 10000, 20000, 40000</code> to see how much a better order saves.</p>
+<figure class="wide">
+<span class="anim-tag">Interactive tool</span>
+<div id="fc"></div>
+</figure>
+
+<h2>Practice</h2>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+
+<h3>Exam questions</h3>
+<div class="exam">
+  <div class="exam-src">DB QB · 18 CT3 1 · 5 marks</div>
+  <div class="exam-q"><p>The track positions of relations r1, r2, r3 and r4 are 40000, 1, 20000 and 10000 respectively. The queries executed sequentially are: <code>SELECT * FROM r1</code>, <code>SELECT * FROM r2</code>, <code>SELECT * FROM r3</code>, <code>SELECT * FROM r4</code>. The current position of the read/write head is at track no. 50000. Write the head movement to process the given queries and the total number of seeks. Assume every movement requires a seek.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>The queries run one after another, so the head visits the relations in query order (first come, first served):</p>
+    <div class="tbl"><table>
+      <tr><th>Query</th><th>Head moves</th><th>Tracks crossed</th><th>Seek</th></tr>
+      <tr><td>SELECT * FROM r1</td><td>50,000 → 40,000</td><td class="num">10,000</td><td>1</td></tr>
+      <tr><td>SELECT * FROM r2</td><td>40,000 → 1</td><td class="num">39,999</td><td>2</td></tr>
+      <tr><td>SELECT * FROM r3</td><td>1 → 20,000</td><td class="num">19,999</td><td>3</td></tr>
+      <tr><td>SELECT * FROM r4</td><td>20,000 → 10,000</td><td class="num">10,000</td><td>4</td></tr>
+    </table></div>
+    <p>Head movement: 50,000 → 40,000 → 1 → 20,000 → 10,000, crossing <strong>79,998 tracks</strong>, with <strong>4 seeks</strong> (one per movement, as the question says). The tracks read while scanning each relation are not given, so they are not counted.</p>
+    <p>For comparison, the order r1, r3, r4, r2 (an elevator sweep downward) would cross only 50,000 − 1 = 49,999 tracks, but the question fixes the order.</p>
+  </div></details>
+</div>
+
+<div class="key"><p><strong>Summary:</strong> The DBMS reads fixed-size blocks so each expensive seek and latency is shared by many records and blocks map onto buffer frames. To find where relations lie, divide each relation's size by the capacity per track of the region it falls in. A full scan of a contiguously stored relation costs one seek plus track-to-track steps; the seeks come from jumping between relations, so the order of queries changes the number of seeks and the total head movement.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="lecture.js"></script>
+<script>
+(() => {
+  const W = 720, x0 = 40, x1 = 680, X = t => x0 + (x1 - x0) * (t - 1) / 39999;
+  const rel = [['customer', 1, 10000, 'cell'], ['product', 10001, 20000, 'cell-new'], ['sale', 20001, 40000, 'cell-hl']];
+  // moves: [from, to, kind] kind: seek | read | step
+  const mv = [[1, 20001, 'seek'], [20001, 40000, 'read'], [40000, 1, 'seek'], [1, 10000, 'read'], [10000, 10001, 'step'], [10001, 20000, 'read']];
+  const fig = k => {
+    let s = '';
+    rel.forEach(([n, a, b, c]) => { s += `<rect x="${X(a)}" y="20" width="${X(b) - X(a)}" height="26" class="${c}"/><text x="${(X(a) + X(b)) / 2}" y="38" text-anchor="middle" class="big" style="font-size:12px">${n}</text>`; });
+    [1, 10000, 20000, 30000, 40000].forEach(t => { s += `<text x="${X(t)}" y="62" text-anchor="middle" class="lbl">${t}</text>`; });
+    s += `<text x="${x0}" y="12" class="lbl">track →</text>`;
+    let seeks = 0, tot = 0;
+    mv.forEach(([a, b, kind], i) => {
+      const y = 82 + i * 36, on = i < k, cur = i === k - 1;
+      if (on) { tot += Math.abs(b - a); if (kind === 'seek') seeks++; }
+      const cls = !on ? 's-fg dash' : kind === 'seek' ? 's-red' : kind === 'read' ? 's-grn' : 's-acc';
+      const mk = !on ? '' : ` marker-end="url(#${kind === 'seek' ? 'm-red' : kind === 'read' ? 'm-grn' : 'm-acc'})"`;
+      s += `<line x1="${X(a)}" y1="${y}" x2="${X(b)}" y2="${y + 22}" class="${cls}" style="${on ? (cur ? 'stroke-width:3' : '') : 'stroke:var(--idle)'}"${mk}/>`;
+      const lx = Math.max(X(a), X(b)), mx = Math.min(X(a), X(b)), txt = `${kind === 'seek' ? 'seek' : kind === 'read' ? 'sequential read' : 'next track'} ${a} → ${b}`;
+      if (on) s += lx < 500 ? `<text x="${lx + 8}" y="${y + 16}" class="lbl">${txt}</text>`
+        : mx > 220 ? `<text x="${mx - 8}" y="${y + 16}" text-anchor="end" class="lbl">${txt}</text>`
+        : `<text x="${(lx + mx) / 2}" y="${y - 3}" text-anchor="middle" class="lbl">${txt}</text>`;
+    });
+    s += `<text x="${x0}" y="316" class="big" style="font-size:12px">seeks: ${seeks} · tracks crossed: ${tot.toLocaleString('en')}</text>`;
+    return `<svg viewBox="0 0 ${W} 330" width="${W}" role="img" aria-label="Head movement for Question w1-2">${s}</svg>`;
+  };
+  const caps = [
+    'Layout from part (b): customer on tracks 1–10,000, product on 10,001–20,000, sale on 20,001–40,000 (the inner tracks hold half as much, so sale needs twice as many tracks). The head is at track 1.',
+    'Q1 = SELECT * FROM sale. The head must get to track 20,001: seek 1, across 20,000 tracks.',
+    'Sale is read sequentially, track after track, up to 40,000. Moving to the adjacent track while reading is not a seek.',
+    'Q2 = SELECT * FROM customer. Customer starts at track 1, at the other end: seek 2, back across 39,999 tracks.',
+    'Customer is read sequentially from track 1 to 10,000.',
+    'Q3 = SELECT * FROM product. Product starts at 10,001, the very next track: a one-track step, not a real seek.',
+    'Product is read sequentially to track 20,000. Total: 2 seeks (3 if the one-track step is counted) and 99,997 tracks crossed.',
+  ];
+  stepper('#w12', caps.map((cap, k) => ({ html: fig(k), cap })), { interval: 2200 });
+})();
+schedTool('#fc', { reqs: '40000, 1, 20000, 10000', start: 50000, dir: 'down', max: 50000, alg: 'fcfs' });
+
+quiz('#quiz', [
+  { q: 'Tracks 1–20,000 hold 20.48 GB. How much does one track hold?', opts: ['1.024 MB', '10.24 MB', '0.512 MB', '2.048 MB'], a: 0, why: '20.48 GB ÷ 20,000 = 1.024 MB per track.' },
+  { q: 'Scanning a relation stored on consecutive tracks costs how many seeks?', opts: ['One per track', 'One, to reach its first track', 'None ever', 'One per block'], a: 1, why: 'After the first seek the head only steps to the adjacent track while reading.' },
+  { q: 'In Question w1-2, why does the third query need no real seek?', opts: ['Product is cached', 'Product starts on the track right after customer ends', 'Product is on another disk', 'Queries are reordered'], a: 1, why: 'After reading customer the head is at 10,000 and product begins at 10,001.' },
+  { q: 'Which order of the three scans of w1-2 needs no seek at all?', opts: ['sale, customer, product', 'customer, product, sale', 'product, sale, customer', 'sale, product, customer'], a: 1, why: 'The head starts at track 1 where customer begins, and the three relations follow each other.' },
+]);
+ask('#try1', { q: 'In w1-2, if sale were stored on tracks 1–20,000 region instead (at 1.024 MB per track), how many tracks would it need?', a: 10000, hint: '10.24 GB ÷ 1.024 MB.', why: '10.24 GB ÷ 1.024 MB = 10,000 tracks.' });
+</script>
+</body>
+</html>

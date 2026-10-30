@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ER to Schema Converter · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 07 (Ishrak) · Chapter 13 · Interactive tool</div>
+<h1>ER to Schema Converter</h1>
+<p class="lede">Describe a design in a few lines of text and the tool draws it, converts it table by table with an explanation of each rule (Chapters 11–12), and produces Oracle CREATE TABLE statements you can run. Use it to check your own exam answers.</p>
+
+<h2>1. The input format</h2>
+<p>One statement per line. Anything after <code>#</code> is a comment.</p>
+<div class="tbl fmt"><table>
+<tr><th>Statement</th><th>Example</th><th>Meaning</th></tr>
+<tr><td><code>entity Name: attrs</code></td><td><code>entity Student: _sid, name, dob</code></td><td>Strong entity set. Prefix the key attribute(s) with <code>_</code>.</td></tr>
+<tr><td>attribute kinds</td><td><code>{phone}</code> · <code>/age</code> · <code>name(first, last)</code></td><td>multivalued · derived · composite</td></tr>
+<tr><td><code>weak entity Name of Owner: attrs</code></td><td><code>weak entity Room of Building: ~room_no, capacity</code></td><td>Weak entity set; prefix the partial key with <code>~</code>. The identifying relationship is implied.</td></tr>
+<tr><td><code>rel name: E1 m1, E2 m2; attrs</code></td><td><code>rel enrolls: Student N, Course N; grade</code></td><td>Relationship. Write <code>1</code> for the "one" side (an arrow into it) and <code>N</code> for "many". Add <code>total</code> for total participation.</td></tr>
+<tr><td>roles</td><td><code>rel manages: Employee 1 as boss, Employee N as worker</code></td><td>Recursive relationship with role names.</td></tr>
+<tr><td>multi-way</td><td><code>rel contract: Actor N, Film N, Studio 1; salary</code></td><td>Three or more participants; <code>1</code> marks an arrow.</td></tr>
+<tr><td><code>isa Parent: Sub1(attrs), Sub2(attrs) [style]</code></td><td><code>isa Product: Software(platforms), Educational(ageGroup) [er]</code></td><td>Subclasses with their own attributes. Style <code>[er]</code>, <code>[oo]</code> or <code>[null]</code> (Chapter 12).</td></tr>
+</table></div>
+
+<h2>2. The converter</h2>
+<p>Pick an example or type your own, then press <b>Convert</b> (or Ctrl+Enter). Wrong input gets a message saying which line to fix.</p>
+<div class="sq-btns" id="presets"></div>
+<div id="tool"></div>
+
+<h2>3. Exercises for the tool</h2>
+<ol>
+<li>Enter slide 41's movie database (Chapter 4). Check that Film's key is (title, year), that director id lands in Film, and that actedIn becomes a table with salary.</li>
+<li>Change <code>directs: Film N, Director 1</code> to <code>Film N, Director N</code>. What changes in the schema, and why?</li>
+<li>Enter the advising design with <code>Student N total, Faculty 1</code>. Which column becomes NOT NULL?</li>
+<li>Enter the product hierarchy three times, with <code>[er]</code>, <code>[oo]</code> and <code>[null]</code>, and compare with Chapter 12's animation.</li>
+<li>Convert the contract relationship with and without <code>Studio 1</code>, and compare the primary keys.</li>
+</ol>
+
+<h2>Practice</h2>
+<h3>Quick check</h3><div id="quiz"></div>
+
+<h3>Exam questions</h3>
+<div class="exam">
+  <div class="exam-src">DB QB · 20-21 6b · 20 marks &nbsp;·&nbsp; BUET QBank · CSE 215 | L-2/T-2 | 2020–21 · 20 marks</div>
+  <div class="exam-q"><p>You are running a startup company allowing users to post blogs, and to comment on other user's blogs. (i) Design the E/R diagram for your company's data. Your database should store information about users, bloggers, and blogs, and encode the following information: Every user has a user ID and a name. Every blog has a blog ID, a text content and one author, who is a blogger. Every blogger is a user. Every blogger also has a rating attribute. Users may comment on blogs. Every comment has an optional text content, and/or an optional rating. (ii) Write a sequence of SQL queries that create the tables for this E/R diagram; uid, bid, and rating are integers, all other attributes are text. You should turn in several CREATE TABLE statements, which include key, foreign key, and not null declarations.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><strong>(i) ERD.</strong> User(<u>uid</u>, name). Blogger isA User with its own attribute rating ("every blogger is a user"). Blog(<u>bid</u>, text). <em>writes</em>: Blog → Blogger, many-to-one, total on Blog ("one author, who is a blogger"); it is attached to Blogger, not User, so only bloggers can author. <em>comments</em>: User – Blog, many-to-many, with attributes text and rating (both optional). <strong>Assumption:</strong> a user comments on a given blog at most once; if repeated comments must be kept, make Comment an entity set with its own cid (Chapter 5, section 6).</p>
+    <figure class="wide"><div id="blogER"></div></figure>
+    <p><strong>(ii) Tables</strong> (E/R style for the isA, Chapter 12; rule 6 for writes; rule 8 for comments). In Oracle "text" is VARCHAR2 (or CLOB for long blog bodies) and "integer" is NUMBER(10):</p>
+<pre>CREATE TABLE Users (
+  user_id    NUMBER(10)    PRIMARY KEY,
+  name   VARCHAR2(100) NOT NULL
+);
+CREATE TABLE Bloggers (
+  user_id    NUMBER(10) PRIMARY KEY REFERENCES Users(user_id),
+  rating NUMBER(10)
+);
+CREATE TABLE Blogs (
+  bid       NUMBER(10)     PRIMARY KEY,
+  text      VARCHAR2(4000) NOT NULL,
+  author    NUMBER(10)     NOT NULL REFERENCES Bloggers(user_id)
+);
+CREATE TABLE Comments (
+  user_id    NUMBER(10) REFERENCES Users(user_id),
+  bid    NUMBER(10) REFERENCES Blogs(bid),
+  text   VARCHAR2(1000),
+  rating NUMBER(10),
+  PRIMARY KEY (user_id, bid),
+  CHECK (text IS NOT NULL OR rating IS NOT NULL)   -- "text and/or rating"
+);</pre>
+    <p>author is NOT NULL and references Bloggers (every blog has exactly one blogger author). The CHECK enforces "and/or": a comment has at least one of the two. (USER and UID are Oracle reserved words, so the table is named Users and the column user_id; the question's uid is the same attribute.) The question bank's version uses a surrogate comment_id, which allows several comments per user and blog; both are acceptable if the assumption is stated, but its <code>TEXT</code> data type is not Oracle.</p>
+    <div id="blogPlay"></div>
+  </div></details>
+</div>
+<div id="chk1"></div>
+<div id="chk2"></div>
+
+<div class="key">
+<p><strong>Summary:</strong> the converter applies Chapter 11's rules in a fixed order: strong entities, weak entities, hierarchies, multivalued attributes, then relationships (many-to-one and one-to-one as foreign keys, many-to-many and multi-way as tables). Use it to check a hand conversion: if your table count or keys differ, find the rule you applied differently.</p>
+</div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/sqlplay.js"></script>
+<script src="lecture.js"></script>
+<script>
+const EX = {
+  'University (all rules)': `# Chapter 11's running example
+entity Department: _dept_id, dname
+entity Instructor: _iid, iname
+entity Course: _code, title, credits
+entity Student: _sid, name(first, last), {phone}, dob, /age
+weak entity Section of Course: ~sec_no, ~semester, room
+rel offeredBy: Course N total, Department 1
+rel heads: Department 1 total, Instructor 1
+rel enrolls: Student N, Section N; grade
+rel mentors: Student 1 as mentor, Student N as mentee`,
+  'Movies (slide 41)': `entity Actor: _id, name, address, dateOfBirth
+entity Director: _id, name, address, dateOfBirth
+entity Film: _title, _year, type
+entity Studio: _name, address, president
+rel actedIn: Actor N, Film N; salary
+rel directs: Film N total, Director 1
+rel produces: Film N, Studio 1`,
+  'Contract (multi-way)': `entity Actor: _actor_id, aname
+entity Film: _title, _year
+entity Studio: _sname, address
+rel contract: Actor N, Film N, Studio 1; salary`,
+  'Weak entity (rooms)': `entity Building: _name, location
+weak entity Room of Building: ~room_no, capacity`,
+  'Products, isA [oo]': `entity Product: _pid, name, price
+isa Product: Software(platforms), Educational(ageGroup) [oo]`,
+};
+const host = document.querySelector('#presets');
+for (const k of Object.keys(EX)) {
+  const b = document.createElement('button'); b.type = 'button'; b.textContent = k;
+  b.onclick = () => { document.querySelector('#tool textarea').value = EX[k]; document.querySelector('#tool [data-go]').click(); };
+  host.append(b);
+}
+erTool('#tool', EX['University (all rules)']);
+$('#blogER').innerHTML = erd({ n: [['User', 'E', 0, 0], ['comments', 'R', 240, 0], ['Blog', 'E', 480, 0], ['isA', 'D', 0, 110, 'isA'], ['Blogger', 'E', 0, 220], ['writes', 'R', 240, 220], ],
+  a: [['User', '_uid', -60, -55], ['User', 'name', 60, -55], ['comments', 'text', -50, -60], ['comments', 'rating', 55, -60], ['Blog', '_bid', -40, -55], ['Blog', 'text', 60, -55], ['Blogger', 'rating', -110, 0]],
+  l: [['User', 'comments'], ['Blog', 'comments'], ['User', 'isA'], ['Blogger', 'isA'], ['Blogger', 'writes', { one: true, role: 'author' }], ['Blog', 'writes', { total: true }]] });
+const BLOG = `CREATE TABLE Users (user_id NUMBER(10) PRIMARY KEY, name VARCHAR2(100) NOT NULL);
+CREATE TABLE Bloggers (user_id NUMBER(10) PRIMARY KEY REFERENCES Users(user_id), rating NUMBER(10));
+CREATE TABLE Blogs (bid NUMBER(10) PRIMARY KEY, text VARCHAR2(4000) NOT NULL, author NUMBER(10) NOT NULL REFERENCES Bloggers(user_id));
+CREATE TABLE Comments (user_id NUMBER(10) REFERENCES Users(user_id), bid NUMBER(10) REFERENCES Blogs(bid),
+  text VARCHAR2(1000), rating NUMBER(10), PRIMARY KEY (user_id, bid), CHECK (text IS NOT NULL OR rating IS NOT NULL));
+INSERT INTO Users VALUES (1, 'Amina');
+INSERT INTO Users VALUES (2, 'Rahim');
+INSERT INTO Users VALUES (3, 'Nabila');
+INSERT INTO Bloggers VALUES (1, 5);
+INSERT INTO Bloggers VALUES (3, 3);
+INSERT INTO Blogs VALUES (10, 'Why ER diagrams?', 1);
+INSERT INTO Blogs VALUES (11, 'Weak entities explained', 1);
+INSERT INTO Blogs VALUES (12, 'My first post', 3);
+INSERT INTO Comments VALUES (2, 10, 'Great post', 5);
+INSERT INTO Comments VALUES (3, 10, NULL, 4);
+INSERT INTO Comments VALUES (2, 12, 'Welcome!', NULL);`;
+sqlPlay('#blogPlay', { setup: BLOG, query: `-- try the constraints:
+INSERT INTO Comments VALUES (1, 12, NULL, NULL);   -- rejected by the CHECK
+-- INSERT INTO Blogs VALUES (13, 'x', 2);           -- rejected: Rahim is not a blogger`, note: 'Invented sample data: Amina and Nabila are bloggers, Rahim is an ordinary user.' });
+sqlCheck('#chk1', { setup: BLOG, task: 'On the blog schema: list the name of each blogger with the number of blogs they wrote.', solution: 'SELECT u.name, COUNT(*) FROM Users u JOIN Blogs b ON b.author = u.user_id GROUP BY u.name', hint: 'Join Users to Blogs on author, then GROUP BY.' });
+sqlCheck('#chk2', { setup: BLOG, task: 'List the bid of every blog that has at least one comment with a rating of 4 or more.', solution: 'SELECT DISTINCT bid FROM Comments WHERE rating >= 4', hint: 'Only Comments is needed.' });
+quiz('#quiz', [
+  { q: 'In the tool, how is a partial key written?', opts: ['_room_no', '~room_no', '{room_no}', '/room_no'], a: 1, why: '~ marks a partial key (dashed underline).' },
+  { q: '"rel advises: Student N total, Faculty 1" produces…', opts: ['a table advises', 'a NOT NULL fid column in Student', 'a sid column in Faculty', 'nothing'], a: 1, why: 'Many-to-one with total participation of the many side.' },
+  { q: '"rel enrolls: Student N, Course N" produces…', opts: ['a table enrolls(sid, code)', 'a column in Student', 'a column in Course', 'two tables'], a: 0, why: 'Many-to-many.' },
+  { q: 'Why is the blog table called Users, not User?', opts: ['Style', 'USER is an Oracle reserved word', 'Tables must be plural', 'To match Bloggers'], a: 1, why: 'USER (and UID) are reserved in Oracle.' },
+]);
+</script>
+</body>
+</html>

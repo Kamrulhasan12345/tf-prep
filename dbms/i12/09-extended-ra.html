@@ -1,0 +1,417 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Extended Relational Algebra · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 12 (Ishrak) · Chapter 9 · Slide 21 + exam topics · Book §5.2</div>
+<h1>Extended Relational Algebra: Grouping, Sorting, Assignment and Updates</h1>
+<p class="lede">Slide 21 promises "extensions and limitations". Plain RA cannot count, sum or sort, and many exam questions ask for exactly that. This chapter teaches the extended operators (γ, generalized π, τ, δ, assignment), shows how updates are written in RA, states what RA cannot do, and then works the bank's six questions that need them.</p>
+
+<h2>1. Why extend the algebra</h2>
+<p>With σ, π, ×, ∪, −, ρ you cannot write "the number of parts each supplier supplies" or "the average salary per department": the basic operators never compute a new value, they only pick and combine existing ones. "More than 10 parts" can in principle be written by joining 11 copies of Catalog with pairwise-different pids, but nobody would. The textbook (§5.2) adds operators that SQL has anyway:</p>
+<div class="tbl"><table>
+<tr><th>Operator</th><th>Meaning</th><th>SQL</th><th>Evaluator syntax</th></tr>
+<tr><td>γ<sub>L</sub>(R)</td><td>grouping and aggregation</td><td>GROUP BY + aggregates</td><td><code>group[dept; avg(salary) -&gt; a](R)</code></td></tr>
+<tr><td>π<sub>A, B·1.1→C</sub>(R)</td><td>generalized projection: computed attributes</td><td>SELECT A, B*1.1 AS C</td><td><code>project[A, B*1.1 -&gt; C](R)</code></td></tr>
+<tr><td>τ<sub>L</sub>(R)</td><td>sorting; the result is a list</td><td>ORDER BY</td><td><code>sort[name desc](R)</code></td></tr>
+<tr><td>δ(R)</td><td>duplicate elimination (for bags)</td><td>DISTINCT</td><td><code>distinct(R)</code></td></tr>
+<tr><td>T := E, R ← E</td><td>assignment: name a result, or replace a relation</td><td>CREATE VIEW / UPDATE…</td><td><code>T := E</code> (one per line)</td></tr>
+</table></div>
+
+<h2>2. Grouping and aggregation γ</h2>
+<dl class="def">
+  <dt>Aggregate function</dt>
+  <dd>A function that turns a column of values into one value: SUM, AVG, MIN, MAX, COUNT. COUNT(*) counts tuples; COUNT(A) counts non-null A values; COUNT(DISTINCT A) counts different values.</dd>
+  <dt>γ<sub>L</sub>(R)</dt>
+  <dd>L is a list of <b>grouping attributes</b> and <b>aggregates</b> f(A)→name. γ partitions R into groups of tuples that agree on all grouping attributes, and outputs one tuple per group: the grouping values plus each aggregate computed over the group. With no grouping attributes, the whole relation is one group and the result is one tuple.</dd>
+</dl>
+<p>For example γ<sub>sid, COUNT(pid)→n</sub>(Catalog) gives each supplier's number of catalog rows. A <code>HAVING</code> condition is simply a σ on top of γ: σ<sub>n&gt;3</sub>(γ<sub>sid, COUNT(pid)→n</sub>(Catalog)).</p>
+
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="g1"></div>
+<figcaption><b>Figure 1.</b> Suppliers with more than 3 catalog entries: γ, then σ (HAVING), then a join to get the names.</figcaption>
+</figure>
+
+<p><b>A set-semantics trap.</b> Project away the key before aggregating and duplicates merge. π<sub>dept, salary</sub>(instructor) collapses two instructors of the same department with the same salary into one tuple, so SUM over it is wrong. Keep a key in the input of γ (or aggregate directly on the base relation). The Atkinson question below shows this.</p>
+
+<h2>3. Generalized projection, sorting, δ</h2>
+<p>A <b>generalized projection</b> may compute new attributes from old ones, π<sub>name, salary·1.1→raise</sub>(instructor). <b>τ</b> sorts; since a set has no order, its result is a list and τ must be the last (outermost) operator. <b>δ</b> removes duplicates from a bag; under the set semantics of these slides it changes nothing, but it matters in the bag algebra that SQL actually uses (textbook §5.1).</p>
+
+<h2>4. Assignment and database updates</h2>
+<p>Assignment names an intermediate result, <code>T := E</code> (<a href="08-writing-queries.html">Chapter 8</a>). Written as <b>R ← E</b> with a stored relation R on the left, it replaces R's contents, which is how RA expresses updates:</p>
+<ul>
+  <li><b>Insert</b>: R ← R ∪ E, where E is a constant relation or a query.</li>
+  <li><b>Delete</b>: R ← R − σ<sub>c</sub>(R), equivalently R ← σ<sub>¬c</sub>(R).</li>
+  <li><b>Update</b>: rebuild R with a generalized projection: R ← π<sub>…, f(A)→A, …</sub>(σ<sub>c</sub>(R)) ∪ σ<sub>¬c</sub>(R).</li>
+</ul>
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="upd"></div>
+<figcaption><b>Figure 2.</b> "Give every Comp. Sci. instructor a 10% raise" as an assignment: raised Comp. Sci. tuples ∪ the untouched others.</figcaption>
+</figure>
+
+<h2>5. Limitations (slide 21's last item)</h2>
+<p>Even extended RA cannot express <b>recursion</b>: "all prerequisites of CS-315, at any depth" (the transitive closure of prereq) needs a join repeated an unknown number of times, and every RA expression has a fixed number of joins. SQL adds recursion for this (<code>WITH … UNION ALL</code> recursive queries; Oracle also has <code>CONNECT BY</code>). RA also has no notion of ordering inside the algebra (τ only formats the final output), and no procedural control flow; those are what stored procedures and triggers provide (<a href="10-triggers.html">Chapter 10</a>).</p>
+
+<figure class="wide">
+<span class="anim-tag">Interactive tool</span>
+<div id="lab"></div>
+</figure>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+<h3>Write it yourself</h3>
+<div id="ex1"></div>
+<div id="ex2"></div>
+<div id="ex3"></div>
+<div id="ex4"></div>
+<div id="ex5"></div>
+
+<h3>Exam questions</h3>
+<div class="exam">
+  <div class="exam-src">DB QB · 23-24 4a · 12 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-1 | 2023–24 · 25 marks</div>
+  <div class="exam-q"><p>Suppliers(sid: integer, sname: string, address: string), Parts(pid: integer, pname: string, color: string), Catalog(sid: integer, pid: integer, cost: real). For the schema above, write down the relational algebraic expression for the following:</p>
+  <p>(i) Find the names of suppliers who supply more than 10 parts.<br>(ii) Find the sids of suppliers who supply some red or green part.<br>(iii) Find the sids of suppliers who supply some red part or are located at 221 Packer Street.<br>(iv) Find the sids of suppliers who supply some red part with each part's cost more than 100 taka.<br>(v) Find the sids of suppliers who supply every part.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><b>(i)</b> Counting needs γ. Count each supplier's parts, keep counts above 10, attach names:</p>
+    <p class="ra-big">π<sub>sname</sub>(Suppliers ⋈ σ<sub>n&gt;10</sub>(γ<sub>sid, COUNT(pid)→n</sub>(Catalog)))</p>
+    <p>(If (sid, pid) were not a key of Catalog, count distinct pids: COUNT(DISTINCT pid).) The sample data has no supplier with more than 10 parts, so the answer there is empty; the evaluator below also runs it with 3 instead of 10.</p>
+    <p><b>(ii)</b> π<sub>sid</sub>(σ<sub>color='red' ∨ color='green'</sub>(Parts) ⋈ Catalog)</p>
+    <p><b>(iii)</b> The two conditions are about different relations, so take the union of two sets of sids:</p>
+    <p class="ra-big">π<sub>sid</sub>(σ<sub>color='red'</sub>(Parts) ⋈ Catalog) ∪ π<sub>sid</sub>(σ<sub>address='221 Packer Street'</sub>(Suppliers))</p>
+    <p>The second set includes suppliers that supply nothing, which is right: they are located at 221 Packer Street.</p>
+    <p><b>(iv)</b> The wording allows two readings; state the one you use.</p>
+    <p>Reading 1, "supply some red part whose cost is more than 100": π<sub>sid</sub>(σ<sub>color='red' ∧ cost&gt;100</sub>(Parts ⋈ Catalog)).</p>
+    <p>Reading 2, "supply some red part, and every red part they supply costs more than 100": all red suppliers minus those with a cheap red part:</p>
+    <p class="ra-big">π<sub>sid</sub>(σ<sub>color='red'</sub>(Parts) ⋈ Catalog) − π<sub>sid</sub>(σ<sub>color='red' ∧ cost≤100</sub>(Parts ⋈ Catalog))</p>
+    <p><b>(v)</b> π<sub>sid,pid</sub>(Catalog) ÷ π<sub>pid</sub>(Parts) (<a href="05-set-operations.html">Chapter 5</a>).</p>
+    <p>Sample data results: (i) ∅ (with "&gt; 3": Acme); (ii) {1, 2, 3, 5}; (iii) {1, 2, 4, 5}; (iv) both readings give {1, 5} here (supplier 2's red bolt costs 90); (v) {1}.</p>
+    <div id="spcLab"></div>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 17-18 6b · 10 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-2 | 2017–18 · 10 marks</div>
+  <div class="exam-q"><p>Consider the following schemas: Manufacturer(man_id, name, address), Laptop(model, man_id, speed, ram, hd, screen, price), Printer(model, man_id, is_color, type, price). Write expressions of relational algebra to answer the following queries.</p>
+  <p>(i) Find the model and speeds of each laptop manufactured by "Dell".<br>(ii) Find the sorted list of names of the manufacturers that produce at least three different models of laptops.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><b>(i)</b> Manufacturer and Laptop share only man_id:</p>
+    <p class="ra-big">π<sub>model, speed</sub>(σ<sub>name='Dell'</sub>(Manufacturer) ⋈ Laptop)</p>
+    <p><b>(ii)</b> Count models per manufacturer, keep counts ≥ 3, attach names, sort:</p>
+    <p class="ra-big">τ<sub>name</sub>(π<sub>name</sub>(Manufacturer ⋈ σ<sub>n≥3</sub>(γ<sub>man_id, COUNT(model)→n</sub>(Laptop))))</p>
+    <p>Without γ, use three renamed copies with strictly increasing models (which also makes them different): π<sub>L1.man_id</sub>(σ<sub>L1.man_id=L2.man_id ∧ L2.man_id=L3.man_id ∧ L1.model&lt;L2.model ∧ L2.model&lt;L3.model</sub>(ρ<sub>L1</sub>(Laptop) × ρ<sub>L2</sub>(Laptop) × ρ<sub>L3</sub>(Laptop))), then join with Manufacturer and sort as above. Both forms give Dell and Lenovo on the sample data.</p>
+    <div id="manLab"></div>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2013–14 · 20 marks</div>
+  <div class="exam-q"><p>Consider the schema EMPLOYEE(EMPLOYEEID, LASTNAME, FIRSTNAME, PHONE, HIREDATE, JOBID, SALARY, DEPARTMENT), JOB(JOBID, JOBTITLE, MINSALARY, MAXSALARY), DEPARTMENT(DEPARTMENTID, DEPARTMENTNAME, MANAGERID). Write relational algebra expressions for the following:</p>
+  <p>(a) List the average salary of each department.<br>(b) List the FIRSTNAME and JOBTITLE of employee 'John'.<br>(c) Increase all salaries more than 10000 by 5% and less than 10000 by 4%.<br>(d) Delete all employees from the EMPLOYEE table who earn less than 1000 as salary.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><b>(a)</b> γ<sub>DEPARTMENT, AVG(SALARY)→avg_salary</sub>(EMPLOYEE). To show department names, join first (EMPLOYEE.DEPARTMENT references DEPARTMENTID): γ<sub>DEPARTMENTNAME, AVG(SALARY)→avg_salary</sub>(EMPLOYEE ⋈<sub>DEPARTMENT=DEPARTMENTID</sub> DEPARTMENT).</p>
+    <p><b>(b)</b> EMPLOYEE and JOB share only JOBID: π<sub>FIRSTNAME, JOBTITLE</sub>(σ<sub>FIRSTNAME='John'</sub>(EMPLOYEE) ⋈ JOB).</p>
+    <p><b>(c)</b> Updates are written as assignment with a generalized projection. Let A stand for EMPLOYEEID, LASTNAME, FIRSTNAME, PHONE, HIREDATE, JOBID (in that order). Three disjoint groups: above 10000, below 10000, and exactly 10000, which the question does not mention and so must stay unchanged:</p>
+    <p class="ra-big">EMPLOYEE ← π<sub>A, SALARY·1.05→SALARY, DEPARTMENT</sub>(σ<sub>SALARY&gt;10000</sub>(EMPLOYEE)) ∪ π<sub>A, SALARY·1.04→SALARY, DEPARTMENT</sub>(σ<sub>SALARY&lt;10000</sub>(EMPLOYEE)) ∪ σ<sub>SALARY=10000</sub>(EMPLOYEE)</p>
+    <p>Note: the bank's answer gives the 4% raise to salary = 10000 as well; the question only says "less than 10000", so leaving 10000 unchanged is the literal reading. Forgetting the third part would delete those employees.</p>
+    <p><b>(d)</b> EMPLOYEE ← EMPLOYEE − σ<sub>SALARY&lt;1000</sub>(EMPLOYEE), or EMPLOYEE ← σ<sub>SALARY≥1000</sub>(EMPLOYEE). (If SALARY could be NULL, only the first form keeps those employees.)</p>
+    <div id="empLab"></div>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2012–13 · 25 marks</div>
+  <div class="exam-q"><p>Consider the relational schema employee(emp_no, name, office, age), books(isbn, title, author, publisher), loan(empno, isbn, date). Answer the following queries in relational algebra:</p>
+  <p>(a) Find the names of employees who have borrowed a book published by McGraw-Hill.<br>(b) Find the names and ages of employees who have borrowed all books written by Carl Hamacher.<br>(c) Find the names of employees who have borrowed more than five different books published by Pearson Education.<br>(d) For each publisher, find the names of employees who have borrowed more than five books of that publisher.<br>(e) Find the titles and authors of the books that have been borrowed by Peter Hart.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>loan and books share isbn, so ⋈ is safe there; employee's emp_no and loan's empno have different names, so that link is an equi-join.</p>
+    <p><b>(a)</b> π<sub>name</sub>(employee ⋈<sub>emp_no=empno</sub> (loan ⋈ σ<sub>publisher='McGraw-Hill'</sub>(books)))</p>
+    <p><b>(b)</b> "all books written by Carl Hamacher" is division. Project loan onto (empno, isbn) first, so that date does not take part:</p>
+    <p class="ra-big">π<sub>name, age</sub>(employee ⋈<sub>emp_no=empno</sub> (π<sub>empno, isbn</sub>(loan) ÷ π<sub>isbn</sub>(σ<sub>author='Carl Hamacher'</sub>(books))))</p>
+    <p><b>(c)</b> "different books": project onto (empno, isbn) before counting, so borrowing the same book twice counts once:</p>
+    <pre>P := π<sub>empno, isbn</sub>(loan ⋈ σ<sub>publisher='Pearson Education'</sub>(books))
+C := σ<sub>n&gt;5</sub>(γ<sub>empno, COUNT(isbn)→n</sub>(P))
+Answer := π<sub>name</sub>(employee ⋈<sub>emp_no=empno</sub> C)</pre>
+    <p><b>(d)</b> The same, but grouped by publisher too, and the publisher kept in the output:</p>
+    <pre>B := π<sub>empno, isbn, publisher</sub>(loan ⋈ books)
+C := σ<sub>n&gt;5</sub>(γ<sub>publisher, empno, COUNT(isbn)→n</sub>(B))
+Answer := π<sub>publisher, name</sub>(employee ⋈<sub>emp_no=empno</sub> C)</pre>
+    <p>(Here "more than five books" is read as different books, as in (c).)</p>
+    <p><b>(e)</b> π<sub>title, author</sub>(books ⋈ (loan ⋈<sub>empno=emp_no</sub> σ<sub>name='Peter Hart'</sub>(employee)))</p>
+    <p>On the sample data below, employee 1 borrowed 6 different Pearson books (one of them twice) and qualifies for (c) and (d); employee 2 has 6 Pearson loans but only 5 different books and correctly does not.</p>
+    <div id="bookLab"></div>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 21 CT2 2 · 6 marks</div>
+  <div class="exam-q"><p>Write the following query using relational algebra. Use the normalized schema you prepared in the previous question [21 CT2 1]. Print the total transaction made by username = "Atkinson" in each year. Print the year and total transaction sorted by the year. You can use TO_YEAR function to get the year of a date.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><b>The schema.</b> In 21 CT2 1, the unnormalized Sales relation has the dependency Transaction Time, Username, Order Number → Transaction Amount. The BCNF decomposition therefore contains a relation Transaction(TransactionTime, Username, OrderNumber, TransactionAmount) with key (TransactionTime, Username, OrderNumber). (TransactionType goes to a separate relation keyed by TransactionTime, because Transaction Time → Transaction Type.) Only this relation is needed.</p>
+    <pre>T := π<sub>TransactionTime, OrderNumber, TO_YEAR(TransactionTime)→year, TransactionAmount</sub>(σ<sub>Username='Atkinson'</sub>(Transaction))
+Answer := τ<sub>year</sub>(γ<sub>year, SUM(TransactionAmount)→total</sub>(T))</pre>
+    <p>Why T keeps TransactionTime and OrderNumber: if it projected only (year, TransactionAmount), two different transactions in the same year with the same amount would become one tuple (sets have no duplicates), and the sum would be too small. Keeping the key avoids that. In the sample data below Atkinson made two 500-taka transactions in 2020; the evaluator shows the wrong total (one 500 lost) for the naive version.</p>
+    <div id="atkLab"></div>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 22-23 6a · 30 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-1 | 2022–23 · 30 marks</div>
+  <div class="exam-q"><p>A school has prepared a database to manage admission tests. The examinees are given roll numbers and assigned to specific rooms for the exam. The test contains 10 questions. Each question is marked by two examiners to ensure fairness and correctness. An absentee list is kept to ensure no script goes missing. The schema: Room(Room_No, Floor, Capacity), Examinee(Roll_No, Name, Address, Date_of_Birth, Room_No), Evaluation(Roll_No, Question_No, Examiner, Marks), Absentee(Roll_No). Write queries using relational algebra to compute the following.</p>
+  <p>(i) The students should be assigned to the rooms in a manner that all the Roll Nos in the room are sequential (e.g., if a room has 10 examinees and the lowest Roll No in that room is 501, then Roll Nos 502, 503, …, 510 should be assigned to that room). Find the rooms that violate this condition.<br>(ii) We need to check if all scripts have been correctly evaluated, i.e., all examinees' answers to all questions have been evaluated by exactly two teachers. Find out the Roll No and Question No of the students that have not got correctly evaluated. Please note that only the examinees that are present in the exam should be considered here.<br>(iii) The marks given by two examiners can only be at most 2 marks apart. Find the Roll No and Question No for which two examiners' marks differ by more than 2.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>Let E := π<sub>Roll_No, Room_No</sub>(Examinee).</p>
+    <p><b>(i)</b> A room's roll numbers are sequential exactly when every examinee in it, except the one with the highest roll, has roll + 1 in the same room. So find the examinees that are not the last in their room, remove those whose successor is in the room, and report the rooms of the rest:</p>
+    <pre>NotLast := π<sub>E1.Roll_No, E1.Room_No</sub>(σ<sub>E1.Room_No=E2.Room_No ∧ E1.Roll_No&lt;E2.Roll_No</sub>(ρ<sub>E1</sub>(E) × ρ<sub>E2</sub>(E)))
+HasNext := π<sub>E1.Roll_No, E1.Room_No</sub>(σ<sub>E1.Room_No=E2.Room_No ∧ E2.Roll_No=E1.Roll_No+1</sub>(ρ<sub>E1</sub>(E) × ρ<sub>E2</sub>(E)))
+Answer  := π<sub>Room_No</sub>(NotLast − HasNext)</pre>
+    <p>With aggregation it is shorter: a room is sequential iff max − min + 1 equals the number of examinees (roll numbers are unique):</p>
+    <p class="ra-big">π<sub>Room_No</sub>(σ<sub>hi−lo+1 ≠ n</sub>(γ<sub>Room_No, MIN(Roll_No)→lo, MAX(Roll_No)→hi, COUNT(Roll_No)→n</sub>(E)))</p>
+    <p>Note: the bank's answer looks for a roll number between two of the room's rolls that is assigned to a <em>different</em> room. That misses a gap whose roll number is assigned to no room at all (room 103 below has 506 and 508, and nobody has 507). Both answers above catch it.</p>
+    <p><b>(ii)</b> Required pairs: every present examinee with every question. Q is the set of the 10 question numbers; it can be written as a constant relation {(1), …, (10)}, or as π<sub>Question_No</sub>(Evaluation) if every question was marked for someone.</p>
+    <pre>Present := π<sub>Roll_No</sub>(Examinee) − Absentee
+Req     := Present × Q
+Cnt     := γ<sub>Roll_No, Question_No, COUNT(Examiner)→n</sub>(Evaluation)
+Answer  := (Req − π<sub>Roll_No, Question_No</sub>(Evaluation))           -- never evaluated
+           ∪ π<sub>Roll_No, Question_No</sub>(σ<sub>n≠2</sub>(Cnt) ⋈ Present)    -- evaluated 1 or 3+ times</pre>
+    <p>Without γ: "at least two" is a self-product with different examiners, "at least three" a three-way one; then (Req − AtLeast2) ∪ (AtLeast3 ∩ Req). The bank's version forgets to restrict the "more than two" part to present examinees.</p>
+    <p><b>(iii)</b> Pair the two evaluations of the same answer:</p>
+    <p class="ra-big">π<sub>V1.Roll_No, V1.Question_No</sub>(σ<sub>V1.Roll_No=V2.Roll_No ∧ V1.Question_No=V2.Question_No ∧ V1.Examiner≠V2.Examiner ∧ V1.Marks−V2.Marks&gt;2</sub>(ρ<sub>V1</sub>(Evaluation) × ρ<sub>V2</sub>(Evaluation)))</p>
+    <p>No absolute value is needed: the product contains both orders of each pair, and whichever examiner gave more appears as V1 in one of them. (The bank writes the ∨ of the two differences without brackets, which by precedence attaches only to the last conjunct; the version above avoids that.)</p>
+    <p>Sample data (two questions instead of ten, to stay small): rooms 101 (501, 502, 505) and 103 (506, 508) violate (i); (ii) finds (503, 2) marked once, (504, 1) marked three times, and (506, 2) never marked, while absent 508 is ignored; (iii) finds (502, 1) with 8 vs 4 and (505, 2) with 4 vs 7.</p>
+    <div id="admLab"></div>
+  </div></details>
+</div>
+
+<div class="key"><p><strong>Summary:</strong> Extended RA adds γ (GROUP BY with SUM/AVG/MIN/MAX/COUNT; HAVING = σ on top), generalized projection with computed attributes, τ (sorting, outermost only), δ (for bags) and assignment. Updates are assignments: insert R ← R ∪ E, delete R ← R − σ(R), update R ← π<sub>…f(A)→A…</sub>(σ<sub>c</sub>(R)) ∪ σ<sub>¬c</sub>(R). Keep a key in the input of γ so set semantics does not merge tuples. RA cannot express recursion.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/sqlplay.js"></script>
+<script src="lecture.js"></script>
+<script>
+raSteps('#g1', DB_SPC, 'project[sname](Suppliers join select[n > 3](group[sid; count(pid) -> n](Catalog)))', { sql: 'SELECT s.sname FROM Suppliers s, (SELECT sid, COUNT(pid) n FROM Catalog GROUP BY sid HAVING COUNT(pid) > 3) c WHERE s.sid = c.sid;' });
+raSteps('#upd', DB_UNI, "instructor := project[ID, name, dept_name, salary * 1.1 -> salary](select[dept_name = 'Comp. Sci.'](instructor)) union select[not (dept_name = 'Comp. Sci.')](instructor)\ninstructor", { sql: "UPDATE instructor SET salary = salary * 1.1 WHERE dept_name = 'Comp. Sci.'; SELECT * FROM instructor;" });
+raLab('#lab', { db: { ...DB_UNI, ...DB_SPC }, presets: [
+  { label: 'γ: average salary per department', ra: 'group[dept_name; avg(salary) -> avg_salary](instructor)', sql: 'SELECT dept_name, AVG(salary) AS avg_salary\nFROM instructor\nGROUP BY dept_name;' },
+  { label: 'γ without grouping: one tuple', ra: 'group[count(*) -> n, max(salary) -> top, min(salary) -> bottom](instructor)', sql: 'SELECT COUNT(*) n, MAX(salary) top, MIN(salary) bottom\nFROM instructor;' },
+  { label: 'HAVING: departments with average salary > 80000', ra: 'select[a > 80000](group[dept_name; avg(salary) -> a](instructor))', sql: 'SELECT dept_name, AVG(salary) a\nFROM instructor\nGROUP BY dept_name\nHAVING AVG(salary) > 80000;' },
+  { label: 'Generalized projection', ra: 'project[name, salary, salary * 1.1 -> raised](instructor)', sql: 'SELECT name, salary, salary * 1.1 AS raised\nFROM instructor;' },
+  { label: 'τ: sorted', ra: 'sort[salary desc](project[name, salary](instructor))', sql: 'SELECT name, salary\nFROM instructor\nORDER BY salary DESC;' },
+  { label: 'Delete as assignment', ra: 'instructor := instructor - select[salary < 70000](instructor)\ninstructor', sql: 'DELETE FROM instructor WHERE salary < 70000;\nSELECT * FROM instructor;' },
+] });
+
+raLab('#spcLab', { db: DB_SPC, presets: [
+  { label: '(i) more than 10 parts', ra: 'project[sname](Suppliers join select[n > 10](group[sid; count(pid) -> n](Catalog)))', sql: 'SELECT s.sname\nFROM Suppliers s\nWHERE (SELECT COUNT(pid) FROM Catalog c WHERE c.sid = s.sid) > 10;' },
+  { label: '(i) with 3 instead of 10, to see a row', ra: 'project[sname](Suppliers join select[n > 3](group[sid; count(pid) -> n](Catalog)))', sql: 'SELECT s.sname\nFROM Suppliers s\nWHERE (SELECT COUNT(pid) FROM Catalog c WHERE c.sid = s.sid) > 3;' },
+  { label: '(ii) red or green', ra: "project[sid](select[color = 'red' or color = 'green'](Parts) join Catalog)", sql: "SELECT DISTINCT c.sid FROM Catalog c, Parts p\nWHERE c.pid = p.pid AND p.color IN ('red', 'green');" },
+  { label: '(iii) red part or at 221 Packer Street', ra: "project[sid](select[color = 'red'](Parts) join Catalog) union project[sid](select[address = '221 Packer Street'](Suppliers))", sql: "SELECT c.sid FROM Catalog c, Parts p WHERE c.pid = p.pid AND p.color = 'red'\nUNION\nSELECT sid FROM Suppliers WHERE address = '221 Packer Street';" },
+  { label: '(iv) reading 1: a red part costing > 100', ra: "project[sid](select[color = 'red' and cost > 100](Parts join Catalog))", sql: "SELECT DISTINCT c.sid FROM Catalog c, Parts p\nWHERE c.pid = p.pid AND p.color = 'red' AND c.cost > 100;" },
+  { label: '(iv) reading 2: all their red parts cost > 100', ra: "project[sid](select[color = 'red'](Parts) join Catalog) - project[sid](select[color = 'red' and cost <= 100](Parts join Catalog))", sql: "SELECT c.sid FROM Catalog c, Parts p WHERE c.pid = p.pid AND p.color = 'red'\nMINUS\nSELECT c.sid FROM Catalog c, Parts p WHERE c.pid = p.pid AND p.color = 'red' AND c.cost <= 100;" },
+  { label: '(v) every part', ra: 'project[sid, pid](Catalog) / project[pid](Parts)', sql: 'SELECT sid FROM Catalog GROUP BY sid\nHAVING COUNT(DISTINCT pid) = (SELECT COUNT(*) FROM Parts);' },
+] });
+
+const MAN = raDB(`
+Manufacturer(man_id, name, address)
+1 | Dell | Texas
+2 | HP | California
+3 | Lenovo | Beijing
+4 | Asus | Taipei
+
+Laptop(model, man_id, speed, ram, hd, screen, price)
+D10 | 1 | 2.4 | 8 | 512 | 14 | 900
+D20 | 1 | 2.8 | 16 | 1024 | 15.6 | 1400
+D30 | 1 | 3.1 | 32 | 1024 | 16 | 2100
+H10 | 2 | 2.2 | 8 | 256 | 14 | 700
+H20 | 2 | 2.6 | 16 | 512 | 15.6 | 1100
+L10 | 3 | 2.0 | 8 | 256 | 13.3 | 600
+L20 | 3 | 2.5 | 16 | 512 | 14 | 950
+L30 | 3 | 2.9 | 16 | 1024 | 15.6 | 1300
+L40 | 3 | 3.2 | 32 | 2048 | 16 | 2500
+A10 | 4 | 2.3 | 8 | 512 | 14 | 800
+
+Printer(model, man_id, is_color, type, price)
+P1 | 2 | T | laser | 300
+P2 | 4 | F | ink-jet | 90
+`);
+raLab('#manLab', { db: MAN, presets: [
+  { label: '(i) Dell laptops', ra: "project[model, speed](select[name = 'Dell'](Manufacturer) join Laptop)", sql: "SELECT l.model, l.speed\nFROM Manufacturer m, Laptop l\nWHERE m.man_id = l.man_id AND m.name = 'Dell';" },
+  { label: '(ii) with γ', ra: 'sort[name](project[name](Manufacturer join select[n >= 3](group[man_id; count(model) -> n](Laptop))))', sql: 'SELECT m.name\nFROM Manufacturer m, Laptop l\nWHERE m.man_id = l.man_id\nGROUP BY m.man_id, m.name\nHAVING COUNT(DISTINCT l.model) >= 3\nORDER BY m.name;' },
+  { label: '(ii) without γ (three copies)', ra: 'M := project[L1.man_id](select[L1.man_id = L2.man_id and L2.man_id = L3.man_id and L1.model < L2.model and L2.model < L3.model](rename[L1](Laptop) x rename[L2](Laptop) x rename[L3](Laptop)))\nsort[name](project[name](Manufacturer join M))', sql: 'SELECT name FROM Manufacturer\nWHERE man_id IN (SELECT man_id FROM Laptop GROUP BY man_id HAVING COUNT(*) >= 3)\nORDER BY name;' },
+] });
+
+const EMPDB = raDB(`
+EMPLOYEE(EMPLOYEEID, LASTNAME, FIRSTNAME, PHONE, HIREDATE, JOBID, SALARY, DEPARTMENT)
+1 | Rahman | John | 01711 | 2015-03-01 | J1 | 12000 | 10
+2 | Akter | Mina | 01712 | 2018-07-15 | J2 | 8000 | 10
+3 | Hasan | Rafi | 01713 | 2016-01-10 | J1 | 10000 | 20
+4 | Khan | Tania | 01714 | 2021-05-20 | J3 | 900 | 20
+5 | Ali | John | 01715 | 2012-11-11 | J2 | 15000 | 30
+6 | Das | Puja | 01716 | 2023-02-02 | J3 | 500 | 30
+
+JOB(JOBID, JOBTITLE, MINSALARY, MAXSALARY)
+J1 | Engineer | 9000 | 20000
+J2 | Analyst | 7000 | 16000
+J3 | Intern | 400 | 1000
+
+DEPARTMENT(DEPARTMENTID, DEPARTMENTNAME, MANAGERID)
+10 | Sales | 1
+20 | IT | 3
+30 | HR | 5
+`);
+raLab('#empLab', { db: EMPDB, presets: [
+  { label: '(a) average salary per department', ra: 'group[DEPARTMENT; avg(SALARY) -> avg_salary](EMPLOYEE)', sql: 'SELECT DEPARTMENT, AVG(SALARY) AS avg_salary\nFROM EMPLOYEE\nGROUP BY DEPARTMENT;' },
+  { label: '(a) with department names', ra: 'group[DEPARTMENTNAME; avg(SALARY) -> avg_salary](EMPLOYEE join[DEPARTMENT = DEPARTMENTID] DEPARTMENT)', sql: 'SELECT d.DEPARTMENTNAME, AVG(e.SALARY) AS avg_salary\nFROM EMPLOYEE e, DEPARTMENT d\nWHERE e.DEPARTMENT = d.DEPARTMENTID\nGROUP BY d.DEPARTMENTNAME;' },
+  { label: "(b) John's first name and job title", ra: "project[FIRSTNAME, JOBTITLE](select[FIRSTNAME = 'John'](EMPLOYEE) join JOB)", sql: "SELECT DISTINCT e.FIRSTNAME, j.JOBTITLE\nFROM EMPLOYEE e, JOB j\nWHERE e.JOBID = j.JOBID AND e.FIRSTNAME = 'John';" },
+  { label: '(c) raise as assignment', ra: 'EMPLOYEE := project[EMPLOYEEID, LASTNAME, FIRSTNAME, PHONE, HIREDATE, JOBID, SALARY * 1.05 -> SALARY, DEPARTMENT](select[SALARY > 10000](EMPLOYEE)) union project[EMPLOYEEID, LASTNAME, FIRSTNAME, PHONE, HIREDATE, JOBID, SALARY * 1.04 -> SALARY, DEPARTMENT](select[SALARY < 10000](EMPLOYEE)) union select[SALARY = 10000](EMPLOYEE)\nEMPLOYEE', sql: 'UPDATE EMPLOYEE\nSET SALARY = CASE WHEN SALARY > 10000 THEN SALARY * 1.05\n                  WHEN SALARY < 10000 THEN SALARY * 1.04\n                  ELSE SALARY END;\nSELECT * FROM EMPLOYEE;' },
+  { label: '(d) delete as assignment', ra: 'EMPLOYEE := EMPLOYEE - select[SALARY < 1000](EMPLOYEE)\nEMPLOYEE', sql: 'DELETE FROM EMPLOYEE WHERE SALARY < 1000;\nSELECT * FROM EMPLOYEE;' },
+] });
+
+const BOOKS = raDB(`
+employee(emp_no, name, office, age)
+1 | Peter Hart | 301 | 45
+2 | Nusrat | 302 | 31
+3 | Kamal | 303 | 52
+
+books(isbn, title, author, publisher)
+B1 | Computer Organization | Carl Hamacher | McGraw-Hill
+B2 | Embedded Systems | Carl Hamacher | McGraw-Hill
+B3 | Pattern Classification | Peter Hart | Wiley
+P1 | Database Concepts | Silberschatz | Pearson Education
+P2 | Operating Systems | Stallings | Pearson Education
+P3 | Networks | Tanenbaum | Pearson Education
+P4 | Compilers | Aho | Pearson Education
+P5 | Algorithms | Sedgewick | Pearson Education
+P6 | AI | Russell | Pearson Education
+P7 | Graphics | Hearn | Pearson Education
+
+loan(empno, isbn, date)
+1 | P1 | 2023-01-05
+1 | P2 | 2023-01-09
+1 | P3 | 2023-02-01
+1 | P4 | 2023-02-11
+1 | P5 | 2023-03-02
+1 | P6 | 2023-03-20
+1 | P6 | 2023-04-01
+1 | B1 | 2023-04-10
+2 | P1 | 2023-01-07
+2 | P2 | 2023-01-20
+2 | P3 | 2023-02-03
+2 | P4 | 2023-02-15
+2 | P5 | 2023-03-05
+2 | P5 | 2023-03-30
+2 | B1 | 2023-04-02
+2 | B2 | 2023-04-03
+3 | B3 | 2023-05-01
+3 | B2 | 2023-05-02
+`);
+raLab('#bookLab', { db: BOOKS, presets: [
+  { label: '(a) borrowed a McGraw-Hill book', ra: "project[name](employee join[emp_no = empno] (loan join select[publisher = 'McGraw-Hill'](books)))", sql: "SELECT DISTINCT e.name\nFROM employee e, loan l, books b\nWHERE e.emp_no = l.empno AND l.isbn = b.isbn AND b.publisher = 'McGraw-Hill';" },
+  { label: '(b) borrowed all Carl Hamacher books', ra: "project[name, age](employee join[emp_no = empno] (project[empno, isbn](loan) / project[isbn](select[author = 'Carl Hamacher'](books))))", sql: "SELECT e.name, e.age FROM employee e\nWHERE NOT EXISTS (SELECT isbn FROM books WHERE author = 'Carl Hamacher'\n                  MINUS\n                  SELECT isbn FROM loan l WHERE l.empno = e.emp_no);" },
+  { label: '(c) more than five different Pearson books', ra: "P := project[empno, isbn](loan join select[publisher = 'Pearson Education'](books))\nC := select[n > 5](group[empno; count(isbn) -> n](P))\nproject[name](employee join[emp_no = empno] C)", sql: "SELECT e.name\nFROM employee e, loan l, books b\nWHERE e.emp_no = l.empno AND l.isbn = b.isbn AND b.publisher = 'Pearson Education'\nGROUP BY e.emp_no, e.name\nHAVING COUNT(DISTINCT l.isbn) > 5;" },
+  { label: '(c) wrong: counting loans, not books', ra: "C := select[n > 5](group[empno; count(*) -> n](rename[L](loan) join select[publisher = 'Pearson Education'](books)))\nproject[name](employee join[emp_no = empno] C)", sql: "SELECT e.name\nFROM employee e, loan l, books b\nWHERE e.emp_no = l.empno AND l.isbn = b.isbn AND b.publisher = 'Pearson Education'\nGROUP BY e.emp_no, e.name\nHAVING COUNT(*) > 5;" },
+  { label: '(d) per publisher, more than five books', ra: "B := project[empno, isbn, publisher](loan join books)\nC := select[n > 5](group[publisher, empno; count(isbn) -> n](B))\nproject[publisher, name](employee join[emp_no = empno] C)", sql: "SELECT b.publisher, e.name\nFROM employee e, loan l, books b\nWHERE e.emp_no = l.empno AND l.isbn = b.isbn\nGROUP BY b.publisher, e.emp_no, e.name\nHAVING COUNT(DISTINCT l.isbn) > 5;" },
+  { label: '(e) books borrowed by Peter Hart', ra: "project[title, author](books join (loan join[empno = emp_no] select[name = 'Peter Hart'](employee)))", sql: "SELECT DISTINCT b.title, b.author\nFROM books b, loan l, employee e\nWHERE b.isbn = l.isbn AND l.empno = e.emp_no AND e.name = 'Peter Hart';" },
+] });
+
+const ATK = raDB(`
+Transaction(TransactionTime, Username, OrderNumber, TransactionAmount)
+2019-02-11 10:15 | Atkinson | O1 | 1200
+2019-08-30 16:40 | Atkinson | O2 | 800
+2020-01-05 09:00 | Atkinson | O3 | 500
+2020-06-17 12:30 | Atkinson | O4 | 500
+2020-06-17 12:30 | Brown | O5 | 700
+2021-03-03 11:11 | Atkinson | O6 | 2000
+`);
+raLab('#atkLab', { db: ATK, presets: [
+  { label: 'Correct: keep the key, then γ, then τ', ra: "T := project[TransactionTime, OrderNumber, to_year(TransactionTime) -> year, TransactionAmount](select[Username = 'Atkinson'](Transaction))\nsort[year](group[year; sum(TransactionAmount) -> total](T))", sql: "SELECT TO_NUMBER(SUBSTR(TransactionTime, 1, 4)) AS year, SUM(TransactionAmount) AS total\nFROM \"Transaction\"\nWHERE Username = 'Atkinson'\nGROUP BY TO_NUMBER(SUBSTR(TransactionTime, 1, 4))\nORDER BY year;" },
+  { label: 'Wrong: project away the key first (2020 loses 500)', ra: "T := project[to_year(TransactionTime) -> year, TransactionAmount](select[Username = 'Atkinson'](Transaction))\nsort[year](group[year; sum(TransactionAmount) -> total](T))", sql: "SELECT year, SUM(TransactionAmount) AS total\nFROM (SELECT DISTINCT TO_NUMBER(SUBSTR(TransactionTime, 1, 4)) AS year, TransactionAmount\n      FROM \"Transaction\" WHERE Username = 'Atkinson')\nGROUP BY year\nORDER BY year;" },
+] });
+
+const ADM = raDB(`
+Room(Room_No, Floor, Capacity)
+101 | 1 | 30
+102 | 1 | 30
+103 | 2 | 20
+
+Examinee(Roll_No, Name, Address, Date_of_Birth, Room_No)
+501 | Arif | Dhaka | 2008-01-02 | 101
+502 | Bela | Dhaka | 2008-03-12 | 101
+503 | Chandan | Khulna | 2007-12-30 | 102
+504 | Dalia | Sylhet | 2008-05-05 | 102
+505 | Emran | Dhaka | 2008-07-19 | 101
+506 | Fahmida | Rajshahi | 2008-02-22 | 103
+508 | Gazi | Barisal | 2008-09-09 | 103
+
+Evaluation(Roll_No, Question_No, Examiner, Marks)
+501 | 1 | X | 7
+501 | 1 | Y | 8
+501 | 2 | X | 5
+501 | 2 | Y | 6
+502 | 1 | X | 8
+502 | 1 | Y | 4
+502 | 2 | X | 6
+502 | 2 | Y | 6
+503 | 1 | X | 9
+503 | 1 | Y | 9
+503 | 2 | X | 3
+504 | 1 | X | 5
+504 | 1 | Y | 6
+504 | 1 | Z | 5
+504 | 2 | X | 7
+504 | 2 | Y | 7
+505 | 1 | X | 6
+505 | 1 | Y | 7
+505 | 2 | X | 4
+505 | 2 | Z | 7
+506 | 1 | X | 5
+506 | 1 | Y | 5
+
+Absentee(Roll_No)
+508
+`);
+raLab('#admLab', { db: ADM, presets: [
+  { label: '(i) pure RA: rolls without a successor', ra: 'E := project[Roll_No, Room_No](Examinee)\nNotLast := project[E1.Roll_No, E1.Room_No](select[E1.Room_No = E2.Room_No and E1.Roll_No < E2.Roll_No](rename[E1](E) x rename[E2](E)))\nHasNext := project[E1.Roll_No, E1.Room_No](select[E1.Room_No = E2.Room_No and E2.Roll_No = E1.Roll_No + 1](rename[E1](E) x rename[E2](E)))\nproject[Room_No](NotLast - HasNext)', sql: 'SELECT Room_No FROM Examinee\nGROUP BY Room_No\nHAVING MAX(Roll_No) - MIN(Roll_No) + 1 <> COUNT(*);' },
+  { label: '(i) with γ', ra: 'project[Room_No](select[hi - lo + 1 <> n](group[Room_No; min(Roll_No) -> lo, max(Roll_No) -> hi, count(Roll_No) -> n](Examinee)))', sql: 'SELECT Room_No FROM Examinee\nGROUP BY Room_No\nHAVING MAX(Roll_No) - MIN(Roll_No) + 1 <> COUNT(*);' },
+  { label: "(i) the bank's version (misses room 103)", ra: 'E := project[Roll_No, Room_No](Examinee)\nproject[E1.Room_No](select[E1.Room_No = E2.Room_No and E1.Roll_No < E3.Roll_No and E3.Roll_No < E2.Roll_No and E1.Room_No <> E3.Room_No](rename[E1](E) x rename[E2](E) x rename[E3](E)))', sql: 'SELECT DISTINCT e1.Room_No\nFROM Examinee e1, Examinee e2, Examinee e3\nWHERE e1.Room_No = e2.Room_No AND e1.Roll_No < e3.Roll_No\n  AND e3.Roll_No < e2.Roll_No AND e1.Room_No <> e3.Room_No;' },
+  { label: '(ii) not evaluated exactly twice', ra: 'Present := project[Roll_No](Examinee) - Absentee\nReq := Present x project[Question_No](Evaluation)\nCnt := group[Roll_No, Question_No; count(Examiner) -> n](Evaluation)\n(Req - project[Roll_No, Question_No](Evaluation)) union project[Roll_No, Question_No](select[n <> 2](Cnt) join Present)', sql: "WITH Present AS (SELECT Roll_No FROM Examinee MINUS SELECT Roll_No FROM Absentee),\n     Q AS (SELECT DISTINCT Question_No FROM Evaluation)\nSELECT p.Roll_No, q.Question_No\nFROM Present p, Q q\nWHERE (SELECT COUNT(*) FROM Evaluation v\n       WHERE v.Roll_No = p.Roll_No AND v.Question_No = q.Question_No) <> 2;" },
+  { label: '(iii) marks differ by more than 2', ra: 'project[V1.Roll_No, V1.Question_No](select[V1.Roll_No = V2.Roll_No and V1.Question_No = V2.Question_No and V1.Examiner <> V2.Examiner and V1.Marks - V2.Marks > 2](rename[V1](Evaluation) x rename[V2](Evaluation)))', sql: 'SELECT DISTINCT v1.Roll_No, v1.Question_No\nFROM Evaluation v1, Evaluation v2\nWHERE v1.Roll_No = v2.Roll_No AND v1.Question_No = v2.Question_No\n  AND v1.Examiner <> v2.Examiner AND v1.Marks - v2.Marks > 2;' },
+] });
+
+flashcards('#cards', [
+  { f: 'γ<sub>L</sub>(R)', b: 'Grouping and aggregation: one output tuple per group of equal grouping values, with aggregates computed per group. SQL GROUP BY.' },
+  { f: 'HAVING in RA', b: 'A σ on top of γ, testing the aggregate attribute.' },
+  { f: 'Generalized projection', b: 'π with computed attributes: π<sub>name, salary·1.1→raise</sub>(R).' },
+  { f: 'τ<sub>L</sub>(R)', b: 'Sorting; the result is a list. Only as the outermost operator.' },
+  { f: 'δ(R)', b: 'Duplicate elimination; matters only with bags.' },
+  { f: 'Delete in RA', b: 'R ← R − σ<sub>c</sub>(R).' },
+  { f: 'Update in RA', b: 'R ← π<sub>…, f(A)→A, …</sub>(σ<sub>c</sub>(R)) ∪ σ<sub>¬c</sub>(R).' },
+  { f: 'What RA cannot do', b: 'Recursion, e.g. the transitive closure of prereq (all prerequisites at any depth).' },
+]);
+quiz('#quiz', [
+  { q: 'γ<sub>dept, COUNT(*)→n</sub>(instructor) on 7 instructors in 4 departments has how many tuples?', opts: ['1', '4', '7', '28'], a: 1, why: 'One tuple per group.' },
+  { q: 'γ<sub>MAX(salary)→m</sub>(instructor) (no grouping attributes) returns…', opts: ['one tuple', 'one tuple per instructor', 'no tuple', 'one per department'], a: 0, why: 'The whole relation is one group.' },
+  { q: 'Why can SUM over π<sub>year, amount</sub>(T) be wrong?', opts: ['SUM ignores NULLs', 'The projection merges equal (year, amount) tuples into one', 'year is not numeric', 'π sorts the data'], a: 1, why: 'Sets have no duplicates; keep the key before aggregating.' },
+  { q: 'Which assignment deletes employees earning under 1000?', opts: ['EMPLOYEE ← σ<sub>SALARY&lt;1000</sub>(EMPLOYEE)', 'EMPLOYEE ← EMPLOYEE − σ<sub>SALARY&lt;1000</sub>(EMPLOYEE)', 'EMPLOYEE ← EMPLOYEE ∪ σ<sub>SALARY&lt;1000</sub>(EMPLOYEE)', 'EMPLOYEE ← π<sub>SALARY</sub>(EMPLOYEE)'], a: 1, why: 'Keep everything except the selected tuples.' },
+  { q: '"Names of employees who borrowed more than five different books" needs…', opts: ['÷', 'γ with COUNT over distinct (empno, isbn) pairs', 'τ', 'an outer join'], a: 1, why: 'Count books, not loans.' },
+  { q: 'Which query cannot be written in RA, even extended?', opts: ['average salary per department', 'all direct and indirect prerequisites of a course', 'suppliers of every part', 'the second-highest salary'], a: 1, why: 'Transitive closure needs recursion.' },
+]);
+ask('#try1', { q: 'In the admission sample data, how many (Roll_No, Question_No) pairs does Cnt := γ<sub>Roll_No, Question_No, COUNT(Examiner)→n</sub>(Evaluation) have?', a: 11, why: '501–505 have both questions (10 pairs) and 506 has only question 1: 11 groups.' });
+
+raCheck('#ex1', { db: DB_UNI, task: '1. (Easy) The number of instructors and the total salary of each department.', solution: 'group[dept_name; count(ID) -> n, sum(salary) -> total](instructor)' });
+raCheck('#ex2', { db: DB_UNI, task: '2. The departments whose highest salary exceeds 90000 (output dept_name only).', solution: 'project[dept_name](select[m > 90000](group[dept_name; max(salary) -> m](instructor)))' });
+raCheck('#ex3', { db: DB_SPC, task: '3. (Exam style) For each colour, the average cost of catalog entries for parts of that colour.', solution: 'group[color; avg(cost) -> avg_cost](Catalog join Parts)', hint: 'Join Catalog with Parts on pid, then group by color.' });
+sqlCheck('#ex4', { setup: raSetup(DB_UNI), task: '4. Write exercise 2 in SQL.', solution: 'SELECT dept_name\nFROM instructor\nGROUP BY dept_name\nHAVING MAX(salary) > 90000;' });
+sqlCheck('#ex5', { setup: raSetup(DB_UNI), task: '5. (Exam style) Write this RA update in SQL and run it: instructor ← π<sub>ID, name, dept_name, salary·1.1→salary</sub>(σ<sub>dept_name=\'Physics\'</sub>(instructor)) ∪ σ<sub>dept_name≠\'Physics\'</sub>(instructor).', solution: "UPDATE instructor SET salary = salary * 1.1 WHERE dept_name = 'Physics';", check: 'state', table: 'instructor' });
+</script>
+</body>
+</html>

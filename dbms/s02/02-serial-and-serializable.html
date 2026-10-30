@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Serial and Serializable Schedules · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 02 (Sukarna) · Chapter 2 · Slides 6–14 · Book §18.1.2–18.1.5</div>
+<h1>Serial and Serializable Schedules</h1>
+<p class="lede">Which interleavings are safe? A serial schedule always is. A serializable schedule is any schedule with the same effect as some serial one. This chapter runs the slides' five schedules of T₁ and T₂ step by step with the values of A and B, and ends with the r/w notation used for the rest of the course.</p>
+
+<h2>1. The running example (slide 6)</h2>
+
+<p>The slides (and the textbook's Example 18.1) use two transactions on elements A and B. The variables t and s are local to T₁ and T₂.</p>
+<div class="tbl"><table style="width:auto">
+<tr><th>T₁</th><th>T₂</th></tr>
+<tr><td><code>READ(A,t)</code></td><td><code>READ(A,s)</code></td></tr>
+<tr><td><code>t := t+100</code></td><td><code>s := s*2</code></td></tr>
+<tr><td><code>WRITE(A,t)</code></td><td><code>WRITE(A,s)</code></td></tr>
+<tr><td><code>READ(B,t)</code></td><td><code>READ(B,s)</code></td></tr>
+<tr><td><code>t := t+100</code></td><td><code>s := s*2</code></td></tr>
+<tr><td><code>WRITE(B,t)</code></td><td><code>WRITE(B,s)</code></td></tr>
+</table></div>
+<p>The only <b class="term">consistency constraint</b> on the database is <strong>A = B</strong>. T₁ adds 100 to both, T₂ doubles both, so each transaction, run alone, turns a state with A = B into another state with A = B. The question is which interleavings of their twelve steps also keep A = B.</p>
+
+<dl class="def">
+  <dt>Consistency constraint</dt><dd>A condition every legal database state must satisfy (here A = B). A <b>consistent state</b> satisfies all constraints.</dd>
+  <dt>Correctness principle (textbook §17.1.3)</dt><dd>Every transaction, if executed in isolation from a consistent state, ends in a consistent state.</dd>
+</dl>
+
+<h2>2. Serial schedules (slides 7–9)</h2>
+
+<dl class="def">
+  <dt>Serial schedule</dt><dd>A schedule in which all actions of one transaction come first, then all actions of another transaction, and so on. No mixing of actions from different transactions. A serial schedule is written simply as the list of its transactions, e.g. (T₁, T₂).</dd>
+</dl>
+<p>With two transactions there are exactly two serial schedules: (T₁, T₂) and (T₂, T₁). With n transactions there are n! of them. Step through both, starting from A = B = 25 (the values in the slide's tables, as in the textbook's Figs. 18.3 and 18.4):</p>
+
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div class="figrow"><div><div class="figlabel">Schedule 1: (T₁, T₂)</div><div id="s12"></div></div><div><div class="figlabel">Schedule 2: (T₂, T₁)</div><div id="s21"></div></div></div>
+<figcaption><b>Figure 1.</b> The two serial schedules. Time goes down; the A and B columns show the buffer value right after each WRITE.</figcaption>
+</figure>
+
+<div class="q">
+<h4>Slide 9 question: are the values of A and B the same at the end of the two serial schedules?</h4>
+<p><strong>No.</strong> (T₁, T₂) computes 2(25 + 100) = 250 for both; (T₂, T₁) computes 2·25 + 100 = 150 for both. The final state depends on the order of the transactions. Both final states are <em>consistent</em> (A = B in each), which is all we require: the DBMS promises the effect of <em>some</em> serial order, not a particular one.</p>
+<p>A note on the slide: its text says “assume initially A = B = 1000”, but its tables start from 25 (they are the textbook's figures). From 1000 the results would be 2(1000 + 100) = 2200 and 2·1000 + 100 = 2100: different again, and each consistent.</p>
+</div>
+
+<h2>3. Serializable schedules (slides 10–12)</h2>
+
+<div class="q">
+<h4>Slide 10 question: why does every serial schedule preserve database consistency?</h4>
+<p>By the correctness principle, each transaction alone maps a consistent state to a consistent state. A serial schedule runs the transactions one at a time, each starting from the state the previous one left. Start consistent; after the first transaction the state is still consistent; so the second starts from a consistent state and also ends consistent; and so on. By induction on the number of transactions, the final state is consistent. Nothing from another transaction ever sneaks in between the steps of a transaction, so the principle applies to each one exactly as if it ran alone.</p>
+</div>
+
+<p>Serial schedules are safe but slow (no overlap at all). Are there other safe schedules? Yes:</p>
+<dl class="def">
+  <dt>Serializable schedule</dt><dd>A schedule S is serializable if there is a serial schedule S′ such that, <em>for every initial database state</em>, the effects of S and S′ are the same.</dd>
+</dl>
+<p>The words “for every initial state” matter. Matching a serial schedule from one lucky starting state is not enough.</p>
+
+<h3>A serializable schedule (slide 10)</h3>
+<p>Here T₁ finishes with A before T₂ touches A, and finishes with B before T₂ touches B. T₂ works on A while T₁ is still busy elsewhere.</p>
+<figure>
+<span class="anim-tag">Animation</span>
+<div id="ser"></div>
+<figcaption><b>Figure 2.</b> A serializable but not serial schedule (textbook Fig. 18.5).</figcaption>
+</figure>
+<p>To prove it is serializable we must check every consistent initial state, not just 25. Every consistent state has A = B = c for some c. Following the schedule: A becomes c + 100, then 2(c + 100); B becomes c + 100, then 2(c + 100). So both end as <strong>2(c + 100)</strong>, exactly what (T₁, T₂) produces. The schedule is serializable with equivalent serial order (T₁, T₂).</p>
+
+<h3>A schedule that is not serializable (slide 11)</h3>
+<figure>
+<span class="anim-tag">Animation</span>
+<div id="nonser"></div>
+<figcaption><b>Figure 3.</b> A nonserializable schedule (textbook Fig. 18.6). T₁ works on A first, but T₂ works on B first.</figcaption>
+</figure>
+<p>From A = B = 25 it ends with A = 250, B = 150: inconsistent. In effect it applied different computations to the two elements: <strong>A := 2(A + 100)</strong> but <strong>B := 2B + 100</strong>. A single bad starting state is enough to prove a schedule is <em>not</em> serializable, because serializability requires equal effects for every initial state and every serial schedule preserves A = B.</p>
+
+<h3>Serializable only because of what the transactions compute (slide 12)</h3>
+<p>Now change T₂ to <em>add 200</em> instead of doubling, and keep exactly the order of Figure 3:</p>
+<figure>
+<span class="anim-tag">Animation</span>
+<div id="sem"></div>
+<figcaption><b>Figure 4.</b> The same interleaving as Figure 3 with T₂ adding 200 (textbook Fig. 18.7).</figcaption>
+</figure>
+<p>Now A = c + 100 + 200 and B = c + 200 + 100: both are c + 300 for every c, which is the effect of (T₁, T₂), and by coincidence also of (T₂, T₁), because additions commute. So this schedule <em>is</em> serializable, while the identical order with doubling was not. Serializability, as defined, depends on the actual arithmetic (“business operation”) inside the transactions.</p>
+
+<p><strong>The scheduler cannot see that arithmetic.</strong> Transactions are programs in a general-purpose language mixed with SQL; the scheduler only sees which elements are read and written. So the scheduler makes a safe assumption (textbook §18.1.4):</p>
+<dl class="def">
+  <dt>“No coincidences” assumption</dt><dd>Whenever a transaction writes an element, the value it writes may depend on the database state in any way, with no lucky arithmetic coincidences. In other words, if there is something T could do to an element that would make the state inconsistent, assume T does it. Under this assumption only the <em>reads and writes</em> matter, not the values.</dd>
+</dl>
+
+<h2>4. Notation: transactions as reads and writes (slides 13–14)</h2>
+<p>Since only reads and writes matter, a transaction is written as its sequence of reads and writes:</p>
+<dl class="def">
+  <dt>Action r<sub>i</sub>(X) / w<sub>i</sub>(X)</dt><dd>Transaction T<sub>i</sub> reads / writes database element X. (The slides also write R<sub>T</sub>(X), W<sub>T</sub>(X) for transaction T.)</dd>
+  <dt>Transaction T<sub>i</sub></dt><dd>A sequence of actions, all with subscript i.</dd>
+  <dt>Schedule S of a set of transactions</dt><dd>A sequence of all their actions in which, for each T<sub>i</sub>, the actions of T<sub>i</sub> appear in the same order as in T<sub>i</sub> itself. S is called an <b>interleaving</b> of the transactions.</dd>
+</dl>
+<pre>T₁: r₁(A); w₁(A); r₁(B); w₁(B);
+T₂: r₂(A); w₂(A); r₂(B); w₂(B);
+
+serializable schedule of Figure 2:
+    r₁(A); w₁(A); r₂(A); w₂(A); r₁(B); w₁(B); r₂(B); w₂(B);</pre>
+<p>The rule that a schedule keeps each transaction's own order is the same rule an operating system obeys: it interleaves programs but never runs one program's instructions out of order.</p>
+<p>How many schedules are there? Two transactions with m and n actions can be interleaved in C(m + n, m) = (m + n)! / (m! n!) ways, since a schedule is fixed once we choose which m of the m + n positions belong to the first transaction. T₁ and T₂ above (4 actions each) have C(8, 4) = <strong>70</strong> schedules, of which only 2 are serial.</p>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+<div id="try2"></div>
+
+<h3>Exam questions</h3>
+<p>Exam questions on these definitions also ask about conflict-serializability, so they are answered in <a href="03-conflicts.html">Chapter 3</a> (counting schedules, serializable vs conflict-serializable) and <a href="07-two-phase-locking.html">Chapter 7</a> (defining serial, serializable, conflict-serializable and 2PL together).</p>
+
+<div class="key"><p><strong>Summary:</strong> a serial schedule runs transactions one after another and always preserves consistency, though different serial orders can give different (all consistent) results. A schedule is serializable if it has the same effect as some serial schedule from every initial state. Whether a schedule is serializable can depend on the transactions' arithmetic, which the scheduler cannot see, so it assumes “no coincidences” and reasons only about reads and writes, written r<sub>i</sub>(X) and w<sub>i</sub>(X).</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="lecture.js"></script>
+<script>
+// blocks: [txn, elem]; each block is READ / compute / WRITE. f1, f2 are T1's and T2's computations.
+function runBlocks(blocks, f1, f2, txt1, txt2, A0 = 25, caps = []) {
+  const v = { A: A0, B: A0 }, rows = [];
+  blocks.forEach(([t, x], k) => {
+    const loc = t === 1 ? 't' : 's', nv = (t === 1 ? f1 : f2)(v[x]);
+    rows.push({ t, html: `READ(${x},${loc})`, ex: ['', ''] });
+    rows.push({ t, html: t === 1 ? txt1 : txt2, ex: ['', ''] });
+    v[x] = nv;
+    rows.push({ t, html: `WRITE(${x},${loc})`, ex: [x === 'A' ? nv : '', x === 'B' ? nv : ''], cap: caps[k] || `T${CC.subs(t)} reads ${x}, computes and writes ${x} = ${nv}.` });
+  });
+  return { rows, v };
+}
+const init = { t: 0, html: '', ex: ['25', '25'] }, ex = ['A', 'B'];
+const add = x => x + 100, dbl = x => 2 * x, add2 = x => x + 200;
+const s12 = runBlocks([[1, 'A'], [1, 'B'], [2, 'A'], [2, 'B']], add, dbl, 't := t+100', 's := s*2');
+s12.rows[s12.rows.length - 1].cap += ' <b>Final: A = B = 250.</b>';
+stepper('#s12', CC.growSteps([1, 2], s12.rows, { extra: ex, init, startCap: 'Start: A = B = 25.' }));
+const s21 = runBlocks([[2, 'A'], [2, 'B'], [1, 'A'], [1, 'B']], add, dbl, 't := t+100', 's := s*2');
+s21.rows[s21.rows.length - 1].cap += ' <b>Final: A = B = 150.</b>';
+stepper('#s21', CC.growSteps([1, 2], s21.rows, { extra: ex, init, startCap: 'Start: A = B = 25.' }));
+const ser = runBlocks([[1, 'A'], [2, 'A'], [1, 'B'], [2, 'B']], add, dbl, 't := t+100', 's := s*2', 25,
+  ['T₁ adds 100 to A: A = 125.', 'T₂ doubles A: A = 250. T₂ sees T₁\'s A, just as in (T₁, T₂).', 'T₁ adds 100 to B: B = 125.', 'T₂ doubles B: B = 250. <b>Final A = B = 250</b>, the same as the serial schedule (T₁, T₂).']);
+stepper('#ser', CC.growSteps([1, 2], ser.rows, { extra: ex, init, startCap: 'Start: A = B = 25. T₁ handles A, then T₂ handles A, then T₁ handles B, then T₂ handles B.' }));
+const non = runBlocks([[1, 'A'], [2, 'A'], [2, 'B'], [1, 'B']], add, dbl, 't := t+100', 's := s*2', 25,
+  ['T₁ adds 100 to A: A = 125.', 'T₂ doubles A: A = 250.', 'T₂ doubles B <em>before</em> T₁ has touched it: B = 50.', 'T₁ adds 100 to B: B = 150. <b>Final A = 250, B = 150: A ≠ B, inconsistent.</b>']);
+stepper('#nonser', CC.growSteps([1, 2], non.rows, { extra: ex, init, startCap: 'Start: A = B = 25. Same transactions, but T₂ handles B before T₁ does.' }));
+const sem = runBlocks([[1, 'A'], [2, 'A'], [2, 'B'], [1, 'B']], add, add2, 't := t+100', 's := s+200', 25,
+  ['T₁: A = 125.', 'T₂ adds 200: A = 325.', 'T₂ adds 200 to B: B = 225.', 'T₁ adds 100: B = 325. <b>Final A = B = 325</b>: consistent, because + 100 and + 200 commute.']);
+stepper('#sem', CC.growSteps([1, 2], sem.rows, { extra: ex, init, startCap: 'Same order as Figure 3, but T₂ now adds 200.' }));
+
+flashcards('#cards', [
+  { f: 'Serial schedule', b: 'All actions of one transaction, then all of the next, and so on. No interleaving.' },
+  { f: 'Serializable schedule', b: 'A schedule whose effect equals that of some serial schedule, for every initial database state.' },
+  { f: 'Correctness principle', b: 'Each transaction alone takes a consistent state to a consistent state.' },
+  { f: 'Why serial schedules are safe', b: 'Each transaction starts from the consistent state the previous one left, so by induction the end state is consistent.' },
+  { f: '“No coincidences”', b: 'The scheduler assumes any written value may break consistency if ordered badly, so only reads and writes matter.' },
+  { f: 'r₂(B)', b: 'Transaction T₂ reads database element B.' },
+  { f: 'Interleaving', b: 'A schedule of several transactions that keeps each transaction\'s own action order.' },
+]);
+quiz('#quiz', [
+  { q: 'From A = B = 25, the serial schedules (T₁, T₂) and (T₂, T₁) end with…', opts: ['250 and 250', '250 and 150', '150 and 150', '125 and 50'], a: 1, why: '(25 + 100)·2 = 250 and 25·2 + 100 = 150.' },
+  { q: 'Figure 3 ends with A = 250, B = 150. What does that prove?', opts: ['Nothing, it is one starting state', 'The schedule is not serializable', 'The schedule is serial', 'T₂ is incorrect'], a: 1, why: 'Every serial schedule keeps A = B. One starting state where the schedule breaks A = B already shows its effect differs from every serial schedule.' },
+  { q: 'Why is the schedule of Figure 4 serializable while Figure 3 is not, with the same order of reads and writes?', opts: ['T₂\'s additions commute with T₁\'s', 'It has fewer actions', 'It is serial', 'T₂ commits first'], a: 0, why: 'A + 100 + 200 = A + 200 + 100. This is an arithmetic coincidence the scheduler cannot know about.' },
+  { q: 'How many different schedules do two transactions of 4 actions each have?', opts: ['8', '16', '70', '40320'], a: 2, why: 'Choose the 4 positions of T₁ among 8: C(8,4) = 70.' },
+  { q: 'Which is a valid schedule of T₁: r₁(A); w₁(A) and T₂: r₂(A)?', opts: ['w₁(A); r₂(A); r₁(A)', 'r₂(A); r₁(A); w₁(A)', 'r₁(A); r₂(A); r₁(A); w₁(A)', 'w₁(A); r₁(A); r₂(A)'], a: 1, why: 'T₁\'s actions must stay in order r₁(A) before w₁(A), and each action appears once.' },
+]);
+ask('#try1', { q: 'Starting from A = B = 10, what is A after the nonserializable schedule of Figure 3?', a: 220, why: 'A = 2(10 + 100) = 220, while B = 2·10 + 100 = 120.' });
+ask('#try2', { q: 'How many schedules (interleavings) do transactions of 4 and 6 actions have? (Textbook Exercise 18.1.2)', a: 210, why: 'C(10, 4) = 10!/(4!·6!) = 210.' });
+</script>
+</body>
+</html>

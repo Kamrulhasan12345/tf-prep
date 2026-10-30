@@ -1,0 +1,393 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>B+ Tree Deletion · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 15 · Chapter 11 · Beyond the slides (asked in exams)</div>
+<h1>Deleting from a B+ Tree</h1>
+<p class="lede">Deletion is insertion run backwards: a node that becomes too empty either borrows a key from a sibling or merges with it, and a merge can ripple up to the root and make the tree shorter. This chapter teaches the standard algorithm (Silberschatz, §14.3.3), shows every case in an animator, and answers the exam questions that mix insertions and deletions, including one on plain B-trees.</p>
+
+<h2>1. Underflow</h2>
+
+<p>Removing a key from a leaf is easy. The problem is what it leaves behind. Every node except the root must stay at least half full (Chapter 10, Section 1): a leaf needs at least ⌈(n−1)/2⌉ keys and an internal node at least ⌈n/2⌉ pointers. A node that drops below its minimum has an <b class="term">underflow</b>, and the tree must repair it before the operation ends.</p>
+
+<dl class="def">
+  <dt>Underflow</dt><dd>A non-root node with fewer entries than the minimum: fewer than ⌈(n−1)/2⌉ keys in a leaf, or fewer than ⌈n/2⌉ pointers in an internal node.</dd>
+  <dt>Sibling</dt><dd>A node immediately to the left or right of a node <em>under the same parent</em>. The repair only ever uses a sibling, because then exactly one separator key in the parent sits between the two nodes.</dd>
+  <dt>Coalesce (merge)</dt><dd>Combine an underflowing node with a sibling into one node, and delete the separator between them (plus the pointer to the removed node) from the parent. Allowed when the two nodes' contents fit in one node.</dd>
+  <dt>Redistribute (borrow)</dt><dd>Move one entry from a sibling that has more than it needs into the underflowing node, and update the separator in the parent so it still divides the two nodes correctly. The parent loses nothing, so the repair stops here.</dd>
+</dl>
+
+<h2>2. The four repairs</h2>
+
+<p>Whether the node is a leaf or an internal node changes how keys move, because leaves keep every key while internal nodes only keep separators.</p>
+
+<div class="tbl"><table>
+<tr><th></th><th>Merge</th><th>Borrow</th></tr>
+<tr><td><strong>Leaf</strong></td><td>Append all keys of the right node to the left node and fix the leaf chain. Delete the separator and the right node's pointer from the parent. The separator simply disappears, since it was a copy.</td><td>Move the sibling's nearest key (the last key of a left sibling, the first key of a right sibling) into this leaf. Replace the separator in the parent with the smallest key of the right-hand node of the pair.</td></tr>
+<tr><td><strong>Internal</strong></td><td>Left node + <em>the separator pulled down from the parent</em> + right node. The separator comes down because the merged node needs one key between the two groups of pointers.</td><td>A rotation through the parent: the sibling's nearest pointer moves over, the parent's separator comes down into this node, and the sibling's nearest key goes up to become the new separator.</td></tr>
+</table></div>
+
+<p>A merge removes one entry from the parent, so the parent may underflow next, and the repair continues one level up. If the parent is the root and it loses its last key, it has a single child: that child becomes the new root and the tree gets one level shorter. This is the only way the height decreases, the mirror image of a root split.</p>
+
+<figure>
+<svg id="cases" viewBox="0 0 880 420" width="880" role="img" aria-label="Leaf borrow and internal merge"></svg>
+<figcaption><b>Figure 1.</b> n = 4 (leaves need 2 keys, internal nodes 2 pointers). <b>Top:</b> leaf [7] underflows; its left sibling [2, 3, 5] cannot merge with it (4 keys &gt; 3), so 5 is borrowed and the separator becomes 5. <b>Bottom:</b> an internal node is left with one pointer after a leaf merge below it; it merges with its left sibling [13], and the separator 23 is pulled down between them. The parent (the root) has lost its only key, so the merged node becomes the new root.</figcaption>
+</figure>
+
+<h3>Do you have to replace a deleted key that is also a separator?</h3>
+<p>No. If you delete 19 and 19 is a separator in an internal node, the separator still works: everything in the subtree to its right is still ≥ 19. Silberschatz leaves such keys alone. Many exam answers replace the separator with the new smallest key on its right, which is also correct. Either way, mention what you did.</p>
+
+<h2>3. The algorithm (Silberschatz)</h2>
+
+<pre>procedure delete(value K, pointer P)
+    find the leaf node L that contains (K, P)
+    delete_entry(L, K, P)
+
+procedure delete_entry(node N, value K, pointer P)
+    delete (P, K) from N
+    if (N is the root and N has only one remaining child)
+        then make the child of N the new root of the tree and delete N
+    else if (N has too few values/pointers) then begin
+        Let N′ be the previous or next child of parent(N)
+        Let K′ be the value between pointers N and N′ in parent(N)
+        if (entries in N and N′ can fit in a single node)
+        then begin   /* Coalesce nodes */
+            if (N is a predecessor of N′) then swap_variables(N, N′)
+            if (N is not a leaf)
+                then append K′ and all pointers and values in N to N′
+                else append all (Kᵢ, Pᵢ) pairs in N to N′;  set N′.Pₙ = N.Pₙ
+            delete_entry(parent(N), K′, N);  delete node N
+        end
+        else begin   /* Redistribution: borrow an entry from N′ */
+            if (N′ is a predecessor of N) then begin
+                if (N is a nonleaf node) then begin
+                    let m be such that N′.Pₘ is the last pointer in N′
+                    remove (N′.Kₘ₋₁, N′.Pₘ) from N′
+                    insert (N′.Pₘ, K′) as the first pointer and value in N
+                    replace K′ in parent(N) by N′.Kₘ₋₁
+                end
+                else begin
+                    let m be such that (N′.Pₘ, N′.Kₘ) is the last pair in N′
+                    remove (N′.Pₘ, N′.Kₘ) from N′
+                    insert (N′.Pₘ, N′.Kₘ) as the first pointer and value in N
+                    replace K′ in parent(N) by N′.Kₘ
+                end
+            end
+            else … symmetric to the then case …
+        end
+    end</pre>
+
+<p>Read it in this order. The node loses an entry. If it is the root with one child left, the root is discarded. Otherwise, if it is too empty, pick <em>one</em> sibling N′ (Silberschatz uses the previous sibling when there is one, else the next). If both fit in one node, merge them, which deletes K′ from the parent through a recursive call. If they do not fit, the sibling must be fuller than the minimum, so borrow one entry from it. Like insertion, deletion only walks up the search path, so it costs O(height).</p>
+
+<h3>Merge first, or borrow first?</h3>
+<p>Silberschatz checks the merge first: it merges whenever the two nodes fit together, and borrows only when they do not. Other textbooks (Ramakrishnan &amp; Gehrke, many exam solutions) check the opposite order: borrow if either sibling can spare an entry, and merge only when neither can. Both produce valid B+ trees, and they often produce the same tree, but not always. The animator lets you pick the rule, and the worked answers below show both trees where they differ.</p>
+
+<h2>4. Every case, animated</h2>
+
+<p>The starting tree (n = 4) is the one from the 2017–18 exam question. The preloaded deletions are chosen to hit every case: deleting 11 makes a leaf borrow from its left sibling, deleting 7 merges two leaves and then makes an internal node borrow (a rotation through the root), deleting 2 needs no repair, deleting 47 borrows again, deleting 41 merges leaves, deleting 37 needs no repair, and deleting 43 merges leaves, then merges two internal nodes, and finally removes the root. Switch the underflow rule and press <b>Animate</b> to compare, or type your own operations (insertions work too).</p>
+
+<figure class="wide">
+<span class="anim-tag">Interactive animation</span>
+<div id="tool"></div>
+</figure>
+
+<h2>5. A note on B-trees</h2>
+<p>A <b class="term">B-tree</b> (no plus) stores each key exactly once, in whichever node it lands, with its record pointer right there. There are no copies of keys in internal nodes and no leaf chain. Insertion is the same idea as for B+ trees, but every split, including a leaf split, <em>moves</em> the middle key up. Deleting a key from an internal node replaces it with its in-order predecessor (largest key in its left subtree) or successor (smallest key in its right subtree), then deletes that key from its leaf, which may underflow and be fixed by borrowing or merging, where a merge pulls the parent's key down between the two nodes. B-trees save a little space, but range scans are harder and internal nodes hold fewer keys (each key also carries a record pointer), so databases prefer B+ trees (Silberschatz §14.4.5).</p>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+<div id="try2"></div>
+<div id="try3"></div>
+
+<h3>Exam questions</h3>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 215 | L-2/T-1 | 2024–25 · 13 marks &nbsp;·&nbsp; DB QB · 24-25 4c · 13 marks</div>
+  <div class="exam-q"><p>Assume that a B+ tree index is initially empty and the number of pointers that fit in one node is 4 (four).</p>
+  <p>(i) Construct the tree by inserting the following key values in the given order: 2, 3, 5, 7, 11, 17, 19, 23, 29, 31.<br>(ii) For the constructed tree above, show the final form of the tree after the following operations: Delete 23, Delete 19.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><strong>Rules, n = 4.</strong> Up to 3 keys per node. Leaves need 2 keys, internal nodes 2 pointers. Leaf split 2 + 2 with copy-up; internal split keeps 3 pointers and pushes the 3rd key up.</p>
+    <p><strong>(i) Construction.</strong></p>
+    <ol>
+      <li>2, 3, 5 fill the root leaf [2, 3, 5].</li>
+      <li>7: [2, 3, 5, 7] overflows → [2, 3] | [5, 7], copy 5 up. Root [5].</li>
+      <li>11: [5, 7, 11]. 17: [5, 7, 11, 17] overflows → [5, 7] | [11, 17], copy 11. Root [5, 11].</li>
+      <li>19: [11, 17, 19]. 23: overflows → [11, 17] | [19, 23], copy 19. Root [5, 11, 19] (4 pointers, full).</li>
+      <li>29: [19, 23, 29]. 31: overflows → [19, 23] | [29, 31], copy 29. The root becomes [5, 11, 19, 29] with 5 pointers and splits: [5, 11] keeps 3 pointers, <strong>19 is pushed up</strong> into a new root, [29] gets 2 pointers.</li>
+    </ol>
+    <div id="q2a"></div>
+    <p><strong>(ii) Delete 23 (Silberschatz, merge first).</strong> Leaf [19, 23] becomes [19], an underflow (1 &lt; 2). It is the first child of [29], so its sibling is the right leaf [29, 31]. 1 + 2 = 3 keys fit in one leaf, so <strong>merge</strong>: [19, 29, 31], and remove separator 29 from the parent. The parent now has no key and 1 pointer, an underflow. Its sibling is [5, 11] (3 pointers); 3 + 1 = 4 pointers fit in one node, so <strong>merge</strong> the internal nodes, pulling the root's separator 19 down: [5, 11, 19]. The root has lost its only key and has one child, so it is removed. The tree shrinks from 3 levels to 2.</p>
+    <div id="q2b"></div>
+    <p><strong>Delete 19.</strong> Leaf [19, 29, 31] becomes [29, 31], which has 2 keys. No underflow. The root still contains 19, which remains a correct separator (everything to its right is ≥ 19); if you prefer, replace it with 29.</p>
+    <div id="q2c"></div>
+    <p><strong>With the borrow-first rule</strong> the internal underflow after deleting 23 is fixed differently: the left sibling [5, 11] has 3 pointers, more than the minimum 2, so it lends one. The pointer to [11, 17] moves across, 19 comes down from the root, and 11 goes up. The tree stays 3 levels high:</p>
+    <div id="q2d"></div>
+    <p>Note: the question bank's answer uses this borrow-first rule (and then replaces 19 by 29 in the separator after deleting 19). Its trees are valid. Under Silberschatz's algorithm, which merges whenever the nodes fit, the answer is the 2-level tree above. Either answer earns marks if you state the rule.</p>
+    <div id="q2tool"></div>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 215 | L-2/T-1 | 2022–23 · 20 marks &nbsp;·&nbsp; DB QB · 22-23 8a · 20 marks</div>
+  <div class="exam-q"><p>The following is a degree 3 B+ tree created after some insert/delete operations.</p>
+  <figure><div id="q3q"></div></figure>
+  <p>Draw the state of this B+ tree after each of the following operations: (i) Insert 315 (ii) Insert 409 and 513 (iii) Delete 456 (iv) Delete 513 (v) Delete 982 and 895.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><strong>Rules.</strong> Degree 3 means n = 3: at most 2 keys and 3 pointers per node. A leaf needs ⌈2/2⌉ = 1 key, an internal node ⌈3/2⌉ = 2 pointers. A leaf split of 3 keys keeps ⌈3/2⌉ = 2 on the left (Silberschatz); an internal node with 4 pointers keeps 2, pushes up its 2nd key, and moves 2. Each operation is applied to the result of the previous one.</p>
+    <p><strong>(i) Insert 315.</strong> Path: root [0671] → [0278, 0456] (0278 ≤ 315 &lt; 0456) → leaf [0278, 0350]. It becomes [0278, 0315, 0350], an overflow. Split into [0278, 0315] | [0350] and copy 0350 up. The parent [0278, 0350, 0456] has 4 pointers: split into [0278] | [0456] and push 0350 up. The root becomes [0350, 0671], which fits.</p>
+    <div id="q3a"></div>
+    <p><strong>(ii) Insert 409 and 513.</strong> 409: root → 0350 ≤ 409 &lt; 0671 → [0456] → 409 &lt; 0456 → leaf [0350] → [0350, 0409]. No split. 513: → [0456] → leaf [0456, 0527] → [0456, 0513, 0527], overflow. Split [0456, 0513] | [0527], copy 0527 up. Parent [0456, 0527] has 3 pointers, which fits.</p>
+    <div id="q3b"></div>
+    <p><strong>(iii) Delete 456.</strong> Leaf [0456, 0513] → [0513]. One key is the minimum, so no underflow. 0456 stays as a separator; it is still correct.</p>
+    <div id="q3c"></div>
+    <p><strong>(iv) Delete 513.</strong> Leaf [0513] becomes empty, an underflow. Its left sibling is [0350, 0409]. Merge first: 2 + 0 keys fit in one leaf, so the empty leaf is merged away and separator 0456 is deleted from the parent, which becomes [0527] with 2 pointers. Fine.</p>
+    <div id="q3d"></div>
+    <p>(Borrow first: the left sibling has 2 keys and can spare 0409, so the leaves become [0350] | [0409] | [0527] and the parent becomes [0409, 0527].)</p>
+    <p><strong>(v) Delete 982 and 895.</strong> 982: [0895, 0982] → [0895], no underflow. 895: [0895] → empty. Its left sibling [0671] fits with it, so merge: leaf [0671], and the parent [0895] loses its key, leaving 1 pointer, an underflow. Its left sibling [0527] has 2 pointers; 2 + 1 = 3 fit, so merge the internal nodes with the root's separator 0671 pulled down: [0527, 0671]. The root [0350, 0671] loses 0671 and becomes [0350], still with 2 children. Final tree:</p>
+    <div id="q3e"></div>
+    <p>With the borrow-first rule (continuing from its own (iv) tree) the final tree is:</p>
+    <div id="q3f"></div>
+    <p>Note: the question bank's answer splits an overflowing leaf of 3 keys as 1 + 2 (the extra key goes right, so [0278, 0315, 0350] becomes [0278] | [0315, 0350] and 0315 is copied up). That is a legitimate convention and its trees are valid B+ trees, but they differ from Silberschatz's 2 + 1 split used in this book. Say which split rule you use.</p>
+    <div id="q3tool"></div>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 215 | L-2/T-2 | 2020–21 · 20 marks &nbsp;·&nbsp; DB QB · 20-21 2b · 20 marks</div>
+  <div class="exam-q"><p>(i) Construct a B+ tree index structure with n = 4, incrementally inserting the search keys 90, 80, 70, 60, 50, 40, 30, 20.<br>(ii) Show the structures after deletion of 20, 30, 40 and 50.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><strong>(i)</strong> n = 4: leaves hold 2–3 keys, split 2 + 2 with copy-up.</p>
+    <ol>
+      <li>90, 80, 70 → root leaf [70, 80, 90].</li>
+      <li>60 → [60, 70, 80, 90] overflows → [60, 70] | [80, 90], copy 80. Root [80].</li>
+      <li>50 → [50, 60, 70]. 40 → [40, 50, 60, 70] overflows → [40, 50] | [60, 70], copy 60. Root [60, 80].</li>
+      <li>30 → [30, 40, 50]. 20 → [20, 30, 40, 50] overflows → [20, 30] | [40, 50], copy 40. Root [40, 60, 80] (4 pointers, full but legal).</li>
+    </ol>
+    <div id="q5a"></div>
+    <p><strong>(ii)</strong></p>
+    <ol>
+      <li><strong>Delete 20:</strong> [20, 30] → [30], underflow. No left sibling; right sibling [40, 50]: 1 + 2 = 3 keys fit, merge into [30, 40, 50], remove 40 from the root → [60, 80].</li>
+      <li><strong>Delete 30:</strong> [30, 40, 50] → [40, 50], 2 keys, no underflow.</li>
+      <li><strong>Delete 40:</strong> [40, 50] → [50], underflow. Right sibling [60, 70]: merge into [50, 60, 70], remove 60 from the root → [80].</li>
+      <li><strong>Delete 50:</strong> [50, 60, 70] → [60, 70], no underflow.</li>
+    </ol>
+    <div id="q5b"></div>
+    <p>Both underflow rules give the same trees here (the right siblings have only 2 keys and cannot lend). The question bank's answer is correct.</p>
+    <div id="q5tool"></div>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 215 | L-2/T-2 | 2017–18 · 16 marks &nbsp;·&nbsp; DB QB · 17-18 4c · 16 marks</div>
+  <div class="exam-q"><p>Consider the B+ tree given in the following figure. Now change the B+ tree incrementally according to the following instructions. For each instruction, draw the final modified state of the B+ tree. (i) Insert keys 8, 9 (ii) Insert keys 24, 27 (iii) Remove keys 8, 9 (iv) Remove keys 24, 27.</p>
+  <figure><div id="q7q"></div></figure></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><strong>Rules.</strong> The nodes have 3 key slots and 4 pointers, so n = 4: leaves 2–3 keys, internal nodes 2–4 pointers.</p>
+    <p><strong>(i) Insert 8, 9.</strong> 8 goes to [7, 11] → [7, 8, 11]. 9 makes it [7, 8, 9, 11], overflow: split [7, 8] | [9, 11], copy 9 up. Parent [7] → [7, 9].</p>
+    <div id="q7a"></div>
+    <p><strong>(ii) Insert 24, 27.</strong> 24 goes to [23, 29] → [23, 24, 29]. 27 makes [23, 24, 27, 29], overflow: split [23, 24] | [27, 29], copy 27 up. Parent [23, 27, 31, 43] has 5 pointers: keep [23, 27] with 3 pointers, push 31 up, new node [43] with 2 pointers. Root [13] → [13, 31].</p>
+    <div id="q7b"></div>
+    <p><strong>(iii) Remove 8, 9.</strong> Deletions are done one at a time.</p>
+    <ul>
+      <li>Delete 8: [7, 8] → [7], underflow. Left sibling [2, 3, 5]: 3 + 1 = 4 keys do not fit in one leaf, so <strong>redistribute</strong>: 5 moves over, the leaf becomes [5, 7], and the separator 7 in the parent becomes 5. Parent [5, 9].</li>
+      <li>Delete 9: [9, 11] → [11], underflow. Left sibling [5, 7]: 2 + 1 = 3 fit, so <strong>merge</strong> into [5, 7, 11] and remove 9 from the parent → [5], 2 pointers, fine.</li>
+    </ul>
+    <div id="q7c"></div>
+    <p><strong>(iv) Remove 24, 27.</strong></p>
+    <ul>
+      <li>Delete 24: [23, 24] → [23], underflow. Left sibling [13, 17, 19] cannot merge (4 keys), so redistribute: 19 moves over → [19, 23], separator 23 becomes 19. Parent [19, 27].</li>
+      <li>Delete 27: [27, 29] → [29], underflow (27 stays as separator for now). Left sibling [19, 23]: merge into [19, 23, 29], remove separator 27 → parent [19], 2 pointers, fine.</li>
+    </ul>
+    <div id="q7d"></div>
+    <p>Both underflow rules give these same trees. Note: the question bank's answer is wrong for (iii) and (iv). It deletes each pair as if the two keys vanished together, so it claims the tree returns exactly to [7] over [2, 3, 5] [7, 11] and finally to the original tree. Deleting 8 alone already underflows [7, 8], and that underflow must be repaired (by borrowing 5) before 9 is deleted. The tree does not return to its original shape.</p>
+    <div id="q7tool"></div>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2016–17 · 8 marks</div>
+  <div class="exam-q"><p>Consider the B+ tree with leaf nodes {2, 3, 5}, {14, 16}, {19, 20, 22}, {24, 27, 29}, {33, 34, 38, 39} and root [13, 17, 24, 30]. Show (without explanation) what happens after each of the following successive operations: (a) Insert 7 (b) Insert 8 (c) Delete 19 (d) Delete 20.</p>
+  <figure><div id="q8q"></div></figure></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><strong>Reading the tree.</strong> A leaf holds 4 keys and the root has 5 children, so n = 5 (Ramakrishnan's order d = 2: 2 to 4 entries per node). Leaves need 2 keys, internal nodes 3 pointers.</p>
+    <p><strong>(a) Insert 7:</strong> [2, 3, 5] → [2, 3, 5, 7]. Fits.</p>
+    <div id="q8a"></div>
+    <p><strong>(b) Insert 8:</strong> [2, 3, 5, 7, 8] overflows → [2, 3, 5] | [7, 8], copy 7. Root [7, 13, 17, 24, 30] has 6 pointers: keep [7, 13] (3 pointers), push 17 up into a new root, [24, 30] gets 3 pointers.</p>
+    <div id="q8b"></div>
+    <p><strong>(c) Delete 19:</strong> [19, 20, 22] → [20, 22], 2 keys, fine.</p>
+    <div id="q8c"></div>
+    <p><strong>(d) Delete 20:</strong> [20, 22] → [22], underflow. It is the first child of [24, 30], so its sibling is [24, 27, 29].</p>
+    <ul>
+      <li><em>Borrow first</em> (the rule in Ramakrishnan's textbook, which this question comes from): the sibling has 3 keys, more than 2, so borrow 24 → [22, 24] | [27, 29], separator becomes 27.</li>
+    </ul>
+    <div id="q8d"></div>
+    <ul>
+      <li><em>Merge first</em> (Silberschatz): 1 + 3 = 4 keys fit, so merge into [22, 24, 27, 29] and remove 24; the parent [30] has 2 pointers, underflow; it merges with [7, 13] (3 + 2 = 5 pointers fit) pulling 17 down, and the root disappears:</li>
+    </ul>
+    <div id="q8e"></div>
+    <p>The question bank's answer (borrow, separator 27) is correct for the borrow-first rule.</p>
+    <div id="q8tool"></div>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2011–12 · 15 marks</div>
+  <div class="exam-q"><p>Draw a B+ tree for the following keys: 2, 3, 5, 7, 14, 16, 20, 34, 38, and 40. Assume a 2-order B+ tree where a node must have 2 to 4 keys. Re-construct the tree after deleting 3, 5, and 7 from the original tree.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><strong>Rules.</strong> 2 to 4 keys per node means n = 5 pointers. Leaves need ⌈4/2⌉ = 2 keys. A leaf that reaches 5 keys splits 3 + 2 (Silberschatz) and copies the right leaf's first key up.</p>
+    <ol>
+      <li>2, 3, 5, 7 → [2, 3, 5, 7].</li>
+      <li>14 → [2, 3, 5, 7, 14] overflows → [2, 3, 5] | [7, 14], copy 7. Root [7].</li>
+      <li>16, 20 → [7, 14, 16, 20]. 34 → overflow → [7, 14, 16] | [20, 34], copy 20. Root [7, 20].</li>
+      <li>38, 40 → [20, 34, 38, 40].</li>
+    </ol>
+    <div id="q14a"></div>
+    <p><strong>Deletions.</strong></p>
+    <ul>
+      <li>Delete 3: [2, 3, 5] → [2, 5], fine.</li>
+      <li>Delete 5: [2, 5] → [2], underflow. Right sibling [7, 14, 16]: 1 + 3 = 4 keys fit, merge → [2, 7, 14, 16], remove 7 from the root → [20]. (Borrow first: 7 moves over, giving [2, 7] | [14, 16] and root [14, 20].)</li>
+      <li>Delete 7: merge-first tree: [2, 7, 14, 16] → [2, 14, 16], fine. (Borrow-first tree: [2, 7] → [2] underflows, [14, 16] cannot lend, merge into [2, 14, 16] and the root becomes [20].)</li>
+    </ul>
+    <div id="q14b"></div>
+    <p>Both rules end with the same tree: root [20], leaves [2, 14, 16] and [20, 34, 38, 40].</p>
+    <p>Note: the question bank's original tree, root [5, 14, 20] over [2, 3] [5, 7] [14, 16] [20, 34, 38, 40], comes from splitting a 5-key leaf 2 + 3 (Ramakrishnan's rule) instead of 3 + 2. It is a valid tree for that rule, and its final tree after the deletions is the same as ours.</p>
+    <div id="q14tool"></div>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2012–13 · 17 marks</div>
+  <div class="exam-q"><p>Draw the B-tree to index the following elements: 2, 3, 5, 13, 17, 19, 23, 29, 31, 37, 41, 43, and 47. Delete elements 31 and 43 and redraw the tree.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>This asks for a <strong>B-tree</strong> (Section 5): every key appears once, and splits move the middle key up. No order is given, so assume order m = 3 (at most 3 children and 2 keys per node, at least 1 key in a non-root node), the smallest order that shows splits clearly. A node that reaches 3 keys splits into its left key and its right key and moves the middle key up.</p>
+    <ol>
+      <li>2, 3 → [2, 3]. 5 → [2, 3, 5] splits: 3 goes up. Root [3] over [2] [5].</li>
+      <li>13 → [5, 13]. 17 → [5, 13, 17] splits, 13 up → root [3, 13] over [2] [5] [17].</li>
+      <li>19 → [17, 19]. 23 → splits, 19 up → root [3, 13, 19] splits, 13 up: root [13] over [3] and [19].</li>
+      <li>29 → [23, 29]. 31 → splits, 29 up → [19, 29]. 37 → [31, 37]. 41 → splits, 37 up → [19, 29, 37] splits, 29 up → root [13, 29] over [3] [19] [37].</li>
+      <li>43 → [41, 43]. 47 → splits, 43 up → [37, 43].</li>
+    </ol>
+    <div id="q13a"></div>
+    <p><strong>Delete 31.</strong> Leaf [31] becomes empty. Its only sibling under [37, 43] is [41], which has the minimum 1 key and cannot lend. Merge: empty leaf + separator 37 (pulled down) + [41] → [37, 41]. The parent becomes [43], which still has 1 key. Done.</p>
+    <div id="q13b"></div>
+    <p><strong>Delete 43.</strong> 43 is in an internal node. Replace it with its in-order predecessor, the largest key in its left subtree, 41, and delete 41 from leaf [37, 41], which leaves [37] (1 key, fine).</p>
+    <div id="q13c"></div>
+    <p>The question bank's answer is correct for order 3. With a different assumed order the trees differ (for m = 4 the first tree is [31] over [5, 19] and [43]), so always state the order.</p>
+  </div></details>
+</div>
+
+<div class="key"><p><strong>Summary:</strong> delete the key from its leaf. If a non-root node falls below its minimum (⌈(n−1)/2⌉ keys in a leaf, ⌈n/2⌉ pointers in an internal node), use a sibling under the same parent. If the two fit in one node, merge them and delete the separator from the parent (for internal nodes the separator comes down into the merged node); the parent may underflow in turn. Otherwise borrow one entry and fix the separator (for internal nodes, rotate through the parent). When the root is left with one child, that child becomes the root and the tree shrinks. Silberschatz merges first; many exam solutions borrow first. Both are valid if stated.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="lecture.js"></script>
+<script>
+const T7 = { k: ['13'], c: [{ k: ['7'], c: [{ k: ['2', '3', '5'] }, { k: ['7', '11'] }] }, { k: ['23', '31', '43'], c: [{ k: ['13', '17', '19'] }, { k: ['23', '29'] }, { k: ['31', '37', '41'] }, { k: ['43', '47'] }] }] };
+const T3 = { k: ['0671'], c: [{ k: ['0278', '0456'], c: [{ k: ['0107'] }, { k: ['0278', '0350'] }, { k: ['0456', '0527'] }] }, { k: ['0895'], c: [{ k: ['0671'] }, { k: ['0895', '0982'] }] }] };
+const T8 = { k: ['13', '17', '24', '30'], c: [{ k: ['2', '3', '5'] }, { k: ['14', '16'] }, { k: ['19', '20', '22'] }, { k: ['24', '27', '29'] }, { k: ['33', '34', '38', '39'] }] };
+const one = (sel, start, n, ops, pref, lab) => bptStages(sel, start, n, [[lab, ops]], pref);
+
+// Figure 1
+(() => {
+  const g = (svg, x, y) => `<g transform="translate(${x} ${y})">${svg.replace(/^<svg[^>]*>/, '').replace(/<\/svg>$/, '')}</g>`;
+  const a1 = { k: ['7'], c: [{ k: ['2', '3', '5'] }, { k: ['7'], hl: 'del' }] };
+  const a2 = { k: ['5'], hl: 'hl', hk: '5', c: [{ k: ['2', '3'] }, { k: ['5', '7'], hl: 'new', hk: '5' }] };
+  const b1 = { k: ['23'], c: [{ k: ['13'], c: [{ k: ['3', '5'] }, { k: ['13', '17', '19'] }] }, { k: [], hl: 'del', c: [{ k: ['23', '29', '31'] }] }] };
+  const b2 = { k: ['13', '23'], hl: 'new', hk: '23', c: [{ k: ['3', '5'] }, { k: ['13', '17', '19'] }, { k: ['23', '29', '31'] }] };
+  let s = `<text x="10" y="16" class="big">Leaf borrows from its left sibling</text>`;
+  s += g(bptSVG(a1, 4), 10, 26) + `<text x="300" y="84" class="big" style="font-size:34px">→</text>` + g(bptSVG(a2, 4), 340, 26);
+  s += `<text x="10" y="190" class="big">Internal node merges (separator pulled down), root removed</text>`;
+  s += g(bptSVG(b1, 4), 10, 200) + `<text x="410" y="322" class="big" style="font-size:34px">→</text>` + g(bptSVG(b2, 4), 450, 242);
+  document.querySelector('#cases').innerHTML = s;
+})();
+
+bptTool('#tool', { n: 4, ops: 'delete 11 7 2 47 41 37 43', start: T7, startLabel: 'the 2017–18 exam tree' });
+
+flashcards('#cards', [
+  { f: 'Underflow', b: 'A non-root node below its minimum: fewer than ⌈(n−1)/2⌉ keys (leaf) or fewer than ⌈n/2⌉ pointers (internal).' },
+  { f: 'When can two nodes merge?', b: 'When their contents fit in one node: at most n − 1 keys for leaves, at most n pointers for internal nodes.' },
+  { f: 'Leaf merge', b: 'Append the right leaf\'s keys to the left leaf, fix the leaf chain, and delete the separator and pointer from the parent.' },
+  { f: 'Internal merge', b: 'Left node + separator pulled down from the parent + right node. The parent loses that separator.' },
+  { f: 'Leaf borrow', b: 'Move the sibling\'s nearest key across, then set the parent\'s separator to the smallest key of the right-hand node.' },
+  { f: 'Internal borrow', b: 'Rotation: sibling\'s nearest pointer moves over, the parent\'s separator comes down, the sibling\'s nearest key goes up.' },
+  { f: 'How does a B+ tree get shorter?', b: 'When the root is left with a single child after a merge, that child becomes the new root.' },
+  { f: 'B-tree vs B+ tree', b: 'A B-tree stores each key once (internal nodes carry record pointers, no leaf chain). A B+ tree keeps every key in the leaves and copies separators upward.' },
+]);
+
+quiz('#quiz', [
+  { q: 'n = 4. After a deletion a leaf holds 1 key. Is that allowed?', opts: ['Yes, leaves may hold 1 to 3 keys', 'No, a non-root leaf needs at least 2 keys', 'Only if it is the leftmost leaf', 'Only if its parent is the root'], a: 1,
+    why: '⌈(n−1)/2⌉ = ⌈3/2⌉ = 2. The only exception is a root that is a leaf.' },
+  { q: 'n = 4. Leaf [7] underflows and its left sibling is [2, 3, 5]. Silberschatz does what?', opts: ['Merge into [2, 3, 5, 7]', 'Borrow 5: [2, 3] and [5, 7], separator 5', 'Borrow 2', 'Delete the leaf and its separator'], a: 1,
+    why: '3 + 1 = 4 keys do not fit in a leaf (max 3), so redistribute: the sibling\'s largest key moves over and becomes the separator.' },
+  { q: 'When two internal nodes merge, where does the separator between them go?', opts: ['It is deleted', 'It stays in the parent', 'It moves down into the merged node', 'It is copied into the leaves'], a: 2,
+    why: 'The merged node needs one key between the left node\'s pointers and the right node\'s pointers; the separator is exactly that key.' },
+  { q: 'You delete 19, and 19 is also a separator in an internal node. What must you do?', opts: ['Nothing: the separator is still correct (replacing it is optional)', 'Always replace it with the largest key on its left', 'Delete the separator and its pointer', 'Rebuild the subtree'], a: 0,
+    why: 'Keys to the right of a separator must be ≥ it, and that remains true. Silberschatz keeps it; many answers replace it with the new smallest key on the right.' },
+  { q: 'Which event makes a B+ tree one level shorter?', opts: ['A leaf merge', 'A borrow from a sibling', 'The root left with a single child', 'Deleting the smallest key'], a: 2,
+    why: 'Only then is the root discarded and its single child promoted, shortening every path by one at once.' },
+  { q: 'Silberschatz merges whenever the nodes fit. Ramakrishnan borrows whenever a sibling can lend. Which is correct?', opts: ['Only Silberschatz', 'Only Ramakrishnan', 'Both, they keep all invariants', 'Neither'], a: 2,
+    why: 'Both leave every node within its limits and the tree balanced. They can produce different trees, so state your rule.' },
+]);
+
+ask('#try1', { q: 'n = 6. What is the minimum number of keys in a non-root leaf?', a: 3, hint: '⌈(n−1)/2⌉', why: '⌈5/2⌉ = 3.' });
+ask('#try2', { q: 'n = 5. A leaf [22] underflows; its only sibling is [24, 27, 29]. Using merge-first, list the merged leaf.', a: ['22,24,27,29', '22 24 27 29'], hint: '1 + 3 keys: do they fit in n − 1 = 4?', why: 'They fit, so Silberschatz merges them into [22, 24, 27, 29] and deletes 24 from the parent.', show: '[22, 24, 27, 29]' });
+ask('#try3', { q: 'n = 4. Root [19] has children [5, 11] (3 pointers) and an internal node that just dropped to 1 pointer. Merge-first: how many keys does the new root have?', a: 3, hint: 'Pointers 3 + 1 = 4 fit, so merge and pull 19 down.', why: 'The merged node [5, 11, 19] becomes the root (the old root lost its only key).' });
+
+// exam figures
+bptStages('#q2a', null, 4, [['(i) Final tree after inserting all ten keys', '2 3 5 7 11 17 19 23 29 31']]);
+one('#q2b', null, 4, '2 3 5 7 11 17 19 23 29 31 delete 23', 'merge', 'After deleting 23 (merge first)');
+one('#q2c', null, 4, '2 3 5 7 11 17 19 23 29 31 delete 23 19', 'merge', 'After deleting 19 (merge first): final answer');
+bptStages('#q2d', null, 4, [['Borrow first: after deleting 23', '2 3 5 7 11 17 19 23 29 31 delete 23'], ['Borrow first: after deleting 19', '2 3 5 7 11 17 19 23 29 31 delete 23 19']], 'borrow');
+bptTool('#q2tool', { n: 4, ops: '2 3 5 7 11 17 19 23 29 31 delete 23 19' });
+
+document.querySelector('#q3q').innerHTML = bptSVG(T3, 3);
+one('#q3a', T3, 3, '0315', 'merge', '(i) After inserting 315');
+one('#q3b', T3, 3, '0315 0409 0513', 'merge', '(ii) After inserting 409 and 513');
+one('#q3c', T3, 3, '0315 0409 0513 -0456', 'merge', '(iii) After deleting 456');
+one('#q3d', T3, 3, '0315 0409 0513 -0456 -0513', 'merge', '(iv) After deleting 513 (merge first)');
+one('#q3e', T3, 3, '0315 0409 0513 -0456 -0513 -0982 -0895', 'merge', '(v) After deleting 982 and 895 (merge first): final');
+one('#q3f', T3, 3, '0315 0409 0513 -0456 -0513 -0982 -0895', 'borrow', '(v) Borrow-first final tree');
+bptTool('#q3tool', { n: 3, ops: '+0315 +0409 +0513 -0456 -0513 -0982 -0895', start: T3, startLabel: 'the question\'s tree' });
+
+bptStages('#q5a', null, 4, [['After 60', '90 80 70 60'], ['After 40', '90 80 70 60 50 40'], ['(i) Final, after 20', '90 80 70 60 50 40 30 20']]);
+bptStages('#q5b', null, 4, [['After deleting 20', '90 80 70 60 50 40 30 20 -20'], ['After deleting 30', '90 80 70 60 50 40 30 20 -20 -30'], ['After deleting 40', '90 80 70 60 50 40 30 20 -20 -30 -40'], ['After deleting 50', '90 80 70 60 50 40 30 20 -20 -30 -40 -50']]);
+bptTool('#q5tool', { n: 4, ops: 'insert 90 80 70 60 50 40 30 20 delete 20 30 40 50' });
+
+document.querySelector('#q7q').innerHTML = bptSVG(T7, 4);
+one('#q7a', T7, 4, '8 9', 'merge', '(i) After inserting 8, 9');
+one('#q7b', T7, 4, '8 9 24 27', 'merge', '(ii) After inserting 24, 27');
+bptStages('#q7c', T7, 4, [['After deleting 8 (borrow 5 from the left)', '8 9 24 27 -8'], ['(iii) After deleting 9 (merge)', '8 9 24 27 -8 -9']]);
+bptStages('#q7d', T7, 4, [['After deleting 24 (borrow 19)', '8 9 24 27 -8 -9 -24'], ['(iv) After deleting 27 (merge)', '8 9 24 27 -8 -9 -24 -27']]);
+bptTool('#q7tool', { n: 4, ops: '+8 +9 +24 +27 -8 -9 -24 -27', start: T7, startLabel: 'the question\'s tree' });
+
+document.querySelector('#q8q').innerHTML = bptSVG(T8, 5);
+one('#q8a', T8, 5, '7', 'merge', '(a) After inserting 7');
+one('#q8b', T8, 5, '7 8', 'merge', '(b) After inserting 8');
+one('#q8c', T8, 5, '7 8 -19', 'merge', '(c) After deleting 19');
+one('#q8d', T8, 5, '7 8 -19 -20', 'borrow', '(d) After deleting 20, borrow first');
+one('#q8e', T8, 5, '7 8 -19 -20', 'merge', '(d) After deleting 20, merge first');
+bptTool('#q8tool', { n: 5, ops: '+7 +8 -19 -20', start: T8, startLabel: 'the question\'s tree', pref: 'borrow' });
+
+one('#q14a', null, 5, '2 3 5 7 14 16 20 34 38 40', 'merge', 'Original tree (n = 5)');
+bptStages('#q14b', null, 5, [['After deleting 3', '2 3 5 7 14 16 20 34 38 40 -3'], ['After deleting 5 (merge first)', '2 3 5 7 14 16 20 34 38 40 -3 -5'], ['After deleting 7: final', '2 3 5 7 14 16 20 34 38 40 -3 -5 -7']]);
+bptTool('#q14tool', { n: 5, ops: '2 3 5 7 14 16 20 34 38 40 delete 3 5 7' });
+
+// B-tree (order 3) trees, verified with work/l14l15/C/btree.py
+const B13 = { k: ['13', '29'], c: [{ k: ['3'], c: [{ k: ['2'] }, { k: ['5'] }] }, { k: ['19'], c: [{ k: ['17'] }, { k: ['23'] }] }, { k: ['37', '43'], c: [{ k: ['31'] }, { k: ['41'] }, { k: ['47'] }] }] };
+const B13b = { k: ['13', '29'], c: [{ k: ['3'], c: [{ k: ['2'] }, { k: ['5'] }] }, { k: ['19'], c: [{ k: ['17'] }, { k: ['23'] }] }, { k: ['43'], hl: 'hl', c: [{ k: ['37', '41'], hl: 'new' }, { k: ['47'] }] }] };
+const B13c = { k: ['13', '29'], c: [{ k: ['3'], c: [{ k: ['2'] }, { k: ['5'] }] }, { k: ['19'], c: [{ k: ['17'] }, { k: ['23'] }] }, { k: ['41'], hl: 'hl', hk: '41', c: [{ k: ['37'], hl: 'new' }, { k: ['47'] }] }] };
+const btree = (sel, t, lab) => document.querySelector(sel).innerHTML = `<div class="figlabel" style="text-align:left">${lab}</div>` + bptSVG(t, 3, { noChain: true, aria: 'B-tree of order 3' });
+btree('#q13a', B13, 'B-tree of order 3 after all insertions (no leaf chain: every key appears once)');
+btree('#q13b', B13b, 'After deleting 31');
+btree('#q13c', B13c, 'After deleting 43 (replaced by its predecessor 41)');
+</script>
+</body>
+</html>

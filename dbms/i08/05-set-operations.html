@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>UNION, INTERSECT and MINUS · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 08 (Ishrak) · Chapter 5 · Slides 23–30</div>
+<h1>UNION, INTERSECT and MINUS</h1>
+<p class="lede">Some questions combine the answers of two separate queries: "PCs or laptops", "both PCs and laptops", "laptops but not PCs". SQL's set operators do this. This chapter introduces the computer-products database used in the rest of the course, explains union compatibility, and works the three questions of slide 24 with a Venn-diagram animation.</p>
+
+<h2>1. The computer-products database (slide 24)</h2>
+<p>From here on the slides use a database of computer products, taken from the course textbook (Garcia-Molina, Ullman and Widom, Exercise 2.4.1):</p>
+<pre>Product (maker, <u>model</u>, type)                 -- type is 'pc', 'laptop' or 'printer'
+PC      (<u>model</u>, speed, ram, hd, price)
+Laptop  (<u>model</u>, speed, ram, hd, screen, price)
+Printer (<u>model</u>, color, type, price)        -- used from Lecture 10 on</pre>
+<p>Product says who makes each model and what kind of product it is. PC, Laptop and Printer hold the technical details, one row per model; their <code>model</code> is a foreign key to Product.model. Model numbers are unique across all makers and types. Speed is in GHz, ram in MB, hd in GB, screen in inches. The playgrounds load the textbook's full sample data: 30 products from 8 makers (A to H), 13 PCs, 10 laptops and 7 printers.</p>
+<figure><div id="tabs"></div><figcaption><b>Figure 1.</b> The sample data (Product, PC and Laptop; Printer is in the playgrounds).</figcaption></figure>
+
+<p>Slide 23 is a joke picture: two photos of the same actor, combined with ∪ and with ∩. It is there to fix the two ideas before the definitions: a <b class="term">union</b> puts together everything from both sides, an <b class="term">intersection</b> keeps only what both sides have in common.</p>
+
+<h2>2. Union (slides 25–26)</h2>
+<dl class="def">
+<dt>Union, A ∪ B (SQL: UNION)</dt><dd>All rows that are in the result of the first query, or of the second, or of both. Duplicates are removed (Chapter 6 explains UNION ALL, which keeps them).</dd>
+<dt>Union-compatible</dt><dd>Two query results can be combined by UNION, INTERSECT or MINUS only if they have the same number of columns and the corresponding columns have compatible types (slide 25: "tables must be compatible ... have the same attributes"). The result takes its column names from the <em>first</em> query.</dd>
+</dl>
+<p><em>Find the model number and price of all PCs and Laptops made by manufacturer 'B'.</em> PCs and laptops live in different tables, so we need one join per table and then glue the two answers together (slide 26):</p>
+<pre>SELECT PC.model, PC.price
+FROM   Product, PC
+WHERE  Product.model = PC.model
+AND    Product.maker = 'B'
+UNION
+SELECT Laptop.model, Laptop.price
+FROM   Product, Laptop
+WHERE  Product.model = Laptop.model
+AND    Product.maker = 'B';</pre>
+<p>Both halves return (model, price), so they are union-compatible. Note the prefixes: model is a column of Product <em>and</em> of PC, so it must be qualified. Maker B makes PCs 1004, 1005, 1006 and laptop 2007, so the answer has 4 rows. We could not have written this with a single join of Product, PC and Laptop: a product is never both a PC and a laptop, so such a join would return nothing.</p>
+<div id="p26"></div>
+
+<h2>3. Intersection (slides 27–28)</h2>
+<dl class="def"><dt>Intersection, A ∩ B (SQL: INTERSECT)</dt><dd>The rows that appear in the results of <em>both</em> queries (duplicates removed).</dd></dl>
+<p><em>Find those manufacturers that sell both PCs and Laptops.</em></p>
+<pre>SELECT maker FROM Product WHERE type = 'pc'
+INTERSECT
+SELECT maker FROM Product WHERE type = 'laptop';</pre>
+<p>The first query lists makers of PCs (A, B, C, D, E), the second makers of laptops (A, B, E, F, G). The makers in both are <strong>A, B, E</strong>.</p>
+<div class="q">
+<h4>Question (worked answer): why not just write WHERE type = 'pc' AND type = 'laptop'?</h4>
+<p>Because WHERE tests one row at a time, and no single Product row has type equal to both 'pc' and 'laptop'. The condition is always false and the query returns nothing. "Sells both" is a fact about <em>two different rows</em> of the same maker. INTERSECT compares the two sets of makers; the same question can also be answered with a self-join (<code>FROM Product p1, Product p2 WHERE p1.maker = p2.maker AND p1.type = 'pc' AND p2.type = 'laptop'</code>, with DISTINCT), with IN, or with EXISTS (Lecture 11).</p>
+</div>
+<div id="p28"></div>
+
+<h2>4. Difference (slides 29–30)</h2>
+<dl class="def"><dt>Difference, A − B (Oracle: MINUS; standard SQL: EXCEPT)</dt><dd>The rows in the result of the first query that are <em>not</em> in the result of the second. Order matters: A − B ≠ B − A.</dd></dl>
+<p><em>Find those manufacturers that sell Laptops, but not PCs.</em></p>
+<pre>SELECT maker FROM Product WHERE type = 'laptop'
+MINUS
+SELECT maker FROM Product WHERE type = 'pc';</pre>
+<p>Laptop makers {A, B, E, F, G} minus PC makers {A, B, C, D, E} = <strong>{F, G}</strong>. Oracle calls this operator <code>MINUS</code>; the SQL standard (and PostgreSQL, SQL Server, SQLite) calls it <code>EXCEPT</code>, and Oracle 21c and later accept EXCEPT as a synonym. In the exam, write MINUS.</p>
+<div id="p30"></div>
+
+<figure>
+<span class="anim-tag">Animation</span>
+<div id="venn"></div>
+</figure>
+
+<h3>Rules that apply to all three operators</h3>
+<ul>
+<li>Each side is a complete SELECT with its own FROM and WHERE. The operator sits between them.</li>
+<li>The two sides must be union-compatible; Oracle reports <code>ORA-01789: query block has incorrect number of result columns</code> otherwise.</li>
+<li>An ORDER BY may appear only once, at the very end, and sorts the combined result.</li>
+<li>UNION, INTERSECT and MINUS remove duplicates (Chapter 6). In Oracle they all have equal precedence and are evaluated left to right; use parentheses to force another order.</li>
+</ul>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+<h3>Try it in SQL</h3>
+<p>All exercises use the computer-products database (textbook data, including Printer).</p>
+<div id="c1"></div><div id="c2"></div><div id="c3"></div><div id="c4"></div><div id="c5"></div><div id="c6"></div>
+
+<h3>Exam questions</h3>
+<div class="exam">
+  <div class="exam-src">DB QB · 20-21 5a · 15 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-2 | 2020–21 · 24 marks</div>
+  <div class="exam-q"><p>You have been analysing data from a social networking site and have derived the following relation which captures topics discussed by various users: <code>Discussion(user1, user2, topic)</code>. The relation contains a tuple (u1, u2, t) every time a user u1 discussed a topic t with user u2. To avoid duplicate entries, user1 always precedes user2 in alphabetical order.</p>
+  <p>(a) Write a SQL query that returns all topics discussed by Pori and Himu but not discussed by Pori and Misir Ali.<br>(b) Write a SQL query that returns the number of topics discussed by more than 10 pairs of users.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><strong>Reading the schema.</strong> Each pair is stored with the alphabetically smaller name in user1. 'Himu' &lt; 'Pori', so their discussions are stored as user1 = 'Himu', user2 = 'Pori'. 'Misir Ali' &lt; 'Pori', so those are stored as user1 = 'Misir Ali', user2 = 'Pori'. Also note "a tuple <em>every time</em>": the same (pair, topic) can occur many times.</p>
+    <p><strong>(a)</strong> A set difference: topics of the first pair minus topics of the second pair. MINUS also removes the repeated topics.</p>
+<pre>SELECT topic FROM Discussion
+WHERE  user1 = 'Himu' AND user2 = 'Pori'
+MINUS
+SELECT topic FROM Discussion
+WHERE  user1 = 'Misir Ali' AND user2 = 'Pori';</pre>
+    <p><strong>(b)</strong> For each topic, count the <em>distinct</em> pairs that discussed it, keep the topics with more than 10 pairs, then count those topics. Grouping and HAVING are taught in <a href="../i10/03-group-by-having.html">Lecture 10</a>; the idea is "one group per topic, then a condition on the group".</p>
+<pre>SELECT COUNT(*) AS num_topics
+FROM  (SELECT topic
+       FROM  (SELECT DISTINCT user1, user2, topic FROM Discussion)
+       GROUP BY topic
+       HAVING COUNT(*) > 10);</pre>
+    <p>The innermost DISTINCT reduces repeated discussions of the same pair and topic to one row, so COUNT(*) per topic counts pairs, not discussions. An equivalent HAVING is <code>COUNT(DISTINCT user1 || '/' || user2) &gt; 10</code> on the raw table.</p>
+    <p>Note: the question bank's answer for (b) groups the raw table and uses <code>HAVING COUNT(*) &gt; 10</code>. That counts <em>discussions</em>, and the question says there is a tuple every time a pair discusses a topic, so a single pair talking about one topic eleven times would wrongly count. It also writes <code>) AS PopularTopics</code>, and Oracle does not allow AS before a subquery alias. On the sample data below (invented: 8 users, 4 topics), the topic "exams" has 16 tuples but only 9 distinct pairs: the correct answer is 2 (cricket, politics), the bank's query gives 3.</p>
+    <div id="ex-disc-a"></div>
+    <div id="ex-disc-b"></div>
+  </div></details>
+</div>
+
+<div class="key"><p><strong>Summary:</strong> UNION, INTERSECT and MINUS (EXCEPT in standard SQL) combine the results of two complete queries that are union-compatible (same number of columns, compatible types). UNION gives rows in either, INTERSECT rows in both, MINUS rows in the first but not the second. They answer "or", "both" and "but not" questions that span different rows or different tables, which a single WHERE clause cannot express. All three remove duplicates.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/sqlplay.js"></script>
+<script src="../i08/lecture.js"></script>
+<script>
+sqlTables('#tabs', PCDB, ['Product', 'PC', 'Laptop']);
+// Venn diagram: PC makers vs laptop makers
+const venn = (mode, cap) => {
+  const L = { cx: 190, cy: 120, r: 95 }, R = { cx: 310, cy: 120, r: 95 };
+  const circ = (c, cls, extra = '') => `<circle cx="${c.cx}" cy="${c.cy}" r="${c.r}" class="${cls}" ${extra}/>`;
+  let fill = '';
+  if (mode === 'union') fill = circ(L, 'cell-hl') + circ(R, 'cell-hl');
+  if (mode === 'inter') fill = `<clipPath id="cpR"><circle cx="${R.cx}" cy="${R.cy}" r="${R.r}"/></clipPath>` + circ(L, 'cell-hl', 'clip-path="url(#cpR)"');
+  if (mode === 'minus') fill = `<clipPath id="cpR2"><circle cx="${R.cx}" cy="${R.cy}" r="${R.r}"/></clipPath>` + circ(R, 'cell-hl') + `<circle cx="${L.cx}" cy="${L.cy}" r="${L.r}" style="fill:var(--plate)" clip-path="url(#cpR2)"/>`;
+  const on = { union: 'ABCDEFG', inter: 'ABE', minus: 'FG', none: '' }[mode];
+  const lab = (t, x, y) => `<text x="${x}" y="${y}" text-anchor="middle" class="big ${on.includes(t) ? 'red' : ''}" style="font-size:18px">${t}</text>`;
+  return `<svg viewBox="0 0 500 250" width="500" role="img" aria-label="Venn diagram of PC makers and laptop makers">${fill}
+    <circle cx="${L.cx}" cy="${L.cy}" r="${L.r}" class="s-fg"/><circle cx="${R.cx}" cy="${R.cy}" r="${R.r}" class="s-fg"/>
+    <text x="150" y="16" text-anchor="middle" class="lbl">makers of PCs</text><text x="350" y="16" text-anchor="middle" class="lbl">makers of laptops</text>
+    ${lab('C', 140, 105)}${lab('D', 150, 150)}${lab('A', 250, 90)}${lab('B', 250, 125)}${lab('E', 250, 160)}${lab('F', 350, 105)}${lab('G', 345, 150)}
+    <text x="250" y="240" text-anchor="middle" class="lbl">${cap}</text></svg>`;
+};
+stepper('#venn', [
+  { html: venn('none', 'Product rows with type pc: makers A B C D E · type laptop: A B E F G'), cap: 'The two sets being combined: makers of PCs (left) and makers of laptops (right). A, B and E are in both.' },
+  { html: venn('union', 'UNION: A B C D E F G'), cap: '<b>UNION</b>: makers of PCs or laptops (or both): 7 makers. Each appears once even though A, B and E are on both sides.' },
+  { html: venn('inter', 'INTERSECT: A B E'), cap: '<b>INTERSECT</b>: makers in both sets (slide 28): A, B, E.' },
+  { html: venn('minus', 'laptop MINUS pc: F G'), cap: '<b>MINUS</b>: laptop makers that are not PC makers (slide 30): F, G. Reversing the order (pc MINUS laptop) would give C, D.' },
+]);
+sqlPlay('#p26', { setup: PCDB, query: "SELECT PC.model, PC.price\nFROM   Product, PC\nWHERE  Product.model = PC.model\nAND    Product.maker = 'B'\nUNION\nSELECT Laptop.model, Laptop.price\nFROM   Product, Laptop\nWHERE  Product.model = Laptop.model\nAND    Product.maker = 'B';", note: 'Slide 26: 4 rows.' });
+sqlPlay('#p28', { setup: PCDB, query: "SELECT maker FROM Product WHERE type = 'pc'\nINTERSECT\nSELECT maker FROM Product WHERE type = 'laptop';", note: 'Slide 28: A, B, E.' });
+sqlPlay('#p30', { setup: PCDB, query: "SELECT maker FROM Product WHERE type = 'laptop'\nMINUS\nSELECT maker FROM Product WHERE type = 'pc';", note: 'Slide 30: F, G. (The playground translates MINUS to SQLite\'s EXCEPT.)' });
+flashcards('#cards', [
+  { f: 'UNION', b: 'Rows in either result (or both), duplicates removed.' },
+  { f: 'INTERSECT', b: 'Rows in both results, duplicates removed.' },
+  { f: 'MINUS', b: 'Rows in the first result but not the second. Oracle\'s name for standard EXCEPT.' },
+  { f: 'Union-compatible', b: 'Same number of columns with compatible types; names come from the first query.' },
+  { f: 'Where can ORDER BY go in a set query?', b: 'Only once, at the end; it sorts the combined result.' },
+  { f: 'Why not WHERE type = \'pc\' AND type = \'laptop\'?', b: 'WHERE looks at one row; no row has both types. "Both" needs INTERSECT, a self-join or a subquery.' },
+]);
+quiz('#quiz', [
+  { q: 'Which pair of queries is NOT union-compatible?', opts: ['SELECT model, price FROM PC / SELECT model, price FROM Laptop', 'SELECT maker FROM Product / SELECT type FROM Printer', 'SELECT model FROM PC / SELECT model, price FROM Laptop', 'SELECT speed FROM PC / SELECT speed FROM Laptop'], a: 2, why: 'One column versus two.' },
+  { q: 'Laptop makers {A,B,E,F,G}, PC makers {A,B,C,D,E}. What is pc MINUS laptop?', opts: ['{F, G}', '{C, D}', '{A, B, E}', '{}'], a: 1, why: 'PC makers that are not laptop makers.' },
+  { q: 'What is Oracle\'s keyword for set difference?', opts: ['EXCEPT only', 'MINUS', 'DIFFERENCE', 'NOT IN'], a: 1, why: 'MINUS (Oracle 21c also accepts EXCEPT).' },
+  { q: 'SELECT maker FROM Product WHERE type = \'pc\' AND type = \'laptop\' returns…', opts: ['A, B, E', 'every maker', 'no rows', 'an error'], a: 2, why: 'No single row satisfies both equalities.' },
+  { q: 'Slide 26 uses UNION of two joins rather than one join of Product, PC and Laptop because…', opts: ['Oracle cannot join three tables', 'a model is never both a PC and a laptop, so the 3-way join is empty', 'UNION is faster', 'PC and Laptop have different keys'], a: 1, why: 'The two halves describe disjoint sets of models.' },
+]);
+ask('#try1', { q: 'How many makers make PCs or printers (or both)? (PC makers A–E, printer makers D, E, H.)', a: 6, why: '{A, B, C, D, E} ∪ {D, E, H} = {A, B, C, D, E, H}.' });
+sqlCheck('#c1', { setup: PCDB, task: '1. (Easy) List the models of all PCs and all laptops (one column).', solution: 'SELECT model FROM PC UNION SELECT model FROM Laptop;' });
+sqlCheck('#c2', { setup: PCDB, task: '2. List the makers that make both laptops and printers.', solution: "SELECT maker FROM Product WHERE type = 'laptop' INTERSECT SELECT maker FROM Product WHERE type = 'printer';" });
+sqlCheck('#c3', { setup: PCDB, task: '3. (BUET QBank, CSE 303 2015–16 (a)) Find those manufacturers that sell Laptops, but not PCs or Printers.', solution: "SELECT maker FROM Product WHERE type = 'laptop' MINUS SELECT maker FROM Product WHERE type IN ('pc', 'printer');", hint: 'One MINUS whose second half covers both pc and printer.' });
+sqlCheck('#c4', { setup: PCDB, task: '4. List the model and price of every product (PC, laptop or printer) made by maker E.', solution: "SELECT PC.model, PC.price FROM Product, PC WHERE Product.model = PC.model AND maker = 'E' UNION SELECT Laptop.model, Laptop.price FROM Product, Laptop WHERE Product.model = Laptop.model AND maker = 'E' UNION SELECT Printer.model, Printer.price FROM Product, Printer WHERE Product.model = Printer.model AND maker = 'E';", hint: 'Three joins glued with two UNIONs.' });
+sqlCheck('#c5', { setup: PCDB, task: '5. List the speeds (GHz) that occur both in some PC and in some laptop.', solution: 'SELECT speed FROM PC INTERSECT SELECT speed FROM Laptop;' });
+sqlCheck('#c6', { setup: PCDB, task: '6. (Exam style) Find the models of all PCs and laptops that cost less than 700, with their price, sorted by price (cheapest first), ties by model.', solution: 'SELECT model, price FROM PC WHERE price < 700 UNION SELECT model, price FROM Laptop WHERE price < 700 ORDER BY price, model;', ordered: true, hint: 'ORDER BY goes once, at the very end, and can use the column name price.' });
+// exam: Discussion data (invented)
+const users = ['Asha', 'Bappi', 'Himu', 'Kona', 'Misir Ali', 'Nila', 'Pori', 'Rupa'];
+const pairs = []; for (let i = 0; i < users.length; i++) for (let j = i + 1; j < users.length; j++) pairs.push([users[i], users[j]]);
+const ins = [];
+const add = (p, t, times = 1) => { for (let k = 0; k < times; k++) ins.push(`INSERT INTO Discussion VALUES ('${p[0]}', '${p[1]}', '${t}');`); };
+pairs.slice(0, 12).forEach(p => add(p, 'cricket'));
+pairs.slice(10, 21).forEach(p => add(p, 'politics', 1));
+pairs.slice(3, 11).forEach((p, k) => add(p, 'exams', k < 6 ? 2 : 1));
+pairs.slice(20, 25).forEach(p => add(p, 'movies'));
+add(['Himu', 'Pori'], 'books', 3); add(['Himu', 'Pori'], 'music'); add(['Himu', 'Pori'], 'exams', 2); add(['Himu', 'Pori'], 'cricket');
+add(['Misir Ali', 'Pori'], 'books'); add(['Misir Ali', 'Pori'], 'mysteries');
+const DISC = 'CREATE TABLE Discussion (user1 VARCHAR2(20), user2 VARCHAR2(20), topic VARCHAR2(20));\n' + ins.join('\n');
+sqlCheck('#ex-disc-a', { setup: DISC, task: '(a) Topics discussed by Pori and Himu but not by Pori and Misir Ali. (Invented data.)', solution: "SELECT topic FROM Discussion WHERE user1 = 'Himu' AND user2 = 'Pori' MINUS SELECT topic FROM Discussion WHERE user1 = 'Misir Ali' AND user2 = 'Pori';" });
+sqlCheck('#ex-disc-b', { setup: DISC, task: '(b) The number of topics discussed by more than 10 distinct pairs of users. (Invented data; the answer is one number.)', solution: 'SELECT COUNT(*) AS num_topics FROM (SELECT topic FROM (SELECT DISTINCT user1, user2, topic FROM Discussion) GROUP BY topic HAVING COUNT(*) > 10);' });
+</script>
+</body>
+</html>

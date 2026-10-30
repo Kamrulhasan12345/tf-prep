@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rules About FDs · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 01 (Sukarna) · Chapter 4 · Slides 20–23 · Book §3.2.1–3.2.3, §3.2.6</div>
+<h1>Reasoning About FDs: Transitivity, Splitting, Combining, Trivial FDs</h1>
+<p class="lede">Some FDs follow from others. This chapter proves the transitive rule with two tuples, shows why right sides can be split and combined while left sides cannot (with a counterexample table), and defines trivial FDs.</p>
+
+<h2>1. Why reason about FDs?</h2>
+<p>A designer writes down some FDs, but the relation then satisfies many more FDs that follow from them. We need those hidden FDs to find keys and to check normal forms. The textbook says an FD <i>f</i> <b class="term">follows from</b> a set S of FDs if every relation instance that satisfies all the FDs in S also satisfies <i>f</i>. Each rule in this chapter is a shortcut for proving that.</p>
+
+<h2>2. The transitive rule (slide 20)</h2>
+<p class="formula">If A → B and B → C hold in R(A, B, C), then A → C holds.</p>
+<p><strong>Proof (slide 20).</strong> Take any two tuples that agree on A, say (a, b₁, c₁) and (a, b₂, c₂). By A → B they agree on B, so b₁ = b₂. Now they agree on B, so by B → C they agree on C: c₁ = c₂. We started from “agree on A” and ended at “agree on C”. Since the two tuples were arbitrary, A → C holds.</p>
+<figure>
+<span class="anim-tag">Animation: visual proof</span>
+<div id="trans"></div>
+</figure>
+<p>The general form (book §3.2.6): if A₁…Aₙ → B₁…Bₘ and B₁…Bₘ → C₁…Cₖ, then A₁…Aₙ → C₁…Cₖ. The textbook's example: a relation about movies and their studios has <code>title year → studioName</code> (a movie has one studio) and <code>studioName → studioAddr</code> (a studio has one address). By transitivity, <code>title year → studioAddr</code>: a movie determines the address of its studio.</p>
+
+<h2>3. Splitting and combining right sides (slides 21–22)</h2>
+<dl class="def">
+  <dt>Splitting rule</dt><dd>A₁A₂…Aₙ → B₁B₂…Bₘ can be replaced by the m FDs A₁A₂…Aₙ → Bᵢ, for i = 1, 2, …, m.</dd>
+  <dt>Combining rule</dt><dd>The m FDs A₁A₂…Aₙ → Bᵢ (i = 1, …, m) can be replaced by the single FD A₁A₂…Aₙ → B₁B₂…Bₘ.</dd>
+</dl>
+<p>Both directions are safe, so the two sets of FDs are <em>equivalent</em>: any instance satisfying one set satisfies the other. Reason: “agree on the A's implies agree on B₁ and on B₂ and … on Bₘ” says exactly the same as “agree on the A's implies agree on all the B's”. Slide 22's example:</p>
+<figure>
+<svg viewBox="0 0 700 130" width="700" role="img" aria-label="three FDs combine into one and split back">
+  <text x="20" y="34" class="big">title year → length</text>
+  <text x="20" y="64" class="big">title year → genre</text>
+  <text x="20" y="94" class="big">title year → studioName</text>
+  <path d="M240 50 H330" class="s-acc" marker-end="url(#m-acc)"/><text x="285" y="42" text-anchor="middle" class="lbl acc">combine</text>
+  <path d="M330 78 H240" class="s-grn" marker-end="url(#m-grn)"/><text x="285" y="96" text-anchor="middle" class="lbl grn">split</text>
+  <text x="345" y="68" class="big">title year → length genre studioName</text>
+</svg>
+<figcaption><b>Figure 1.</b> Splitting and combining act on the <em>right</em> side only. Both forms say the same thing.</figcaption>
+</figure>
+
+<h3>Left sides cannot be split</h3>
+<p>The slide warns: <code>title year → length</code> is <strong>not</strong> equivalent to the pair <code>title → length</code> and <code>year → length</code>. The left side is a <em>combination</em>: only the pair (title, year) identifies a movie. A legal instance shows the difference:</p>
+<figure>
+<div id="nosplit"></div>
+<figcaption><b>Figure 2.</b> A legal instance of Movies1 (King Kong was really made in 1933 and remade in 2005, with different lengths; the second row of 1977 is made up). It satisfies title year → length, yet two rows agree on title and differ on length, and two rows agree on year and differ on length.</figcaption>
+</figure>
+<p>Rows 1 and 2 share the title King Kong but have different lengths, so <code>title → length</code> fails. Rows 3 and 4 share the year 1977 but have different lengths, so <code>year → length</code> fails. Yet no two rows share both title and year, so <code>title year → length</code> holds. The FD with the combined left side is weaker (easier to satisfy) than each split piece.</p>
+
+<h2>4. Trivial FDs (slide 23)</h2>
+<dl class="def">
+  <dt>Trivial FD</dt><dd>A₁A₂…Aₙ → B₁B₂…Bₘ is trivial if {B₁, …, Bₘ} ⊆ {A₁, …, Aₙ}: the right side is a subset of the left side. Examples: <code>title year → title</code>, <code>title year → year</code>.</dd>
+  <dt>Nontrivial / completely nontrivial</dt><dd>Nontrivial: at least one B is not among the A's. Completely nontrivial (book): none of the B's is among the A's.</dd>
+</dl>
+<p>A trivial FD holds in <em>every</em> relation: if two tuples agree on all the A's, they certainly agree on any subset of the A's. It says nothing about the data, so normal-form tests ignore trivial FDs.</p>
+<p><strong>Trivial dependency rule.</strong> A₁…Aₙ → B₁…Bₘ is equivalent to A₁…Aₙ → C₁…Cₖ, where the C's are the B's that are <em>not</em> among the A's. We may drop from the right side anything that is already on the left. For example, <code>title year → year length</code> is equivalent to <code>title year → length</code>.</p>
+<figure>
+<svg viewBox="0 0 560 206" width="560" role="img" aria-label="trivial dependency rule diagram">
+  <path d="M80 30 V180 M240 30 V180 M410 30 V180" class="s-fg dash"/>
+  <path d="M86 24 H234" class="s-fg" marker-end="url(#m-fg)"/><text x="160" y="18" text-anchor="middle" class="big">A's</text>
+  <path d="M186 50 H404" class="s-acc" marker-end="url(#m-acc)"/><text x="295" y="44" text-anchor="middle" class="big acc">B's</text>
+  <path d="M246 76 H404" class="s-grn" marker-end="url(#m-grn)"/><text x="290" y="70" text-anchor="middle" class="big grn">C's</text>
+  <path d="M180 46 V180" class="s-acc dash"/>
+  <text x="54" y="112" class="big">t</text><rect x="70" y="94" width="460" height="28" class="cell"/>
+  <rect x="80" y="94" width="160" height="28" class="cell-hl"/><rect x="240" y="94" width="170" height="28" class="cell-new"/>
+  <text x="54" y="162" class="big">u</text><rect x="70" y="144" width="460" height="28" class="cell"/>
+  <rect x="80" y="144" width="160" height="28" class="cell-hl"/><rect x="240" y="144" width="170" height="28" class="cell-new"/>
+  <text x="84" y="194" class="lbl">t, u agree on the A's</text><text x="250" y="194" class="lbl grn">→ must agree on the C's</text>
+</svg>
+<figcaption><b>Figure 3.</b> Slide 23's picture. The B's overlap the A's. The part of the B's inside the A's (between the blue dashes) is free: agreement there is automatic. Only the C's (the B's outside the A's) carry information.</figcaption>
+</figure>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+
+<div class="key"><p><strong>Summary:</strong> FDs imply other FDs. Transitivity: X → Y and Y → Z give X → Z (two tuples that agree on X agree on Y, hence on Z). The right side of an FD may be split into single attributes or combined freely; the left side may not, because a combination of attributes can be unique when no single attribute is. A trivial FD has its right side inside its left side; it always holds, and right-side attributes that also appear on the left can be dropped.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="lecture.js"></script>
+<script>
+const H = ['A', 'B', 'C'];
+const two = (r1, r2, cell) => inst(H, [r1, r2], { cell });
+stepper('#trans', [
+  { html: two(['a', 'b₁', 'c₁'], ['a', 'b₂', 'c₂'], { '0,0': 'hl', '1,0': 'hl' }), cap: 'Given A → B and B → C. Take any two tuples that agree on A (orange). We do not yet know anything about B or C.' },
+  { html: two(['a', 'b', 'c₁'], ['a', 'b', 'c₂'], { '0,0': 'hl', '1,0': 'hl', '0,1': 'good', '1,1': 'good' }), cap: 'Apply <b>A → B</b>: they agree on A, so they agree on B. b₁ = b₂; call it b.' },
+  { html: two(['a', 'b', 'c'], ['a', 'b', 'c'], { '0,0': 'hl', '1,0': 'hl', '0,1': 'hl', '1,1': 'hl', '0,2': 'good', '1,2': 'good' }), cap: 'Apply <b>B → C</b>: they now agree on B, so they agree on C. c₁ = c₂.' },
+  { html: two(['a', 'b', 'c'], ['a', 'b', 'c'], { '0,0': 'hl', '1,0': 'hl', '0,2': 'good', '1,2': 'good' }), cap: 'Agreeing on A forced agreement on C, for any two tuples. So <b>A → C</b> holds.' },
+]);
+$('#nosplit').innerHTML = inst(['title', 'year', 'length'], [['King Kong', '1933', '100'], ['King Kong', '2005', '187'], ['Star Wars', '1977', '124'], ['Movie Q', '1977', '90']],
+  { cell: { '0,0': 'hl', '1,0': 'hl', '0,2': 'bad', '1,2': 'bad', '2,1': 'hl', '3,1': 'hl', '2,2': 'bad', '3,2': 'bad' } });
+
+flashcards('#cards', [
+  { f: 'Transitive rule', b: 'X → Y and Y → Z imply X → Z.' },
+  { f: 'Splitting rule', b: 'X → B₁…Bₘ can be replaced by X → B₁, …, X → Bₘ.' },
+  { f: 'Combining rule', b: 'X → B₁, …, X → Bₘ can be replaced by X → B₁…Bₘ.' },
+  { f: 'Can a left side be split?', b: 'No. AB → C does not imply A → C or B → C.' },
+  { f: 'Trivial FD', b: 'Right side ⊆ left side, e.g. title year → year. Holds in every relation.' },
+  { f: 'Trivial dependency rule', b: 'Drop right-side attributes that also appear on the left: AB → BC ≡ AB → C.' },
+]);
+quiz('#quiz', [
+  { q: 'Given A → B and B → C, which FD follows?', opts: ['C → A', 'A → C', 'B → A', 'C → B'], a: 1, why: 'Transitivity.' },
+  { q: '<code>title year → length</code> implies…', opts: ['title → length', 'year → length', 'title year → length (only itself and weaker forms)', 'both title → length and year → length'], a: 2, why: 'A left side cannot be split.' },
+  { q: 'Which FD is trivial?', opts: ['A → B', 'AB → A', 'A → AB', 'AB → C'], a: 1, why: 'Its right side {A} is inside its left side {A, B}. A → AB is nontrivial (B is new).' },
+  { q: 'AB → BCD is equivalent to…', opts: ['AB → CD', 'A → CD', 'B → CD', 'AB → B'], a: 0, why: 'Trivial dependency rule: drop B from the right side.' },
+  { q: 'Splitting X → YZ into X → Y and X → Z gives a set that is…', opts: ['weaker', 'stronger', 'equivalent', 'unrelated'], a: 2, why: 'Splitting and combining right sides preserve meaning.' },
+]);
+ask('#try1', { q: 'Split <code>AB → CDE</code> into FDs with one attribute on the right. How many FDs do you get?', a: 3, why: 'AB → C, AB → D, AB → E.' });
+</script>
+</body>
+</html>

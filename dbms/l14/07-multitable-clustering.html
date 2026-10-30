@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Multitable Clustering · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 14 · Chapter 7 · Slides 18–19</div>
+<h1>Multitable Clustering File Organization</h1>
+<p class="lede">Normally each table gets its own file. Here, rows from two tables that are often used together are stored side by side in one file, so a join can read them in one go.</p>
+
+<h2>1. The idea</h2>
+
+<p>Chapter 1 assumed that different relations go in different files. That is the <b class="term">single-table file organization</b>: one file for <code>department</code>, another for <code>instructor</code>. It is simple, but think about how the two tables are used. Very often a query wants a department <em>together with</em> its instructors, which is a <b class="term">join</b>: combining rows from two tables where a column matches (here, <code>dept_name</code>).</p>
+
+<p>A <b class="term">multitable clustering file organization</b> stores several relations in one file, and places related rows next to each other. Each department record is immediately followed by the records of the instructors who belong to it. “Clustering” means grouping things that belong together physically close on disk.</p>
+
+<figure>
+<div class="figrow">
+  <div><div class="figlabel">department (its own file)</div><div id="dep"></div></div>
+  <div><div class="figlabel">instructor (its own file)</div><div id="ins"></div></div>
+</div>
+<figcaption><b>Figure 1.</b> The two relations from the slide, stored the usual way in two separate files.</figcaption>
+</figure>
+
+<figure>
+<div id="clu"></div>
+<figcaption><b>Figure 2.</b> Multitable clustering of department and instructor in one file. Each department record (orange) is followed by its instructors. Katz and Brandt were moved up next to Srinivasan because they are also in Comp. Sci.</figcaption>
+</figure>
+
+<h2>2. The slide's example query</h2>
+
+<pre>SELECT ID, building
+FROM instructor i, department d
+WHERE i.dept_name = d.dept_name
+  AND dept_name = 'Comp. Sci.';</pre>
+
+<p>In words: list each Comp. Sci. instructor's ID together with the building of the Comp. Sci. department. The answer is (10101, Taylor), (45565, Taylor), (83821, Taylor).</p>
+
+<div class="q">
+<h4>Example (worked answer): how is this query processed?</h4>
+<p><strong>(a) Single-table file organization.</strong></p>
+<ol>
+  <li>Seek to the department file and read its blocks until the Comp. Sci. row is found. Remember building = Taylor.</li>
+  <li>Seek to the instructor file, which is somewhere else on disk.</li>
+  <li>Scan the instructor file and keep every row with dept_name = Comp. Sci. Srinivasan, Katz and Brandt are scattered between Physics instructors, so in a real table they could be spread over many blocks.</li>
+  <li>Pair each match with Taylor and output.</li>
+</ol>
+<p>Cost: at least 2 seeks (one per file), plus block transfers for both files.</p>
+
+<p><strong>(b) Multitable clustering file organization.</strong></p>
+<ol>
+  <li>Seek to the clustered file and find the Comp. Sci. department record.</li>
+  <li>Its instructors are the records directly after it, in the same block (or the next one). Read them until the next department record (Physics) appears.</li>
+  <li>Output each instructor's ID with Taylor.</li>
+</ol>
+<p>Cost: 1 seek, and usually a single block transfer, because everything the query needs is stored together.</p>
+</div>
+
+<h2>3. Strengths and weaknesses (slide 19)</h2>
+
+<h3>Good for</h3>
+<p>Queries that compute <code>department ⨝ instructor</code> (the symbol ⨝ means join), and queries about <em>one</em> department and its instructors. Both read rows that are already sitting next to each other.</p>
+
+<h3>Bad for</h3>
+<p>Queries that involve <em>only</em> department, such as <code>SELECT * FROM department</code>. In a separate file, all department rows would sit together in a few blocks. In the clustered file, department rows are spread out with instructor rows in between, so the scan must read every block of the file and skip all the instructor records. The more instructors per department, the worse this gets.</p>
+
+<h3>Results in variable-size records</h3>
+<p>The file now contains two kinds of record: a department record (3 fields) and an instructor record (4 fields). They have different sizes, so this is case (a) from Chapter 4: several record types in one file. The file must use variable-length techniques such as the slotted page, and each record must say which relation it belongs to.</p>
+
+<h3>Pointer chains</h3>
+<p>To soften the “bad for department-only queries” problem, the slide suggests adding <b class="term">pointer chains</b>. Each department record stores the address of the next department record. A department-only scan follows the chain and jumps from department to department without looking at the instructor records in between.</p>
+
+<figure>
+<div id="chain"></div>
+<figcaption><b>Figure 3.</b> A pointer chain links the department records (as in the slide's curved arrow). Scanning departments follows the chain: Comp. Sci. → Physics → end.</figcaption>
+</figure>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+
+<h3>Exam questions</h3>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 24-25 8c · 10 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-1 | 2024–25 · 10 marks</div>
+  <div class="exam-q"><p>What is the purpose of using multiple clustering file organization? Give an example of its usage. Mention the disadvantages of this organization.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+<p><strong>Purpose.</strong> A multitable clustering file organization stores records of two or more relations in one file, and places each record next to the records of the other relation it joins with (on a common attribute, the cluster key). Its purpose is to make the frequent join of those relations, and lookups of one “parent” together with its “children”, cost as few block reads as possible: the matching records are already in the same block.</p>
+<p><strong>Example.</strong> In a university database, <code>department</code> and <code>instructor</code> are joined on <code>dept_name</code> all the time (“show the Comp. Sci. department with its instructors”). Clustering stores the Comp. Sci. department record followed directly by Srinivasan, Katz and Brandt, then the Physics record followed by Gold (Figure 2). The query</p>
+<pre>SELECT ID, building FROM instructor i, department d
+WHERE i.dept_name = d.dept_name AND d.dept_name = 'Comp. Sci.';</pre>
+<p>then reads one block after one seek, instead of seeking to and scanning two separate files.</p>
+<p><strong>Disadvantages.</strong></p>
+<ul>
+<li>Queries on one relation alone become slower. <code>SELECT * FROM department</code> must read every block of the clustered file and skip the instructor records between department records (pointer chains reduce this).</li>
+<li>The file holds records of different types and sizes, so it needs variable-length record handling (slotted pages) and a type tag per record.</li>
+<li>Only joins on the cluster key benefit. Queries on other attributes see a spread-out, larger file.</li>
+<li>Insertions are harder: a new instructor must go next to its department, which may need moving records or overflow blocks; a department with many instructors spans several blocks.</li>
+</ul>
+<p>The bank's answer is correct.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 20-21 1c · 10 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-2 | 2020–21 · 10 marks</div>
+  <div class="exam-q"><p>The department and instructor relations are given in the following figures respectively. Show the multi-table clustering file organization for these relations and explain the types of queries for which this organization will be efficient and the type for which it is inefficient.</p><p>(The two relations are the ones in Figure 1.)</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+<p><strong>Organization.</strong> Each department record is followed by the instructor records with the same dept_name: (Comp. Sci., Taylor, 100000), (10101, Srinivasan, Comp. Sci., 65000), (45565, Katz, Comp. Sci., 75000), (83821, Brandt, Comp. Sci., 92000), (Physics, Watson, 70000), (33456, Gold, Physics, 87000). This is exactly Figure 2.</p>
+<p><strong>Efficient for:</strong> joins of department and instructor on dept_name (for example, every instructor with the building of their department), and queries about one department and its instructors (the Comp. Sci. example in Section 2). The matching records share a block, so one seek and usually one block transfer answers them.</p>
+<p><strong>Inefficient for:</strong> queries that use only one relation. <code>SELECT * FROM department</code> must scan the whole file, reading all instructor records just to skip them. A query on instructor alone, such as “all salaries above 80000”, also reads more blocks than a compact instructor file, because department records are mixed in. Pointer chains (Figure 3) help the department-only case.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2014–15 · 15 marks</div>
+  <div class="exam-q"><p>The relation student(student_id, name, dept_code, level, term) and department(dept_code, location, floors, type) are given (dept_code is PK of department and FK in student).</p>
+  <div class="figrow"><div><div class="figlabel">Figure 1: student</div><div id="q27s"></div></div><div><div class="figlabel">Figure 2: department</div><div id="q27d"></div></div></div>
+  <p>(a) Show the multitable clustering file structure for the given relations. Explain why executing SELECT * FROM department is more expensive in this structure.<br>(b) Show the multitable clustering file structure with pointer chain. How is the query in (a) executed faster in this structure?</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+<p><strong>(a)</strong> Each department record is followed by its students. To count block reads, assume 4 records fit in a block (any small number gives the same picture).</p>
+<figure><div id="q27c"></div></figure>
+<p>In separate files, the 2 department records would sit in 1 block, so <code>SELECT * FROM department</code> would read 1 block. In the clustered file they are records 0 and 7, separated by 6 student records, and nothing tells the scan where the next department record is. It must read all <strong>3 blocks</strong> and skip 9 student records. With hundreds of students per department, the department scan reads the whole (large) file instead of a few blocks.</p>
+<p><strong>(b)</strong> Add a pointer field to each department record that holds the address of the next department record (the last one holds null):</p>
+<figure><div id="q27p"></div></figure>
+<p>The scan reads block 0, outputs CSE, and follows CSE's pointer straight to the EEE record in block 1. EEE's pointer is null, so the scan stops. It reads <strong>2 blocks</strong> instead of 3 and never looks at block 2. In a real file, the blocks that hold only student records are skipped entirely, so the department scan costs about one block per department instead of the whole file. (Instructor records can be chained per department the same way.)</p>
+<p>The bank's answer is correct.</p>
+  </div></details>
+</div>
+
+<div class="key">
+<p><strong>Summary:</strong> multitable clustering stores related rows of several tables together in one file (each department followed by its instructors). Joins and single-department queries get much faster. Queries on department alone get slower, the file has mixed record sizes, and pointer chains can be added to jump between records of one relation.</p>
+</div>
+</main>
+<script src="../assets/book.js"></script>
+<script>
+recTable('#dep', [{ cells: ['Comp. Sci.', 'Taylor', '100000'] }, { cells: ['Physics', 'Watson', '70000'] }], ['dept_name', 'building', 'budget']);
+recTable('#ins', [
+  { cells: ['10101', 'Srinivasan', 'Comp. Sci.', '65000'] }, { cells: ['33456', 'Gold', 'Physics', '87000'] },
+  { cells: ['45565', 'Katz', 'Comp. Sci.', '75000'] }, { cells: ['83821', 'Brandt', 'Comp. Sci.', '92000'] }], ['ID', 'name', 'dept_name', 'salary']);
+const clustered = (side = {}) => [
+  { lab: 'department', cells: ['Comp. Sci.', 'Taylor', '100000', ''], cls: 'hl', side: side[0] },
+  { lab: 'instructor', cells: ['10101', 'Srinivasan', 'Comp. Sci.', '65000'] },
+  { lab: 'instructor', cells: ['45565', 'Katz', 'Comp. Sci.', '75000'] },
+  { lab: 'instructor', cells: ['83821', 'Brandt', 'Comp. Sci.', '92000'] },
+  { lab: 'department', cells: ['Physics', 'Watson', '70000', ''], cls: 'hl', side: side[4] },
+  { lab: 'instructor', cells: ['33456', 'Gold', 'Physics', '87000'] }];
+recTable('#clu', clustered(), ['', '', '', '']);
+recTable('#chain', clustered({ 0: '<span style="color:var(--red)">next dept → Physics row</span>', 4: '<span style="color:var(--red)">next dept → null</span>' }), ['', '', '', '']);
+document.querySelectorAll('#clu th, #chain th').forEach(th => th.remove());
+</script>
+<script>
+flashcards('#cards', [
+  { f: 'Single-table file organization', b: 'Each relation is stored in its own file.' },
+  { f: 'Multitable clustering', b: 'Records of several relations are stored in one file, with related records (e.g. a department and its instructors) next to each other.' },
+  { f: 'Cluster key', b: 'The attribute the clustered relations share and are joined on, here dept_name.' },
+  { f: 'Good for', b: 'department ⨝ instructor, and queries on one department with its instructors.' },
+  { f: 'Bad for', b: 'Queries on one relation alone, such as SELECT * FROM department.' },
+  { f: 'Pointer chain', b: 'Each record of one relation stores the address of the next record of the same relation, so a scan of that relation can skip the others.' },
+]);
+quiz('#quiz', [
+  { q: 'Why does a clustered department/instructor file need variable-length record handling?', opts: ['Because instructor names vary', 'Because records of two different types (and sizes) share the file', 'Because clustering compresses data', 'It does not'], a: 1,
+    why: 'Department and instructor records have different fields and sizes, case (a) of variable-length records.' },
+  { q: 'Which query benefits most from multitable clustering of department and instructor?', opts: ['SELECT * FROM department', 'SELECT avg(salary) FROM instructor', 'SELECT name, building FROM instructor NATURAL JOIN department WHERE dept_name = \'Physics\'', 'SELECT count(*) FROM department'], a: 2,
+    why: 'It joins the two relations on the cluster key and asks for one department, whose records are stored together.' },
+  { q: 'What does a pointer chain on department records speed up?', opts: ['Scans of department only', 'Joins', 'Inserting instructors', 'Updating salaries'], a: 0,
+    why: 'Following the chain jumps from department to department without reading the instructor records in between.' },
+  { q: 'For the slide query (Comp. Sci. instructors with building), what is the cost in the clustered file?', opts: ['2 seeks, scan both files', '1 seek and usually 1 block transfer', '1 seek per instructor', 'A full scan of the file'], a: 1,
+    why: 'The Comp. Sci. record and its instructors are stored together, normally in one block.' },
+]);
+ask('#try1', { q: 'A clustered file holds 50 departments, each followed by 39 instructors, 10 records per block (200 blocks). With a pointer chain, about how many blocks does SELECT * FROM department read (assume each department record is in a different block)?', a: 50,
+  hint: 'One block per department record.', why: 'The chain visits one block per department: 50 blocks instead of all 200.' });
+const STU = [['1205001', 'N11'], ['1205004', 'N12'], ['1205007', 'N13'], ['1205010', 'N14'], ['1205013', 'N15'], ['1205016', 'N16'], ['1204001', 'N21'], ['1204002', 'N22'], ['1204003', 'N23']]
+  .map(([id, n]) => [id, n, id.startsWith('1205') ? 'CSE' : 'EEE', '3', '1']);
+const DEP = [['CSE', 'ECE BUILDING', '12', 'A'], ['EEE', 'ME BUILDING', '6', 'B']];
+recTable('#q27s', STU.map((c, i) => ({ lab: `record ${i}`, cells: c })), ['student_id', 'name', 'dept', 'level', 'term']);
+recTable('#q27d', DEP.map(c => ({ cells: c })), ['dept_code', 'location', 'floors', 'type']);
+const q27rows = side => {
+  const order = [['d', 0], ...[0, 1, 2, 3, 4, 5].map(i => ['s', i]), ['d', 1], ...[6, 7, 8].map(i => ['s', i])];
+  return order.map(([t, i], k) => ({ lab: `block ${Math.floor(k / 4)} · ${t === 'd' ? 'department' : 'student'}`,
+    cells: t === 'd' ? [...DEP[i], ''] : STU[i], cls: t === 'd' ? 'hl' : '', side: t === 'd' ? side[i] : '' }));
+};
+const rd = t => `<span style="color:var(--red)">${t}</span>`;
+document.querySelector('#q27c').innerHTML = recTable(null, q27rows({}), ['', '', '', '', '']);
+document.querySelector('#q27p').innerHTML = recTable(null, q27rows({ 0: rd('next dept → block 1, EEE'), 1: rd('next dept → null') }), ['', '', '', '', '']);
+document.querySelectorAll('#q27c tr:first-child, #q27p tr:first-child').forEach(tr => tr.remove());
+['#q27c', '#q27p'].forEach(sel => { let prev = null; document.querySelectorAll(`${sel} tr`).forEach(tr => {
+  const b = tr.querySelector('td').textContent.slice(0, 7); if (prev !== null && b !== prev) tr.classList.add('blk'); prev = b; }); });
+</script>
+</body>
+</html>

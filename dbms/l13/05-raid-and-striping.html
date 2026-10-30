@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RAID and Disk Striping · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 13 · Chapter 5 · Slides 12–14 · Book §13.3.3</div>
+<h1>RAID and Disk Striping</h1>
+<p class="lede">Why databases use many disks at once, and the two ways of spreading data over them: bit-level and block-level striping. Answers the slides' “Find i-th byte?” question and the discussion of points 1 and 2.</p>
+
+<h2>1. RAID (slide 12)</h2>
+
+<p>Chapter 3 showed that one magnetic disk manages only 50–200 random reads per second, and that one disk failure loses everything on it. The answer to both problems is to use many disks together.</p>
+
+<dl class="def">
+  <dt>RAID: Redundant Arrays of Independent Disks</dt><dd>Disk organisation techniques that manage a large number of disks while giving the rest of the system the logical view of a <em>single</em> disk that has
+    <ul><li><strong>high capacity and high speed</strong>, by using multiple disks in parallel, and</li>
+    <li><strong>high reliability</strong>, by storing data redundantly, so that data can be recovered even if a disk fails.</li></ul></dd>
+  <dt>Array</dt><dd>A group of disks that the computer treats as one big disk.</dd>
+  <dt>Redundant</dt><dd>Storing extra information (copies or parity) that is not strictly needed, so that lost data can be rebuilt from what remains.</dd>
+</dl>
+<p>This chapter covers the speed half: <b class="term">striping</b>. Chapters 6–8 add the redundancy half.</p>
+
+<h2>2. Goals of parallelism (slide 13)</h2>
+
+<p>If one disk is slow, use eight of them at the same time. A supermarket with eight checkout lanes serves customers faster than one lane, but only if the customers spread out across the lanes. So the question is how to spread a table's data across the disks. The slide lists what parallelism should achieve:</p>
+
+<dl class="def">
+  <dt>Throughput: load-balance multiple small accesses</dt><dd><b class="term">Throughput</b> is how many requests the system finishes per second. <b class="term">Load balancing</b> means spreading the requests evenly so no disk is overloaded while others sit idle. Many small independent lookups should go to different disks and run at the same time.</dd>
+  <dt>Response time: parallelise large accesses</dt><dd><b class="term">Response time</b> is how long one request takes from start to finish. One big request, split among 8 disks, finishes roughly 8 times sooner.</dd>
+  <dt>Transfer rate: stripe data across multiple disks</dt><dd>With 8 disks streaming at once, the combined data-transfer rate is about 8 times that of one disk.</dd>
+</dl>
+
+<p>The technique is <b class="term">striping</b>: cut the data into pieces and deal the pieces out across the disks, like dealing cards around a table. The pieces lined up across all disks at the same position form a <b class="term">stripe</b>. Slide 13 cuts the data into bits; slide 14 cuts it into blocks.</p>
+
+<h2>3. Bit-level striping (slide 13)</h2>
+
+<dl class="def">
+  <dt>Bit-level striping</dt><dd>Split the bits of each byte across multiple disks. In an array of eight disks, write bit <i>i</i> of each byte to disk <i>i</i>.</dd>
+</dl>
+
+<p>The slide's student relation starts with the bytes <code>10101111</code>, <code>00000000</code>, <code>11111111</code>, … Watch the first two bytes being stored.</p>
+
+<figure>
+<span class="anim-tag">Animation</span>
+<div id="bitst"></div>
+</figure>
+
+<p>No single disk holds a whole byte. Each disk holds one “column” of bits: disk 0 has the first bit of every byte, disk 1 the second bit, and so on.</p>
+
+<h3>Good: reading everything (sequential access)</h3>
+<p><code>SELECT * FROM student;</code> reads the whole relation in order. All eight disks stream together, and in the time one disk delivers one bit, the eight deliver a whole byte. This is the slide's <em>“each access can read data at eight times the rate of a single disk (sequential access)”</em>.</p>
+
+<h3>Bad: finding one thing</h3>
+<p><code>SELECT * FROM student WHERE id = 05050;</code> wants one record, a few bytes in the middle of the relation. Every one of those bytes is split across all 8 disks.</p>
+
+<div class="q">
+<h4>Slide 13: “Find i-th byte?” (worked answer)</h4>
+<p>Byte <i>i</i> of the relation is stored as bit position <i>i</i> on each of the eight disks: its first bit is the <i>i</i>-th bit on disk 0, its second bit the <i>i</i>-th bit on disk 1, and so on. To read that one byte, <strong>all eight disks must seek to position <i>i</i> and rotate it under their heads</strong>, and the byte is complete only when the slowest of the eight has delivered its bit. So:</p>
+<ul>
+  <li>the access time is the <em>worst</em> of eight seeks and eight rotational latencies, which on average is longer than one disk's access time; and</li>
+  <li>all eight disks are busy serving this one tiny request, so no other request can run meanwhile.</li>
+</ul>
+<p>This is the slide's <em>“seek/access time worse than for a single disk”</em>. Since databases mostly do many small lookups, <em>bit-level striping is not used much any more</em>.</p>
+</div>
+
+<figure>
+<svg id="fig-bitseek" viewBox="0 0 600 190" width="600" role="img" aria-label="Bit-level lookup forces all 8 disks to seek"></svg>
+<figcaption><b>Figure 1.</b> Looking up one student with bit-level striping. All eight disks must seek (red), the request is only as fast as the slowest of them, and no disk is free for anyone else.</figcaption>
+</figure>
+
+<h2>4. Block-level striping (slide 14)</h2>
+
+<dl class="def">
+  <dt>Block-level striping</dt><dd>With <i>n</i> disks, block <i>i</i> of a file goes to disk (<i>i</i> mod <i>n</i>) + 1.</dd>
+  <dt>mod</dt><dd>The remainder after division: 10 mod 8 = 2, because 10 = 1 × 8 + 2. Like a clock, block numbers wrap around every <i>n</i> blocks.</dd>
+</dl>
+<p>The “+ 1” is there only because that formula numbers the disks 1 to <i>n</i>. The slide's pictures number the disks 0 to 7, so with them the rule is simply <strong>block <i>i</i> → disk <i>i</i> mod <i>n</i></strong>. This book uses 0-based disk numbers, as the slides' figures do.</p>
+
+<figure>
+<span class="anim-tag">Animation</span>
+<div id="blockst"></div>
+</figure>
+
+<div class="tbl"><table>
+<tr><th>Block</th><th>Calculation (n = 8)</th><th>Disk</th></tr>
+<tr><td>B0 … B7</td><td>0 mod 8 = 0, …, 7 mod 8 = 7</td><td>0 … 7 (one each)</td></tr>
+<tr><td>B8</td><td>8 mod 8 = 0</td><td>0 (wraps around)</td></tr>
+<tr><td>B13</td><td>13 mod 8 = 5</td><td>5</td></tr>
+<tr><td>B21</td><td>21 mod 8 = 5</td><td>5</td></tr>
+</table></div>
+
+<p>The key difference from bit-level striping: <strong>each block sits whole on one disk</strong>, so any record inside a block can be read from a single disk with a single seek.</p>
+
+<div class="q">
+<h4>Discussion (slide 14): explain points 1 and 2 of block-level striping</h4>
+<p><strong>Point 1: “Requests for different blocks can run in parallel if the blocks reside on different disks.”</strong> Suppose Alice runs <code>SELECT * FROM student WHERE id &gt;= 05005</code> and her rows are in block B3, while at the same moment Bob needs a row in B10. B3 is on disk 3 and B10 on disk 10 mod 8 = 2. Different disks, so both arms seek at the same time and both requests finish in about one access time. Neither waits for the other, and the other six disks remain free for more users. With bit-level striping, Alice's request alone would have occupied all eight disks. This is the <em>throughput</em> goal: small accesses are load-balanced across the disks.</p>
+<figure>
+<svg id="fig-p1" viewBox="0 0 600 200" width="600" role="img" aria-label="Two requests served by two different disks at the same time"></svg>
+<figcaption><b>Figure 2.</b> Point 1. Alice's request (blue) uses only disk 3, Bob's (green) only disk 2. They run simultaneously; six disks (grey) are still free.</figcaption>
+</figure>
+<p><strong>Point 2: “A request for a long sequence of blocks can utilize all disks in parallel.”</strong> <code>SELECT * FROM student</code> needs every block, B0 to B13. Consecutive blocks were dealt to different disks, so B0–B7 are read at the same moment by disks 0–7, and in the next round disks 0–5 read B8–B13. The relation arrives in 2 rounds instead of 14. This is the <em>response time</em> goal, and it gives the same benefit for big scans that bit-level striping gave.</p>
+<figure>
+<svg id="fig-p2" viewBox="0 0 600 262" width="600" role="img" aria-label="14 blocks: 14 rounds on one disk versus 2 rounds on 8 disks"></svg>
+<figcaption><b>Figure 3.</b> Point 2. Reading 14 blocks: one disk needs 14 rounds; eight striped disks need 2.</figcaption>
+</figure>
+</div>
+
+<h2>5. Bit-level versus block-level</h2>
+
+<div class="tbl"><table>
+<tr><th></th><th>Big scan<br><code>SELECT * FROM student</code></th><th>Small lookup<br><code>WHERE id = 05050</code></th><th>Many users at once</th></tr>
+<tr><th>Bit-level</th><td class="good">8× transfer rate</td><td class="bad">all 8 disks seek; slower than one disk</td><td class="bad">each request uses all disks</td></tr>
+<tr><th>Block-level</th><td class="good">all disks read in parallel</td><td class="good">1 disk, 1 seek</td><td class="good">requests spread across disks</td></tr>
+</table></div>
+
+<p>The textbook (§13.3.3, Example 13.5) puts numbers on point 2: striping a 1024-block relation over four Megatron 747 disks cuts the time to read it from about 139 ms to about 40 ms per disk, a speed-up of about three (not four, because the request must wait for the slowest of the four seeks).</p>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+
+<h3>Exam questions</h3>
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2010–11 · 5 marks</div>
+  <div class="exam-q"><p>Explain block level striping with an example of storing 1, 2, …, n logical blocks into a disk subsystem consisting of 8 disks.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><strong>Block-level striping</strong> divides a file into blocks and deals consecutive blocks round-robin over the disks, so each block is stored whole on one disk and consecutive blocks are on different disks. With 8 disks numbered 1 to 8 and blocks numbered from 1, block <i>i</i> goes to disk ((<i>i</i> − 1) mod 8) + 1. (With blocks numbered from 0, as on slide 14, block <i>i</i> goes to disk (<i>i</i> mod 8) + 1.)</p>
+    <div class="tbl"><table>
+      <tr><th></th><th>Disk 1</th><th>Disk 2</th><th>Disk 3</th><th>Disk 4</th><th>Disk 5</th><th>Disk 6</th><th>Disk 7</th><th>Disk 8</th></tr>
+      <tr><th>stripe 1</th><td>1</td><td>2</td><td>3</td><td>4</td><td>5</td><td>6</td><td>7</td><td>8</td></tr>
+      <tr><th>stripe 2</th><td>9</td><td>10</td><td>11</td><td>12</td><td>13</td><td>14</td><td>15</td><td>16</td></tr>
+      <tr><th>stripe 3</th><td>17</td><td>18</td><td>19</td><td>20</td><td>21</td><td>22</td><td>23</td><td>24</td></tr>
+      <tr><th>…</th><td colspan="8">block <i>n</i> is on disk ((<i>n</i> − 1) mod 8) + 1, in stripe ⌈<i>n</i>/8⌉</td></tr>
+    </table></div>
+    <p>For example, block 21 goes to disk (20 mod 8) + 1 = 5, in stripe 3.</p>
+    <p><strong>Benefits.</strong> (1) Requests for different blocks on different disks run in parallel, so many small requests are load-balanced and throughput rises. (2) A long sequential read uses all 8 disks at once, e.g. blocks 1–8 are read in one round, so the transfer rate is about 8 times that of one disk and response time drops. Unlike bit-level striping, a single-block lookup still needs only one disk and one seek.</p>
+    <p><strong>Limitation.</strong> Striping alone (RAID 0) has no redundancy: if any of the 8 disks fails, every stripe loses a block.</p>
+  </div></details>
+</div>
+
+<div class="key"><p><strong>Summary:</strong> RAID makes many disks look like one disk that is large, fast (parallel) and reliable (redundant). Striping spreads data over the disks. Bit-level striping puts bit i of every byte on disk i: 8× transfer rate for scans, but every lookup occupies all disks and waits for the slowest seek, so it is rarely used. Block-level striping puts block i on disk i mod n: big scans use all disks in parallel and small requests for blocks on different disks run side by side.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="lecture.js"></script>
+<script>
+// cylinder drawing (from the original striping page)
+function cyl(x, y, w, h, lines = [], cls = '') {
+  const rx = w / 2, ry = 7;
+  let s = `<g class="${cls}"><path class="cyl-body" d="M${x} ${y + ry} v${h} a${rx} ${ry} 0 0 0 ${w} 0 v${-h}"/>`;
+  s += `<ellipse class="cyl-top" cx="${x + rx}" cy="${y + ry}" rx="${rx}" ry="${ry}"/>`;
+  lines.forEach(([t, c], i) => { s += `<text x="${x + rx}" y="${y + ry + 26 + i * 22}" text-anchor="middle" class="big ${c || ''}">${t}</text>`; });
+  return s + '</g>';
+}
+function row(y, h, contents, classes = []) {
+  let s = '';
+  for (let d = 0; d < 8; d++) {
+    const x = 20 + d * 72;
+    s += cyl(x, y, 56, h, contents[d] || [], classes[d] || '');
+    s += `<text x="${x + 28}" y="${y + h + 30}" text-anchor="middle" class="lbl">disk ${d}</text>`;
+  }
+  return s;
+}
+// Animation: bit-level storing of two bytes
+(() => {
+  const b1 = '10101111', b2 = '00000000';
+  const fig = (k) => {   // k = 0 nothing, 1 first byte split, 2 first byte stored, 3 second byte stored
+    let s = `<text x="20" y="18" class="lbl">student relation: 10101111 00000000 11111111 …</text>`;
+    const cur = k >= 3 ? b2 : b1, cls = k >= 3 ? 'red' : '';
+    s += `<text x="20" y="40" class="lbl">${k === 0 ? '' : k >= 3 ? 'storing the 2nd byte:' : 'storing the 1st byte:'}</text>`;
+    if (k > 0) for (let d = 0; d < 8; d++) {
+      const cx = 48 + d * 72;
+      s += `<rect class="cell-plain" x="${cx - 14}" y="48" width="28" height="26"/><text x="${cx}" y="66" text-anchor="middle" class="big ${cls}">${cur[d]}</text>`;
+      s += `<text x="${cx}" y="88" text-anchor="middle" class="lbl">bit ${d}</text><path d="M${cx} 94 V118" class="s-fg" marker-end="url(#m-fg)"/>`;
+    }
+    const c = [...Array(8)].map((_, d) => [...(k >= 2 ? [[b1[d]]] : []), ...(k >= 3 ? [[b2[d], 'red']] : [])]);
+    return `<svg viewBox="0 0 600 290" width="600" role="img" aria-label="Bit-level striping of two bytes over 8 disks">${s}${row(124, 112, c)}</svg>`;
+  };
+  stepper('#bitst', [
+    { html: fig(0), cap: 'Eight disks, numbered 0 to 7. The student relation is one long sequence of bytes.' },
+    { html: fig(1), cap: 'The 1st byte, 10101111, is split into its 8 bits.' },
+    { html: fig(2), cap: 'Bit i goes to disk i: disk 0 gets 1, disk 1 gets 0, disk 2 gets 1, …, disk 7 gets 1.' },
+    { html: fig(3), cap: 'The 2nd byte, 00000000 (red), is split the same way and stored under the first. After n bytes, every disk holds n bits, one from each byte.' },
+  ], { interval: 2000 });
+})();
+// Figure 1: bit-level lookup
+(() => {
+  let s = `<text x="20" y="18" class="lbl">WHERE id = 05050 → the record's bits live on ALL 8 disks</text>`;
+  for (let d = 0; d < 8; d++) { const cx = 48 + d * 72; s += `<path d="M${cx} 30 L${cx} 58" class="s-red" marker-end="url(#m-red)"/><text x="${cx}" y="42" dx="6" class="lbl red">seek</text>`; }
+  s += row(62, 80, [...Array(8)].map(() => [['?', 'red']]), Array(8).fill('hiR'));
+  document.getElementById('fig-bitseek').innerHTML = s;
+})();
+// Animation: dealing blocks B0..B13 over 8 disks
+(() => {
+  const fig = k => {
+    const c = [...Array(8)].map((_, d) => { const l = []; if (d < k) l.push(['B' + d]); if (d + 8 < k) l.push(['B' + (d + 8), 'red']); return l; });
+    let s = `<text x="20" y="18" class="lbl">student relation = B0, B1, …, B13   →   block i goes to disk i mod 8</text>`;
+    if (k > 0 && k <= 14) { const b = k - 1; s += `<text x="20" y="40" class="big">B${b} → disk ${b} mod 8 = ${b % 8}</text>`; }
+    return `<svg viewBox="0 0 600 240" width="600" role="img" aria-label="Block-level striping across 8 disks">${s}${row(56, 120, c)}</svg>`;
+  };
+  const steps = [{ html: fig(0), cap: 'Eight empty disks. The relation has 14 blocks.' }];
+  for (let k = 1; k <= 14; k++) steps.push({ html: fig(k), cap: k <= 8 ? `B${k - 1} goes to disk ${k - 1}.` : `B${k - 1}: ${k - 1} mod 8 = ${(k - 1) % 8}, so it wraps around to disk ${(k - 1) % 8} (red = second stripe).` + (k === 14 ? ' This matches slide 14\'s picture “After Block 7”.' : '') });
+  stepper('#blockst', steps, { interval: 900 });
+})();
+// Figure 2: two parallel requests
+(() => {
+  const cls = Array(8).fill('idle'); cls[3] = 'hiA'; cls[2] = 'hiB';
+  const c = [...Array(8)].map((_, d) => [['B' + d], ...(d + 8 <= 13 ? [['B' + (d + 8)]] : [])]);
+  c[3] = [['B3', 'acc'], ['B11']]; c[2] = [['B2'], ['B10', 'grn']];
+  let s = `<text x="160" y="16" text-anchor="end" class="lbl grn">Bob needs B10</text><path d="M164 20 L188 46" class="s-grn" marker-end="url(#m-grn)"/>`;
+  s += `<text x="300" y="16" class="lbl acc">Alice needs B3</text><path d="M296 20 L270 46" class="s-acc" marker-end="url(#m-acc)"/>`;
+  s += row(52, 95, c, cls);
+  document.getElementById('fig-p1').innerHTML = s;
+})();
+// Figure 3: 14 rounds vs 2 rounds
+(() => {
+  let s = `<text x="20" y="20" class="lbl">ONE DISK: reads B0…B13 one after another</text>`;
+  for (let i = 0; i < 14; i++) s += `<rect class="cell-plain" x="${20 + i * 40}" y="30" width="36" height="26"/><text x="${38 + i * 40}" y="48" text-anchor="middle" style="font-size:11px">B${i}</text>`;
+  s += `<text x="20" y="74" class="lbl">→ 14 rounds</text><text x="20" y="105" class="lbl">EIGHT STRIPED DISKS: each column is one moment in time</text>`;
+  for (let d = 0; d < 8; d++) {
+    const y = 115 + d * 15;
+    s += `<text x="20" y="${y + 11}" class="lbl">disk ${d}</text><rect class="cell-plain" x="70" y="${y}" width="36" height="13"/><text x="88" y="${y + 10}" text-anchor="middle" style="font-size:11px">B${d}</text>`;
+    if (d + 8 <= 13) s += `<rect class="cell-plain" x="110" y="${y}" width="36" height="13" style="stroke:var(--red)"/><text x="128" y="${y + 10}" text-anchor="middle" class="red" style="font-size:11px">B${d + 8}</text>`;
+  }
+  s += `<text x="88" y="250" text-anchor="middle" class="lbl">round 1</text><text x="128" y="250" text-anchor="middle" class="lbl">round 2</text>`;
+  s += `<text x="180" y="180" class="big">→ 2 rounds</text><text x="180" y="198" class="lbl">same data, about 7× sooner</text>`;
+  document.getElementById('fig-p2').innerHTML = s;
+})();
+
+flashcards('#cards', [
+  { f: 'RAID', b: 'Redundant Arrays of Independent Disks: many disks seen as one disk with high capacity, speed and reliability.' },
+  { f: 'Striping', b: 'Splitting data into pieces dealt across several disks so they can work in parallel.' },
+  { f: 'Bit-level striping', b: 'Bit i of each byte goes to disk i (8 disks). Fast scans, but every access uses all disks.' },
+  { f: 'Block-level striping', b: 'Block i goes to disk (i mod n) (+1 if disks are numbered from 1).' },
+  { f: 'Throughput', b: 'Requests finished per second; raised by load-balancing small accesses over disks.' },
+  { f: 'Response time', b: 'Time for one request; cut by spreading a large access over all disks.' },
+]);
+quiz('#quiz', [
+  { q: 'With 8 disks (numbered 0–7) and block-level striping, which disk holds B21?', opts: ['disk 2', 'disk 5', 'disk 6', 'disk 3'], a: 1, why: '21 mod 8 = 5.' },
+  { q: 'Why does a single-record lookup touch all disks under bit-level striping?', opts: ['The index is striped', 'Every byte of the record is split over all 8 disks', 'Disks must stay synchronised', 'It does not'], a: 1, why: 'Each disk holds one bit of every byte.' },
+  { q: 'Point 1 of slide 14 (different blocks in parallel) improves…', opts: ['response time of one big request', 'throughput of many small requests', 'reliability', 'capacity'], a: 1, why: 'Independent small requests on different disks run side by side.' },
+  { q: 'Point 2 of slide 14 (long sequence uses all disks) improves…', opts: ['response time of one large request', 'reliability', 'the cost per byte', 'seek time of one disk'], a: 0, why: 'One big read is split across all disks and finishes sooner.' },
+  { q: 'What does block-level striping alone (RAID 0) NOT give?', opts: ['Parallel reads', 'Load balancing', 'Recovery after a disk failure', 'Higher transfer rate'], a: 2, why: 'There is no redundancy.' },
+]);
+ask('#try1', { q: 'A file has blocks B0…B29 striped over 6 disks (0–5). How many blocks end up on disk 4?', a: 5, hint: 'Blocks 4, 10, 16, …', why: 'Blocks 4, 10, 16, 22, 28: five blocks (30 blocks ÷ 6 disks).' });
+</script>
+</body>
+</html>

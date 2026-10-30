@@ -1,0 +1,389 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Updating an Index · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 15 · Chapter 5 · Slides 18–22</div>
+<h1>Updating an Index: Deletion and Insertion</h1>
+<p class="lede">When records are deleted or inserted, every index has to follow. This chapter gives the rules for dense, sparse and multilevel indices, animates each case, writes out the algorithms the slides ask for, and works the 160-million-record NID question.</p>
+
+<h2>1. The general rule for deletion (slides 18–19)</h2>
+
+<p>The slides start with a rule that applies to every index: <em>if the deleted record was the only record in the file with its particular search-key value, the search key is deleted from the index too.</em> If other records still have that value (for example, deleting one of three Comp. Sci. instructors from a dept-name index), the index entry stays, because it is still needed to find the others.</p>
+
+<h2>2. Deleting from a dense index</h2>
+
+<p>For a dense index, <em>deleting a search key is similar to deleting a file record</em> (Lecture 14, Chapter 3). The index is just a sorted file of entries, so the entry is removed and the gap is closed by shifting or by a free list.</p>
+
+<p>Slide 18's example: <code>DELETE FROM instructor WHERE id = 22222</code>.</p>
+<figure>
+<span class="anim-tag">Animation</span>
+<div id="ddel"></div>
+</figure>
+
+<div class="q">
+<h4>Question (worked answer): algorithm for deletion in a dense index</h4>
+<pre>delete_dense(K):
+    1. Use the index to find the record(s) with search key K; delete the record from the file.
+    2. if no other record in the file has search key K:
+           delete the index entry for K
+           (shift the following entries up, or put the slot on a free list)
+    3. else if the index entry pointed at the deleted record:
+           change its pointer to the next record with key K
+           (for an index with buckets: just remove that pointer from K's bucket)</pre>
+</div>
+
+<h2>3. Deleting from a sparse index</h2>
+
+<p>A sparse index only has entries for some keys, so there are three possibilities when record <i>K</i> is deleted:</p>
+<ol>
+  <li><strong><i>K</i> has no index entry.</strong> Nothing to do in the index. This is the slide's own example: with the sparse index (10101, 32343, 76766), deleting 22222 changes only the file.</li>
+  <li><strong><i>K</i> has an entry, and the next key in the file does not.</strong> <em>Replace</em> the entry for <i>K</i> by the next search-key value in the file (in search-key order). The entry then points to that next record, which is now where the run of records starts.</li>
+  <li><strong><i>K</i> has an entry, and the next key already has one.</strong> <em>Delete</em> the entry instead of replacing it, since there is nothing between the two entries any more.</li>
+</ol>
+
+<p>The animation uses a block-level sparse index (one entry per block, as recommended in Chapter 2). The file has 3 slots per block, and some blocks have free slots, which also prepares us for insertion.</p>
+
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="sdel"></div>
+</figure>
+
+<div class="q">
+<h4>Question (worked answer): algorithm for deletion in a sparse index</h4>
+<pre>delete_sparse(K):
+    1. Find the largest index entry ≤ K, follow it, and delete record K from the file.
+    2. if the index has no entry for K:
+           done                                   -- case 1
+    3. else:
+           K' = the next search-key value after K in the file
+                (for a block-level index: the next key in the same block)
+           if K' exists and K' has no index entry:
+               replace entry K by (K', pointer to K')  -- case 2
+           else:
+               delete entry K                     -- case 3</pre>
+</div>
+
+<h2>4. Inserting into a dense index (slide 20)</h2>
+
+<p>Every insertion starts the same way: <em>perform a lookup using the search-key value of the record to be inserted</em>, to find where it belongs. For a dense index: <em>if the search-key value does not appear in the index, insert it.</em> The slide notes two practical details:</p>
+<ul>
+  <li><strong>Indices are maintained as sequential files</strong>, sorted by key, so the new entry must go in its sorted position, and the entries after it shift down.</li>
+  <li><strong>Space may need to be created for the new entry</strong>, and when the index block is full, an <b class="term">overflow block</b> may be required: an extra block chained to the full one that holds entries that did not fit.</li>
+</ul>
+<p>Slide 20's example: <code>INSERT INTO instructor VALUES (45566, 'Karim', 'Physics', 70000)</code>.</p>
+<figure>
+<span class="anim-tag">Animation</span>
+<div id="dins"></div>
+</figure>
+
+<h2>5. Inserting into a sparse index (slide 21)</h2>
+
+<p>For a sparse index with one entry per block: <em>no change needs to be made to the index unless a new block is created. If a new block is created, the first search-key value appearing in the new block is inserted into the index.</em> The slide assumes 3 records per block and inserts two records:</p>
+<ul>
+  <li><code>(98400, 'Abid', 'History', 50000)</code>: no new block needed.</li>
+  <li><code>(32400, 'Atika', 'Comp. Sci', 80000)</code>: a new block is needed.</li>
+</ul>
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="sins"></div>
+</figure>
+
+<div class="q">
+<h4>Question (worked answer): insertion algorithms for single-level dense and sparse indices</h4>
+<pre>insert_dense(record r with key K):
+    1. Look up K in the index.
+    2. Insert r into the file in key order (use a free slot; if the block is full,
+       use an overflow block or split the block).
+    3. if K is not in the index:
+           insert entry (K, pointer to r) in sorted position,
+           shifting later entries (overflow block if the index block is full)
+       else (K already present):
+           secondary index: add a pointer to r in K's bucket
+           clustering index: nothing (the entry already points at the first K)
+
+insert_sparse(record r with key K):        -- one entry per block
+    1. Find the largest index entry ≤ K; it names block B.
+    2. if B has a free slot:
+           put r into B in key order        -- index unchanged
+    3. else:
+           create a new block B'; move the records of B that come after r's
+           position (or r itself) into B', keeping key order
+           insert entry (first key of B', pointer to B') into the index</pre>
+</div>
+
+<h2>6. Multilevel indices (slide 22)</h2>
+
+<p><em>Multilevel insertion and deletion algorithms are simple extensions of the single-level algorithms.</em> Treat each level as a single-level index on the level below it, and work from the bottom up:</p>
+<ul>
+  <li><strong>Insertion:</strong> insert into the data file. If that created a new data block, insert its first key into the level-1 index. If <em>that</em> created a new level-1 block, insert its first key into level 2. Continue upward until some level absorbs the change without creating a new block.</li>
+  <li><strong>Deletion:</strong> delete from the data file. If that removed or replaced a level-1 entry, apply the sparse deletion rules to level 1. If a level-1 block's first entry changed or the block became empty, apply the same rules one level up, and so on.</li>
+</ul>
+<p>Most of the time the change stops at the bottom level, because blocks usually have free space. In the animation above, inserting Abid changed nothing in the index at all, and inserting Atika changed only level 1.</p>
+
+<div class="q">
+<h4>Question (worked answer): a 4-level index for an NID database</h4>
+<p><em>Write the deletion/insertion algorithms for a multilevel index with an example of 4 levels for an NID (national ID) database with 160 million records. Block size is 16&nbsp;KB, and each block can hold 16 NID records or 800 index records.</em></p>
+
+<p><strong>Building the levels.</strong> The data file is sorted on NID, so every index level can be sparse, with one entry per block of the level below:</p>
+<div class="tbl"><table>
+<tr><th>Level</th><th>What it indexes</th><th>Entries</th><th>Blocks</th></tr>
+<tr><td>Level 0: data file</td><td>160,000,000 records, 16 per block</td><td class="num">160,000,000</td><td class="num">160,000,000 ÷ 16 = 10,000,000</td></tr>
+<tr><td>Level 1 index</td><td>one entry per data block</td><td class="num">10,000,000</td><td class="num">10,000,000 ÷ 800 = 12,500</td></tr>
+<tr><td>Level 2 index</td><td>one entry per level-1 block</td><td class="num">12,500</td><td class="num">⌈12,500 ÷ 800⌉ = 16</td></tr>
+<tr><td>Level 3 index (root)</td><td>one entry per level-2 block</td><td class="num">16</td><td class="num">1</td></tr>
+</table></div>
+<p>That gives the 4 levels: three index levels plus the data level. The root is a single 16&nbsp;KB block, easily kept in memory. Finding any NID reads 1 block per level below the root: level 2, level 1, then the data block, so <strong>3 block reads</strong> (4 if the root is not cached). Binary search on the 10,000,000 data blocks would need about log₂(10⁷) ≈ 24 reads.</p>
+
+<figure>
+<svg id="nid" viewBox="0 0 640 300" width="640" role="img" aria-label="Four-level NID index">
+  <g id="nidg"></g>
+</svg>
+<figcaption><b>Figure 1.</b> The NID index. Each level is 800 times smaller than the one below it. A lookup follows one block per level (red path).</figcaption>
+</figure>
+
+<p><strong>Insertion</strong> of a new person with NID <i>K</i>:</p>
+<pre>insert_multilevel(r with key K):
+    1. Starting at the root (level 3), at each level follow the largest entry ≤ K
+       down to the data block B that should hold K.        -- 3 block reads
+    2. if B has a free slot: put r in B. Done.              -- by far the common case
+    3. else split B: create B', move the upper half of B's records into it.
+       Insert (first key of B', pointer to B') into the level-1 block L1 above B.
+    4. if L1 had room: done.
+       else split L1 into L1 and L1', and insert (first key of L1', pointer)
+       into the level-2 block above.
+    5. Repeat upward. If the root splits, create a new root with two entries:
+       the index gains a 5th level.</pre>
+<p>Example: inserting an NID into a data block that has 11 of its 16 slots used changes 1 block. Only when that data block is full does level 1 change, and only when a level-1 block reaches 800 entries does level 2 change.</p>
+
+<p><strong>Deletion</strong> of NID <i>K</i>:</p>
+<pre>delete_multilevel(K):
+    1. Follow the levels down to data block B and delete record K.
+    2. if K was the first key of B (so it is B's level-1 entry):
+           if B still has records: replace the level-1 entry by B's new first key
+           else (B is now empty): delete the level-1 entry and free B
+    3. If that changed the first entry of a level-1 block, or emptied it,
+       apply the same rule to its level-2 entry; repeat upward.</pre>
+<p>Example: deleting an NID that is in the middle of its data block changes only that data block. Deleting the last NID of a data block also deletes one level-1 entry, and that level-1 block still has hundreds of other entries, so the change stops there.</p>
+</div>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+<div id="try2"></div>
+
+<h3>Exam questions</h3>
+<div class="exam">
+  <div class="exam-src">DB QB · 20-21 2a · 10 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-2 | 2020–21 · 10 marks</div>
+  <div class="exam-q"><p>Given that one block contains only three records, and no overflow block is allowed. Show the index structure with the concerned blocks after insertion of the following tuples: (12122, Rafique, History, 40000) and (83820, Abid, Comp. Sci., 90000).</p>
+  <figure><div id="q182a"></div><figcaption>The given structure: a primary sparse index with one entry per block (10101, 22222, …, 83821). As in the question, the blocks between 33456 and 83821 are not shown.</figcaption></figure></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>The index is a block-level sparse index (slide 21): the index changes only when a block is created, or when a block's first key changes. No overflow blocks are allowed, so a full block has to be split into two blocks.</p>
+    <p><strong>Insert 12122 (Rafique).</strong> Lookup: largest entry ≤ 12122 is 10101, so the record belongs in block 0, between 12121 and 15151. Block 0 is full (10101, 12121, 15151). Create a new block after block 0. In key order the four records are 10101, 12121, 12122, 15151: block 0 keeps the first three, and <strong>15151 moves to the new block</strong>. The new block's first key, <strong>15151, is inserted into the index</strong> between 10101 and 22222.</p>
+    <p><strong>Insert 83820 (Abid).</strong> 83820 is just below 83821, so it belongs immediately before Brandt in key order. The last block (83821, 98345) has one free slot, so place 83820 at the start of that block (83820, 83821, 98345). No block is created, but the block's smallest key changed, so its <strong>index entry 83821 is replaced by 83820</strong>. Without this change a search for 83820 would go to the previous block and miss it.</p>
+    <figure><span class="anim-tag">Animation</span><div id="q182"></div></figure>
+    <p>Two equally valid variants, if you state them: (1) when splitting block 0, a half-and-half split (10101, 12121 | 12122, 15151) gives the new index entry 12122 instead of 15151 (this is the question bank's answer); (2) following the lookup rule literally sends 83820 to the block before 83821; if that block is full, a new block holding 83820 is created and the entry 83820 is inserted, keeping 83821's entry. The version above uses the free slot and creates no extra block.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">DB QB · Jan 20 3b · 15 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-2 | 2018–19 · 15 marks (second part)</div>
+  <div class="exam-q"><p>Explain the deletion of records from 10101 to 22222 from the instructor relation given in the figure (sparse index 10101, 32343, 76766 on the instructor file) as per the deletion algorithm of a relation with sparse index.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>Delete the four records 10101, 12121, 15151, 22222 one at a time, applying the sparse-index deletion rule (slide 19) each time: if the deleted key has an index entry, replace it with the next key in the file, unless that next key already has an entry, in which case delete the entry.</p>
+    <figure><span class="anim-tag">Animation</span><div id="q190"></div></figure>
+    <div class="tbl"><table>
+      <tr><th>Delete</th><th>Has an entry?</th><th>Next key in file</th><th>Action</th><th>Index after</th></tr>
+      <tr><td class="num">10101</td><td>yes</td><td class="num">12121 (no entry)</td><td>replace 10101 by 12121</td><td class="num">12121, 32343, 76766</td></tr>
+      <tr><td class="num">12121</td><td>yes</td><td class="num">15151 (no entry)</td><td>replace 12121 by 15151</td><td class="num">15151, 32343, 76766</td></tr>
+      <tr><td class="num">15151</td><td>yes</td><td class="num">22222 (no entry)</td><td>replace 15151 by 22222</td><td class="num">22222, 32343, 76766</td></tr>
+      <tr><td class="num">22222</td><td>yes</td><td class="num">32343 (has an entry)</td><td>delete entry 22222</td><td class="num"><strong>32343, 76766</strong></td></tr>
+    </table></div>
+    <p>Final state: the file starts at 32343 (El Said), and the sparse index has two entries, 32343 and 76766. The question bank reaches the same final index but skips the intermediate replacements; in the exam, show each step as above.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2014–15 · 20 marks</div>
+  <div class="exam-q"><p>Create the following index structures for the given student relation: (a) a sparse index on student_id for search key values {1204001, 1205001, 1205010}; (b) a secondary index on department_code; (c) delete the record with student_id = 1205010 and show the resulting index structures; (d) insert the record {1205011, N114, EEE, 3, 1} and show the resulting index structures.</p>
+  <div class="tbl"><table><tr><th></th><th>student_id</th><th>name</th><th>department_code</th><th>level</th><th>term</th></tr>
+  <tr><td>Record 0</td><td>1205001</td><td>N11</td><td>CSE</td><td>3</td><td>1</td></tr><tr><td>Record 1</td><td>1205004</td><td>N12</td><td>CSE</td><td>3</td><td>1</td></tr><tr><td>Record 2</td><td>1205007</td><td>N13</td><td>CSE</td><td>3</td><td>1</td></tr><tr><td>Record 3</td><td>1205010</td><td>N14</td><td>CSE</td><td>3</td><td>1</td></tr><tr><td>Record 4</td><td>1205013</td><td>N15</td><td>CSE</td><td>3</td><td>1</td></tr><tr><td>Record 5</td><td>1205016</td><td>N16</td><td>CSE</td><td>3</td><td>1</td></tr><tr><td>Record 6</td><td>1204001</td><td>N21</td><td>EEE</td><td>3</td><td>1</td></tr><tr><td>Record 7</td><td>1204002</td><td>N22</td><td>EEE</td><td>3</td><td>1</td></tr><tr><td>Record 8</td><td>1204003</td><td>N23</td><td>EEE</td><td>3</td><td>1</td></tr></table></div></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><strong>First, the file order.</strong> As printed, the file is sorted on department_code (CSE before EEE), not on student_id: 1205016 is followed by 1204001. A sparse index on student_id needs the file sorted on student_id (Section 3 of Chapter 2), so we store it in student_id order: 1204001, 1204002, 1204003, 1205001, 1205004, 1205007, 1205010, 1205013, 1205016. Then student_id gives the primary (clustering) index, and department_code, which is no longer the file order, gets a secondary index.</p>
+    <p><strong>(a)</strong> Sparse index with the three given entries, each pointing to its record: 1204001 → record 1204001, 1205001 → record 1205001, 1205010 → record 1205010. A search for, say, 1205007 starts at 1205001 and scans forward.</p>
+    <p><strong>(b)</strong> Secondary index on department_code: one entry per value, each pointing to a bucket: CSE → {1205001, 1205004, 1205007, 1205010, 1205013, 1205016}, EEE → {1204001, 1204002, 1204003}.</p>
+    <p><strong>(c) Delete 1205010.</strong> Remove the record. In the sparse index, 1205010 has an entry and the next key, 1205013, has none, so the entry is <strong>replaced by 1205013</strong>. In the secondary index, CSE still has other students, so the CSE entry stays and only the pointer to 1205010 is removed from its bucket.</p>
+    <p><strong>(d) Insert {1205011, N114, EEE, 3, 1}.</strong> In the file it goes between 1205007 and 1205013. The sparse index is <strong>unchanged</strong>: a search for 1205011 starts at entry 1205001 and scans forward to it. In the secondary index, EEE already exists, so a pointer to the new record is added to EEE's bucket (now 4 pointers).</p>
+    <figure class="wide"><span class="anim-tag">Animation</span><div id="q303"></div></figure>
+  </div></details>
+</div>
+
+<div class="key">
+<p><strong>Summary:</strong> a deleted key leaves the index only if no other record has that key. Dense indices delete or insert their entry like a sequential file. Sparse indices change only when an indexed key is deleted (replace it with the next key, or delete it) or when a new block is created (insert its first key). Multilevel indices apply the same rules level by level, bottom up, and changes rarely travel far.</p>
+</div>
+</main>
+<script src="../assets/book.js"></script>
+<script>
+const H = ['ID', 'Name', 'Dept.', 'Salary'];
+const R = id => INSTR.find(r => r[0] === id);
+const denseOf = (rows, cls = {}) => rows.map((r, i) => r && ({ key: r[0], to: cls[r[0]] === 'del' ? [] : [i], alignRow: i, cls: cls[r[0]] || '' })).filter(Boolean);
+
+// 2. dense delete 22222
+const minus = INSTR.filter(r => r[0] !== '22222');
+stepper('#ddel', [
+  { html: indexSVG({ rows: INSTR, head: H, index: denseOf(INSTR) }), cap: 'Dense index on id. We delete id = <b>22222</b> (Einstein).' },
+  { html: indexSVG({ rows: INSTR, head: H, rowCls: { 3: 'del' }, index: denseOf(INSTR, { '22222': 'del' }) }), cap: 'Look up 22222 in the index, follow the pointer, and delete the record. 22222 was the only record with this key, so the index entry must go too.' },
+  { html: indexSVG({ rows: minus, head: H, index: denseOf(minus) }), cap: 'The entry is removed and the entries after it shift up, exactly like deleting a fixed-length record. Index and file both have 11 rows.' },
+]);
+
+// 3. sparse delete with a block-level index (3 slots per block; every frame spelled out)
+const blocks = bl => bl.flatMap(b => [0, 1, 2].map(j => b[j] ? R(b[j]) : null));
+const idxOf = (rows, keys, cls = {}) => keys.map(k => ({ key: k, to: [rows.findIndex(r => r && r[0] === k)], cls: cls[k] || '' }));
+const blk = (rows, o = {}) => indexSVG({ rows, head: H, blockSize: 3, labels: { idx: 'index, 1 per block' }, ...o });
+const frame = (bl, keys, cls, rowCls, cap) => { const rows = blocks(bl); return { html: blk(rows, { rowCls, index: idxOf(rows, keys, cls) }), cap }; };
+const B0 = ['10101', '12121', '15151'], B4 = ['83821', '98345'];
+stepper('#sdel', [
+  frame([B0, ['22222', '32343', '33456'], ['45565', '58583'], ['76543', '76766'], B4], ['10101', '22222', '45565', '76543', '83821'], {}, {},
+    'A block-level sparse index: one entry per block, holding the block\'s first id. Blocks 2, 3 and 4 have a free slot.'),
+  frame([B0, ['22222', '32343', '33456'], ['45565', '58583'], ['76543', '76766'], B4], ['10101', '22222', '45565', '76543', '83821'], { '22222': 'hl' }, { 3: 'del' },
+    'Delete <b>22222</b>. It has an index entry (it is the first key of block 1). The next key, 32343, has no entry, so this is <b>case 2: replace</b>.'),
+  frame([B0, ['32343', '33456'], ['45565', '58583'], ['76543', '76766'], B4], ['10101', '32343', '45565', '76543', '83821'], { '32343': 'new' }, { 3: 'new' },
+    'The record is removed and block 1 closes up. Entry 22222 is <b>replaced by 32343</b>, which points at the new first record of block 1.'),
+  frame([B0, ['32343', '33456'], ['45565', '58583'], ['76543', '76766'], B4], ['10101', '32343', '45565', '76543', '83821'], {}, { 7: 'del' },
+    'Delete <b>58583</b>. It has no index entry (it is not the first key of block 2). <b>Case 1: the index is unchanged.</b>'),
+  frame([B0, ['32343', '33456'], ['45565'], ['76543', '76766'], B4], ['10101', '32343', '45565', '76543', '83821'], { '76543': 'hl' }, { 9: 'del' },
+    'Delete <b>76543</b>, the first key of block 3. The next key, 76766, has no entry. Case 2 again: replace.'),
+  frame([B0, ['32343', '33456'], ['45565'], ['76766'], B4], ['10101', '32343', '45565', '76766', '83821'], { '76766': 'new' }, { 9: 'new' },
+    'Entry 76543 is <b>replaced by 76766</b>. Block 3 now holds a single record.'),
+  frame([B0, ['32343', '33456'], ['45565'], ['76766'], B4], ['10101', '32343', '45565', '76766', '83821'], { '76766': 'hl', '83821': 'hl' }, { 9: 'del' },
+    'Delete <b>76766</b>. It has an entry, and the next key in the file, 83821, <b>already has an entry</b>: this is <b>case 3</b>.'),
+  frame([B0, ['32343', '33456'], ['45565'], [], B4], ['10101', '32343', '45565', '83821'], {}, {},
+    'Entry 76766 is <b>deleted</b> rather than replaced, and the now-empty block 3 can be freed. The index has 4 entries.'),
+]);
+
+// 4. dense insert 45566
+const K = ['45566', 'Karim', 'Physics', '70000'];
+const withK = [...INSTR.slice(0, 7), K, ...INSTR.slice(7)];
+stepper('#dins', [
+  { html: indexSVG({ rows: INSTR, head: H, index: denseOf(INSTR).map(e => e.key === '45565' ? { ...e, cls: 'hl' } : e) }), cap: 'Look up 45566. It is not in the index; the largest smaller key is 45565, so the new record belongs right after Katz.' },
+  { html: indexSVG({ rows: withK, head: H, rowCls: { 7: 'new' }, index: denseOf(withK, { '45566': 'new' }) }), cap: 'Insert the record after 45565, and insert the new entry <b>45566</b> in sorted position in the index. Later entries shift down by one.' },
+]);
+
+// 5. sparse insert Abid and Atika
+const A = ['98400', 'Abid', 'History', '50000'], T = ['32400', 'Atika', 'Comp. Sci', '80000'];
+const S0 = blocks([B0, ['22222', '32343', '33456'], ['45565', '58583'], ['76543', '76766'], B4]);
+const S1 = S0.map((r, i) => i === 14 ? A : r);
+const S2 = [S1[0], S1[1], S1[2], S1[3], S1[4], T, S1[5], null, null, ...S1.slice(6)];
+const k0 = ['10101', '22222', '45565', '76543', '83821'];
+const sidx = (rows, keys, cls = {}) => keys.map(k => ({ key: k, to: [rows.findIndex(r => r && r[0] === k)], cls: cls[k] || '' }));
+stepper('#sins', [
+  { html: blk(S0, { index: sidx(S0, k0) }), cap: 'Before: 5 blocks of 3 slots, a sparse index with one entry per block.' },
+  { html: blk(S0, { rowCls: { 12: 'hl', 13: 'hl' }, index: sidx(S0, k0, { '83821': 'hl' }) }), cap: 'Insert <b>98400</b> (Abid). Lookup: largest entry ≤ 98400 is 83821, so the record belongs in block 4.' },
+  { html: blk(S1, { rowCls: { 14: 'new' }, index: sidx(S1, k0) }), cap: 'Block 4 has a free slot, so Abid goes there. <b>No new block, so the index is unchanged.</b>' },
+  { html: blk(S1, { rowCls: { 3: 'hl', 4: 'hl', 5: 'hl' }, index: sidx(S1, k0, { '22222': 'hl' }) }), cap: 'Insert <b>32400</b> (Atika). Largest entry ≤ 32400 is 22222, so it belongs in block 1, between 32343 and 33456. But block 1 is <b>full</b>.' },
+  { html: blk(S2, { rowCls: { 5: 'new', 6: 'hl' }, index: [...sidx(S2, ['10101', '22222']), { key: '33456', to: [6], cls: 'new' }, ...sidx(S2, ['45565', '76543', '83821'])] }),
+    cap: 'A <b>new block</b> is created. Block 1 keeps 22222, 32343 and Atika (32400) in order, and 33456 moves to the new block. The new block\'s first key, <b>33456, is inserted into the index</b>.' },
+]);
+
+// NID figure: one row of blocks per level, the lookup path in red
+(() => {
+  const lv = [['Level 3 (root)', '1 block · 16 entries', 1], ['Level 2', '16 blocks · 12,500 entries', 5],
+              ['Level 1', '12,500 blocks · 10,000,000 entries', 9], ['Data file', '10,000,000 blocks · 160M records', 11]];
+  const w = 30, g = 6, X = k => 230 + (400 - k * (w + g)) / 2;
+  let s = '';
+  lv.forEach(([n, d, k], i) => {
+    const y = 20 + i * 70, mid = Math.floor(k / 2);
+    s += `<text x="10" y="${y + 14}" class="big" style="font-size:12px">${n}</text><text x="10" y="${y + 30}" class="lbl">${d}</text>`;
+    for (let j = 0; j < k; j++) {
+      const x = X(k) + j * (w + g);
+      if (k > 3 && (j === 1 || j === k - 2)) s += `<text x="${x + w / 2}" y="${y + 18}" text-anchor="middle" class="lbl">…</text>`;
+      else s += `<rect class="${j === mid ? 'cell-hl' : 'cell'}" x="${x}" y="${y}" width="${w}" height="26"/>`;
+    }
+    if (i < 3) {
+      const nk = lv[i + 1][2];
+      s += `<path d="M${X(k) + mid * (w + g) + w / 2} ${y + 26} L${X(nk) + Math.floor(nk / 2) * (w + g) + w / 2} ${y + 68}" class="s-red" marker-end="url(#m-red)"/>`;
+    }
+  });
+  document.querySelector('#nidg').innerHTML = s;
+})();
+// DB QB 182 / CSE215 Q1
+(() => {
+  const R = id => INSTR.find(r => r[0] === id) || ({ '12122': ['12122', 'Rafique', 'History', '40000'], '83820': ['83820', 'Abid', 'Comp. Sci.', '90000'] })[id];
+  const rowsOf = bl => bl.flatMap(b => [0, 1, 2].map(j => b[j] ? R(b[j]) : null));
+  const fig = (bl, keys, cls, rowCls) => { const rows = rowsOf(bl);
+    return indexSVG({ rows, head: H, blockSize: 3, blockLabels: false, rowCls, labels: { idx: 'primary index' },
+      index: keys.map(k => ({ key: k, to: [rows.findIndex(r => r && r[0] === k)], cls: cls[k] || '' })) }); };
+  const B0 = ['10101', '12121', '15151'], B1 = ['22222', '32343', '33456'], BL = ['83821', '98345'];
+  document.querySelector('#q182a').innerHTML = fig([B0, B1, BL], ['10101', '22222', '83821'], {}, {});
+  stepper('#q182', [
+    { html: fig([B0, B1, BL], ['10101', '22222', '83821'], { '10101': 'hl' }, { 0: 'hl', 1: 'hl', 2: 'hl' }), cap: 'Insert <b>12122</b>. Largest entry ≤ 12122 is 10101: block 0. Block 0 is full and overflow blocks are not allowed.' },
+    { html: fig([['10101', '12121', '12122'], ['15151'], B1, BL], ['10101', '15151', '22222', '83821'], { '15151': 'new' }, { 2: 'new', 3: 'hl' }),
+      cap: 'A new block is created after block 0. Block 0 keeps 10101, 12121, 12122 (in order); 15151 moves to the new block. The new block\'s first key <b>15151 is inserted into the index</b>.' },
+    { html: fig([['10101', '12121', '12122'], ['15151'], B1, BL], ['10101', '15151', '22222', '83821'], { '83821': 'hl' }, { 9: 'hl', 10: 'hl' }),
+      cap: 'Insert <b>83820</b>. It sorts just before 83821. The block holding 83821 and 98345 has a free slot.' },
+    { html: fig([['10101', '12121', '12122'], ['15151'], B1, ['83820', '83821', '98345']], ['10101', '15151', '22222', '83820'], { '83820': 'new' }, { 9: 'new' }),
+      cap: '83820 becomes the first record of that block, so its index entry <b>83821 is replaced by 83820</b>. No new block was needed. Final index: 10101, 15151, 22222, …, 83820.' },
+  ]);
+})();
+// DB QB 190: delete 10101..22222 with the slide 19 sparse index
+(() => {
+  const st = (gone, keys, cls, del) => { const rows = INSTR.filter(r => !gone.includes(r[0]));
+    return indexSVG({ rows, head: H, rowCls: del != null ? { [rows.findIndex(r => r[0] === del)]: 'del' } : {}, labels: { idx: 'sparse index' },
+      index: keys.map(k => ({ key: k, to: [rows.findIndex(r => r[0] === k)], cls: cls[k] || '' })) }); };
+  stepper('#q190', [
+    { html: st([], ['10101', '32343', '76766'], { '10101': 'hl' }, '10101'), cap: 'Delete <b>10101</b>. It has an entry; the next key, 12121, has none: <b>replace</b>.' },
+    { html: st(['10101'], ['12121', '32343', '76766'], { '12121': 'hl' }, '12121'), cap: 'Entry is now 12121. Delete <b>12121</b>: again an indexed key whose successor (15151) has no entry: replace.' },
+    { html: st(['10101', '12121'], ['15151', '32343', '76766'], { '15151': 'hl' }, '15151'), cap: 'Entry is now 15151. Delete <b>15151</b>: replace by the next key, 22222.' },
+    { html: st(['10101', '12121', '15151'], ['22222', '32343', '76766'], { '22222': 'hl', '32343': 'hl' }, '22222'), cap: 'Entry is now 22222. Delete <b>22222</b>: the next key, 32343, <b>already has an entry</b>, so entry 22222 is <b>deleted</b>.' },
+    { html: st(['10101', '12121', '15151', '22222'], ['32343', '76766'], {}, null), cap: 'Final: the file starts at 32343 and the index is <b>32343, 76766</b>.' },
+  ]);
+})();
+// CSE 303 2014-15 student relation
+(() => {
+  const S = [['1204001','N21','EEE','3','1'],['1204002','N22','EEE','3','1'],['1204003','N23','EEE','3','1'],['1205001','N11','CSE','3','1'],['1205004','N12','CSE','3','1'],['1205007','N13','CSE','3','1'],['1205010','N14','CSE','3','1'],['1205013','N15','CSE','3','1'],['1205016','N16','CSE','3','1']];
+  const hd = ['id', 'name', 'dept', 'lv', 'tm'], cw = [72, 44, 44, 28, 28];
+  const pair = (rows, keys, o = {}) => {
+    const sp = indexSVG({ rows, head: hd, colW: cw, idxW: 84, rowCls: o.rowCls, labels: { idx: 'sparse index', file: 'file, sorted on id' },
+      index: keys.map(k => ({ key: k, to: [rows.findIndex(r => r[0] === k)], cls: (o.kc || {})[k] || '' })) });
+    const sec = indexSVG({ rows, head: hd, colW: cw, bucket: true, rowCls: o.rowCls, labels: { idx: 'index on dept', file: 'same file' },
+      index: ['CSE', 'EEE'].map(d => ({ key: d, to: rows.map((r, i) => r[2] === d ? i : -1).filter(i => i >= 0), cls: (o.dc || {})[d] || '' })) });
+    return `<div class="figrow"><div>${sp}</div><div>${sec}</div></div>`; };
+  const S2 = S.filter(r => r[0] !== '1205010');
+  const S3 = [...S2.slice(0, 6), ['1205011', 'N114', 'EEE', '3', '1'], ...S2.slice(6)];
+  stepper('#q303', [
+    { html: pair(S, ['1204001', '1205001', '1205010']), cap: '(a), (b): the file in student_id order, the sparse index {1204001, 1205001, 1205010}, and the secondary index on department_code with buckets.' },
+    { html: pair(S, ['1204001', '1205001', '1205010'], { rowCls: { 6: 'del' }, kc: { '1205010': 'hl' }, dc: { CSE: 'hl' } }), cap: '(c) Delete <b>1205010</b>. It has a sparse entry, and the next key 1205013 has none. CSE\'s bucket loses one pointer.' },
+    { html: pair(S2, ['1204001', '1205001', '1205013'], { kc: { '1205013': 'new' } }), cap: 'After (c): sparse entry 1205010 <b>replaced by 1205013</b>; CSE bucket has 5 pointers.' },
+    { html: pair(S3, ['1204001', '1205001', '1205013'], { rowCls: { 6: 'new' }, dc: { EEE: 'new' } }), cap: '(d) Insert <b>1205011</b> (EEE) between 1205007 and 1205013. Sparse index <b>unchanged</b>; a pointer is added to EEE\'s bucket (4 pointers).' },
+  ]);
+})();
+flashcards('#cards', [
+  { f: 'When does a deleted key leave the index?', b: 'Only when no other record in the file has that search-key value.' },
+  { f: 'Dense index deletion', b: 'Delete the entry like a record in a sequential file (shift or free list); for buckets, remove one pointer.' },
+  { f: 'Sparse deletion, key has no entry', b: 'Index unchanged.' },
+  { f: 'Sparse deletion, key has an entry', b: 'Replace it by the next key in the file; if that next key already has an entry, delete the entry instead.' },
+  { f: 'Dense index insertion', b: 'If the key is new, insert an entry in sorted position (overflow block if the index block is full).' },
+  { f: 'Block-level sparse insertion', b: 'Index changes only if a new block is created: insert the new block\'s first key.' },
+  { f: 'Multilevel update', b: 'Apply the single-level rules bottom-up; stop at the first level that absorbs the change.' },
+]);
+quiz('#quiz', [
+  { q: 'Sparse index (10101, 32343, 76766). Delete 32343. What happens to the index?', opts: ['Unchanged', 'Entry 32343 replaced by 33456', 'Entry 32343 deleted', 'Entry 10101 deleted'], a: 1, why: '32343 has an entry; the next key 33456 has none, so replace.' },
+  { q: 'Same index. Delete 58583.', opts: ['Unchanged', 'Replace 32343 by 58583', 'Delete 76766', 'Insert 76543'], a: 0, why: '58583 has no index entry.' },
+  { q: 'Block-level sparse index, 3 records per block. Insert a record into a block that has a free slot, and the new key is not the smallest in the block.', opts: ['Index unchanged', 'New entry added', 'Entry replaced', 'Index rebuilt'], a: 0, why: 'No new block and the block\'s first key is the same.' },
+  { q: 'Dense index on dept_name. Delete one of three Comp. Sci. instructors.', opts: ['Delete entry Comp. Sci.', 'Keep the entry (other records still have the value)', 'Replace it by Elec. Eng.', 'Rebuild the index'], a: 1, why: 'A key leaves the index only when its last record is deleted.' },
+  { q: 'NID question: 160,000,000 records at 16 per block, 800 index entries per block. How many level-1 index blocks?', opts: ['200,000', '12,500', '16', '800'], a: 1, why: '10,000,000 data blocks / 800 = 12,500.' },
+  { q: 'In a multilevel index, a new data block is created but the level-1 block it belongs to has room. Which levels change?', opts: ['Only level 1', 'All levels', 'Only the root', 'None'], a: 0, why: 'Level 1 absorbs the new entry, so the change stops there.' },
+]);
+ask('#try1', { q: 'Sparse index (10101, 32343, 76766). Delete 76766, then 83821. How many index entries remain?', a: 3, hint: 'Apply the replace rule twice; check whether the successor already has an entry.', why: '76766 has an entry and 83821 has none: replace by 83821. Then 83821 has an entry and 98345 has none: replace by 98345. Index: 10101, 32343, 98345.' });
+ask('#try2', { q: 'A file of 2,000,000 records, 20 per block, 400 index entries per block, one sparse entry per block of the level below. How many index levels are needed until the top level is a single block?', a: 2, hint: 'Data blocks first, then divide by 400 repeatedly.', why: '100,000 data blocks → 100,000 / 400 = 250 level-1 blocks → 250 entries fit in 1 level-2 block. Two index levels.' });
+
+</script>
+</body>
+</html>

@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Building an ERD Step by Step: Movies · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 07 (Ishrak) · Chapter 4 · Slides 35–41</div>
+<h1>Building an ERD Step by Step: the Movie Database</h1>
+<p class="lede">The slides' six-step workflow, applied to the class activity: from a paragraph about actors, directors, films and studios to the finished diagram of slide 41, one decision at a time.</p>
+
+<h2>1. A practical ERD workflow (slide 36)</h2>
+<ol>
+<li><strong>Read the requirement once for the story.</strong> Do not draw yet; understand what the organisation does.</li>
+<li><strong>Mark important nouns</strong> as candidate entity sets.</li>
+<li><strong>Mark verbs or verb phrases</strong> as candidate relationships.</li>
+<li><strong>Attach descriptive facts</strong> as attributes.</li>
+<li><strong>Add keys and multiplicity constraints.</strong></li>
+<li><strong>Test the diagram</strong> using small example scenarios.</li>
+</ol>
+<p>The order matters. Structure (boxes and diamonds) first, then attributes, then constraints. Deciding multiplicity before the structure is settled wastes effort, because a relationship may still move or split.</p>
+
+<h2>2. The class activity (slide 37)</h2>
+<blockquote class="q" style="border-color:var(--line)"><ul>
+<li>For actors and directors, store name, unique ID, address, and date of birth.</li>
+<li>For films, store title, production year, and type, such as thriller or comedy.</li>
+<li>Store who directed each film and who acted in each film.</li>
+<li>Every film has one director.</li>
+<li>Store each actor's salary for each film.</li>
+<li>For studios, store name, address, and president. A film is produced by only one studio.</li>
+</ul></blockquote>
+
+<h2>3. Marking the text (slides 38–40)</h2>
+<p>Slides 38–40 colour the requirement three times. Step through them:</p>
+<figure class="wide"><span class="anim-tag">Animation</span><div id="mark"></div></figure>
+<p>Some judgement is needed at each pass:</p>
+<ul>
+<li><strong>Entity nouns:</strong> actors, directors, films, studios. "Type" and "president" are nouns too, but they are single descriptive values about a film and a studio, so they are attributes (slide 16's question: one value, or an object to describe?).</li>
+<li><strong>Relationship verbs:</strong> <em>directed</em> (Director–Film), <em>acted in</em> (Actor–Film), <em>produced by</em> (Film–Studio). "Every film <em>has</em> one director" is not a new relationship; it is the multiplicity of <em>directs</em>.</li>
+<li><strong>Attributes:</strong> name, unique ID, address and date of birth for actors and for directors; title, production year and type for films; name, address and president for studios; and <em>salary</em>, which is "each actor's salary <em>for each film</em>": it depends on the pair (actor, film), so it goes on <em>actedIn</em>, exactly like grade on enrolls (Chapter 2).</li>
+</ul>
+
+<h2>4. Building the diagram (slide 41)</h2>
+<figure class="wide"><span class="anim-tag">Animation</span><div id="build"></div></figure>
+
+<h3>Keys and multiplicities, justified</h3>
+<div class="tbl"><table>
+<tr><th>Decision</th><th>Reason from the requirement</th></tr>
+<tr><td>Actor key <u>id</u>, Director key <u>id</u></td><td>"unique ID" is stated. Names can repeat.</td></tr>
+<tr><td>Film key <u>title</u> + <u>year</u></td><td>No film ID is given. Titles repeat across remakes (two films called <em>King Kong</em>), but the slide assumes title and production year together are unique, so both are underlined: a composite key.</td></tr>
+<tr><td>Studio key <u>name</u></td><td>Studio names are assumed unique.</td></tr>
+<tr><td>actedIn many-to-many</td><td>A film has many actors; an actor acts in many films.</td></tr>
+<tr><td>directs: arrow into Director</td><td>"Every film has one director": fix a film, at most one director. A director may direct many films.</td></tr>
+<tr><td>produces: arrow into Studio</td><td>"A film is produced by only one studio."</td></tr>
+<tr><td>salary on actedIn</td><td>One value per (actor, film) pair.</td></tr>
+</table></div>
+
+<div class="q">
+<h4>Question (worked answer): "Every film has one director." Does the arrow capture "every"?</h4>
+<p>Only half of it. The arrow says <em>at most one</em> director per film. "Every film has one" also means <em>at least one</em>: no film without a director. In the slides' notation that second half is written as a design note beside the diagram ("every film has exactly one director"), as on slide 96. Chen's notation draws it as a double line from Film to directs (total participation, Chapter 10). When converted to tables (Chapter 11), it becomes a <code>NOT NULL</code> foreign key column <code>director_id</code> in Film.</p>
+</div>
+
+<div class="q">
+<h4>Question (worked answer): Actors and directors have the same attributes. Why two entity sets?</h4>
+<p>The slide keeps them separate because they play different parts: directors are connected to films through <em>directs</em> (one per film) and actors through <em>actedIn</em> (many per film, with a salary). A person who both acts and directs would appear in both sets with the same ID, which duplicates their name and address. A cleaner alternative uses Chapter 7's subclasses: an entity set Person(id, name, address, dateOfBirth) with subclasses Actor and Director, each keeping its own relationship. Both designs are acceptable answers; say which assumption you make.</p>
+</div>
+
+<h2>5. Test the diagram (workflow step 6)</h2>
+<p>Try concrete scenarios against the finished diagram:</p>
+<ul>
+<li><em>Can Tom Hanks act in two films with two different salaries?</em> Yes: two actedIn pairs, each with its own salary.</li>
+<li><em>Can a film have two directors?</em> No: the arrow forbids it. If the domain allows co-directors (it does, in reality), the arrow must go; that is a requirement question, not a drawing question.</li>
+<li><em>Can a studio produce no films yet?</em> Yes: nothing forces a studio to take part in produces.</li>
+<li><em>Can we record a film's studio's president?</em> Yes, through produces: Film → Studio → president. We must not also store a presidentName on Film (Principle 2).</li>
+</ul>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+
+<h3>Exam questions</h3>
+<div class="exam">
+  <div class="exam-src">DB QB · Jan 20 13 · 10 marks &nbsp;·&nbsp; BUET QBank · CSE 215 | L-2/T-2 | 2018–19 · 10 marks</div>
+  <div class="exam-q"><p>Suppose you are the manager of the website development department of your organization. Each website developed by your organization can be uniquely identified by a url. It also has a public host-ip address and a date of going live. Each website is developed by a team of developers. Each developer can be uniquely identified by an employee id. The relevant information for a developer is his/her name, address, highest educational qualification, salary and hire date. Each website is developed by a web-based framework which is associated with a particular programming language. Each framework and its associated programming language have a specific name and the development year. The other information relevant to a web framework is its author name. Now design a Entity Relationship Diagram for your website development department so that you can manage it conveniently.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><strong>Nouns → entity sets:</strong> Website, Developer, Framework, Language. Language is an entity set (not an attribute of Framework) because it has its own facts (name, development year) and several frameworks can share one language.</p>
+    <p><strong>Verbs → relationships:</strong> <em>developedBy</em> (Website–Developer), <em>builtWith</em> (Website–Framework), <em>uses</em> (Framework–Language).</p>
+    <p><strong>Assumptions:</strong> (1) a developer may work on several websites over time, so developedBy is many-to-many; (2) a website uses exactly one framework ("developed by a web-based framework"), many websites can use the same framework: arrow into Framework; (3) a framework is associated with exactly one language, a language can have many frameworks: arrow into Language; (4) framework names and language names are unique, so they are keys.</p>
+    <figure class="wide"><div id="exWeb"></div><figcaption>Arrows mark the "one" side. Double lines: every website has a team, a framework; every framework has a language (total participation, Chapter 10).</figcaption></figure>
+    <p><strong>Relational schema</strong> (Chapter 11 rules): <span class="mono">Website(<u>url</u>, host_ip, live_date, <i>framework_name</i>)</span>, <span class="mono">Developer(<u>emp_id</u>, name, address, qualification, salary, hire_date)</span>, <span class="mono">DevelopedBy(<u>url</u>, <u>emp_id</u>)</span>, <span class="mono">Framework(<u>name</u>, dev_year, author, <i>language_name</i>)</span>, <span class="mono">Language(<u>name</u>, dev_year)</span>. Italic columns are foreign keys; framework_name and language_name are NOT NULL because participation is total. The question bank's answer is the same design.</p>
+  </div></details>
+</div>
+
+<div class="key">
+<p><strong>Summary:</strong> read the story, mark nouns (entity sets), verbs (relationships) and descriptive facts (attributes), then add keys and multiplicities, then test with scenarios. In the movie database, salary depends on (actor, film) so it sits on actedIn; "every film has one director" gives an arrow into Director plus a design note for "every"; Film's key is the pair (title, year).</p>
+</div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="lecture.js"></script>
+<script>
+const LINES = [
+  [['actors', 'n'], ['directors', 'n'], ['name', 'a'], ['unique ID', 'a'], ['address', 'a'], ['date of birth', 'a'], 'For actors and directors, store name, unique ID, address, and date of birth.'],
+  [['films', 'n'], ['title', 'a'], ['production year', 'a'], ['type', 'a'], 'For films, store title, production year, and type, such as thriller or comedy.'],
+  [['directed', 'v'], ['acted in', 'v'], ['film', 'n'], 'Store who directed each film and who acted in each film.'],
+  [['film', 'n'], ['director', 'n'], 'Every film has one director.'],
+  [['actor', 'n'], ['salary', 'a'], ['film', 'n'], 'Store each actor\'s salary for each film.'],
+  [['studios', 'n'], ['name', 'a'], ['address', 'a'], ['president', 'a'], ['film', 'n'], ['produced by', 'v'], ['studio', 'n'], 'For studios, store name, address, and president. A film is produced by only one studio.'],
+];
+const col = { n: 'var(--cell)', v: 'var(--cell-del)', a: 'var(--cell-new)' };
+const marked = kinds => '<ul style="font-size:.95rem;max-width:46em;margin:0 auto">' + LINES.map(L => {
+  let t = L[L.length - 1];
+  for (const [w, k] of L.slice(0, -1)) if (kinds.includes(k)) t = t.replace(new RegExp(`\\b${w}\\b(?![^<]*>)`, 'g'), m => `<mark style="background:${col[k]};color:var(--fg)">${m}</mark>`);
+  return `<li>${t}</li>`;
+}).join('') + `</ul><p style="text-align:center;font-size:.85rem">${kinds.map(k => `<mark style="background:${col[k]};color:var(--fg)">${{ n: 'entity nouns', v: 'relationship verbs', a: 'attributes' }[k]}</mark>`).join(' ')}</p>`;
+stepper('#mark', [
+  { html: marked([]), cap: 'Slide 37: the requirement, read once for the story.' },
+  { html: marked(['n']), cap: 'Slide 38: <b>entity nouns</b>: actors, directors, films, studios (singular forms too).' },
+  { html: marked(['n', 'v']), cap: 'Slide 39: <b>relationship verbs</b>: directed, acted in, produced by.' },
+  { html: marked(['n', 'v', 'a']), cap: 'Slide 40: <b>attributes</b>: name, unique ID, address, date of birth, title, production year, type, salary, president.' },
+]);
+const MOVIE = {
+  n: [['Actor', 'E', 0, 0], ['actedIn', 'R', 220, 0], ['Film', 'E', 440, 0], ['directs', 'R', 520, 120], ['Director', 'E', 600, 240], ['produces', 'R', 250, 160], ['Studio', 'E', 60, 250]],
+  a: [['Actor', '_id', -110, -60], ['Actor', 'name', -20, -85], ['Actor', 'dateOfBirth', 100, -70], ['Actor', 'address', -110, 50], ['actedIn', 'salary', 0, -75],
+      ['Film', '_title', -40, -80], ['Film', '_year', 50, -80], ['Film', 'type', 120, -40],
+      ['Studio', '_name', -80, -60], ['Studio', 'president', 65, -65], ['Studio', 'address', -80, 60],
+      ['Director', 'dateOfBirth', -150, 40], ['Director', 'address', -90, 85], ['Director', 'name', 10, 90], ['Director', '_id', 115, 55]],
+  l: [['Actor', 'actedIn'], ['Film', 'actedIn'], ['Film', 'directs'], ['Director', 'directs', { one: true }], ['Film', 'produces'], ['Studio', 'produces', { one: true }]],
+};
+erdSteps('#build', MOVIE, [
+  { set: ['Actor', 'Director', 'Film', 'Studio'], cap: 'Step 2: the four entity sets from the nouns.' },
+  { add: ['actedIn', 'directs', 'produces'], mult: false, cap: 'Step 3: the three relationships from the verbs, drawn without multiplicity yet.' },
+  { add: ['Actor.id', 'Actor.name', 'Actor.dateOfBirth', 'Actor.address', 'Director.id', 'Director.name', 'Director.dateOfBirth', 'Director.address'], mult: false, cap: 'Step 4: attributes of actors and directors.' },
+  { add: ['Film.title', 'Film.year', 'Film.type', 'Studio.name', 'Studio.president', 'Studio.address'], mult: false, cap: 'Attributes of films and studios.' },
+  { add: ['actedIn.salary'], hl: ['actedIn.salary'], mult: false, cap: '"Each actor\'s salary for each film": salary depends on the pair, so it goes on actedIn.' },
+  { add: [], hl: ['Actor.id', 'Director.id', 'Film.title', 'Film.year', 'Studio.name'], mult: false, cap: 'Step 5a: keys. id for Actor and Director; title + year together for Film; name for Studio.' },
+  { add: [], hl: ['Director-directs'], cap: 'Step 5b: "Every film has one director": arrow into Director.' },
+  { add: [], hl: ['Studio-produces'], cap: '"A film is produced by only one studio": arrow into Studio. actedIn has no arrows: many-to-many. This is slide 41.' },
+]);
+$('#exWeb').innerHTML = erd({
+  n: [['Developer', 'E', 0, 0], ['developedBy', 'R', 230, 0, 'developed\nBy'], ['Website', 'E', 460, 0], ['builtWith', 'R', 460, 130, 'built\nWith'], ['Framework', 'E', 460, 260], ['uses', 'R', 230, 260], ['Language', 'E', 0, 260]],
+  a: [['Developer', '_emp_id', -120, -55], ['Developer', 'name', -25, -75], ['Developer', 'address', 85, -60], ['Developer', 'qualification', -140, 40], ['Developer', 'salary', -40, 65], ['Developer', 'hire_date', 70, 60],
+      ['Website', '_url', -40, -60], ['Website', 'host_ip', 60, -65], ['Website', 'live_date', 140, -20],
+      ['Framework', '_name', 130, -20], ['Framework', 'dev_year', 120, 35], ['Framework', 'author', 20, 65],
+      ['Language', '_name', -80, 55], ['Language', 'dev_year', 60, 60]],
+  l: [['Developer', 'developedBy'], ['Website', 'developedBy', { total: true }], ['Website', 'builtWith', { total: true }], ['Framework', 'builtWith', { one: true }], ['Framework', 'uses', { total: true }], ['Language', 'uses', { one: true }]],
+});
+flashcards('#cards', [
+  { f: 'Six workflow steps', b: 'Read for the story; nouns → entities; verbs → relationships; facts → attributes; keys and multiplicity; test with scenarios.' },
+  { f: 'Where does salary go?', b: 'On actedIn: it is per (actor, film) pair.' },
+  { f: 'Key of Film', b: '(title, year), a composite key: both underlined.' },
+  { f: '"Every film has one director"', b: 'Arrow into Director (at most one) plus a design note or double line for "every" (at least one).' },
+  { f: 'Why test with scenarios?', b: 'Concrete cases (two directors? actor in two films?) expose wrong multiplicities before implementation.' },
+]);
+quiz('#quiz', [
+  { q: 'In "For studios, store name, address, and president", what is president?', opts: ['An entity set', 'A relationship', 'An attribute of Studio', 'A key'], a: 2, why: 'Slide 40 marks it as an attribute: one descriptive value per studio.' },
+  { q: 'Where does the arrow of directs point?', opts: ['Into Film', 'Into Director', 'Both', 'Neither'], a: 1, why: 'Each film has (at most) one director.' },
+  { q: 'Why is year underlined in Film?', opts: ['Years are unique', 'title alone is not unique; (title, year) together is the key', 'Every attribute of Film is a key', 'It is a derived attribute'], a: 1, why: 'Composite key (slide 11).' },
+  { q: 'Which relationship of slide 41 is many-to-many?', opts: ['directs', 'produces', 'actedIn', 'none'], a: 2, why: 'No arrows on actedIn.' },
+  { q: 'Workflow step 5 adds…', opts: ['entity sets', 'relationships', 'keys and multiplicity', 'test scenarios'], a: 2, why: 'Slide 36.' },
+]);
+ask('#try1', { q: 'How many attribute ovals does slide 41 contain in total (count every oval, including salary)?', a: 15, hint: 'Actor 4, Director 4, Film 3, Studio 3, plus the relationship attribute.', why: '4 + 4 + 3 + 3 + 1 = 15.' });
+</script>
+</body>
+</html>

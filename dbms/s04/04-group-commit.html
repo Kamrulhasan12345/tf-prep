@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Group Commit · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 04 (Sukarna) · Chapter 4 · Slides 13–14 · Book §19.1.6</div>
+<h1>Group Commit</h1>
+<p class="lede">Strict 2PL makes every transaction wait for a disk write of its commit record before it can release its locks. Group commit removes that wait without ever allowing a harmful dirty read. This chapter states the two rules, animates the slide's example including every crash case, and answers the slide's "Why?".</p>
+
+<h2>1. The cost that group commit removes</h2>
+
+<p>Under strict 2PL (Chapter 3), a transaction may release its exclusive locks only after its <code>COMMIT</code> log record has been <b class="term">flushed</b> (written from the log buffer in memory to the log on disk). A disk write takes milliseconds, while the transaction's real work may take microseconds. If every commit waits for its own disk write, other transactions sit waiting for the locks, and the disk does one small write per transaction.</p>
+
+<dl class="def">
+  <dt>Log buffer</dt><dd>The area of main memory where new log records are appended before they are written to disk. Records in the buffer are lost in a crash.</dd>
+  <dt>Flush</dt><dd>Writing log blocks from the buffer to disk. Only flushed records survive a crash.</dd>
+</dl>
+
+<h2>2. The group commit rule (slide 13)</h2>
+
+<p>The observation: we can avoid reading dirty data even without flushing each commit record immediately, <em>as long as log records are flushed in the order they were written</em>. Then locks may be released as soon as the commit record is in the log buffer.</p>
+
+<dl class="def">
+  <dt>Group commit</dt><dd>
+  <ol style="margin:.3em 0 0">
+    <li>Do not release locks until the transaction has finished and its <code>COMMIT</code> record at least appears in the log buffer.</li>
+    <li>Flush log records (log blocks) to disk in the order in which they were created. Typically many transactions' records are flushed together, later, as one group.</li>
+  </ol></dd>
+</dl>
+
+<p><strong>Advantage:</strong> no transaction needs an immediate flush at commit. Locks are released earlier, and one disk write carries the commit records of many transactions. For example, if a flush takes 10 ms and 50 transactions finish within that time, one write commits all 50, instead of 50 writes taking 500 ms of disk time. The slide notes that Oracle, MySQL/InnoDB and Microsoft SQL Server all use group-commit-style log flushing.</p>
+
+<p><strong>Durable commit vs NOWAIT commit</strong> (the slide's "compare"): in a <b>durable</b> commit, the system tells the application "committed" only after the commit record is on disk; with group commit the application waits for the group's flush, but locks are already free. In a <b>NOWAIT</b> (asynchronous, "delayed durability") commit, the application is told "committed" immediately, before the flush. That is faster still, but a crash can lose transactions the user was told had committed. Group commit itself never loses a reported commit; NOWAIT trades durability for speed.</p>
+
+<h2>3. The slide's example, step by step (slide 14)</h2>
+
+<p>T<sub>1</sub> writes X, finishes, and writes its <code>COMMIT</code> record into the log buffer. Following rule 1 it releases its lock on X at once. T<sub>2</sub> then reads X, finishes and writes its own <code>COMMIT</code> record, which lands in the buffer after T<sub>1</sub>'s. At this moment <em>neither</em> transaction is committed in the strict sense, because neither commit record is on disk, and T<sub>2</sub> has read a value whose writer is not yet durably committed.</p>
+
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="gc"></div>
+</figure>
+
+<div class="q">
+<h4>Slide 14: when T<sub>1</sub> is not committed on disk, T<sub>2</sub> is not committed either. Why?</h4>
+<p>T<sub>2</sub> read X only after T<sub>1</sub> released its lock, and T<sub>1</sub> released the lock only after its <code>COMMIT</code> record was in the log buffer (rule 1). T<sub>2</sub> wrote its own <code>COMMIT</code> record later still, so it sits after T<sub>1</sub>'s in the log. Log records reach disk in the order they were created (rule 2). So T<sub>2</sub>'s commit record cannot be on disk unless T<sub>1</sub>'s already is. Contrapositive: if T<sub>1</sub>'s is not on disk, T<sub>2</sub>'s is not on disk, and the recovery manager aborts both. T<sub>2</sub>'s read of an uncommitted value then has no effect on the database, so in effect there was no dirty read.</p>
+</div>
+
+<p>The two cases the recovery manager can find (textbook, Example 19.5):</p>
+<ol>
+  <li><strong>T<sub>1</sub> is committed on disk.</strong> Then, whether or not T<sub>2</sub> also is, T<sub>2</sub> read X from a committed transaction. Nothing is wrong.</li>
+  <li><strong>T<sub>1</sub> is not committed on disk.</strong> Then T<sub>2</sub> is not either; both are rolled back, and the database is as if neither ran.</li>
+</ol>
+<p>The animation's last frames show what happens if rule 2 is broken, for example because the buffer manager decides to write the block holding T<sub>2</sub>'s commit record early to reuse the buffer. Then a crash can leave T<sub>2</sub> committed and T<sub>1</sub> not. T<sub>2</sub>'s effect is permanent but based on a dirty read of X. This is exactly why the rule insists on flushing in creation order. Like the recoverable-schedule requirement of Chapter 2, group commit guarantees there is never a harmful read of dirty data.</p>
+
+<h2>4. When is a transaction really committed?</h2>
+<p>Group commit shows that "committed" covers several states. A transaction can (a) have finished its work, (b) have its <code>COMMIT</code> record in the log buffer, (c) have that record on the log disk, and (d) have it copied to an archive (a backup). A crash loses transactions in state (b); a media failure of the log disk can even lose those in state (c) that are not yet archived. Without failures all these states lead to the same outcome, but when reasoning about recovery the difference matters. In this lecture, "committed" means state (c).</p>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+
+<div class="key"><p><strong>Summary:</strong> group commit lets a transaction release its locks once its COMMIT record is in the log buffer, provided log records are flushed to disk in the order they were created, usually many at once. A later reader's commit record then always follows its writer's, so either the writer is durably committed or both are rolled back: dirty reads never do harm, and no transaction waits for its own disk write. Flushing out of order would break this.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="lecture.js"></script>
+<script>
+// one frame: transactions (left), log buffer (middle), log on disk (right), optional crash verdict
+function gcFrame({ t1, t2, lock, buf, disk, crash, verdict, bad }) {
+  const box = (y, name, txt, cls) => `<rect x="10" y="${y}" width="200" height="54" rx="6" class="${cls}"/><text x="22" y="${y + 22}" class="big">${name}</text><text x="22" y="${y + 42}" class="lbl">${txt}</text>`;
+  let s = box(40, 'T1', t1[0], t1[1]) + box(130, 'T2', t2[0], t2[1]);
+  s += `<text x="10" y="24" class="lbl">TRANSACTIONS</text><text x="10" y="222" class="lbl">lock on X: ${lock}</text>`;
+  const list = (x, title, recs, hot) => {
+    let h = `<text x="${x}" y="24" class="lbl">${title}</text><rect x="${x}" y="32" width="190" height="170" rx="6" class="cell-plain" style="fill:none"/>`;
+    recs.forEach((r, i) => { h += `<rect x="${x + 8}" y="${40 + i * 26}" width="174" height="22" class="${r[1] || 'cell'}"/><text x="${x + 16}" y="${55 + i * 26}" style="font-size:12px">${r[0]}</text>`; });
+    return h;
+  };
+  s += list(250, 'LOG BUFFER (memory)', buf) + list(484, 'LOG ON DISK', disk);
+  s += `<path d="M444 117 H480" class="s-acc" marker-end="url(#m-acc)"/><text x="462" y="108" text-anchor="middle" class="lbl">flush</text>`;
+  if (crash) s += `<text x="330" y="232" text-anchor="middle" class="red big">CRASH: the buffer is lost</text>`;
+  if (verdict) s += `<text x="10" y="258" class="${bad ? 'red' : 'grn'}" style="font-size:12.5px;font-weight:600">${verdict}</text>`;
+  return `<svg viewBox="0 0 684 270" width="684" role="img" aria-label="group commit">${s}</svg>`;
+}
+const S = '&lt;START T1&gt;', W1 = '&lt;T1, X, old, new&gt;', C1 = '&lt;COMMIT T1&gt;', S2 = '&lt;START T2&gt;', C2 = '&lt;COMMIT T2&gt;';
+const frames = [
+  { t1: ['active', 'cell'], t2: ['not started', 'cell-dim'], lock: 'none', buf: [], disk: [], cap: 'Start: empty log buffer, empty log on disk.' },
+  { t1: ['wrote X, holds lock on X', 'cell'], t2: ['not started', 'cell-dim'], lock: 'T1 (exclusive)', buf: [[S], [W1]], disk: [], cap: 'T1 writes X. Its log records go to the log buffer. X is dirty and locked by T1.' },
+  { t1: ['finished, COMMIT in buffer', 'cell-hl'], t2: ['not started', 'cell-dim'], lock: 'none (released)', buf: [[S], [W1], [C1, 'cell-hl']], disk: [], cap: 'T1 finishes and appends &lt;COMMIT T1&gt; to the <b>buffer</b>. Rule 1 is satisfied, so T1 <b>releases its lock on X now</b>, without waiting for a disk write.' },
+  { t1: ['finished, COMMIT in buffer', 'cell-hl'], t2: ['read X (T1\'s value)', 'cell'], lock: 'T2 (shared)', buf: [[S], [W1], [C1, 'cell-hl'], [S2]], disk: [], cap: 'T2 locks and reads X. T1 is not yet committed on disk, so strictly speaking this reads uncommitted data.' },
+  { t1: ['finished, COMMIT in buffer', 'cell-hl'], t2: ['finished, COMMIT in buffer', 'cell-hl'], lock: 'none', buf: [[S], [W1], [C1, 'cell-hl'], [S2], [C2, 'cell-hl']], disk: [], cap: 'T2 finishes; &lt;COMMIT T2&gt; goes into the buffer <b>after</b> &lt;COMMIT T1&gt;. Neither transaction is committed yet: no commit record is on disk.' },
+  { t1: ['committed', 'cell-new'], t2: ['committed', 'cell-new'], lock: 'none', buf: [], disk: [[S], [W1], [C1, 'cell-new'], [S2], [C2, 'cell-new']], cap: 'Normal case: the whole group is flushed <b>in order</b> with one disk write. Both transactions are now committed, and only one I/O was paid for two commits.' },
+  { t1: ['rolled back', 'cell-del'], t2: ['rolled back', 'cell-del'], lock: 'none', buf: [], disk: [[S], [W1]], crash: true, verdict: 'Case 2: T1 not committed on disk, so neither is T2. Both undone. T2\'s read had no effect: OK.', cap: 'Crash case A: the crash hits before &lt;COMMIT T1&gt; reached disk. Because flushing is in order, &lt;COMMIT T2&gt; is not on disk either. Recovery rolls back both.' },
+  { t1: ['committed', 'cell-new'], t2: ['rolled back', 'cell-del'], lock: 'none', buf: [], disk: [[S], [W1], [C1, 'cell-new'], [S2]], crash: true, verdict: 'Case 1: T1 committed on disk, so T2 read committed data. T2 is undone. OK.', cap: 'Crash case B: the flush got as far as &lt;COMMIT T1&gt; but not &lt;COMMIT T2&gt;. T1 survives, T2 is rolled back. T2 read X from a committed transaction, so nothing is wrong.' },
+  { t1: ['rolled back', 'cell-del'], t2: ['committed', 'cell-new'], lock: 'none', buf: [], disk: [[S2], [C2, 'cell-del']], crash: true, bad: true, verdict: 'Rule 2 broken: T2 committed after recovery, T1 not. T2 read dirty X. Inconsistent!', cap: 'What rule 2 prevents: suppose the block holding &lt;COMMIT T2&gt; was written to disk <b>out of order</b> and then the system crashed. Recovery sees T2 committed and T1 not: T2\'s permanent effect is based on a dirty read.' },
+];
+stepper('#gc', frames.map(f => ({ html: gcFrame(f), cap: f.cap })), { interval: 2600 });
+
+flashcards('#cards', [
+  { f: 'Group commit rule 1', b: 'Do not release locks until the transaction finishes and its COMMIT record is at least in the log buffer.' },
+  { f: 'Group commit rule 2', b: 'Flush log records to disk in the order they were created (often many at once, as a group).' },
+  { f: 'Why no harmful dirty read?', b: 'A reader\'s COMMIT record follows its writer\'s in the log, so in-order flushing never makes the reader durable without the writer.' },
+  { f: 'Benefit', b: 'Locks are released without waiting for a disk write, and one flush commits many transactions.' },
+  { f: 'NOWAIT commit', b: 'The application is told "committed" before the flush. Faster, but a crash can lose a reported commit.' },
+]);
+quiz('#quiz', [
+  { q: 'Under group commit, when may T<sub>1</sub> release its exclusive locks?', opts: ['After its first write', 'When its COMMIT record is in the log buffer', 'Only after its COMMIT record is on disk', 'After the next checkpoint'], a: 1, why: 'Rule 1. Strict 2PL would wait for the disk.' },
+  { q: 'T<sub>2</sub> read from T<sub>1</sub> under group commit, then a crash leaves T<sub>2</sub>\'s commit on disk. What can we conclude?', opts: ['T<sub>1</sub>\'s commit is also on disk', 'T<sub>1</sub> must be rolled back', 'The schedule was not recoverable', 'Nothing'], a: 0, why: 'T<sub>1</sub>\'s commit record was created earlier and flushing is in order.' },
+  { q: 'What breaks group commit?', opts: ['Flushing several transactions at once', 'Flushing a later log block before an earlier one', 'Releasing shared locks early', 'Using an undo/redo log'], a: 1, why: 'Out-of-order flushing can make a reader durable while its writer is lost.' },
+  { q: 'Which is NOT an advantage of group commit?', opts: ['Fewer disk writes per transaction', 'Shorter lock holding times', 'No transaction can ever be lost in a crash', 'No per-transaction flush at commit'], a: 2, why: 'Transactions whose commit records are still in the buffer are lost (rolled back) in a crash; group commit only guarantees this never leaves a dirty read in the database.' },
+]);
+ask('#try1', { q: 'A log flush takes 8 ms. During that time 40 transactions finish and append their COMMIT records. With group commit, how many log flushes do these 40 commits need?', a: 1, why: 'All 40 commit records go to disk in one write (versus 40 writes, 320 ms of disk time, without grouping).' });
+</script>
+</body>
+</html>

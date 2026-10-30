@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Why the Precedence-Graph Test Works · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 02 (Sukarna) · Chapter 5 · Slides 26–29 · Book §18.2.3</div>
+<h1>Why the Precedence-Graph Test Works</h1>
+<p class="lede">The test has two halves: a cycle rules out every serial order, and no cycle guarantees one. This chapter proves both, as the slides do, and animates the induction that peels one transaction at a time off the front of the schedule. The same induction reappears in the proof that two-phase locking works.</p>
+
+<p>Let P be “the precedence graph of S has a cycle” and Q be “S is not conflict-serializable”. The test claims P ⇔ Q. Slide 26 proves P ⇒ Q; slides 27–29 prove the other direction in the equivalent form ¬P ⇒ ¬Q (no cycle ⇒ conflict-serializable). (The slides call the second statement the “inverse”; together with P ⇒ Q it gives the full equivalence.)</p>
+
+<h2>1. A cycle means not conflict-serializable (slide 26)</h2>
+<p><strong>Claim.</strong> If the precedence graph of S has a cycle, then S is not conflict-serializable.</p>
+<p><strong>Proof (by contradiction).</strong> Suppose the graph has a cycle T₁ → T₂ → ⋯ → T<sub>n</sub> → T₁, and suppose some serial schedule S′ is conflict-equivalent to S. Each arc T<sub>k</sub> → T<sub>k+1</sub> comes from a conflicting pair whose order no legal swap can change, so in S′ all of T<sub>k</sub>'s actions precede all of T<sub>k+1</sub>'s (Chapter 4, slide 22). Following the arcs T₁ → T₂ → ⋯ → T<sub>n</sub>, the actions of T₁ precede those of T<sub>n</sub> in S′. But the arc T<sub>n</sub> → T₁ says the actions of T<sub>n</sub> precede those of T₁. Both cannot hold in a serial schedule, a contradiction. So no such S′ exists. ∎</p>
+
+<h2>2. No cycle means conflict-serializable (slides 27–29)</h2>
+<p><strong>Claim.</strong> If the precedence graph of S is acyclic, then S can be turned into a serial schedule by swaps of adjacent non-conflicting actions.</p>
+<p><strong>Proof by induction on n, the number of transactions in S.</strong></p>
+<p><strong>Basis, n = 1.</strong> A schedule of one transaction is already serial. (Slide 27: “trivial”.)</p>
+<p><strong>Induction step.</strong> Assume the claim for every schedule of n − 1 transactions, and let S<sub>n</sub> have n transactions and an acyclic graph.</p>
+<ol>
+  <li><strong>There is a node with no incoming arcs.</strong> In a finite acyclic graph, start anywhere and keep walking backwards along incoming arcs; without a cycle you can never revisit a node, so the walk must stop, at a node with no incoming arc. Call it node i, transaction T<sub>i</sub>.</li>
+  <li><strong>No action of another transaction that conflicts with an action of T<sub>i</sub> comes before it.</strong> If some action a<sub>j</sub> of T<sub>j</sub> conflicted with an action a<sub>i</sub> of T<sub>i</sub> and came ahead of it in S<sub>n</sub>, then T<sub>j</sub> &lt;<sub>S</sub> T<sub>i</sub>, and there would be an arc j → i. There is none.</li>
+  <li><strong>So T<sub>i</sub>'s actions can be moved to the front</strong>, keeping their own order. Move the first action of T<sub>i</sub> forward by adjacent swaps: everything it passes belongs to another transaction and, by step 2, does not conflict with it. Then the second action, up to just behind the first, and so on. The schedule becomes
+  <div class="formula">(actions of T<sub>i</sub>) (actions of the other n − 1 transactions)</div></li>
+  <li><strong>The tail is handled by the induction hypothesis.</strong> The tail is a schedule of n − 1 transactions whose actions keep their original relative order. Its precedence graph is acyclic (see the question below), so by hypothesis it can be swapped into a serial schedule. Putting T<sub>i</sub> first and the serial tail after it gives a serial schedule conflict-equivalent to S<sub>n</sub>. ∎</li>
+</ol>
+
+<div class="q">
+<h4>Slide 29 question: why is the precedence graph of the tail acyclic?</h4>
+<p>The tail contains exactly the actions of the other n − 1 transactions, in the same relative order as in S. So two of its actions conflict, and come in a given order, exactly when they did in S. Its precedence graph is therefore the original graph with node i and node i's arcs removed. Deleting nodes and arcs can never create a cycle: any cycle in the smaller graph would already be a cycle in the original one. Since the original is acyclic, so is the tail's graph.</p>
+</div>
+
+<h3>The induction, animated</h3>
+<p>Each round finds a transaction with no incoming arcs (yellow), moves all its actions to the front (they never pass a conflicting action), and then treats the rest as a smaller schedule. The order in which transactions are peeled off is a topological order of the graph. Try your own acyclic schedule:</p>
+<figure class="wide">
+<span class="anim-tag">Interactive animation</span>
+<div id="peel"></div>
+</figure>
+
+<h2>3. What the proof gives us</h2>
+<ul>
+  <li><strong>The test is exact for conflict-serializability:</strong> cycle ⇔ not conflict-serializable.</li>
+  <li><strong>Any topological order works.</strong> The proof may pick any node without incoming arcs at each step, so every topological order is reachable.</li>
+  <li><strong>The proof is a recipe.</strong> Repeatedly moving a source transaction to the front is exactly how to answer “transform the schedule into an equivalent serial schedule by swapping”.</li>
+</ul>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+
+<h3>Exam questions</h3>
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2012–13 · 4 marks</div>
+  <div class="exam-q"><p>Give a counter-example for: P(S₁) = P(S₂) ⇒ S₁, S₂ conflict equivalent. <em>(P(S) is the precedence graph of S.)</em></p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+  <p>The precedence graph records only <em>whether</em> some conflict points from T<sub>i</sub> to T<sub>j</sub>, not which pairs. Conflict-equivalence needs every conflicting pair in the same order. Take T₁: r₁(A); w₁(B) and T₂: w₂(A); r₂(B).</p>
+  <pre>S₁: r₁(A); w₂(A); r₂(B); w₁(B)
+S₂: w₂(A); r₁(A); w₁(B); r₂(B)</pre>
+  <ul>
+    <li>S₁: on A, r₁(A) before w₂(A): 1 → 2. On B, r₂(B) before w₁(B): 2 → 1.</li>
+    <li>S₂: on A, w₂(A) before r₁(A): 2 → 1. On B, w₁(B) before r₂(B): 1 → 2.</li>
+  </ul>
+  <p>So P(S₁) = P(S₂) = {1 → 2, 2 → 1}. But the conflicting pair r₁(A), w₂(A) is in opposite orders in S₁ and S₂, and no legal swap can reverse it, so <b>S₁ and S₂ are not conflict-equivalent</b>. (In S₁, T₁ reads the old A; in S₂ it reads T₂'s A, so they can produce different results.)</p>
+  <p>Note that any counter-example must have a <em>cyclic</em> graph: if P(S₁) = P(S₂) is acyclic, both schedules are conflict-equivalent to the same serial schedule (any topological order), and hence to each other.</p>
+  </div></details>
+</div>
+
+<div class="key"><p><strong>Summary:</strong> a cycle T₁ → ⋯ → Tₙ → T₁ would force each transaction before itself in any serial order, so a cyclic schedule is not conflict-serializable. If the graph is acyclic, some transaction has no incoming arc; no conflicting action precedes any of its actions, so it can be swapped to the front, and the remaining schedule has an acyclic graph and is handled by induction. The order of removal is a topological order.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="lecture.js"></script>
+<script>
+function peelSteps(s) {
+  const R = CC.csAnalyze(CC.parse(s).acts);
+  if (R.cycle) return null;
+  const steps = [], done = [];
+  let rest = R.acts.slice();
+  const rank = Object.fromEntries(R.order.map((t, i) => [t, i]));
+  const edges = (removed) => R.edges.map(e => ({ from: e.from, to: e.to, label: [...e.elems].join(','), cls: removed.has(e.from) ? 'dim' : '' }));
+  const view = (seq, cut, removed, mark) => `<div class="cc-two"><div class="swapbox">${CC.tokens(seq, -1, rank)}<p style="text-align:center;font:12px var(--mono);color:var(--muted)">${cut ? `serial part: ${cut} action${cut > 1 ? 's' : ''} · remaining schedule: ${seq.length - cut}` : 'whole schedule'}</p></div><div>${CC.graphSVG(R.txns, edges(removed), { dim: removed, mark })}</div></div>`;
+  const removed = new Set();
+  steps.push({ html: view(R.acts, 0, removed, new Set()), cap: `The schedule has ${R.txns.length} transactions and an acyclic precedence graph.` });
+  for (const t of R.order) {
+    const srcs = R.txns.filter(u => !removed.has(u) && !R.edges.some(e => e.to === u && !removed.has(e.from)));
+    steps.push({ html: view([...done, ...rest], done.length, removed, new Set([t])), cap: `In the remaining graph, ${srcs.map(u => 'T' + CC.subs(u)).join(', ')} ${srcs.length > 1 ? 'have' : 'has'} no incoming arc. Pick <b>T${CC.subs(t)}</b>: no action of another remaining transaction conflicts with one of its actions and comes before it.` });
+    const mine = rest.filter(a => a.t === t);
+    rest = rest.filter(a => a.t !== t);
+    done.push(...mine);
+    removed.add(t);
+    steps.push({ html: view([...done, ...rest], done.length, removed, new Set()), cap: `Swap T${CC.subs(t)}'s ${mine.length} action${mine.length > 1 ? 's' : ''} forward, keeping their order. The rest is a schedule of ${R.txns.length - removed.size} transaction${R.txns.length - removed.size === 1 ? '' : 's'} with T${CC.subs(t)}'s node removed from the graph${removed.size < R.txns.length ? ', still acyclic: repeat.' : '.'}` });
+  }
+  steps.push({ html: view(done, done.length, removed, new Set()), cap: `Serial schedule (${R.order.map(t => 'T' + CC.subs(t)).join(', ')}) reached. The order of peeling is a topological order.` });
+  return steps;
+}
+(function () {
+  const host = document.querySelector('#peel');
+  host.innerHTML = '<form class="cc-form"><label>Acyclic schedule<input type="text" value="r2(A); r1(B); w2(A); r3(A); w1(B); w3(A); r2(B); w2(B)" spellcheck="false" autocomplete="off"></label><button type="submit">Peel transactions</button></form><div class="cc-msg"></div><div class="cc-out"></div>';
+  const run = () => {
+    const v = host.querySelector('input').value, p = CC.parse(v, ['r', 'w']), msg = host.querySelector('.cc-msg');
+    if (p.err) { msg.className = 'cc-msg bad'; msg.textContent = p.err; return; }
+    if (CC.txnsOf(p.acts).length > 8) { msg.className = 'cc-msg bad'; msg.textContent = 'Use at most 8 transactions.'; return; }
+    const st = peelSteps(v);
+    if (!st) { msg.className = 'cc-msg bad'; msg.textContent = 'This schedule\'s precedence graph has a cycle, so it cannot be peeled into a serial schedule. Try an acyclic one.'; return; }
+    msg.textContent = ''; host.querySelector('.cc-out').innerHTML = '<div></div>';
+    stepper(host.querySelector('.cc-out').firstChild, st);
+  };
+  host.querySelector('form').addEventListener('submit', e => { e.preventDefault(); run(); });
+  run();
+})();
+flashcards('#cards', [
+  { f: 'Cycle ⇒ ?', b: 'Not conflict-serializable: following the cycle forces each transaction before itself.' },
+  { f: 'Induction basis', b: 'n = 1: one transaction is already serial.' },
+  { f: 'Why a source node exists', b: 'Walking backwards along arcs in a finite acyclic graph must stop at a node with no incoming arc.' },
+  { f: 'Why the source can move to the front', b: 'No conflicting action of another transaction precedes any of its actions, or there would be an arc into it.' },
+  { f: 'Why the tail is acyclic', b: 'Its graph is the old graph minus one node and its arcs; deleting cannot create cycles.' },
+]);
+quiz('#quiz', [
+  { q: 'In the induction step, which transaction is moved to the front?', opts: ['The one with the most actions', 'One with no incoming arcs in the precedence graph', 'The one that commits first', 'T₁'], a: 1, why: 'Only a source node can be moved to the front without passing a conflicting action.' },
+  { q: 'Which statement does the proof by contradiction (slide 26) establish?', opts: ['acyclic ⇒ conflict-serializable', 'cycle ⇒ not conflict-serializable', 'serializable ⇒ conflict-serializable', '2PL ⇒ conflict-serializable'], a: 1, why: 'It assumes a cycle and a serial order, and derives a contradiction.' },
+  { q: 'If P(S₁) = P(S₂) and both graphs are acyclic, then S₁ and S₂ are…', opts: ['always conflict-equivalent', 'never conflict-equivalent', 'conflict-equivalent only if serial', 'unrelated'], a: 0, why: 'Both are conflict-equivalent to the same serial schedule, and conflict-equivalence is symmetric and transitive.' },
+]);
+ask('#try1', { q: 'For the graph 2 → 1, 3 → 1 (three transactions), how many different serial orders can the peeling proof produce?', a: 2, why: 'First T₂ or T₃ (both sources), then the other, then T₁: (T₂,T₃,T₁) and (T₃,T₂,T₁).' });
+</script>
+</body>
+</html>

@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>INSERT, Bulk Insert and Copying Tables · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="../i03/lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 05 (Ishrak) · Chapter 1 · Slides 1–6 · Book §6.5.1</div>
+<h1>INSERT, Bulk Insert and Copying a Table</h1>
+<p class="lede">Lecture 5 covers the three statements that change data. This chapter is about adding rows: one at a time with VALUES, many at once by inserting the result of a query, and creating a whole new table from a query (CREATE TABLE … AS SELECT), which is how a table is copied, with or without its data.</p>
+
+<h2>1. The products database</h2>
+<p>All of Lecture 5 works on the textbook's products database (Garcia-Molina, Ullman, Widom, Figs. 2.20–2.21). The slides show part of it; the playground holds all of it:</p>
+<ul>
+  <li><code>Product(maker, model, type)</code>: who makes each model, and whether it is a pc, laptop or printer. <code>model</code> is the key, unique across all product types.</li>
+  <li><code>PC(model, speed, ram, hd, price)</code>: speed in GHz, RAM in MB, hard disk in GB.</li>
+  <li><code>Laptop(model, speed, ram, hd, screen, price)</code>: as PC, plus screen size in inches.</li>
+  <li><code>Printer(model, color, type, price)</code>: color is 'T' or 'F'; type is laser or ink-jet.</li>
+</ul>
+<div id="tabs"></div>
+<p>Note that a model's maker is stored only in Product. To know who made laptop 2007 you must look it up in Product: this is why several statements in this lecture contain a query inside them.</p>
+
+<h2>2. INSERT … VALUES, reviewed (slide 2)</h2>
+<pre>INSERT INTO &lt;table_name&gt; [(a1, a2, …, an)] VALUES (v1, v2, …, vn);</pre>
+<p>A <b class="term">full insert</b> gives a value for every attribute in declaration order; a <b class="term">partial insert</b> lists the attributes it gives, and the rest become NULL or their DEFAULT (Lec 03, Chapter 6). One INSERT … VALUES adds exactly one row.</p>
+<pre>INSERT INTO Student VALUES ('S123456789', 'John', 'Doe', 'Houston', 'TX');
+INSERT INTO Student VALUES ('S111111111', 'Mary', 'Jones', 'Houston', 'TX');
+INSERT INTO Student (id, first_name, last_name) VALUES ('S987654321', 'Jane', 'Smith');</pre>
+
+<h2>3. Bulk insert: saving a query's result (slide 3)</h2>
+<dl class="def">
+  <dt>INSERT INTO … SELECT</dt>
+  <dd>Inserts every row returned by a query into an <em>existing</em> table. The query replaces the VALUES list:
+  <pre>INSERT INTO &lt;existing_table_name&gt;
+SELECT …;
+
+INSERT INTO &lt;existing_table_name&gt; (a1, a2, …, an)
+SELECT …;</pre>
+  The query must return as many columns as the table has (or as are listed), in the same order and of compatible types. It may return zero, one or many rows.</dd>
+  <dt>CREATE TABLE … AS SELECT</dt>
+  <dd>Creates a <em>new</em> table whose columns are the query's output columns (same names and types) and fills it with the query's rows:
+  <pre>CREATE TABLE &lt;new_table_name&gt; AS
+SELECT …;</pre>
+  Oracle calls this a CTAS statement (Create Table As Select).</dd>
+</dl>
+
+<h2>4. Worked example: a laptop for every PC (slides 4–5)</h2>
+<p><em>Insert the fact that for every PC there is a laptop with the same manufacturer, speed, ram and hard disk, a 17-inch screen, a model number 1100 greater and a price $500 more.</em></p>
+<p>Two tables must change: Laptop gets the specifications, and Product gets the (maker, model, 'laptop') facts, because the maker is stored only there. Each is one bulk insert:</p>
+<pre>INSERT INTO Laptop
+SELECT model + 1100, speed, ram, hd, 17, price + 500
+FROM   PC;
+
+INSERT INTO Product
+SELECT maker, model + 1100, 'laptop'
+FROM   Product
+WHERE  type = 'pc';</pre>
+<p>How to read the first statement: the SELECT runs over PC and computes, for every PC row, one output row whose six values line up with Laptop's six columns (model, speed, ram, hd, screen, price). The constant <code>17</code> fills <code>screen</code> for every row. A SELECT list may contain expressions and constants, not only column names. The second statement takes the maker of every PC from Product and adds a laptop row with the shifted model number.</p>
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="a1"></div>
+</figure>
+<div class="q">
+<h4>Two questions the slides raise implicitly (worked answers)</h4>
+<p><strong>Does the second statement see its own new rows?</strong> It reads Product and inserts into Product. SQL's rule (textbook §6.5.1) is that the query is evaluated completely <em>before</em> any row is inserted. So the 13 new laptop rows are not themselves read by <code>WHERE type = 'pc'</code> (they are laptops anyway), and in general an INSERT … SELECT on the same table never loops on its own output.</p>
+<p><strong>Can the new model numbers clash with existing ones?</strong> PCs are 1001–1013, so the new laptops are 2101–2113. Existing laptops are 2001–2010, so there is no clash here. If some PC model + 1100 already existed in Laptop or Product, the primary key would reject the whole INSERT statement (Oracle undoes all rows of a failed statement).</p>
+</div>
+<div id="p1"></div>
+
+<h2>5. Copying a table (slide 6)</h2>
+<p><em>Create a duplicate copy of the Laptop table.</em></p>
+<pre>CREATE TABLE Laptop2 AS
+SELECT *
+FROM   Laptop;</pre>
+<p><code>SELECT *</code> returns every column and every row, so Laptop2 gets Laptop's columns (names and types) and a copy of all its rows. The copy is independent: later changes to Laptop do not affect Laptop2.</p>
+<p>To copy only the <em>schema</em> (the columns, no rows), add a condition that no row can satisfy. The table is still created from the query's column list, but the query returns zero rows:</p>
+<pre>CREATE TABLE Laptop3 AS
+SELECT *
+FROM   Laptop
+WHERE  1 = 0;</pre>
+<p>Two details matter in exam answers:</p>
+<ul>
+  <li><strong>Constraints are not copied</strong>, except NOT NULL. The new table has no primary key, no UNIQUE, no foreign keys, no indexes and no defaults. Add them afterwards with ALTER TABLE if needed.</li>
+  <li>A <strong>partial copy</strong> uses an ordinary query: <code>CREATE TABLE BigLaptop AS SELECT model, screen FROM Laptop WHERE screen &gt;= 17;</code></li>
+</ul>
+<div id="p2"></div>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div><div id="try2"></div>
+<h3>SQL exercises</h3>
+<div id="c1"></div><div id="c2"></div><div id="c3"></div><div id="c4"></div><div id="c5"></div><div id="c6"></div>
+
+<h3>Exam questions</h3>
+<div class="exam">
+  <div class="exam-src">DB QB · 21-22 3a · 5 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-2 | 2021–22 · 5 marks &nbsp;|&nbsp; BUET QBank · CSE 303 | L-3/T-1 | 2015–16 · part (d) of a 19-mark question</div>
+  <div class="exam-q"><p>Show SQL command to create a duplicate copy of table named Student. What the command will be if we just want to copy the schema not the data of Student table?</p>
+  <p>(CSE 303 2015–16 (d) asks the same for a table R: "Show the DDL to create a copy of a table R including the schema. What is the DDL if we just want to copy the schema and not the tuples?")</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><strong>Full copy (schema and data):</strong></p>
+    <pre>CREATE TABLE Student_Copy AS
+SELECT * FROM Student;</pre>
+    <p>The SELECT returns all columns and all rows of Student; CREATE TABLE … AS creates Student_Copy with the same column names and data types and inserts those rows.</p>
+    <p><strong>Schema only (no data):</strong></p>
+    <pre>CREATE TABLE Student_Schema AS
+SELECT * FROM Student
+WHERE  1 = 0;</pre>
+    <p>The condition <code>1 = 0</code> is false for every row, so the query returns no rows; the table is still created from the query's column list, so it has Student's columns and is empty.</p>
+    <p><strong>Note:</strong> in Oracle only the columns, their data types and NOT NULL constraints are copied. Primary keys, UNIQUE, CHECK and foreign-key constraints, defaults, indexes and triggers are not; re-create them with ALTER TABLE if they are needed. For table R the commands are the same with R in place of Student.</p>
+    <p>(The question bank also mentions <code>CREATE TABLE … LIKE</code> and <code>SELECT … INTO</code>. Those are MySQL/PostgreSQL and SQL Server forms; Oracle does not support them.)</p>
+  </div></details>
+</div>
+<div id="cq1"></div><div id="cq2"></div>
+
+<div class="key"><p><strong>Summary:</strong> INSERT … VALUES adds one row. INSERT INTO T [(cols)] SELECT … adds every row of a query; its columns must line up with T's, and may be expressions or constants. The query is evaluated fully before rows are inserted. CREATE TABLE T AS SELECT … creates and fills a new table: <code>SELECT *</code> copies a table, and <code>WHERE 1 = 0</code> copies only its columns. Only columns, types and NOT NULL are copied, not keys or other constraints.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/sqlplay.js"></script>
+<script src="../i03/lecture.js"></script>
+<script>
+sqlTables('#tabs', PCS, ['PC', 'Laptop']);
+(() => {
+  const PCH = ['model', 'speed', 'ram', 'hd', 'price'], LH = ['model', 'speed', 'ram', 'hd', 'screen', 'price'];
+  const PCR = [[1001, 2.66, 1024, 250, 2114], [1002, 2.10, 512, 250, 995], [1003, 1.42, 512, 80, 478], [1004, 2.80, 1024, 250, 649], [1005, 3.20, 512, 250, 630], [1006, 3.20, 1024, 320, 1049], [1007, 2.20, 1024, 200, 510], [1008, 2.20, 2048, 250, 770], [1009, 2.00, 1024, 250, 650], [1010, 2.80, 2048, 300, 770], [1011, 1.86, 2048, 160, 959], [1012, 2.80, 1024, 160, 649], [1013, 3.06, 512, 80, 529]];
+  const LR = [[2001, 2.00, 2048, 240, 20.1, 3673], [2002, 1.73, 1024, 80, 17.0, 949], [2003, 1.80, 512, 60, 15.4, 549], [2004, 2.00, 512, 60, 13.3, 1150], [2005, 2.16, 1024, 120, 17.0, 2500], [2006, 2.00, 2048, 80, 15.4, 1700], [2007, 1.83, 1024, 120, 13.3, 1429], [2008, 1.60, 1024, 100, 15.4, 900], [2009, 1.60, 512, 80, 14.1, 680], [2010, 2.00, 2048, 160, 15.4, 2300]];
+  const NEW = PCR.map(r => [r[0] + 1100, r[1], r[2], r[3], 17, r[4] + 500]);
+  const L = [['ins', 'INSERT INTO Laptop'], ['sel', 'SELECT model + 1100, speed, ram, hd, 17, price + 500'], ['from', 'FROM   PC;']];
+  const shortL = rows => rows.length > 12 ? [...rows.slice(0, 3), { c: ['…', '', '', '', '', ''] }, ...rows.slice(-13)] : rows;
+  stepper('#a1', [
+    { html: dmlFrame(L, 'from', [T(PCH, PCR, { name: 'PC (13 rows)' }), T(LH, LR, { name: 'Laptop before (10 rows)' })]), cap: '<b>Before.</b> PC has 13 rows; Laptop has 10. The SELECT part reads PC.' },
+    { html: dmlFrame(L, 'sel', [T(PCH, PCR.map((r, i) => ({ c: r, cls: i === 0 ? 'hl' : '' })), { name: 'PC' }), T(LH, [{ c: NEW[0], cls: 'new', side: '1001+1100, …, 17, 2114+500' }], { name: 'computed row' })]), cap: 'For the first PC (1001) the SELECT list computes (1001 + 1100, 2.66, 1024, 250, <b>17</b>, 2114 + 500) = (2101, 2.66, 1024, 250, 17, 2614). The six values line up with Laptop\'s six columns.' },
+    { html: dmlFrame(L, 'sel', [T(LH, NEW.map(r => ({ c: r, cls: 'new' })), { name: 'result of the SELECT (13 rows)' })]), cap: 'The query is evaluated completely first: 13 new rows, one per PC, all with screen 17.' },
+    { html: dmlFrame(L, 'ins', [T(LH, shortL([...LR.map(r => ({ c: r })), ...NEW.map(r => ({ c: r, cls: 'new' }))]), { name: 'Laptop after (23 rows)' })]), cap: '<b>After.</b> INSERT adds all 13 rows to Laptop (10 + 13 = 23 rows). Oracle reports "13 rows created." The second statement then adds (maker, model + 1100, \'laptop\') to Product for the same 13 models.' },
+  ], { interval: 2600 });
+})();
+sqlPlay('#p1', { setup: PCS, query: "INSERT INTO Laptop\nSELECT model + 1100, speed, ram, hd, 17, price + 500\nFROM   PC;\n\nINSERT INTO Product\nSELECT maker, model + 1100, 'laptop'\nFROM   Product\nWHERE  type = 'pc';\n\nSELECT * FROM Laptop WHERE model > 2100;", note: 'Run once. Running it a second time fails: the models 2101–2113 already exist (primary key). Press Reset to start again.' });
+sqlPlay('#p2', { setup: PCS, query: 'CREATE TABLE Laptop2 AS\nSELECT * FROM Laptop;\n\nCREATE TABLE Laptop3 AS\nSELECT * FROM Laptop WHERE 1 = 0;\n\nSELECT COUNT(*) FROM Laptop2;', note: 'Press Show tables: Laptop2 has 10 rows, Laptop3 has the same columns and no rows.' });
+flashcards('#cards', [
+  { f: 'INSERT … VALUES', b: 'Adds exactly one row.' },
+  { f: 'INSERT INTO T SELECT …', b: 'Adds every row the query returns to an existing table.' },
+  { f: 'Column matching in bulk insert', b: 'By position: same number of columns, same order, compatible types.' },
+  { f: 'Evaluation rule', b: 'The SELECT is evaluated completely before any row is inserted.' },
+  { f: 'CREATE TABLE T AS SELECT …', b: 'Creates a new table from the query\'s columns and fills it with its rows (CTAS).' },
+  { f: 'Copy schema only', b: 'CREATE TABLE T2 AS SELECT * FROM T WHERE 1 = 0;' },
+  { f: 'What CTAS copies', b: 'Columns, types, NOT NULL. Not keys, other constraints, defaults or indexes.' },
+]);
+quiz('#quiz', [
+  { q: 'Which statement creates a new table?', opts: ['INSERT INTO T SELECT …', 'CREATE TABLE T AS SELECT …', 'INSERT INTO T VALUES (…)', 'UPDATE T SET …'], a: 1, why: 'INSERT needs an existing table.' },
+  { q: 'Laptop has 6 columns. <code>INSERT INTO Laptop SELECT model, speed, ram, hd, price FROM PC</code>…', opts: ['works, screen becomes NULL', 'fails: 5 values for 6 columns', 'works, price goes into screen', 'creates a column'], a: 1, why: 'Without a column list, the query must supply all 6. With <code>INSERT INTO Laptop (model, speed, ram, hd, price)</code> it would work and screen would be NULL.' },
+  { q: 'How many rows does <code>INSERT INTO Laptop SELECT … FROM PC</code> add on the textbook data?', opts: ['10', '13', '23', '1'], a: 1, why: 'One per PC row.' },
+  { q: 'Which keeps only the columns of Student, with no rows?', opts: ['CREATE TABLE S2 AS SELECT * FROM Student WHERE 1 = 1', 'CREATE TABLE S2 AS SELECT * FROM Student WHERE 1 = 0', 'CREATE TABLE S2 LIKE Student', 'INSERT INTO S2 SELECT * FROM Student'], a: 1, why: '1 = 0 is false for every row. (LIKE is MySQL syntax.)' },
+  { q: 'Student has PRIMARY KEY (id). After <code>CREATE TABLE S2 AS SELECT * FROM Student</code>, does S2 reject duplicate ids?', opts: ['Yes', 'No: the key is not copied', 'Only for NULL ids', 'Only after COMMIT'], a: 1, why: 'CTAS copies columns and NOT NULL only.' },
+]);
+ask('#try1', { q: 'After running both statements of slide 5, how many rows does Product have? (It starts with 30.)', a: 43, why: '30 + 13 new laptop rows.' });
+ask('#try2', { q: 'What is the price of the new laptop made from PC 1005?', a: 1130, why: 'PC 1005 costs 630; 630 + 500 = 1130 (model 2105).' });
+chk('#c1', UNI, '<b>Easy.</b> Insert the three students of slide 2 into the empty <code>Student</code> table (two full inserts and the partial insert of Jane Smith).', STUDENT_ROWS, { check: 'state', table: 'Student' });
+chk('#c2', PCS, '<b>Slide 5, first statement.</b> Insert into Laptop, for every PC, a laptop with model + 1100, the same speed, ram and hd, a 17-inch screen and price + 500.', 'INSERT INTO Laptop\nSELECT model + 1100, speed, ram, hd, 17, price + 500\nFROM PC;', { check: 'state', table: 'Laptop' });
+chk('#c3', PCS, "<b>Slide 5, second statement.</b> Insert into Product the corresponding (maker, model + 1100, 'laptop') facts for every PC.", "INSERT INTO Product\nSELECT maker, model + 1100, 'laptop'\nFROM Product\nWHERE type = 'pc';", { check: 'state', table: 'Product' });
+chk('#c4', PCS, '<b>Copy a table.</b> Create <code>Laptop2</code> as a full copy of Laptop.', 'CREATE TABLE Laptop2 AS SELECT * FROM Laptop;', { check: 'state', table: 'Laptop2' });
+chk('#c5', PCS, '<b>Partial copy with a column list.</b> Create an empty table <code>Cheap</code> with the columns <code>model, price</code> of PC (copy the schema only). Then insert into it the model and price of every PC under $600, using a bulk insert.', 'CREATE TABLE Cheap AS SELECT model, price FROM PC WHERE 1 = 0;\nINSERT INTO Cheap SELECT model, price FROM PC WHERE price < 600;', { check: 'state', table: 'Cheap' });
+chk('#c6', PCS, '<b>Exam style (CSE 215 2021–22, variant).</b> For every PC insert a laptop with the same speed, ram and hard disk, a 17-inch screen, a model number 1100 greater and a price <b>$400</b> more, into <em>both</em> Laptop and Product. (The checker looks at Product; make sure Laptop is filled too.)', "INSERT INTO Laptop\nSELECT model + 1100, speed, ram, hd, 17, price + 400 FROM PC;\nINSERT INTO Product\nSELECT maker, model + 1100, 'laptop' FROM Product WHERE type = 'pc';", { check: 'state', table: 'Product', hint: 'Two bulk inserts, as on slide 5, with 400 instead of 500. The full exam question is worked in Chapter 2.' });
+chk('#cq1', UNI, '<b>Exam question, part 1</b> on the Lecture 3 data: create <code>Students_Copy</code> as a duplicate of the <code>Students</code> table (schema and data).', 'CREATE TABLE Students_Copy AS SELECT * FROM Students;', { check: 'state', table: 'Students_Copy' });
+chk('#cq2', UNI, '<b>Exam question, part 2.</b> Create <code>Students_Schema</code> with the columns of <code>Students</code> and no rows.', 'CREATE TABLE Students_Schema AS SELECT * FROM Students WHERE 1 = 0;', { check: 'state', table: 'Students_Schema', hint: 'A WHERE condition that is false for every row.' });
+</script>
+</body>
+</html>

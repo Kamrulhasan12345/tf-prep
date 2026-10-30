@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Multiversion Concurrency Control · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="../s02/lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 03 (Sukarna) · Chapter 6 · Slides 29–34 · Book §18.8.5–18.8.6</div>
+<h1>Multiversion Concurrency Control, and Timestamps vs Locking</h1>
+<p class="lede">If the database keeps old versions of each element, a transaction that is “too late” to read the current value can read the version that was current at its timestamp, so reads never abort. This chapter gives the MVCC rules, animates the slides' two examples, and closes with when timestamps beat locking.</p>
+
+<h2>1. The idea (slide 29)</h2>
+<p>Chapter 5's Fig. 18.40 aborted T₃ (TS 175) because A had been overwritten by T₂ (TS 200), even though the value T₁ wrote at time 150 was exactly what T₃ needed. <b class="term">Multiversion concurrency control</b> (MVCC; the textbook calls it multiversion timestamping, sometimes abbreviated MVTO) keeps that old value.</p>
+<dl class="def">
+  <dt>Version X<sub>t</sub></dt><dd>A copy of element X written by the transaction with timestamp t. Each write creates a new version; versions are identified by their write times, which never change.</dd>
+  <dt>RT(X<sub>t</sub>)</dt><dd>The read time of a version: the largest timestamp of a transaction that has read that version.</dd>
+</dl>
+<p>When T reads X, the scheduler gives it the version of X that was current at T's timestamp, so <strong>a read is never aborted</strong>. The method is cheap when elements are disk blocks: the buffer manager just keeps the old blocks that some active transaction might still need.</p>
+
+<h2>2. The protocol (slides 30–31)</h2>
+<div class="key">
+<ol>
+  <li><strong>Write.</strong> When a legal write w<sub>T</sub>(X) occurs, create a new version X<sub>t</sub> with t = TS(T), i.e. WT(X<sub>t</sub>) = TS(T).</li>
+  <li><strong>Read.</strong> When r<sub>T</sub>(X) occurs, find the version X<sub>t</sub> with t ≤ TS(T) such that no other version X<sub>t′</sub> has t &lt; t′ ≤ TS(T): the version written immediately before T theoretically executed. T reads it, and RT(X<sub>t</sub>) := max(RT(X<sub>t</sub>), TS(T)).</li>
+  <li><strong>Reject a write.</strong> For w<sub>T</sub>(X), find the version X<sub>t</sub> with the largest t ≤ TS(T) (the version T's write would follow). If RT(X<sub>t</sub>) &gt; TS(T), reject the write and roll back T.</li>
+  <li><strong>Delete old versions.</strong> If a version X<sub>t</sub> exists such that no active transaction has a timestamp less than t, every version of X older than X<sub>t</sub> may be deleted.</li>
+</ol>
+</div>
+<p><strong>Note on the slides' inequalities.</strong> Slide 29 says T reads the latest version with TS(T) &gt; WT(X); slide 30 says t ≤ TS(T). The correct condition is <strong>t ≤ TS(T)</strong> (a transaction that wrote X and then reads it again must see its own version, whose write time equals its own timestamp). Slide 30's write check says “latest X<sub>t</sub> with WT(X<sub>t</sub>) &lt; TS(T)”; again ≤ is the textbook's version, and it only matters when T writes X a second time.</p>
+
+<div class="q">
+<h4>Slide 31 question: why are versions older than X<sub>t</sub> no longer required?</h4>
+<p>An old version X<sub>s</sub> (s &lt; t) could only be read by a transaction whose timestamp lies between s and t: any transaction with timestamp ≥ t reads X<sub>t</sub> or a newer version. If no active transaction has a timestamp below t, and every new transaction gets a larger timestamp than all existing ones, no present or future transaction has a timestamp below t. So nobody will ever read X<sub>s</sub>. Nor is X<sub>s</sub> needed for write checks: a writer with timestamp below t would be required for that, and there is none. The versions can be discarded.</p>
+</div>
+
+<h2>3. Slide 32: reads never abort</h2>
+<p>The transactions of Fig. 18.40 again (TS 150, 200, 175, 225), now with versions (textbook Example 18.28, Fig. 18.42):</p>
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="f42"></div>
+<figcaption><b>Figure 1.</b> Initially only A₀ exists. T₁ reads A₀ and creates A₁₅₀; T₂ reads A₁₅₀ and creates A₂₀₀; T₃ (175) reads A₁₅₀ instead of aborting; T₄ (225) reads A₂₀₀.</figcaption>
+</figure>
+<p>T₃ is not aborted: the latest version with write time ≤ 175 is A₁₅₀, exactly the value T₃ would have seen had every transaction run instantaneously at its timestamp.</p>
+
+<h2>4. Slide 33: a write that must be rejected</h2>
+<p>X has versions X₅₀ and X₁₀₀. X₅₀ was read by a transaction with timestamp 80, so RT(X₅₀) = 80. Now a transaction T with timestamp 60 tries to write X.</p>
+<figure><div id="tl"></div><figcaption><b>Figure 2.</b> A write that would make events physically unrealizable (textbook Fig. 18.41).</figcaption></figure>
+<p>If T's write were allowed, it would create X₆₀. Then the transaction with timestamp 80 should have read X₆₀ (60 is the latest write time ≤ 80), but it actually read X₅₀. The version T's write would follow is X₅₀, and RT(X₅₀) = 80 &gt; 60 = TS(T), so <strong>the write is rejected and T is rolled back</strong>. Writes can still abort under MVCC; only reads cannot.</p>
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="f41"></div>
+<figcaption><b>Figure 3.</b> The same situation in the simulator: T₁ (50) writes, T₃ (80) reads X₅₀, T₄ (100) writes, T₂ (60) tries to write.</figcaption>
+</figure>
+
+<h3>Try MVCC</h3>
+<p>The timestamp simulator with “multiversion” ticked. Compare a schedule with the box ticked and unticked: e.g. <code>w1(A) w2(A) w3(A) r2(A) r4(A)</code> (textbook Exercise 18.8.2(a)).</p>
+<figure class="wide">
+<span class="anim-tag">Interactive</span>
+<div id="tool"></div>
+</figure>
+
+<h2>5. Timestamps versus locking (slide 34)</h2>
+<ul>
+  <li><strong>Timestamping is better when most transactions are read-only</strong>, or when concurrent transactions rarely read and write the same elements: there is little to abort, and nobody waits for locks.</li>
+  <li><strong>Locking is better in high-conflict situations.</strong> Locking frequently delays transactions while they wait for locks, but if transactions often read and write the same elements, a timestamp scheduler rolls them back often, and a rollback wastes all the work done so far and adds even more delay than waiting.</li>
+  <li>Locking avoids such rollbacks because it maintains conflict-serializability by delaying, not aborting.</li>
+</ul>
+<p><strong>A compromise used by several commercial systems</strong> (textbook §18.8.6): split transactions into read-only and read/write. Read/write transactions use two-phase locking. Read-only transactions use multiversion timestamps: the versions created by writers are kept, and each read-only transaction reads the versions appropriate to its timestamp. A read-only transaction then never aborts and is rarely delayed. This is essentially how “snapshot” reads in systems like PostgreSQL and Oracle work.</p>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+<div id="try2"></div>
+
+<h3>Exam questions</h3>
+<div class="exam">
+  <div class="exam-src">DB QB · 23-24 7c · 13 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-1 | 2023–24 · 13 marks</div>
+  <div class="exam-q"><p>In which scenario, timestamp-based concurrency control performs better than lock-based protocol? In which scenario, lock-based protocols are preferable? Discuss the rules of multi-version concurrency control (MVCC) protocol using a suitable example.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+  <p><b>Timestamps better:</b> when most transactions are read-only, or concurrent transactions rarely access the same elements with at least one write. Then few transactions are ever rolled back and nobody pays for waiting on locks or for deadlock handling.</p>
+  <p><b>Locking better:</b> in high-conflict workloads, where concurrent transactions often read and write the same elements. A timestamp scheduler would roll back many of them (losing their work and restarting), which costs more than the delays of waiting for locks. Locking delays but does not abort (except to break deadlocks).</p>
+  <p><b>MVCC rules.</b> Each element keeps versions X<sub>t</sub>, where t is the timestamp of the writer; each version has a read time RT(X<sub>t</sub>).</p>
+  <ol>
+    <li>A legal write w<sub>T</sub>(X) creates a new version X<sub>TS(T)</sub>.</li>
+    <li>A read r<sub>T</sub>(X) reads the version X<sub>t</sub> with the largest t ≤ TS(T) and sets RT(X<sub>t</sub>) := max(RT(X<sub>t</sub>), TS(T)). Reads never abort.</li>
+    <li>A write w<sub>T</sub>(X) is rejected (T rolled back) if the version X<sub>t</sub> with the largest t ≤ TS(T) has RT(X<sub>t</sub>) &gt; TS(T): a later reader already read X<sub>t</sub> when it should have read T's value.</li>
+    <li>Versions older than X<sub>t</sub> can be deleted once no active transaction has a timestamp less than t.</li>
+  </ol>
+  <p><b>Example</b> (slide 32): TS(T₁) = 150, TS(T₂) = 200, TS(T₃) = 175, TS(T₄) = 225; schedule r₁(A) w₁(A) r₂(A) w₂(A) r₃(A) r₄(A).</p>
+  <div class="tbl"><table><tr><th>action</th><th>MVCC</th><th>single-version TO</th></tr>
+  <tr><td>r₁(A)</td><td>reads A₀; RT(A₀) = 150</td><td>RT = 150</td></tr>
+  <tr><td>w₁(A)</td><td>creates A₁₅₀</td><td>WT = 150</td></tr>
+  <tr><td>r₂(A)</td><td>reads A₁₅₀; RT(A₁₅₀) = 200</td><td>RT = 200</td></tr>
+  <tr><td>w₂(A)</td><td>creates A₂₀₀ (RT(A₁₅₀) = 200 ≤ 200)</td><td>WT = 200</td></tr>
+  <tr><td>r₃(A)</td><td><b>reads A₁₅₀</b> (latest ≤ 175)</td><td class="bad">abort T₃: 175 &lt; WT = 200</td></tr>
+  <tr><td>r₄(A)</td><td>reads A₂₀₀; RT(A₂₀₀) = 225</td><td>RT = 225</td></tr></table></div>
+  <p>Write rejection example (slide 33): versions X₅₀ (RT = 80) and X₁₀₀; a transaction with TS 60 writing X would follow X₅₀, whose read time 80 &gt; 60, so it is rolled back.</p>
+  </div></details>
+</div>
+
+<div class="key"><p><strong>Summary:</strong> MVCC keeps a version of each element per writer. A read gets the latest version written at or before its timestamp, so reads never abort. A write is rejected if the version it would follow has already been read by a later transaction. Versions older than X<sub>t</sub> are discarded once no active transaction is older than t. Timestamping (especially multiversion) suits read-mostly, low-conflict workloads; locking suits high-conflict ones; systems often use 2PL for writers and multiversion reads for read-only transactions.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../s02/lecture.js"></script>
+<script>
+const run = (sel, s, o) => stepper(sel, CC.tsSteps(CC.parse(s).acts, o).steps, { interval: 2300 });
+run('#f42', 'r1(A) w1(A) r2(A) w2(A) r3(A) r4(A)', { ts: { 1: 150, 2: 200, 3: 175, 4: 225 }, multi: true });
+run('#f41', 'w1(X) r3(X) w4(X) w2(X)', { ts: { 1: 50, 3: 80, 4: 100, 2: 60 }, multi: true });
+CC.tsTool('#tool', 'r1(A) w1(A) r2(A) w2(A) r3(A) r4(A)', { ts: 'T1=150, T2=200, T3=175, T4=225', multi: true });
+// Fig 18.41 timeline
+(() => {
+  const Y = 90; let s = `<path d="M30 ${Y} H520" class="s-fg" marker-end="url(#m-fg)"/><text x="518" y="${Y + 46}" text-anchor="end" class="lbl">timestamps</text>`;
+  const up = (x, l) => `<path d="M${x} ${Y + 30} V${Y + 4}" class="s-fg" marker-end="url(#m-fg)"/><text x="${x}" y="${Y + 46}" text-anchor="middle" class="big">${l}</text>`;
+  s += up(90, 'X₅₀') + up(410, 'X₁₀₀');
+  s += `<path d="M260 30 V${Y - 4}" class="s-acc" marker-end="url(#m-acc)"/><text x="260" y="22" text-anchor="middle" class="big acc">RT(X₅₀) = 80</text>`;
+  s += `<path d="M170 ${Y + 30} V${Y + 4}" class="s-red dash" marker-end="url(#m-red)"/><text x="170" y="${Y + 46}" text-anchor="middle" class="lbl red">attempted write</text><text x="170" y="${Y + 60}" text-anchor="middle" class="lbl red">by TS 60</text>`;
+  document.querySelector('#tl').innerHTML = `<svg viewBox="0 0 540 ${Y + 70}" width="540" role="img" aria-label="Versions 50 and 100, read at 80, write at 60">${s}</svg>`;
+})();
+flashcards('#cards', [
+  { f: 'MVCC read rule', b: 'Read the version Xₜ with the largest t ≤ TS(T); never abort.' },
+  { f: 'MVCC write rule', b: 'Create version X_TS(T), unless the preceding version was read by a later transaction (then roll back).' },
+  { f: 'RT(Xₜ)', b: 'Largest timestamp of a transaction that read version Xₜ.' },
+  { f: 'Version garbage collection', b: 'Delete versions older than Xₜ once no active transaction has timestamp < t.' },
+  { f: 'Timestamps win when…', b: 'Most transactions are read-only or conflicts are rare.' },
+  { f: 'Locking wins when…', b: 'Conflicts are frequent: rollbacks would cost more than waiting.' },
+]);
+quiz('#quiz', [
+  { q: 'Versions A₀, A₁₅₀, A₂₀₀. A transaction with TS 190 reads A. Which version?', opts: ['A₀', 'A₁₅₀', 'A₂₀₀', 'it aborts'], a: 1, why: 'Largest write time ≤ 190.' },
+  { q: 'Versions X₅₀ (RT 80) and X₁₀₀. A transaction with TS 90 writes X. Result?', opts: ['Rejected', 'Creates X₉₀', 'Overwrites X₁₀₀', 'Waits'], a: 1, why: 'Preceding version X₅₀ has RT 80 ≤ 90, so the write is legal.' },
+  { q: 'Can an MVCC read be rolled back?', opts: ['Yes, if TS < WT', 'No, a suitable version always exists', 'Only with commit bits', 'Only for read-only transactions'], a: 1, why: 'That is the point of keeping versions.' },
+  { q: 'Active transactions have timestamps 120 and 300. Versions A₀, A₁₀₀, A₁₅₀. Which can be deleted?', opts: ['A₀', 'A₀ and A₁₀₀', 'none', 'all but A₁₅₀'], a: 0, why: 'A₁₀₀ is still needed by the transaction with TS 120 (100 ≤ 120 < 150); A₀ is older than A₁₀₀ and no active transaction is older than 100.' },
+]);
+ask('#try1', { q: 'TS(Tᵢ) = i. MVCC schedule w₁(A) w₂(A) w₃(A) r₂(A) r₄(A). Which version does r₂(A) read? (write like A2)', a: ['A2', 'A₂'], why: 'Latest version with write time ≤ 2 is T₂\'s own A₂.' });
+ask('#try2', { q: 'Same schedule, single-version timestamp ordering (commit bits off). How many transactions are rolled back?', a: 1, why: 'r₂(A): TS 2 < WT(A) = 3, so T₂ is rolled back; r₄(A) reads T₃\'s value.' });
+</script>
+</body>
+</html>

@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Beyond the Slides: 4NF · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 01 (Sukarna) · Chapter 18 · Exam topics beyond the slides · Book §3.6.3–3.6.6</div>
+<h1>Exam Topics Beyond the Slides: Fourth Normal Form and the Normal-Form Hierarchy</h1>
+<p class="lede">The slides mention 4NF only in passing (“we will not cover in details”), and the syllabus stops at §3.6.2. One exam question asks for BCNF, 3NF and 4NF and how they relate, so this chapter gives the minimum needed: MVD rules, the 4NF definition and decomposition, and the textbook's comparison table.</p>
+
+<h2>1. A few rules for MVDs (book §3.6.3)</h2>
+<ul>
+  <li><strong>Trivial MVDs.</strong> X ↠ Y holds in every relation if Y ⊆ X, <em>or</em> if X ∪ Y is all of R's attributes (swapping the Y-part of two tuples that agree on X just swaps the tuples).</li>
+  <li><strong>FD promotion.</strong> Every FD X → Y is an MVD X ↠ Y (Chapter 15).</li>
+  <li><strong>Complementation.</strong> If X ↠ Y, then X ↠ Z where Z is all attributes not in X or Y. For AvailableShirts, shirt_code ↠ size gives shirt_code ↠ color.</li>
+  <li><strong>Transitivity</strong> holds for MVDs, but <strong>splitting does not</strong>: name ↠ street city does not give name ↠ street (a street belongs with its city).</li>
+</ul>
+
+<h2>2. Fourth normal form (book §3.6.4)</h2>
+<dl class="def">
+  <dt>4NF</dt><dd>R is in 4NF if, whenever X ↠ Y is a nontrivial MVD, X is a superkey. It is the BCNF condition applied to MVDs. Keys are still defined by FDs only.</dd>
+</dl>
+<p>Since every FD is an MVD, a 4NF relation has no BCNF violation either: <strong>4NF ⇒ BCNF ⇒ 3NF</strong>. AvailableShirts is in BCNF but not 4NF: shirt_code ↠ size is nontrivial (shirt_code ∪ size is not all of R, and size ⊄ shirt_code), and shirt_code is not a superkey.</p>
+<p><strong>Decomposition into 4NF (Algorithm 3.33)</strong> mirrors BCNF: find a 4NF violation X ↠ Y; split R into R₁ = X ∪ Y and R₂ = X ∪ (R − X − Y); find the dependencies of each piece and repeat. The MVD itself guarantees the join is lossless. For AvailableShirts: violation shirt_code ↠ size gives (shirt_code, size) and (shirt_code, color): slide 61's decomposition. In each piece the remaining MVD covers all attributes, so it is trivial and both pieces are in 4NF.</p>
+
+<figure>
+<svg viewBox="0 0 520 220" width="520" role="img" aria-label="nested sets 3NF contains BCNF contains 4NF">
+  <rect x="10" y="10" width="500" height="200" rx="14" class="cell"/><text x="26" y="34" class="big">Relations in 3NF</text>
+  <rect x="60" y="48" width="400" height="150" rx="12" class="cell-hl"/><text x="76" y="72" class="big">Relations in BCNF</text>
+  <rect x="120" y="88" width="280" height="96" rx="10" class="cell-new"/><text x="136" y="112" class="big">Relations in 4NF</text>
+  <text x="136" y="140" class="lbl">no nontrivial MVD except from a superkey</text>
+  <text x="76" y="190" class="lbl">e.g. AvailableShirts</text>
+  <text x="26" y="204" class="lbl">e.g. Bookings</text>
+</svg>
+<figcaption><b>Figure 1.</b> 4NF implies BCNF implies 3NF (book Fig. 3.12).</figcaption>
+</figure>
+
+<h2>3. What each normal form guarantees (book Fig. 3.13)</h2>
+<div class="tbl"><table>
+<tr><th>Property of the decomposition</th><th>3NF</th><th>BCNF</th><th>4NF</th></tr>
+<tr><td>Eliminates redundancy due to FDs</td><td class="bad">No (not guaranteed)</td><td class="good">Yes</td><td class="good">Yes</td></tr>
+<tr><td>Eliminates redundancy due to MVDs</td><td class="bad">No</td><td class="bad">No</td><td class="good">Yes</td></tr>
+<tr><td>Preserves FDs</td><td class="good">Yes</td><td class="bad">Not always</td><td class="bad">Not always</td></tr>
+<tr><td>Preserves MVDs</td><td class="bad">Not always</td><td class="bad">Not always</td><td class="bad">Not always</td></tr>
+</table></div>
+<p>All three decompositions are lossless. In practice designers aim for BCNF, fall back to 3NF when BCNF would lose an FD they must enforce, and check for independent multivalued facts (4NF) separately.</p>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+
+<h3>Exam questions</h3>
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2010–11 · 17 marks</div>
+  <div class="exam-q"><p>Define BCNF, 3NF, and 4NF. Describe relationships among these normal forms.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><strong>BCNF:</strong> R is in BCNF if for every nontrivial FD X → Y on R, X is a superkey of R. Example: Movies2(title, year, length, genre, studioName) with key {title, year}.</p>
+    <p><strong>3NF:</strong> R is in 3NF if for every nontrivial FD X → Y, either X is a superkey or every attribute of Y − X is prime (a member of some candidate key). Example in 3NF but not BCNF: Bookings(title, theatre, city) with theatre → city and title city → theatre (city is prime).</p>
+    <p><strong>4NF:</strong> R is in 4NF if for every nontrivial MVD X ↠ Y (Y ⊄ X and X ∪ Y ≠ R), X is a superkey. Example in BCNF but not 4NF: AvailableShirts(shirt_code, size, color) with shirt_code ↠ size; it has no nontrivial FD (so BCNF), but shirt_code is not a superkey. Its 4NF decomposition is (shirt_code, size), (shirt_code, color).</p>
+    <p><strong>Relationships:</strong></p>
+    <ul>
+      <li>Containment: every 4NF relation is in BCNF (an FD is a special MVD, so a BCNF violation would be a 4NF violation), and every BCNF relation is in 3NF (its first clause already holds). 4NF ⊂ BCNF ⊂ 3NF; the examples above show both inclusions are strict.</li>
+      <li>Redundancy: 3NF may keep some FD redundancy (theatre → city repeats the city); BCNF removes all redundancy caused by FDs; only 4NF also removes redundancy from independent multivalued facts.</li>
+      <li>Decomposition: all three can be reached by lossless decompositions. 3NF synthesis always preserves FDs; BCNF and 4NF decompositions may lose some.</li>
+    </ul>
+  </div></details>
+</div>
+
+<div class="key"><p><strong>Summary:</strong> 4NF requires every nontrivial MVD to have a superkey on the left; it removes the redundancy of independent set-valued facts that BCNF misses, and is reached by splitting on a violating MVD X ↠ Y into XY and X(R − X − Y). 4NF ⊂ BCNF ⊂ 3NF; only 3NF guarantees FD preservation, only 4NF removes MVD redundancy.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="lecture.js"></script>
+<script>
+flashcards('#cards', [
+  { f: '4NF', b: 'Every nontrivial MVD X ↠ Y has X a superkey.' },
+  { f: 'Trivial MVD', b: 'Y ⊆ X, or X ∪ Y = all attributes.' },
+  { f: 'Complementation', b: 'X ↠ Y implies X ↠ (R − X − Y).' },
+  { f: '4NF split on X ↠ Y', b: 'R₁ = X ∪ Y, R₂ = X ∪ (R − X − Y).' },
+  { f: 'Hierarchy', b: '4NF ⊂ BCNF ⊂ 3NF.' },
+]);
+quiz('#quiz', [
+  { q: 'AvailableShirts is in…', opts: ['3NF only', 'BCNF but not 4NF', '4NF', 'not even 3NF'], a: 1, why: 'No nontrivial FD, but shirt_code ↠ size with shirt_code not a superkey.' },
+  { q: 'Which normal form\'s decomposition always preserves FDs?', opts: ['3NF', 'BCNF', '4NF', 'all'], a: 0, why: 'The synthesis algorithm keeps every minimal-basis FD inside one relation.' },
+  { q: 'In R(A, B, C), is A ↠ BC trivial?', opts: ['Yes', 'No'], a: 0, why: 'A ∪ BC is all of R.' },
+]);
+</script>
+</body>
+</html>

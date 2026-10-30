@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Lock Table · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="../s02/lecture.css">
+<style>
+.ht { display: grid; gap: 6px; font: 12.5px/1.35 var(--mono); }
+.ht-row { display: flex; align-items: flex-start; gap: 8px; flex-wrap: wrap; }
+.ht-b { min-width: 3.2em; border: 1.5px solid var(--fg); background: var(--plate); padding: 4px 6px; text-align: center; border-radius: 3px; }
+.ht-b.empty { color: var(--idle); border-color: var(--idle); }
+.ht-arrow { color: var(--muted); padding-top: 5px; }
+.ht .lt-e { min-width: 13em; }
+</style>
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 03 (Sukarna) · Chapter 3 · Slides 10–14 · Book §18.5</div>
+<h1>The Lock Table and the Locking Scheduler</h1>
+<p class="lede">How does a real scheduler decide, in constant time, whether a lock can be granted? It keeps a hash table of lock-table entries, each with a group mode, a waiting bit and a list of holders and waiters. This chapter describes the textbook's two-part scheduler, the entry structure, and the rules for lock and unlock requests, with an animated lock table and the exam questions on lock tables.</p>
+
+<h2>1. A scheduler that inserts the locks (textbook §18.5.1)</h2>
+<p>Real transactions do not write lock and unlock actions themselves. The textbook's simple architecture rests on two principles: (1) the <em>scheduler</em> inserts lock actions into the stream of reads and writes; (2) transactions do not release locks: the scheduler releases all of a transaction's locks when the transaction manager says it is committing or aborting. (Holding locks until commit is “strict” two-phase locking; it is automatically 2PL.)</p>
+<figure>
+<svg viewBox="0 0 600 260" width="600" role="img" aria-label="Two-part scheduler">
+  <text x="250" y="16" text-anchor="middle" class="lbl">read, write, commit, abort requests from transactions</text>
+  <path d="M250 22 V44" class="s-fg" marker-end="url(#m-fg)"/>
+  <rect class="cell-hl" x="160" y="48" width="180" height="44" rx="4"/><text x="250" y="68" text-anchor="middle" class="big">Scheduler, Part I</text><text x="250" y="84" text-anchor="middle" class="lbl">inserts lock actions</text>
+  <path d="M250 92 V124" class="s-fg" marker-end="url(#m-fg)"/><text x="258" y="113" class="lbl">lock + read/write actions</text>
+  <rect class="cell-hl" x="160" y="128" width="180" height="44" rx="4"/><text x="250" y="148" text-anchor="middle" class="big">Scheduler, Part II</text><text x="250" y="164" text-anchor="middle" class="lbl">grants / delays, executes</text>
+  <path d="M250 172 V204" class="s-fg" marker-end="url(#m-fg)"/><text x="258" y="193" class="lbl">reads and writes</text>
+  <rect class="cell-plain" x="190" y="208" width="120" height="36" rx="4"/><text x="250" y="231" text-anchor="middle" class="big">database</text>
+  <rect class="cell" x="440" y="88" width="130" height="50" rx="4"/><text x="505" y="110" text-anchor="middle" class="big">lock table</text><text x="505" y="126" text-anchor="middle" class="lbl">(in main memory)</text>
+  <path d="M342 70 H500 V84" class="s-fg dash" marker-end="url(#m-fg)"/><path d="M342 150 H500 V142" class="s-fg dash" marker-end="url(#m-fg)"/>
+</svg>
+<figcaption><b>Figure 1.</b> The two-part scheduler (textbook Fig. 18.24). Both parts use the lock table.</figcaption>
+</figure>
+<ol>
+  <li><strong>Part I</strong> takes each request and puts the right lock action in front of it, choosing the mode (S for a read, X for a write; U for a read when it knows a write of the same element will follow). On commit or abort it releases all the transaction's locks and tells Part II which elements became free.</li>
+  <li><strong>Part II</strong> executes the lock and access actions. If the transaction is already waiting, the action joins that transaction's list of delayed actions. Otherwise an access is executed, and a lock is looked up in the lock table: granted (entry updated) or recorded as waiting (and the transaction is delayed).</li>
+  <li>When an element becomes free, Part II picks the transaction(s) that now get the lock and lets them run their delayed actions until they finish or hit another lock that cannot be granted.</li>
+</ol>
+<p><strong>Knowing future actions.</strong> To choose U instead of S, Part I needs advance notice that the transaction may later write the element. That information is available: a query never writes, an SQL update statement says what it modifies, and a compiler sees all the SQL statements of an embedded-SQL program (textbook Example 18.19). Here is Example 18.19 itself: transactions issue only reads, writes and commits; Part I inserts S, U and X locks; commit releases locks.</p>
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="ex19"></div>
+<figcaption><b>Figure 2.</b> Example 18.19: T₁: r₁(A); r₁(B); w₁(B) and T₂: r₂(A); r₂(B), in the order of Fig. 18.17.</figcaption>
+</figure>
+
+<h2>2. The structure of the lock table (slides 10–11)</h2>
+<p>Abstractly the lock table is a relation from database elements to locking information. It is usually a <b class="term">hash table</b> keyed on the element (its address). An element without locks does not appear at all, so the table's size is proportional to the number of locked elements, not to the size of the database.</p>
+<p>Each entry (textbook Fig. 18.26, for the S/X/U scheme) contains:</p>
+<dl class="def">
+  <dt>Group mode</dt><dd>A summary of the most stringent lock held on the element: <b>S</b> = only shared locks are held; <b>U</b> = one update lock and zero or more shared locks; <b>X</b> = one exclusive lock and nothing else. A new request is compared with the group mode only, instead of with every lock held.</dd>
+  <dt>Waiting bit</dt><dd>“Yes” if at least one transaction is waiting for a lock on this element.</dd>
+  <dt>List</dt><dd>One node per transaction that holds or waits for a lock on the element: transaction name, lock mode, whether it is holding or waiting (Wait?), a <b>Next</b> link to the next node of this element, and a <b>Tnext</b> link to the next node of the <em>same transaction</em> (for another element). Tnext lets the scheduler find all locks of a committing or aborting transaction quickly.</dd>
+</dl>
+<figure>
+<svg viewBox="0 0 680 320" width="680" role="img" aria-label="Lock table entry for A with list of three transactions">
+  <text x="20" y="20" class="lbl">hash table on elements</text>
+  <rect class="cell-plain" x="20" y="30" width="70" height="34"/><rect class="cell-hl" x="20" y="64" width="70" height="34"/><rect class="cell-plain" x="20" y="98" width="70" height="34"/>
+  <text x="55" y="86" text-anchor="middle" class="big">A</text>
+  <path d="M90 81 H170" class="s-fg" marker-end="url(#m-fg)"/>
+  <rect class="cell" x="174" y="40" width="170" height="90"/>
+  <text x="184" y="62" class="big">Group mode: U</text><text x="184" y="86" class="big">Waiting: yes</text><text x="184" y="110" class="big">List:</text>
+  <path d="M230 106 C260 130 260 150 252 162" class="s-fg" marker-end="url(#m-fg)"/>
+  <g id="lst"></g>
+</svg>
+<figcaption><b>Figure 3.</b> A lock-table entry (slide 11, textbook Fig. 18.26). T₁ holds S, T₂ holds U, T₃ waits for X. Group mode U says: one update lock and some shared locks are held.</figcaption>
+</figure>
+
+<h2>3. Handling lock requests (slide 12)</h2>
+<p>Transaction T requests a lock on A:</p>
+<ul>
+  <li><strong>No entry for A:</strong> there are no locks on A, so create the entry and grant the request. Group mode = the requested mode.</li>
+  <li><strong>Entry exists, group mode U or X:</strong> no lock can be granted (except when T itself holds the U lock and asks to upgrade: footnote of §18.5.2). Add T to the list with Wait? = yes, set the waiting bit.</li>
+  <li><strong>Entry exists, group mode S:</strong> a shared or update lock can be granted. Add T with Wait? = no; the group mode becomes U if the new lock is U, otherwise stays S. (An X request is refused and T waits.)</li>
+</ul>
+<p>In every case the new list node is linked through Next and Tnext. The group mode alone answered the question; the list was never scanned.</p>
+
+<h2>4. Handling unlocks (slides 13–14)</h2>
+<p>Transaction T unlocks A: delete T's node from A's list. Then:</p>
+<ul>
+  <li><strong>T's lock ≠ group mode</strong> (e.g., T held S while the group mode is U): no change.</li>
+  <li><strong>T's lock = group mode:</strong> scan the list for the new group mode. If T held U (or the only S), the remaining holders can only be shared, so the new mode is S, or there are no holders left. If T held X, nobody else held anything.</li>
+  <li><strong>If the waiting bit is yes:</strong> grant one or more waiting requests.</li>
+</ul>
+<div class="q">
+<h4>Slide 13 question: why does the group mode not change when T's lock differs from the group mode?</h4>
+<p>The group mode is the most stringent lock held by anyone. If T's lock is not equal to it, T's lock was weaker (T held S while the group mode was U), so the lock that made the group mode U belongs to another transaction and is still held. Removing a weaker lock cannot change the strongest one. (With the S/X/U modes, the only possible case is S under U, since group mode X means T would have to be the X holder.)</p>
+</div>
+<p>Which waiting request is granted (slide 14 and textbook §18.5.2)?</p>
+<ol>
+  <li><strong>First-come-first-served:</strong> grant the request that has waited longest. No starvation (no transaction waits forever while others keep getting the lock).</li>
+  <li><strong>Priority to shared locks:</strong> grant all waiting S locks, then one U, and an X only if nothing else waits. Can starve a transaction waiting for U or X.</li>
+  <li><strong>Priority to upgrading:</strong> if a transaction holding U waits to upgrade to X, grant that first; otherwise use one of the other policies.</li>
+</ol>
+<p>A group mode of “nothing” never appears: when the last holder leaves and nobody waits, the entry is deleted.</p>
+
+<h3>The lock table in action</h3>
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="gm"></div>
+<figcaption><b>Figure 4.</b> Group-mode changes on one element: S → U, an unlock that does not change the group mode, an upgrade to X, and a waiting shared request granted at the end (FCFS).</figcaption>
+</figure>
+
+<h3>Try it</h3>
+<p>The lock table on the right of each frame is the book's structure (group mode, waiting bit, list). Type your own requests, with locks or letting the scheduler insert them.</p>
+<figure class="wide">
+<span class="anim-tag">Interactive</span>
+<div id="tool"></div>
+</figure>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+
+<h3>Exam questions</h3>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 21-22 5b · 10 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-2 | 2021–22 · 10 marks</div>
+  <div class="exam-q"><p>With necessary figures and examples, explain how Two-Phase Lock is implemented using Lock Table.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+  <p><b>Architecture.</b> Transactions send reads, writes, commits and aborts to the scheduler (Figure 1). Part I inserts a lock before each access: S before a read, X before a write, U before a read when a write of the same element will follow. Locks are never released by the transaction itself; Part I releases all of a transaction's locks when it commits or aborts. So every transaction acquires locks while it runs (growing phase) and releases them all at the end (shrinking phase): this is two-phase locking (in its strict form).</p>
+  <p><b>Lock table.</b> A hash table keyed on element; an entry exists only for locked elements. Each entry holds the group mode (S, U or X), a waiting bit and a list of (transaction, mode, Wait?) nodes linked by Next, with Tnext linking all nodes of one transaction (Figure 3).</p>
+  <p><b>Lock request</b> by T on A: no entry → create it, grant. Group mode X or U → T is added with Wait? = yes, waiting bit = yes, T is delayed. Group mode S → grant S or U (group mode becomes U for U), refuse X. The decision uses the group mode and the compatibility matrix only.</p>
+  <p><b>Commit/abort</b> of T: follow T's Tnext chain, delete each of T's nodes, recompute the group mode where T's lock equalled it, and if the waiting bit is set, grant waiting requests (FCFS, shared-first or upgrade-first); granted transactions resume their delayed actions.</p>
+  <p><b>Example</b> (Figure 2): r₁(A); r₂(A); r₂(B); r₁(B); w₁(B); c₂; c₁. Part I inserts sl₁(A), sl₂(A), sl₂(B), ul₁(B) (T₁ will write B), xl₁(B). Entry B: group mode S after sl₂(B), U after ul₁(B); xl₁(B) is refused because T₂ holds S on B (T₁: Wait? = yes). At c₂ the scheduler removes T₂'s nodes from A and B; B's group mode drops to U, the waiting upgrade is granted (group mode X), and T₁ finishes. The resulting schedule is conflict-serializable in the order (T₂, T₁), the order in which the transactions released their locks.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 19-20 4b · 5 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-2 | 2019–20 · 15 marks</div>
+  <div class="exam-q"><p>The hash values of data items A, B and C are 5, 1 and 8 respectively. Show and explain the lock table entries for the instructions with transactions as follows: {READ (A), T1} {READ (B), T2} {READ (C), T1}, {READ (A), T2}, {READ (B), T1} {READ (C), T2}, {WRITE (A), T3}, {WRITE (A), T4}, {WRITE (B), T3}, {WRITE (C), T1}</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+  <p>Reads request S locks, writes request X locks; locks are kept (2PL) since no transaction finishes in the list. Processing in order:</p>
+  <ol>
+    <li>READ(A),T₁: no entry for A (bucket 5) → create, grant S. A: group S.</li>
+    <li>READ(B),T₂: create entry in bucket 1, grant S.</li>
+    <li>READ(C),T₁: create entry in bucket 8, grant S.</li>
+    <li>READ(A),T₂: group mode S → grant S. A: T₁ S, T₂ S.</li>
+    <li>READ(B),T₁: group S → grant S. B: T₂ S, T₁ S.</li>
+    <li>READ(C),T₂: group S → grant S. C: T₁ S, T₂ S.</li>
+    <li>WRITE(A),T₃: X requested, group mode S → <b>wait</b>. A: waiting bit yes; T₃ X waiting.</li>
+    <li>WRITE(A),T₄: <b>wait</b>, queued behind T₃.</li>
+    <li>WRITE(B),T₃: T₃ is already waiting, so the scheduler delays this request; it is not yet in the lock table. (If it were issued, it would also wait: B is held in S by T₂ and T₁.)</li>
+    <li>WRITE(C),T₁: T₁ holds S on C and asks for X (an upgrade). T₂ also holds S on C, so the upgrade <b>waits</b>. C: waiting bit yes.</li>
+  </ol>
+  <div id="q96"></div>
+  <p>Final lock table: bucket 1 → B (group S, waiting no: T₂ S, T₁ S); bucket 5 → A (group S, waiting yes: T₁ S, T₂ S, T₃ X wait, T₄ X wait); bucket 8 → C (group S, waiting yes: T₁ S, T₂ S, T₁ X wait). Waits-for: T₃ → T₁, T₂; T₄ → T₁, T₂; T₁ → T₂. No cycle, so no deadlock: when T₂ commits, T₁'s upgrade on C is granted; when T₁ and T₂ have both released A, T₃ and then T₄ get A.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2015–16 · 15 marks</div>
+  <div class="exam-q"><p>Create a lock table for the following list of data items and their locking status:</p>
+  <div class="tbl"><table style="width:auto"><tr><th>Data Item</th><th>Hash Value</th><th>Transactions with Lock</th><th>Transactions Waiting</th></tr>
+  <tr><td>A</td><td>5</td><td>T1, T5</td><td>T2</td></tr><tr><td>S</td><td>3</td><td>T1, T2</td><td>—</td></tr><tr><td>D</td><td>5</td><td>—</td><td>T3</td></tr><tr><td>F</td><td>2</td><td>T2</td><td>T5</td></tr><tr><td>G</td><td>2</td><td>T2, T3, T4</td><td>T1</td></tr><tr><td>H</td><td>5</td><td>T4</td><td>—</td></tr></table></div></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+  <p>The lock table is a hash table on the data item; items with the same hash value are chained in one bucket (bucket 2: F, G; bucket 3: S; bucket 5: A, D, H). Each entry carries the group mode, the waiting bit and the list of granted and waiting requests in arrival order.</p>
+  <p>Modes are not given, so they are inferred: an item locked by several transactions at once must be locked in <b>S</b> mode, and a transaction waiting behind shared holders must have asked for <b>X</b>. For F and H (one holder) either mode is possible; F's holder must conflict with T₅'s request, so we show X held by T₂ (S held + X requested would also fit).</p>
+  <div id="q32"></div>
+  <p>Notes. (1) D has a waiting transaction but no holder. A correct lock manager never leaves a request waiting on a free element: T₃'s request would be granted at once (or, if D was just released, granted at that moment). So D's entry is shown with T₃ waiting as the data says, but in a consistent state T₃ would be holding D. (2) Waits-for arcs: T₂ → T₁, T₅ (on A); T₅ → T₂ (on F); T₁ → T₂, T₃, T₄ (on G). T₂ → T₁ → T₂ is a cycle, so this state is a <b>deadlock</b> (also T₂ → T₅ → T₂); the scheduler would have to abort one of T₁, T₂, T₅.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2010–11 · 10 marks</div>
+  <div class="exam-q"><p>Describe the implementation of lock manager using a lock table data structure and show the following locks: (a) T1 has granted locks for data items 10, 22, 35 and is waiting for data item 44. (b) T2 has granted locks for data items 44 and 22. (c) T3 has been waiting for data item 22. (d) T4 has been granted locks for data items 8, 10, 22 and is waiting for data item 35. Also explain how the lock manager processes a lock request using the structure.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+  <p><b>Implementation.</b> The lock manager keeps an in-memory hash table indexed by data item (hash function here: item mod 8, chaining on collisions). Each entry is an item that is currently locked or requested: group mode, waiting bit, and a linked list of request nodes (transaction, mode, granted or waiting) in arrival order; each node also links to the next node of the same transaction, so all of a transaction's locks can be found and released at commit/abort.</p>
+  <p><b>Modes.</b> Item 22 is granted to T₁, T₂ and T₄ simultaneously, so those are S locks, and T₃'s waiting request must be X. Item 10 is shared by T₁ and T₄ (S). Items 35, 44, 8 have one holder each; 35 and 44 have waiters, so holder and waiter conflict (shown as X held, X requested).</p>
+  <div id="q51"></div>
+  <p><b>Processing a lock request</b> for item x by T: compute h(x), walk the bucket's chain to find x's entry. If absent, create it with T's request granted. If present, append T's node at the end of x's list; grant it if the requested mode is compatible with the group mode and no earlier request is waiting (FCFS), otherwise mark it waiting, set the waiting bit and suspend T. On unlock or commit, remove T's nodes (via its transaction chain) and grant the waiting requests at the front of each list that have become compatible. Here: T₁ waits for T₂ (44), T₄ waits for T₁ (35), T₃ waits for T₁, T₂, T₄ (22). No cycle, so no deadlock: when T₂ finishes, T₁ gets 44, finishes and releases 35 to T₄, and so on.</p>
+  </div></details>
+</div>
+
+<div class="key"><p><strong>Summary:</strong> the scheduler inserts lock requests itself and releases a transaction's locks at commit or abort, which makes every transaction two-phase locked. The lock table is a hash table of entries for locked elements only; each entry stores the group mode (most stringent lock held: S, U or X), a waiting bit, and a list of holders and waiters linked per element and per transaction. A request is decided against the group mode; an unlock may change the group mode and wakes waiters under FCFS, shared-first or upgrade-first policy.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../s02/lecture.js"></script>
+<script>
+// Fig 18.26 list nodes
+(() => {
+  const rows = [['T₁', 'S', 'no'], ['T₂', 'U', 'no'], ['T₃', 'X', 'yes']];
+  let s = ['Tran', 'Mode', 'Wait?', 'Tnext', 'Next'].map((h, k) => `<text x="${275 + k * 50}" y="160" text-anchor="middle" class="lbl">${h}</text>`).join('');
+  rows.forEach((r, i) => {
+    const y = 178 + i * 46, x = 250;
+    [r[0], r[1], r[2], '', ''].forEach((v, k) => { s += `<rect class="${k < 3 ? 'cell' : 'cell-plain'}" x="${x + k * 50}" y="${y}" width="50" height="26"/><text x="${x + k * 50 + 25}" y="${y + 18}" text-anchor="middle" style="font-size:12px">${v}</text>`; });
+    s += `<path d="M${x + 175} ${y} V${y - 7} H${x + 268}" class="s-acc" marker-end="url(#m-acc)"/><text x="${x + 274}" y="${y - 3}" class="lbl acc">${r[0]}'s other locks</text>`;
+    if (i < 2) s += `<path d="M${x + 225} ${y + 26} C${x + 225} ${y + 44} ${x - 20} ${y + 30} ${x + 10} ${y + 44}" class="s-fg" marker-end="url(#m-fg)"/>`;
+  });
+  document.querySelector('#lst').innerHTML = s;
+})();
+stepper('#ex19', CC.lockSteps(CC.insertLocks(CC.parse('r1(A) r2(A) r2(B) r1(B) w1(B) c2 c1').acts, 'update', 'end')).steps, { interval: 2300 });
+stepper('#gm', CC.lockSteps(CC.parse('sl1(A) sl2(A) ul3(A) sl4(A) u1(A) u2(A) xl3(A) w3(A) u3(A)').acts).steps, { interval: 2300 });
+CC.lockTool('#tool', 'sl1(A) sl2(A) ul3(A) xl4(A) u2(A) u1(A) xl3(A) w3(A) c3 c4', { auto: true, scheme: 'none' });
+
+// hash-bucket lock tables for the exam answers. buckets: {n: [[item, group, waiting, [[T, mode, wait]...]], ...]}
+function hashTable(sel, nb, buckets) {
+  let h = '<div class="ht">';
+  for (let b = 0; b < nb; b++) {
+    const items = buckets[b] || [];
+    h += `<div class="ht-row"><div class="ht-b${items.length ? '' : ' empty'}">${b}</div>`;
+    items.forEach(([x, g, w, list]) => {
+      h += `<span class="ht-arrow">→</span><div class="lt-e"><div class="lt-h"><b>${x}</b> · group <b>${g}</b> · waiting? <b>${w}</b></div><table><tr><th>Tran</th><th>Mode</th><th>Wait?</th></tr>${list.map(([t, m, wt]) => `<tr class="${wt ? 'w' : ''}"><td>T${CC.subs(t)}</td><td>${m}</td><td>${wt ? 'yes' : 'no'}</td></tr>`).join('')}</table></div>`;
+    });
+    h += '</div>';
+  }
+  document.querySelector(sel).innerHTML = h + '</div>';
+}
+hashTable('#q96', 10, {
+  1: [['B', 'S', 'no', [[2, 'S'], [1, 'S']]]],
+  5: [['A', 'S', 'yes', [[1, 'S'], [2, 'S'], [3, 'X', 1], [4, 'X', 1]]]],
+  8: [['C', 'S', 'yes', [[1, 'S'], [2, 'S'], [1, 'X', 1]]]],
+});
+hashTable('#q32', 6, {
+  2: [['F', 'X', 'yes', [[2, 'X'], [5, 'X', 1]]], ['G', 'S', 'yes', [[2, 'S'], [3, 'S'], [4, 'S'], [1, 'X', 1]]]],
+  3: [['S', 'S', 'no', [[1, 'S'], [2, 'S']]]],
+  5: [['A', 'S', 'yes', [[1, 'S'], [5, 'S'], [2, 'X', 1]]], ['D', '–', 'yes', [[3, '?', 1]]], ['H', 'X', 'no', [[4, 'X']]]],
+});
+hashTable('#q51', 8, {
+  0: [['8', 'X', 'no', [[4, 'X']]]],
+  2: [['10', 'S', 'no', [[1, 'S'], [4, 'S']]]],
+  3: [['35', 'X', 'yes', [[1, 'X'], [4, 'X', 1]]]],
+  4: [['44', 'X', 'yes', [[2, 'X'], [1, 'X', 1]]]],
+  6: [['22', 'S', 'yes', [[1, 'S'], [2, 'S'], [4, 'S'], [3, 'X', 1]]]],
+});
+flashcards('#cards', [
+  { f: 'Lock table', b: 'A hash table from (locked) elements to locking information; unlocked elements have no entry.' },
+  { f: 'Group mode', b: 'Most stringent lock held on the element: S (only shared), U (one update + shared), X (one exclusive).' },
+  { f: 'Waiting bit', b: 'Yes if some transaction is waiting for a lock on the element.' },
+  { f: 'Tnext link', b: 'Links all lock nodes of one transaction, to release them quickly at commit/abort.' },
+  { f: 'Part I of the scheduler', b: 'Inserts lock actions before reads/writes; releases all locks at commit/abort.' },
+  { f: 'FCFS granting', b: 'Grant the longest-waiting request; prevents starvation.' },
+  { f: 'Priority to shared locks', b: 'Grant waiting S locks first, then one U, X last; can starve writers.' },
+]);
+quiz('#quiz', [
+  { q: 'Group mode is S. T requests U. Result?', opts: ['Granted; group mode becomes U', 'Granted; group mode stays S', 'Denied', 'Granted; group mode becomes X'], a: 0, why: 'U is compatible with held S, and the group mode records the most stringent lock.' },
+  { q: 'Group mode U. A holder of S unlocks. New group mode?', opts: ['S', 'U', 'X', 'Entry deleted'], a: 1, why: 'T\'s lock (S) is not the group mode, so nothing changes.' },
+  { q: 'Group mode U. The U holder unlocks; two S locks remain. New group mode?', opts: ['S', 'U', 'X', 'none'], a: 0, why: 'Only shared locks remain.' },
+  { q: 'Why compare a request with the group mode instead of every held lock?', opts: ['It is required by 2PL', 'One comparison decides grant/deny, without scanning the list', 'It prevents deadlock', 'It saves disk space'], a: 1, why: 'The group mode summarizes the strictest condition the requester faces.' },
+  { q: 'Which policy can starve a writer?', opts: ['FCFS', 'Priority to shared locks', 'Priority to upgrading', 'None'], a: 1, why: 'A stream of shared requests keeps being granted first.' },
+]);
+ask('#try1', { q: 'Holders on A: T₁ S, T₂ S, T₃ U (group mode U). Which transaction\'s unlock, if it happens first, changes the group mode? (Answer like T2)', a: ['T3', 'T₃', '3'], why: 'Only T₃ holds the lock equal to the group mode; after u₃(A) the group mode becomes S. Unlocking an S lock under group mode U changes nothing.' });
+</script>
+</body>
+</html>

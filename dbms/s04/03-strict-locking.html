@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Strict and Rigorous 2PL · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 04 (Sukarna) · Chapter 3 · Slides 10–12 · Book §19.1.5</div>
+<h1>Managing Rollbacks with Locking: Strict and Rigorous 2PL</h1>
+<p class="lede">A lock-based scheduler can rule out dirty reads with one extra rule: keep exclusive locks until the commit (or abort) record is on disk. This chapter proves the slide's two properties of strict 2PL, explains rigorous 2PL and its "interesting" commit-order property, maps out how all the schedule classes contain each other, and shows how an aborted transaction's buffered changes are undone.</p>
+
+<h2>1. Strict 2PL (slide 10)</h2>
+
+<dl class="def">
+  <dt>Strict 2PL locking</dt><dd>A transaction follows two-phase locking, and in addition it must not release any <em>exclusive</em> lock until it has committed or aborted <em>and</em> the commit or abort log record has been flushed to disk. Shared locks may be released earlier (still obeying 2PL).</dd>
+  <dt>Strict 2PL schedule</dt><dd>A schedule of transactions that all follow the strict 2PL rule. The textbook calls it simply a <b>strict schedule</b>, and its rule also covers other locks that allow a value to change, such as increment locks.</dd>
+</dl>
+
+<p>Why "flushed to disk"? Because "committed" means the commit record survives a crash. If T<sub>1</sub> released its lock as soon as it wrote <code>COMMIT</code> into a log buffer, and the system crashed before the buffer reached disk, T<sub>1</sub> would be undone at recovery, and anyone who read its values would have read dirty data after all. (Chapter 4 shows a careful way to relax this, called group commit.)</p>
+
+<p>The slide notes that Oracle, MySQL and SQL Server use this rule at the READ COMMITTED isolation level. More precisely, all three hold <em>write</em> locks until commit; Oracle (and MySQL/InnoDB for plain reads) let readers see the last committed version of a row instead of taking shared locks, which has the same effect for dirty reads.</p>
+
+<h3>Slide 10, P1: every strict 2PL schedule is ACR. Why?</h3>
+<p>Suppose T<sub>1</sub> writes X. To write, it must hold an exclusive lock on X. Any other transaction T<sub>2</sub> that wants to read X needs at least a shared lock on X, which conflicts with T<sub>1</sub>'s exclusive lock, so T<sub>2</sub> must wait until T<sub>1</sub> releases it. Under the strict rule, that release happens only after T<sub>1</sub> has committed or aborted and the log record is on disk. So T<sub>2</sub> reads X either after T<sub>1</sub> committed (a committed value) or after T<sub>1</sub> aborted (by then X has been restored to its old, committed value). Either way T<sub>2</sub> never reads dirty data, which is the definition of ACR. Here are the slides' two transactions from Fig. 19.1 again, this time under strict 2PL:</p>
+
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="strict"></div>
+</figure>
+
+<p>Compare Chapter 1: there T<sub>2</sub> read the dirty A = 125 and the database ended with A = 250, B = 50. Under strict 2PL, T<sub>2</sub> simply waits, and the result A = B = 50 is correct.</p>
+
+<h3>Slide 10, P2: every strict 2PL schedule is serializable. Why?</h3>
+<p>A strict 2PL schedule is in particular a 2PL schedule: each transaction takes all its locks before releasing any. The earlier lecture proved that every 2PL schedule is conflict-serializable (order the transactions by their lock points, the moment each one holds all its locks; every conflict goes from an earlier lock point to a later one). The strict rule only adds a restriction, so the property carries over. The textbook gives another view: a strict schedule is equivalent to the serial schedule in which each transaction runs instantly at the moment it commits.</p>
+
+<h2>2. Rigorous (strong strict) 2PL (slide 11)</h2>
+
+<dl class="def">
+  <dt>Strong strict 2PL, or rigorous 2PL</dt><dd>A transaction must not release <em>any</em> lock, shared or exclusive, until it has committed or aborted and the commit or abort record is on disk.</dd>
+</dl>
+
+<p><strong>The "interesting" property: the commit order of conflicting transactions is their serializability order.</strong> Proof: take two conflicting actions, one of T<sub>i</sub> and then one of T<sub>j</sub> on the same element X (at least one a write). When T<sub>i</sub> acts on X it holds a lock on X, and under rigorous 2PL it keeps that lock until it commits. T<sub>j</sub> needs a conflicting lock on X, so it can act only after T<sub>i</sub> commits. Since T<sub>j</sub> commits after its own action, c<sub>i</sub> comes before c<sub>j</sub>. So every edge T<sub>i</sub> → T<sub>j</sub> of the precedence graph points from an earlier commit to a later commit, and listing the transactions in commit order is a valid serial order.</p>
+
+<p>Plain strict 2PL does not guarantee this, because shared locks may go early. Example (strict 2PL, not rigorous): T<sub>1</sub> takes sl<sub>1</sub>(A), reads A, takes xl<sub>1</sub>(B), then releases the shared lock on A. T<sub>2</sub> now takes xl<sub>2</sub>(A), writes A and commits. Finally T<sub>1</sub> writes B and commits:</p>
+<p class="formula">sl<sub>1</sub>(A) r<sub>1</sub>(A) xl<sub>1</sub>(B) u<sub>1</sub>(A) xl<sub>2</sub>(A) w<sub>2</sub>(A) c<sub>2</sub> u<sub>2</sub>(A) w<sub>1</sub>(B) c<sub>1</sub> u<sub>1</sub>(B)</p>
+<p>The conflict r<sub>1</sub>(A) before w<sub>2</sub>(A) forces the serial order T<sub>1</sub>, T<sub>2</sub>, yet T<sub>2</sub> commits first. Rigorous 2PL would have made T<sub>2</sub> wait for A until c<sub>1</sub>.</p>
+
+<p>This matters in practice: with rigorous 2PL the system can tell users "the result is as if transactions ran in the order they committed", which is easy to reason about and useful for replication. The slide notes that SQL Server uses rigorous 2PL to provide the REPEATABLE READ and SERIALIZABLE isolation levels (it keeps shared locks until commit at those levels).</p>
+
+<div class="tbl"><table>
+  <tr><th>Protocol</th><th>Exclusive locks held until</th><th>Shared locks held until</th><th>Guarantees</th></tr>
+  <tr><td>Basic 2PL</td><td>any time after the lock point</td><td>any time after the lock point</td><td>conflict-serializable; dirty reads and cascading rollback possible</td></tr>
+  <tr><td>Strict 2PL</td><td>commit/abort record on disk</td><td>any time after the lock point</td><td>conflict-serializable, ACR (hence recoverable)</td></tr>
+  <tr><td>Rigorous 2PL</td><td>commit/abort record on disk</td><td>commit/abort record on disk</td><td>all of the above, and commit order = a serial order</td></tr>
+</table></div>
+
+<h2>3. How the schedule classes fit together (slide 12)</h2>
+
+<p>The slide reproduces the textbook's Fig. 19.3. Below it is redrawn with a concrete schedule in every region; each was checked with the classifier tool of Chapter 2.</p>
+
+<figure class="wide">
+<svg viewBox="0 0 660 330" width="660" role="img" aria-label="containments among schedule classes">
+  <rect x="2" y="2" width="656" height="326" class="cell-plain" style="fill:none;stroke:var(--line)"/>
+  <ellipse cx="235" cy="160" rx="210" ry="135" class="cell-plain" style="fill:none;stroke-width:1.6"/>
+  <ellipse cx="415" cy="160" rx="215" ry="135" class="cell-plain" style="fill:none;stroke-width:1.6"/>
+  <ellipse cx="375" cy="170" rx="125" ry="100" class="cell" style="fill-opacity:.35"/>
+  <ellipse cx="340" cy="180" rx="80" ry="64" class="cell-new" style="fill-opacity:.55"/>
+  <ellipse cx="340" cy="195" rx="46" ry="22" class="cell-hl"/>
+  <text x="100" y="105" class="big">Serializable</text>
+  <text x="495" y="95" class="big">Recoverable</text>
+  <text x="455" y="245" class="big">ACR</text>
+  <text x="303" y="150" class="big">Strict</text>
+  <text x="318" y="199" text-anchor="middle" class="big" style="font-size:12px">Serial</text>
+  <g id="pts"></g>
+</svg>
+<figcaption><b>Figure 1.</b> Containments and non-containments. Strict ⊂ ACR ⊂ Recoverable, Strict ⊂ Serializable, and Serial ⊂ Strict. Serializable and Recoverable overlap but neither contains the other, and ACR sticks out of Serializable. The numbered dots are the schedules in the table below.</figcaption>
+</figure>
+
+<div class="tbl"><table>
+  <tr><th>#</th><th>Schedule</th><th>Region and reason</th></tr>
+  <tr><td>1</td><td><code>w1(A); w1(B); c1; w2(A); r2(B); c2</code></td><td>Serial: T<sub>1</sub> finishes before T<sub>2</sub> starts.</td></tr>
+  <tr><td>2</td><td><code>w1(A); w2(B); c1; c2</code></td><td>Strict, not serial: interleaved, but nobody touches uncommitted data.</td></tr>
+  <tr><td>3</td><td><code>w1(A); w1(B); w2(A); c1; r2(B); c2</code> (slide 9's S<sub>4</sub>)</td><td>ACR and serializable, not strict: w<sub>2</sub>(A) overwrites T<sub>1</sub>'s uncommitted A.</td></tr>
+  <tr><td>4</td><td><code>w1(A); w1(B); w2(A); r2(B); c1; c2</code> (S<sub>1</sub>)</td><td>Recoverable and serializable, not ACR: dirty read r<sub>2</sub>(B).</td></tr>
+  <tr><td>5</td><td><code>w2(A); w1(B); w1(A); r2(B); c1; c2</code> (S<sub>2</sub>)</td><td>Recoverable, not serializable (cycle T<sub>1</sub> ⇄ T<sub>2</sub>), not ACR.</td></tr>
+  <tr><td>6</td><td><code>w1(A); w1(B); w2(A); r2(B); c2; c1</code> (S<sub>3</sub>)</td><td>Serializable, not recoverable.</td></tr>
+  <tr><td>7</td><td><code>w2(A); w1(B); w1(A); r2(B); c2; c1</code></td><td>Neither serializable nor recoverable (outside both ovals).</td></tr>
+  <tr><td>8</td><td><code>w1(A); w2(A); w2(B); c2; r1(B); c1</code></td><td>ACR but not serializable: T<sub>1</sub> reads B only after c<sub>2</sub>, yet the conflicts give T<sub>1</sub> → T<sub>2</sub> (on A) and T<sub>2</sub> → T<sub>1</sub> (on B).</td></tr>
+</table></div>
+
+<p>Reading the picture: the strict class is the one produced by strict 2PL, so it lies inside both ACR (property P1) and Serializable (P2). Serial schedules are trivially strict, since no two transactions overlap. ACR and recoverability constrain only reads and commits, so they say nothing about serializability, which is why those ovals cross the Serializable boundary.</p>
+
+<h2>4. Undoing an aborted transaction's changes in buffers (textbook §19.1.5)</h2>
+
+<p>Strict locking stops other transactions from <em>reading</em> dirty data, but when a transaction aborts its new values are still sitting in buffers (or on disk) and must be cancelled. How hard this is depends on the size of the lockable element.</p>
+
+<h3>When the lockable elements are blocks</h3>
+<p>Then there is a simple method that never needs the log, provided one rule is followed: <strong>blocks written by uncommitted transactions are pinned in main memory</strong>, that is, the buffer manager may not write them to disk. If T aborts, the system just tells the buffer manager to discard T's modified buffer for block A and return it to the pool of free buffers. Since T held the exclusive lock on A from its write until its abort, nobody else read or changed A in between, and the disk copy of A is still the most recent committed value. The same trick works in a multiversion system: remove T's version of A from the list of versions.</p>
+
+<h3>When the lockable elements are smaller than a block (tuples, objects)</h3>
+<p>Now one buffer can contain changes from several transactions, so the buffer cannot simply be thrown away; the other transactions' changes must survive. The old value of the aborted transaction's element A can be recovered in three ways:</p>
+<ol>
+  <li><strong>Read the original A from the disk copy</strong> and patch the buffer. Costs a disk access.</li>
+  <li><strong>Take the old value from the log</strong>, if it is an undo or undo/redo log. The same code used for crash recovery handles this "voluntary" rollback. It may need no disk access if the log records are still in a buffer, but it may also mean searching the log on disk.</li>
+  <li><strong>Keep a private main-memory log</strong> of each active transaction's changes, discarded when it ends. No disk access, but it can use a lot of memory.</li>
+</ol>
+<p>None of the three is ideal; real systems mostly use option 2.</p>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+
+<h3>Exam questions</h3>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 23-24 5b · 5 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-1 | 2023–24 · 5 marks</div>
+  <div class="exam-q"><p>Show that a "strict" two-phase locking (2PL) schedule avoids cascading rollback.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+  <p><strong>Definitions.</strong> Strict 2PL: transactions follow 2PL and do not release exclusive locks until they have committed or aborted and the commit/abort log record is on disk. A schedule avoids cascading rollback (ACR) if every transaction reads only values written by committed transactions.</p>
+  <p><strong>Argument.</strong> Let T<sub>j</sub> read an element X whose last writer before that read is T<sub>i</sub> (i ≠ j).</p>
+  <ol>
+    <li>To write X, T<sub>i</sub> held an exclusive lock xl<sub>i</sub>(X).</li>
+    <li>To read X, T<sub>j</sub> needs sl<sub>j</sub>(X) (or xl<sub>j</sub>(X)), which conflicts with xl<sub>i</sub>(X). So T<sub>j</sub> can read only after T<sub>i</sub> releases xl<sub>i</sub>(X).</li>
+    <li>By the strict rule, that release happens only after T<sub>i</sub>'s commit (or abort) record is on disk.</li>
+    <li>If T<sub>i</sub> committed, T<sub>j</sub> reads a committed value. If T<sub>i</sub> aborted, X was restored before the lock was released, so T<sub>i</sub> is no longer X's last writer and T<sub>j</sub> reads the previous committed value.</li>
+  </ol>
+  <p>So no transaction ever reads uncommitted data, and an abort can never force another transaction to roll back: the schedule is ACR. Timeline: xl<sub>i</sub>(X), w<sub>i</sub>(X), … T<sub>j</sub> requests sl<sub>j</sub>(X) and waits …, c<sub>i</sub> (flushed), u<sub>i</sub>(X), sl<sub>j</sub>(X) granted, r<sub>j</sub>(X). The animation in section 1 shows this with real values. The question bank's answer is correct.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 22-23 1d · 5 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-1 | 2022–23 · 5 marks</div>
+  <div class="exam-q"><p>Show that a schedule satisfying strict 2PL (two-phase locking) is ACR (avoids cascading rollback).</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+  <p>Same statement as the previous question; here is the proof written by contradiction, which some examiners prefer.</p>
+  <p>Let S satisfy strict 2PL and suppose S is <em>not</em> ACR. Then some transaction T<sub>j</sub> reads X from an uncommitted T<sub>i</sub>: the schedule contains w<sub>i</sub>(X) &lt; r<sub>j</sub>(X) &lt; c<sub>i</sub> (with no abort of T<sub>i</sub> in between).</p>
+  <ul>
+    <li>w<sub>i</sub>(X) requires xl<sub>i</sub>(X) before it: xl<sub>i</sub>(X) &lt; w<sub>i</sub>(X).</li>
+    <li>r<sub>j</sub>(X) requires sl<sub>j</sub>(X) before it, and sl<sub>j</sub>(X) is incompatible with xl<sub>i</sub>(X), so T<sub>i</sub> must have unlocked X first: w<sub>i</sub>(X) &lt; u<sub>i</sub>(X) &lt; sl<sub>j</sub>(X) &lt; r<sub>j</sub>(X).</li>
+    <li>Combined with r<sub>j</sub>(X) &lt; c<sub>i</sub>: u<sub>i</sub>(X) &lt; c<sub>i</sub>. T<sub>i</sub> released an exclusive lock before committing.</li>
+  </ul>
+  <p>That contradicts the strict rule (exclusive locks are released only after the commit/abort record is on disk). Hence every strict 2PL schedule is ACR. As a consequence it is also recoverable (every ACR schedule is). The question bank's proof follows the same lines and is correct.</p>
+  </div></details>
+</div>
+
+<div class="key"><p><strong>Summary:</strong> strict 2PL keeps exclusive locks until the commit or abort record is on disk, so nobody can read dirty data: every strict schedule is ACR (P1) and, being 2PL, conflict-serializable (P2). Rigorous 2PL keeps all locks until then, which makes the commit order a valid serial order. Strict ⊂ ACR ⊂ Recoverable and Strict ⊂ Serializable, while Serializable and Recoverable overlap without containment. An aborted transaction's buffered writes are undone by discarding pinned blocks (block-level locking) or by restoring old values from disk, the log, or a private memory log (smaller elements).</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="lecture.js"></script>
+<script>
+// Fig 19.1's transactions under strict 2PL: T1 keeps A locked until its abort record is on disk.
+const R = [
+  ['', '', '', '25', '25'],
+  ['1', 'l<sub>1</sub>(A); r<sub>1</sub>(A);', '', '', ''],
+  ['2', 'A := A+100; w<sub>1</sub>(A);', '', '125', ''],
+  ['3', 'l<sub>1</sub>(B); r<sub>1</sub>(B);', '', '', ''],
+  ['4', '', 'l<sub>2</sub>(A) <b>Denied</b>', '', ''],
+  ['5', '<b>Abort</b> (record flushed); A restored', '', '25', ''],
+  ['6', 'u<sub>1</sub>(A); u<sub>1</sub>(B);', '', '', ''],
+  ['7', '', 'l<sub>2</sub>(A); r<sub>2</sub>(A); A := A*2; w<sub>2</sub>(A);', '50', ''],
+  ['8', '', 'l<sub>2</sub>(B); r<sub>2</sub>(B); B := B*2; w<sub>2</sub>(B);', '', '50'],
+  ['9', '', 'commit (record flushed); u<sub>2</sub>(A); u<sub>2</sub>(B);', '', ''],
+];
+const cap = [
+  'Same transactions as Fig. 19.1, A = B = 25. Now both follow strict 2PL.',
+  'T<sub>1</sub> locks A (exclusive) and reads 25.',
+  'T<sub>1</sub> writes A = 125. A is dirty, but T<sub>1</sub> <b>keeps the lock on A</b>: strict 2PL forbids releasing it before commit or abort.',
+  'T<sub>1</sub> locks B and reads it.',
+  'T<sub>2</sub> asks for A and is <b>denied</b>: it cannot see the dirty 125. It waits.',
+  'T<sub>1</sub> aborts. A is restored to 25 (pinned buffer discarded, or old value from the undo log) and the abort record reaches disk.',
+  'Only now does T<sub>1</sub> release its locks.',
+  'T<sub>2</sub> gets A and reads the <b>committed value 25</b>, writing 50.',
+  'T<sub>2</sub> doubles B as well: 50.',
+  'T<sub>2</sub> commits and then unlocks. Final <b>A = B = 50</b>: consistent, and no cascading rollback was needed.',
+];
+stepper('#strict', R.map((r, i) => ({ html: s4table(['step', 'T<sub>1</sub>', 'T<sub>2</sub>', 'A', 'B'], R, { upto: i, cur: i, cls: { '4,2': i >= 4 ? 'hl' : '', '5,1': i >= 5 ? 'del' : '', '7,2': i >= 7 ? 'ok' : '' } }), cap: cap[i] })));
+
+// numbered dots in the Venn diagram
+const P = [[1, 368, 195], [2, 340, 165], [3, 395, 112], [4, 230, 115], [5, 555, 130], [6, 95, 165], [7, 30, 305], [8, 468, 165]];
+document.querySelector('#pts').innerHTML = P.map(([n, x, y]) => `<circle cx="${x}" cy="${y}" r="10" class="cell-plain" style="stroke:var(--red);stroke-width:1.8"/><text x="${x}" y="${y + 4}" text-anchor="middle" class="red" style="font-size:11.5px;font-weight:600">${n}</text>`).join('');
+
+flashcards('#cards', [
+  { f: 'Strict 2PL', b: '2PL plus: no exclusive lock is released until the commit/abort record is on disk. Shared locks may go earlier.' },
+  { f: 'Rigorous (strong strict) 2PL', b: 'No lock of any kind is released until the commit/abort record is on disk.' },
+  { f: 'P1', b: 'Every strict 2PL schedule is ACR: a reader must wait for the writer\'s exclusive lock, which outlives the commit.' },
+  { f: 'P2', b: 'Every strict 2PL schedule is (conflict-)serializable, because it is a 2PL schedule.' },
+  { f: 'Rigorous 2PL bonus', b: 'Commit order of conflicting transactions = their serializability order.' },
+  { f: 'Pinned block', b: 'A buffer the buffer manager may not write to disk. Blocks written by uncommitted transactions are pinned, so an abort just discards them.' },
+  { f: 'Undo for small elements', b: 'Old value from the disk copy, from the undo log, or from a private in-memory log of the transaction.' },
+]);
+quiz('#quiz', [
+  { q: 'Under strict 2PL, which locks may a transaction release before it commits?', opts: ['None', 'Shared locks only (after its lock point)', 'Exclusive locks only', 'Any lock after its lock point'], a: 1, why: 'Slide 10: shared locks may be released before commit/rollback, exclusive locks may not.' },
+  { q: 'Why must the commit record be on disk (not just in the log buffer) before exclusive locks are released?', opts: ['To save buffer space', 'Otherwise a crash could undo the transaction after others read its values', 'Because 2PL requires it', 'To make the schedule serial'], a: 1, why: 'A commit record still in a buffer is lost in a crash; the transaction is then aborted and its readers read dirty data.' },
+  { q: 'Which class is NOT contained in Serializable?', opts: ['Serial', 'Strict', 'ACR', 'Strict ∩ ACR'], a: 2, why: 'Example 8: w1(A); w2(A); w2(B); c2; r1(B); c1 is ACR but has a cycle.' },
+  { q: 'Under rigorous 2PL, T<sub>3</sub> commits before T<sub>1</sub>, and they conflict. The serial order must put…', opts: ['T<sub>1</sub> first', 'T<sub>3</sub> first', 'either first', 'it depends on timestamps'], a: 1, why: 'Rigorous 2PL: commit order is the serialization order.' },
+  { q: 'w<sub>1</sub>(A); w<sub>2</sub>(A); c<sub>1</sub>; c<sub>2</sub> is…', opts: ['strict', 'ACR but not strict', 'not recoverable', 'not serializable'], a: 1, why: 'There are no reads, so it is ACR, but w<sub>2</sub>(A) overwrites uncommitted data, which strict locking would forbid.' },
+  { q: 'With block-level locking and pinned dirty blocks, how is an aborted transaction\'s write undone?', opts: ['Read the undo log', 'Discard the buffer; the disk copy is the last committed value', 'Run cascading rollback', 'Write the buffer to disk and then restore'], a: 1, why: 'The pinned block never reached disk, so the disk already has the right value.' },
+]);
+ask('#try1', { q: 'In Figure 1, which numbered schedule is ACR but not serializable?', a: 8, why: 'Schedule 8 reads only committed data, but its precedence graph has the cycle T<sub>1</sub> ⇄ T<sub>2</sub>.' });
+</script>
+</body>
+</html>

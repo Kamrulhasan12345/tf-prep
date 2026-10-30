@@ -1,0 +1,379 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Triggers in Oracle · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 12 (Ishrak) · Chapter 10 · Slides 50–52 · Book §7.5</div>
+<h1>Triggers: Syntax, Row vs Statement, :NEW and :OLD</h1>
+<p class="lede">A trigger is a block of code the database runs by itself when a table is changed. This chapter explains the Oracle trigger syntax of slide 50 clause by clause, animates how row-level and statement-level triggers fire, walks through the two example triggers of slides 51–52 line by line, and lets you experiment in a trigger simulator.</p>
+
+<h2>1. What a trigger is</h2>
+<dl class="def">
+  <dt>Trigger (ECA rule)</dt>
+  <dd>A named piece of code stored in the database and executed automatically when a specified <b>event</b> happens to a table. The textbook (§7.5) calls triggers <b>event-condition-action rules</b>: an <b>event</b> (INSERT, UPDATE or DELETE on a table) awakens the trigger; a <b>condition</b> is tested; if it holds, the <b>action</b> runs.</dd>
+  <dt>Triggering statement</dt>
+  <dd>The INSERT, UPDATE or DELETE statement whose execution fires the trigger.</dd>
+</dl>
+<p>Why not just use constraints? A CHECK constraint can only look at the row being written, and a foreign key can only reject, cascade or set null. A trigger can run arbitrary code: look at other tables, change other tables, change the row being written, or reject the change with your own message. That flexibility is also the danger: triggers run invisibly, so a simple-looking UPDATE can do a lot more than it says. Prefer a declarative constraint when one can express the rule (Lec 06), and use a trigger when it cannot.</p>
+
+<figure>
+<svg id="eca" viewBox="0 0 760 120" width="760" role="img" aria-label="event, condition, action"></svg>
+<figcaption><b>Figure 1.</b> The three parts of every trigger. If the condition is false, the action is skipped; if it is true (or there is no condition), the action runs. Either way the triggering statement continues, unless the action raises an error.</figcaption>
+</figure>
+
+<h2>2. The Oracle syntax (slide 50)</h2>
+<pre class="lines"><span class="l">CREATE [OR REPLACE] TRIGGER trigger_name</span><span class="l">{BEFORE | AFTER}</span><span class="l">{INSERT [OR] | UPDATE [OR] | DELETE}</span><span class="l">[OF col_name]</span><span class="l">ON table_name</span><span class="l">[REFERENCING OLD AS o NEW AS n]</span><span class="l">[FOR EACH ROW]</span><span class="l">WHEN (condition)</span><span class="l">BEGIN</span><span class="l">  Executable-statements</span><span class="l">END;</span></pre>
+<div class="tbl"><table>
+<tr><th>Line</th><th>Clause</th><th>Meaning</th></tr>
+<tr><td>1</td><td><code>CREATE [OR REPLACE] TRIGGER name</code></td><td>Creates the trigger. OR REPLACE overwrites an existing trigger of the same name instead of failing, which is what you want while developing.</td></tr>
+<tr><td>2</td><td><code>BEFORE | AFTER</code></td><td>The <b>timing</b>: run the trigger before or after the triggering statement changes each row (row-level) or the table (statement-level). A third option, <code>INSTEAD OF</code>, exists for views (<a href="11-trigger-design.html">Chapter 11</a>).</td></tr>
+<tr><td>3</td><td><code>INSERT OR UPDATE OR DELETE</code></td><td>The <b>event</b>. Several can be combined with OR; inside the body the predicates <code>INSERTING</code>, <code>UPDATING</code>, <code>DELETING</code> tell which one fired it.</td></tr>
+<tr><td>4</td><td><code>OF col1, col2</code></td><td>Only for UPDATE: fire only when the UPDATE's SET list names one of these columns. Without OF, any UPDATE of the table fires it.</td></tr>
+<tr><td>5</td><td><code>ON table</code></td><td>The table whose changes are watched.</td></tr>
+<tr><td>6</td><td><code>REFERENCING OLD AS o NEW AS n</code></td><td>Optional: renames the correlation names OLD and NEW (section 4) to o and n. Useful only if your table is itself called NEW or OLD; the slides use it to name them oldTupple / newTupple.</td></tr>
+<tr><td>7</td><td><code>FOR EACH ROW</code></td><td>Makes the trigger <b>row-level</b>: it fires once per affected row. Without it, the trigger is <b>statement-level</b> and fires once per statement (section 3).</td></tr>
+<tr><td>8</td><td><code>WHEN (condition)</code></td><td>The <b>condition</b>. It is optional, although the slide's template shows it without the [ ] it puts around the other optional clauses. Allowed only for row-level triggers. It may refer to <code>new.col</code> and <code>old.col</code> <b>without</b> a colon, and it cannot contain a subquery.</td></tr>
+<tr><td>9–11</td><td><code>BEGIN … END;</code></td><td>The <b>action</b>, a PL/SQL block. It may start with <code>DECLARE</code> for local variables. Inside it, the row values are <code>:NEW.col</code> and <code>:OLD.col</code> <b>with</b> a colon.</td></tr>
+</table></div>
+<p>In SQL*Plus and SQL Developer a PL/SQL block (a trigger, procedure or function) must be followed by a line containing only <code>/</code>, which tells the tool to send the block to the server. That is the slash at the end of slides 51 and 52. If the trigger has a compilation error, Oracle still creates it but marks it invalid; <code>SHOW ERRORS</code> lists the problems.</p>
+
+<h2>3. Row-level and statement-level triggers</h2>
+<dl class="def">
+  <dt>Row-level trigger (FOR EACH ROW)</dt>
+  <dd>Fires once for every row the triggering statement inserts, updates or deletes. It can see that row's old and new values. If the statement affects no row, it never fires.</dd>
+  <dt>Statement-level trigger (the default)</dt>
+  <dd>Fires exactly once per triggering statement, even if the statement affects zero rows. It cannot see individual rows (:NEW and :OLD are not available).</dd>
+</dl>
+<p>When several triggers exist on one table, Oracle fires them in this order for one statement:</p>
+<ol>
+  <li>BEFORE statement-level triggers (once);</li>
+  <li>for each affected row: BEFORE row-level triggers, then the row is changed, then AFTER row-level triggers;</li>
+  <li>AFTER statement-level triggers (once).</li>
+</ol>
+<p>The animation runs <code>UPDATE PC SET price = price - 100 WHERE speed &gt;= 2.80</code>, which changes 3 rows, with four triggers on PC (one of each kind). Count how often each fires.</p>
+<figure class="wide">
+<span class="anim-tag">Animation</span>
+<div id="order"></div>
+<figcaption><b>Figure 2.</b> Firing order for a 3-row UPDATE. The row-level triggers fire 3 times each, the statement-level ones once each.</figcaption>
+</figure>
+
+<h2>4. :NEW and :OLD</h2>
+<p>In a row-level trigger, <b>:OLD</b> is the row as it was before the statement changed it and <b>:NEW</b> is the row as it will be after. Which ones exist depends on the event:</p>
+<div class="tbl"><table>
+<tr><th>Event</th><th>:OLD</th><th>:NEW</th></tr>
+<tr><td>INSERT</td><td>all columns NULL (there was no old row)</td><td>the row being inserted</td></tr>
+<tr><td>UPDATE</td><td>the row before the update</td><td>the row after the update</td></tr>
+<tr><td>DELETE</td><td>the row being deleted</td><td>all columns NULL</td></tr>
+</table></div>
+<ul>
+  <li>In a <b>BEFORE</b> row trigger you may assign to <code>:NEW.col</code> (for example <code>:NEW.price := 0;</code>) and the changed value is what gets stored. In an AFTER row trigger the row is already written, so assigning to :NEW is a compile error (ORA-04084).</li>
+  <li>Write the colon in the body (<code>:NEW.price</code>), not in WHEN (<code>new.price</code>). With REFERENCING NEW AS n, write <code>:n.price</code> and <code>n.price</code>.</li>
+</ul>
+
+<h2>5. Slide 51: refusing negative values</h2>
+<pre class="lines"><span class="l">CREATE OR REPLACE TRIGGER NoNegative</span><span class="l">BEFORE UPDATE OF Price, speed ON PC</span><span class="l">REFERENCING new as newTupple</span><span class="l">FOR EACH ROW</span><span class="l">WHEN (newTupple.price &lt; 0 OR newTupple.speed &lt; 0)</span><span class="l">BEGIN</span><span class="l">    RAISE_APPLICATION_ERROR(-20000, 'no negative value allowed');</span><span class="l">END;</span><span class="l">/</span></pre>
+<ul>
+  <li><b>Line 1.</b> Create (or replace) a trigger called NoNegative.</li>
+  <li><b>Line 2.</b> It runs <b>before</b> an UPDATE of PC that sets price or speed (column names are not case-sensitive, so Price = price). An UPDATE that only changes ram does not fire it.</li>
+  <li><b>Line 3.</b> Inside this trigger the new row is called newTupple instead of NEW (the spelling is the slide's).</li>
+  <li><b>Line 4.</b> Row-level: once per updated row.</li>
+  <li><b>Line 5.</b> The condition: the new price or the new speed is negative. No colon here, because it is the WHEN clause.</li>
+  <li><b>Lines 6–8.</b> The action raises an error, which stops the UPDATE (section 6).</li>
+  <li><b>Line 9.</b> The slash runs the CREATE in SQL*Plus.</li>
+</ul>
+<p><b>BEFORE or AFTER?</b> Either would stop the statement, but BEFORE is the right choice for validation: the bad value is rejected before any row is written, so there is less work to undo.</p>
+<p><b>A gap in the slide's trigger:</b> it fires only on UPDATE, so <code>INSERT INTO PC VALUES (1020, -2.0, 512, 80, 400)</code> still stores a negative speed. To guard both, write <code>BEFORE INSERT OR UPDATE OF price, speed ON PC</code>. (For a rule about a single row like this one, a <code>CHECK (price &gt;= 0 AND speed &gt;= 0)</code> constraint does the same job more simply; the slide uses it to show the syntax.)</p>
+
+<p><b>Try it.</b> The playground cannot run PL/SQL, so here is the same trigger in <b>SQLite version (syntax differs from Oracle)</b>: SQLite writes NEW without a colon everywhere, has no REFERENCING clause, and rejects a change with <code>SELECT RAISE(ABORT, 'message')</code> instead of RAISE_APPLICATION_ERROR. Run the UPDATE, then change −5 to 5 and run again.</p>
+<div id="sq51"></div>
+
+<h2>6. RAISE_APPLICATION_ERROR</h2>
+<p><code>RAISE_APPLICATION_ERROR(error_number, message)</code> is a built-in Oracle procedure that raises an error with your own number and text. The number must be between <b>−20000 and −20999</b> (the range Oracle reserves for applications). When a trigger raises an error that it does not handle itself:</p>
+<ul>
+  <li>the <b>triggering statement fails</b>, and every change it made, including changes made by triggers it fired, is undone (statement-level atomicity);</li>
+  <li>the <b>transaction is not rolled back</b>: earlier statements of the same transaction keep their effects, and the application decides whether to roll back;</li>
+  <li>the client receives the error, e.g. <code>ORA-20000: no negative value allowed</code>.</li>
+</ul>
+
+<h2>7. Slide 52: cascading a delete</h2>
+<pre class="lines"><span class="l">CREATE OR REPLACE TRIGGER cascading</span><span class="l">BEFORE delete ON PC</span><span class="l">REFERENCING OLD AS oldTupple</span><span class="l">FOR EACH ROW</span><span class="l">BEGIN</span><span class="l">DELETE FROM Product</span><span class="l">WHERE model = :oldTupple.model;</span><span class="l">END;</span><span class="l">/</span></pre>
+<ul>
+  <li><b>Line 1.</b> Create the trigger "cascading".</li>
+  <li><b>Line 2.</b> Fire before each DELETE on PC.</li>
+  <li><b>Line 3.</b> Call the deleted row oldTupple (instead of OLD).</li>
+  <li><b>Line 4.</b> Once per deleted PC row.</li>
+  <li><b>Lines 5–8.</b> No WHEN clause, so the action always runs: delete the Product row with the same model. Note the colon: <code>:oldTupple.model</code> is in the body.</li>
+</ul>
+<p>So deleting a PC also deletes its row in Product, keeping the two tables consistent: a model listed in Product as a pc always has a PC row. One deleted PC row fires the trigger once; <code>DELETE FROM PC WHERE price &lt; 600</code> deleting 3 rows fires it 3 times.</p>
+<p><b>A caution about timing.</b> In the textbook's schema PC.model is usually a foreign key referencing Product.model. In that case this BEFORE trigger fails with ORA-02292 (child record found): when it runs, the PC row still exists, so the parent Product row cannot be deleted yet. Declared as <b>AFTER</b> DELETE, the PC row is already gone and the Product delete succeeds. Without the foreign key, as on the slide, both work.</p>
+<p><b>SQLite version (syntax differs from Oracle):</b> run the DELETE and look at Product: the deleted PCs' models are gone from Product too.</p>
+<div id="sq52"></div>
+
+<h2>8. Trigger simulator</h2>
+<p>Build a trigger on a small PC table, choose a statement, and watch it run step by step: when the trigger fires, whether its condition holds, and what the action does. The Oracle code for your choices is shown above the animation. Things to try: make it statement-level and pick the UPDATE that matches no row; add a WHEN with an AFTER statement-level trigger (Oracle rejects it); make the action change :NEW in an AFTER trigger (also rejected); raise an error in the middle of a 3-row UPDATE and see the table restored.</p>
+<div class="trg-tool" id="sim"></div>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+<div id="try2"></div>
+<h3>Write it yourself (SQLite triggers, auto-checked)</h3>
+<p>These run in the SQLite playground, so write SQLite trigger syntax: <code>NEW.col</code> and <code>OLD.col</code> without colons, one event per trigger, <code>SELECT RAISE(ABORT, '…')</code> to reject. Each task ends with a statement you must include so the checker can see the trigger work.</p>
+<div id="ex1"></div>
+<div id="ex2"></div>
+<div id="ex3"></div>
+
+<h3>Exam questions</h3>
+<div class="exam">
+  <div class="exam-src">DB QB · 20-21 8c · 12 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-2 | 2020–21 · 12 marks</div>
+  <div class="exam-q"><p>Consider the following two schemas: Product(maker, model, type), Laptop(model, speed, ram, hd, screen, price). Write necessary triggers to implement the following constraints:</p>
+  <p>(i) speed, ram, hd, screen and price cannot be negative.<br>(ii) When a Laptop model is deleted, that model must also be deleted from the Product table.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><b>(i)</b> A negative value can enter through an INSERT or through an UPDATE of one of the five columns, so one row-level BEFORE trigger covers both events:</p>
+<pre>CREATE OR REPLACE TRIGGER LaptopNoNegative
+BEFORE INSERT OR UPDATE OF speed, ram, hd, screen, price ON Laptop
+FOR EACH ROW
+WHEN (new.speed &lt; 0 OR new.ram &lt; 0 OR new.hd &lt; 0
+      OR new.screen &lt; 0 OR new.price &lt; 0)
+BEGIN
+  RAISE_APPLICATION_ERROR(-20001,
+    'Laptop ' || :NEW.model || ': speed, ram, hd, screen and price cannot be negative');
+END;
+/</pre>
+    <p>BEFORE rejects the row before it is written; FOR EACH ROW is needed to see the new values; the WHEN clause uses <code>new.</code> without a colon, the body uses <code>:NEW.</code> with one. A NULL value makes its comparison unknown, so NULLs are allowed (add <code>IS NULL</code> tests if they should be rejected too).</p>
+    <p><b>(ii)</b></p>
+<pre>CREATE OR REPLACE TRIGGER LaptopDeleteProduct
+AFTER DELETE ON Laptop
+FOR EACH ROW
+BEGIN
+  DELETE FROM Product WHERE model = :OLD.model;
+END;
+/</pre>
+    <p>Row-level, because each deleted laptop has its own model; :OLD holds the deleted row. AFTER is the safe timing if Laptop.model is a foreign key to Product.model (with BEFORE, the laptop row would still exist and the parent delete would fail with ORA-02292), and it works equally well without the foreign key. This is slide 52's pattern applied to Laptop.</p>
+    <p>Note: the question bank's answer is written in MySQL syntax (DELIMITER, SIGNAL SQLSTATE, two separate INSERT and UPDATE triggers). The course uses Oracle, where one trigger with <code>INSERT OR UPDATE</code> and RAISE_APPLICATION_ERROR is the expected form.</p>
+    <p>The same two rules in <b>SQLite version (syntax differs from Oracle)</b>, so you can test them. SQLite allows one event per trigger, hence two triggers for (i):</p>
+    <div id="sqExam"></div>
+  </div></details>
+</div>
+<p>The other trigger questions in the bank (prerequisite check, a manager's raise, the average-net-worth rule, and "uses and restrictions of triggers") are worked in <a href="11-trigger-design.html">Chapter 11</a>.</p>
+
+<div class="key"><p><strong>Summary:</strong> A trigger is an event-condition-action rule: <code>CREATE OR REPLACE TRIGGER name {BEFORE|AFTER} {INSERT OR UPDATE [OF cols] OR DELETE} ON table [REFERENCING …] [FOR EACH ROW] [WHEN (cond)] BEGIN … END; /</code>. Row-level triggers fire once per affected row and see :OLD/:NEW (colon in the body, none in WHEN); statement-level triggers fire once per statement, even for zero rows. Order: BEFORE statement, then per row BEFORE row / change / AFTER row, then AFTER statement. Only BEFORE row triggers can change :NEW. RAISE_APPLICATION_ERROR(−20000…−20999, msg) aborts the triggering statement.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/sqlplay.js"></script>
+<script src="lecture.js"></script>
+<script>
+// ECA figure
+(() => {
+  const b = (x, t1, t2, cls) => `<rect x="${x}" y="20" width="190" height="64" rx="10" class="${cls}"/><text x="${x + 95}" y="46" text-anchor="middle" class="big" style="font-size:14px">${t1}</text><text x="${x + 95}" y="68" text-anchor="middle" class="lbl" style="font-size:12px">${t2}</text>`;
+  document.querySelector('#eca').innerHTML = b(10, 'EVENT', 'INSERT / UPDATE / DELETE on T', 'cell') + `<path d="M204 52 H278" class="s-acc" marker-end="url(#m-acc)"/>` +
+    b(285, 'CONDITION', 'WHEN (…) is true?', 'cell-hl') + `<path d="M479 52 H553" class="s-grn" marker-end="url(#m-grn)"/><text x="516" y="44" text-anchor="middle" class="lbl grn">yes</text>` +
+    b(560, 'ACTION', 'BEGIN … END; runs', 'cell-new') + `<text x="380" y="110" text-anchor="middle" class="lbl">no → action skipped; the triggering statement goes on</text>`;
+})();
+
+// ---------- trigger simulator ----------
+const PC0 = [[1001, 2.66, 1024, 250, 2114], [1003, 1.42, 512, 80, 478], [1004, 2.80, 1024, 250, 649], [1005, 3.20, 512, 250, 630], [1006, 3.20, 1024, 320, 1049], [1007, 2.20, 1024, 200, 510]];
+const COLS = ['model', 'speed', 'ram', 'hd', 'price'];
+const STMTS = [
+  { sql: 'UPDATE PC SET price = price - 100 WHERE speed >= 2.80', ev: 'UPDATE', set: ['price'], hit: r => r[1] >= 2.80, fn: r => { r[4] -= 100; } },
+  { sql: 'UPDATE PC SET price = -1 WHERE model = 1003', ev: 'UPDATE', set: ['price'], hit: r => r[0] === 1003, fn: r => { r[4] = -1; } },
+  { sql: 'UPDATE PC SET ram = ram * 2 WHERE price > 5000', ev: 'UPDATE', set: ['ram'], hit: r => r[4] > 5000, fn: r => { r[2] *= 2; } },
+  { sql: 'UPDATE PC SET speed = speed + 0.1', ev: 'UPDATE', set: ['speed'], hit: () => true, fn: r => { r[1] = Math.round((r[1] + 0.1) * 100) / 100; } },
+  { sql: 'DELETE FROM PC WHERE price < 640', ev: 'DELETE', hit: r => r[4] < 640 },
+  { sql: 'INSERT INTO PC VALUES (1014, 3.40, 2048, 500, -50)', ev: 'INSERT', row: [1014, 3.40, 2048, 500, -50] },
+];
+const esc = s => String(s).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+// o: {timing, level, event, of, when, action, stmt}
+function trigSim(o) {
+  const row = o.level === 'row', ev = o.event, st = STMTS[o.stmt];
+  const of = (o.of || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+  const code = `CREATE OR REPLACE TRIGGER sim_trg\n${o.timing} ${ev}${of.length && ev === 'UPDATE' ? ' OF ' + of.join(', ') : ''} ON PC\n${row ? 'FOR EACH ROW\n' : ''}${o.when.trim() ? `WHEN (${o.when.trim()})\n` : ''}BEGIN\n  ${{ raise: `RAISE_APPLICATION_ERROR(-20000, 'rejected by sim_trg');`, log: `INSERT INTO PC_log VALUES (${row ? ":OLD.model, :NEW.model, :NEW.price" : "NULL, NULL, NULL"}, '${o.timing} ${row ? 'row' : 'statement'}');`, setnew: ':NEW.price := 0;' }[o.action]}\nEND;\n/`;
+  // compile-time checks (Oracle error codes)
+  const errs = [];
+  if (of.length && ev !== 'UPDATE') errs.push('OF columns are allowed only for UPDATE triggers.');
+  if (of.some(c => !COLS.includes(c))) errs.push(`PC has no column ${of.find(c => !COLS.includes(c))}.`);
+  if (o.when.trim() && !row) errs.push('ORA-04077: WHEN clause cannot be used with table level triggers.');
+  if (o.action === 'setnew' && !row) errs.push('ORA-04082: NEW or OLD references not allowed in table level triggers.');
+  if (o.action === 'setnew' && o.timing === 'AFTER') errs.push('ORA-04084: cannot change NEW values for this trigger type.');
+  if (o.action === 'setnew' && ev === 'DELETE') errs.push(':NEW is all NULL in a DELETE trigger; assigning to it makes no sense.');
+  let cond = null;
+  if (o.when.trim() && !errs.length) {
+    try { cond = raCondFn(o.when.replace(/:(new|old)\./gi, '$1.'), [...COLS.map(c => 'old.' + c), ...COLS.map(c => 'new.' + c)]); }
+    catch (e) { errs.push('WHEN clause: ' + e.message); }
+  }
+  if (errs.length) return { code, errs };
+  const fires = st.ev === ev && (ev !== 'UPDATE' || !of.length || of.some(c => st.set.includes(c)));
+  let table = PC0.map(r => [...r]); const log = [], frames = [];
+  let fired = 0, aborted = null;
+  const tl = [];   // timeline boxes
+  const tblHTML = (t, hl = {}, title = 'PC') => `<div class="ra-rel"><div class="ra-rt">${title}</div><table class="ra-t"><tr>${COLS.map(c => `<th>${c}</th>`).join('')}</tr>${t.map((r, i) => `<tr class="${hl[i] || ''}">${r.map(v => `<td>${v}</td>`).join('')}</tr>`).join('')}</table></div>`;
+  const logHTML = () => `<div class="ra-rel"><div class="ra-rt">PC_log</div><table class="ra-t"><tr><th>old_model</th><th>new_model</th><th>new_price</th><th>fired by</th></tr>${log.length ? log.map(l => `<tr>${l.map(v => `<td>${v == null ? '<span class="sq-null">NULL</span>' : v}</td>`).join('')}</tr>`).join('') : '<tr><td colspan="4" class="ra-empty">(empty)</td></tr>'}</table></div>`;
+  const push = (cap, hl = {}) => frames.push({ html: `<div class="trg-row">${tl.map(b => `<span class="trg-box ${b.cls || ''}">${b.t}</span>`).join('<span class="trg-arrow">→</span>')}</div><div class="ra-io">${tblHTML(table, hl)}${logHTML()}</div><p class="sq-note">Trigger fired so far: <b>${fired}</b> time${fired === 1 ? '' : 's'}.</p>`, cap });
+  const mark = cls => { if (tl.length) tl[tl.length - 1].cls = cls; };
+  const act = (oldR, newR) => {   // returns false if the statement is aborted
+    fired++;
+    const c = cond ? cond([...(oldR || COLS.map(() => null)), ...(newR || COLS.map(() => null))]) : true;
+    if (c !== true) return { ok: true, msg: `the WHEN condition is ${c === null ? 'unknown (NULL)' : 'false'}, so the action is skipped` };
+    if (o.action === 'raise') return { ok: false, msg: 'the action calls RAISE_APPLICATION_ERROR(-20000, …)' };
+    if (o.action === 'log') { log.push([oldR ? oldR[0] : null, newR ? newR[0] : null, newR ? newR[4] : null, `${o.timing} ${row ? 'row' : 'statement'}`]); return { ok: true, msg: 'the action inserts a row into PC_log' }; }
+    newR[4] = 0; return { ok: true, msg: 'the action sets :NEW.price := 0, so price 0 will be stored' };
+  };
+  const snapshot = table.map(r => [...r]);
+  tl.push({ t: st.sql.split(' ')[0] + ' starts' }); mark('on');
+  push(`The statement <code>${esc(st.sql)}</code> starts. ${fires ? 'Its event matches the trigger.' : `It does <b>not</b> match the trigger's event (${ev}${of.length ? ' OF ' + of.join(', ') : ''}), so the trigger will never fire.`}`);
+  mark('done');
+  const stmtTrig = when => {
+    if (!fires || row || o.timing !== when) return true;
+    tl.push({ t: `${when} statement trigger` }); mark('on');
+    const r = act(null, null);
+    if (!r.ok) { mark('err'); aborted = r.msg; push(`${when} statement-level trigger fires (once): ${r.msg}. The whole statement fails with ORA-20000 and its changes are undone.`); return false; }
+    push(`${when} statement-level trigger fires, once for the whole statement: ${r.msg}.`); mark('done'); return true;
+  };
+  let ok = stmtTrig('BEFORE');
+  const targets = st.ev === 'INSERT' ? [null] : table.map((r, i) => st.hit(r) ? i : -1).filter(i => i >= 0);
+  if (ok && !targets.length) { tl.push({ t: 'no rows match', cls: 'off' }); push('The WHERE clause matches <b>no rows</b>. A row-level trigger therefore never fires; a statement-level trigger still fires once.'); }
+  for (const i of ok ? targets : []) {
+    const oldR = i == null ? null : [...table[i]];
+    let newR = st.ev === 'DELETE' ? null : i == null ? [...st.row] : (() => { const n = [...table[i]]; st.fn(n); return n; })();
+    const label = `row ${(i == null ? newR : oldR)[0]}`;
+    if (fires && row && o.timing === 'BEFORE') {
+      tl.push({ t: `BEFORE ${label}` }); mark('on');
+      const r = act(oldR, newR);
+      if (!r.ok) { mark('err'); aborted = r.msg; push(`BEFORE row trigger for ${label}: ${r.msg}. The statement fails; rows already changed are put back.`, i == null ? {} : { [i]: 'del' }); ok = false; break; }
+      push(`BEFORE row trigger for ${label}${oldR && newR ? ` (:OLD.price = ${oldR[4]}, :NEW.price = ${newR[4]})` : newR ? ` (:NEW.price = ${newR[4]})` : ` (:OLD.price = ${oldR[4]})`}: ${r.msg}.`, i == null ? {} : { [i]: 'hl' }); mark('done');
+    }
+    tl.push({ t: `change ${label}` }); mark('on');
+    let hl = {};
+    if (st.ev === 'DELETE') { table.splice(i, 1); targets.forEach((t, k) => { if (t > i) targets[k]--; }); push(`The row ${label} is deleted.`); }
+    else if (i == null) { table.push(newR); hl = { [table.length - 1]: 'new' }; push(`The row ${label} is inserted${newR[4] < 0 ? ' with a negative price' : ''}.`, hl); }
+    else { table[i] = newR; hl = { [i]: 'new' }; push(`The row ${label} is updated: price ${oldR[4]} → ${newR[4]}${newR[1] !== oldR[1] ? `, speed ${oldR[1]} → ${newR[1]}` : ''}${newR[2] !== oldR[2] ? `, ram ${oldR[2]} → ${newR[2]}` : ''}.`, hl); }
+    mark('done');
+    if (fires && row && o.timing === 'AFTER') {
+      tl.push({ t: `AFTER ${label}` }); mark('on');
+      const r = act(oldR, newR);
+      if (!r.ok) { mark('err'); aborted = r.msg; push(`AFTER row trigger for ${label}: ${r.msg}. The statement fails; every row it changed is put back.`, hl); ok = false; break; }
+      push(`AFTER row trigger for ${label}: ${r.msg}.`, hl); mark('done');
+    }
+  }
+  if (ok) ok = stmtTrig('AFTER');
+  if (!ok) { table = snapshot; log.length = 0; tl.push({ t: 'ORA-20000, rolled back', cls: 'err' }); push(`<b>Statement failed</b> (${esc(aborted)}). Oracle undoes everything the statement did, including the trigger's own changes: PC and PC_log are back to their state before the statement. The transaction itself is still open.`); }
+  else { tl.push({ t: 'statement done', cls: 'done' }); push(`<b>Statement complete.</b> The trigger fired ${fired} time${fired === 1 ? '' : 's'}.`); }
+  return { code, frames };
+}
+
+// Figure 2: four triggers at once
+(() => {
+  const T = PC0.map(r => [...r]), hit = T.map(r => r[1] >= 2.80);
+  const steps = [], seq = ['BEFORE stmt'];
+  T.forEach((r, i) => { if (hit[i]) seq.push(`BEFORE row ${r[0]}`, `change ${r[0]}`, `AFTER row ${r[0]}`); });
+  seq.push('AFTER stmt');
+  let cnt = { bs: 0, br: 0, ar: 0, as: 0 };
+  const cur = T.map(r => [...r]);
+  seq.forEach((s, k) => {
+    if (s === 'BEFORE stmt') cnt.bs++; else if (s === 'AFTER stmt') cnt.as++; else if (s.startsWith('BEFORE')) cnt.br++; else if (s.startsWith('AFTER')) cnt.ar++;
+    const m = s.match(/(\d{4})/), idx = m ? cur.findIndex(r => r[0] === +m[1]) : -1;
+    if (s.startsWith('change')) cur[idx][4] -= 100;
+    const boxes = seq.map((t, j) => `<span class="trg-box ${j < k ? 'done' : j === k ? 'on' : 'off'}">${t}</span>`).join('<span class="trg-arrow">→</span>');
+    const tbl = `<table class="ra-t"><tr>${COLS.map(c => `<th>${c}</th>`).join('')}</tr>${cur.map((r, i) => `<tr class="${i === idx ? (s.startsWith('change') ? 'new' : 'hl') : ''}">${r.map(v => `<td>${v}</td>`).join('')}</tr>`).join('')}</table>`;
+    const counts = `<table class="ra-t"><tr><th>trigger</th><th>fired</th></tr><tr><td>BEFORE … (statement)</td><td>${cnt.bs}</td></tr><tr><td>BEFORE … FOR EACH ROW</td><td>${cnt.br}</td></tr><tr><td>AFTER … FOR EACH ROW</td><td>${cnt.ar}</td></tr><tr><td>AFTER … (statement)</td><td>${cnt.as}</td></tr></table>`;
+    const cap = s === 'BEFORE stmt' ? 'The UPDATE starts. The BEFORE statement-level trigger fires first, once, before any row is touched.'
+      : s === 'AFTER stmt' ? 'All 3 rows are done. The AFTER statement-level trigger fires once, last. Totals: statement-level triggers 1 each, row-level triggers 3 each.'
+      : s.startsWith('BEFORE') ? `Row ${m[1]} is about to change. The BEFORE row trigger fires; it sees :OLD.price = ${cur[idx][4]} and :NEW.price = ${cur[idx][4] - 100} and could still change :NEW or reject the row.`
+      : s.startsWith('change') ? `Oracle writes the new value of row ${m[1]}: price is now ${cur[idx][4]}.`
+      : `The AFTER row trigger for ${m[1]} fires. The row is already changed; it can read :OLD and :NEW but no longer change :NEW.`;
+    steps.push({ html: `<div class="trg-row">${boxes}</div><div class="ra-io">${tbl}${counts}</div>`, cap });
+  });
+  stepper('#order', steps, { interval: 2200 });
+})();
+
+// simulator UI
+(() => {
+  const host = document.querySelector('#sim');
+  host.innerHTML = `<div class="trg-form">
+    <label><span>Timing</span><select name="timing"><option>BEFORE</option><option>AFTER</option></select></label>
+    <label><span>Level</span><select name="level"><option value="row">FOR EACH ROW (row-level)</option><option value="stmt">statement-level</option></select></label>
+    <label><span>Event</span><select name="event"><option>UPDATE</option><option>INSERT</option><option>DELETE</option></select></label>
+    <label><span>OF columns (UPDATE only, optional)</span><input name="of" placeholder="e.g. price, speed"></label>
+    <label class="wide"><span>WHEN condition (row-level only, optional; use new.col / old.col)</span><input name="when" value="new.price < 600"></label>
+    <label><span>Action</span><select name="action"><option value="log">insert a row into PC_log</option><option value="raise">RAISE_APPLICATION_ERROR</option><option value="setnew">:NEW.price := 0</option></select></label>
+    <label class="wide"><span>Triggering statement</span><select name="stmt">${STMTS.map((s, i) => `<option value="${i}">${esc(s.sql)}</option>`).join('')}</select></label>
+  </div><button type="button">Run the statement ▶</button><pre class="trg-code"></pre><div class="trg-msg"></div><div class="trg-out"></div>`;
+  const val = n => host.querySelector(`[name="${n}"]`).value;
+  const run = () => {
+    const o = { timing: val('timing'), level: val('level'), event: val('event'), of: val('of'), when: val('when'), action: val('action'), stmt: +val('stmt') };
+    const r = trigSim(o);
+    host.querySelector('.trg-code').textContent = r.code;
+    const msg = host.querySelector('.trg-msg'), out = host.querySelector('.trg-out');
+    if (r.errs) { msg.innerHTML = `<p class="sq-msg err"><b>Oracle would not create this trigger:</b> ${r.errs.map(esc).join(' ')}</p>`; out.innerHTML = ''; return; }
+    msg.innerHTML = ''; out.innerHTML = '<div></div>'; stepper(out.firstChild, r.frames, { interval: 2000 });
+  };
+  host.querySelector('button').onclick = run;
+  host.querySelectorAll('select, input').forEach(el => el.addEventListener('change', run));
+  run();
+})();
+
+// SQLite playgrounds
+const PCSET = raSetup(DB_PPLP, ['Product', 'PC']);
+sqlPlay('#sq51', { setup: PCSET + `
+CREATE TRIGGER NoNegative
+BEFORE UPDATE OF price, speed ON PC
+FOR EACH ROW
+WHEN NEW.price < 0 OR NEW.speed < 0
+BEGIN
+  SELECT RAISE(ABORT, 'no negative value allowed');
+END;`, query: "UPDATE PC SET price = -5 WHERE model = 1001;\nSELECT * FROM PC WHERE model = 1001;", note: 'SQLite version (syntax differs from Oracle). The setup already created PC, Product and the trigger NoNegative; press Show tables to see the data.' });
+sqlPlay('#sq52', { setup: PCSET + `
+CREATE TRIGGER cascading
+BEFORE DELETE ON PC
+FOR EACH ROW
+BEGIN
+  DELETE FROM Product WHERE model = OLD.model;
+END;`, query: "DELETE FROM PC WHERE price < 600;\nSELECT * FROM Product WHERE type = 'pc';", note: 'SQLite version (syntax differs from Oracle). PCs 1003, 1007 and 1013 cost under 600; after the DELETE their Product rows are gone as well.' });
+sqlPlay('#sqExam', { setup: raSetup(DB_PPLP, ['Product', 'Laptop']) + `
+CREATE TRIGGER LaptopNoNegIns BEFORE INSERT ON Laptop FOR EACH ROW
+WHEN NEW.speed < 0 OR NEW.ram < 0 OR NEW.hd < 0 OR NEW.screen < 0 OR NEW.price < 0
+BEGIN SELECT RAISE(ABORT, 'Laptop values cannot be negative'); END;
+CREATE TRIGGER LaptopNoNegUpd BEFORE UPDATE OF speed, ram, hd, screen, price ON Laptop FOR EACH ROW
+WHEN NEW.speed < 0 OR NEW.ram < 0 OR NEW.hd < 0 OR NEW.screen < 0 OR NEW.price < 0
+BEGIN SELECT RAISE(ABORT, 'Laptop values cannot be negative'); END;
+CREATE TRIGGER LaptopDeleteProduct AFTER DELETE ON Laptop FOR EACH ROW
+BEGIN DELETE FROM Product WHERE model = OLD.model; END;`, query: "-- try each statement on its own\nDELETE FROM Laptop WHERE model = 2004;\nSELECT * FROM Product WHERE type = 'laptop';\n-- INSERT INTO Laptop VALUES (2011, 1.8, -512, 128, 14.0, 700);", note: 'SQLite version (syntax differs from Oracle). Uncomment the INSERT to see the rejection.' });
+
+flashcards('#cards', [
+  { f: 'Trigger', b: 'Code stored in the database that runs automatically when an INSERT/UPDATE/DELETE happens on a table. An event-condition-action rule.' },
+  { f: 'Row-level trigger', b: 'FOR EACH ROW: fires once per affected row; can use :OLD and :NEW.' },
+  { f: 'Statement-level trigger', b: 'The default: fires once per statement, even if no row is affected; no :OLD/:NEW.' },
+  { f: 'Firing order', b: 'BEFORE statement → (BEFORE row → change → AFTER row) per row → AFTER statement.' },
+  { f: ':NEW / :OLD', b: 'Row after / before the change. INSERT: no :OLD values; DELETE: no :NEW values.' },
+  { f: 'Colon rule', b: ':NEW.col in the trigger body; new.col (no colon) in the WHEN clause.' },
+  { f: 'Changing :NEW', b: 'Allowed only in a BEFORE row trigger.' },
+  { f: 'RAISE_APPLICATION_ERROR', b: 'RAISE_APPLICATION_ERROR(−20000…−20999, \'msg\'): aborts the triggering statement and undoes its changes.' },
+  { f: 'UPDATE OF col', b: 'The trigger fires only if the UPDATE\'s SET list names one of the columns.' },
+]);
+quiz('#quiz', [
+  { q: 'An UPDATE changes 4 rows. A row-level AFTER trigger and a statement-level AFTER trigger exist. How many firings in total?', opts: ['2', '5', '8', '4'], a: 1, why: '4 row-level + 1 statement-level.' },
+  { q: 'An UPDATE matches no rows. Which trigger fires?', opts: ['Both', 'Only the statement-level trigger', 'Only the row-level trigger', 'Neither'], a: 1, why: 'Statement-level triggers fire once per statement, regardless of rows.' },
+  { q: 'Slide 51\'s trigger is BEFORE UPDATE OF price, speed. Does <code>UPDATE PC SET ram = 64</code> fire it?', opts: ['Yes', 'No, ram is not in the OF list', 'Only if ram is negative', 'Only for one row'], a: 1, why: 'OF restricts the event to updates of the listed columns.' },
+  { q: 'Inside a DELETE trigger, :NEW.price is…', opts: ['the deleted price', 'NULL', 'an error', '0'], a: 1, why: 'There is no new row after a delete.' },
+  { q: 'Which is correct Oracle?', opts: ['WHEN (:NEW.price &lt; 0)', 'WHEN (new.price &lt; 0)', 'WHEN NEW.price &lt; 0 THEN', 'IF (new.price &lt; 0) WHEN'], a: 1, why: 'No colon in WHEN, and the condition is in brackets.' },
+  { q: 'A trigger raises ORA-20000 on the third of five rows of an UPDATE. What happens?', opts: ['Rows 1–2 stay updated', 'The whole UPDATE is undone; the transaction stays open', 'The whole transaction is rolled back', 'Rows 4–5 are updated anyway'], a: 1, why: 'Statement-level atomicity.' },
+  { q: 'Where can you write :NEW.price := 0?', opts: ['AFTER row trigger', 'BEFORE row trigger', 'Statement-level trigger', 'Any trigger'], a: 1, why: 'Only before the row is written.' },
+]);
+ask('#try1', { q: '<code>DELETE FROM PC WHERE price &lt; 600</code> deletes 3 PCs. How many times does slide 52\'s trigger fire?', a: 3, why: 'It is FOR EACH ROW.' });
+ask('#try2', { q: 'What is the largest error number you may pass to RAISE_APPLICATION_ERROR (it is negative)?', a: -20000, why: 'The application range is −20999 to −20000.' });
+
+const SETPC = raSetup(DB_PPLP, ['Product', 'PC']) + '\nCREATE TABLE PriceLog (model NUMBER, old_price NUMBER, new_price NUMBER);';
+sqlCheck('#ex1', { setup: SETPC, check: 'state', table: 'PriceLog', task: '1. (Easy) Write a trigger <code>LogPrice</code> that, after each update of a PC\'s price, inserts (model, old price, new price) into PriceLog. End your answer with: <code>UPDATE PC SET price = price - 50 WHERE speed &gt;= 3;</code>', solution: 'CREATE TRIGGER LogPrice\nAFTER UPDATE OF price ON PC\nFOR EACH ROW\nBEGIN\n  INSERT INTO PriceLog VALUES (OLD.model, OLD.price, NEW.price);\nEND;\nUPDATE PC SET price = price - 50 WHERE speed >= 3;', hint: 'AFTER UPDATE OF price ON PC FOR EACH ROW; OLD.price and NEW.price.' });
+sqlCheck('#ex2', { setup: raSetup(DB_PPLP, ['Product', 'Laptop']), check: 'state', table: 'Product', task: '2. The exam rule (ii): when a laptop is deleted, delete its model from Product. End with: <code>DELETE FROM Laptop WHERE screen &lt; 14;</code>', solution: 'CREATE TRIGGER LaptopDeleteProduct\nAFTER DELETE ON Laptop\nFOR EACH ROW\nBEGIN\n  DELETE FROM Product WHERE model = OLD.model;\nEND;\nDELETE FROM Laptop WHERE screen < 14;' });
+sqlCheck('#ex3', { setup: raSetup(DB_PPLP, ['Printer']), check: 'state', table: 'Printer', task: '3. (Exam style) A printer inserted with a negative price should be stored with price 0 instead of being rejected. SQLite cannot assign to NEW, so write an AFTER INSERT trigger that updates the new row. End with: <code>INSERT INTO Printer VALUES (3008, \'T\', \'laser\', -20);</code> (In Oracle this would be a BEFORE INSERT row trigger with <code>:NEW.price := 0;</code>.)', solution: "CREATE TRIGGER FixPrice\nAFTER INSERT ON Printer\nFOR EACH ROW\nWHEN NEW.price < 0\nBEGIN\n  UPDATE Printer SET price = 0 WHERE model = NEW.model;\nEND;\nINSERT INTO Printer VALUES (3008, 'T', 'laser', -20);", hint: 'WHEN NEW.price &lt; 0, then UPDATE Printer … WHERE model = NEW.model.' });
+</script>
+</body>
+</html>

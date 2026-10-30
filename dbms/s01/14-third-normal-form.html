@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Third Normal Form · DBMS Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="lecture.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Lec 01 (Sukarna) · Chapter 14 · Slides 57–59 · Book §3.5.1–3.5.2</div>
+<h1>Third Normal Form and the 3NF Synthesis Algorithm</h1>
+<p class="lede">3NF relaxes BCNF just enough that every relation can be decomposed losslessly <em>and</em> with all dependencies preserved. This chapter defines 3NF and prime attributes (correcting a slip on slide 57), runs the synthesis algorithm on the slides' example with a tool, and works the “3NF but not BCNF” exam questions.</p>
+
+<h2>1. Definition (slide 57)</h2>
+<dl class="def">
+  <dt>Third normal form (3NF)</dt>
+  <dd>A relation R is in 3NF if, whenever A₁A₂…Aₙ → B₁B₂…Bₘ is a nontrivial FD, either {A₁, …, Aₙ} is a superkey, or each of the B's that is not among the A's is a member of some key (not necessarily the same key).</dd>
+  <dt>Prime attribute</dt>
+  <dd>An attribute that is a member of <em>some key</em> (candidate key).</dd>
+</dl>
+<p class="tbl-note">Slide 57 says “a member of a superkey”. That is a slip: every attribute is a member of some superkey (the set of all attributes is a superkey), so every attribute would be prime and every relation would be in 3NF. The textbook's definition says “a member of some key”.</p>
+<p>So the 3NF condition reads: <strong>for every nontrivial FD, either the left side is a superkey, or the right side consists of prime attributes only.</strong> Compare BCNF: the left side must be a superkey, no exceptions. The extra clause “excuses” FDs whose right side is part of a key.</p>
+<div class="figrow">
+<div class="q" style="flex:1 1 300px"><h4>Bookings is in 3NF</h4><p>Keys {title, city}, {title, theatre}, so all three attributes are prime. theatre → city violates BCNF, but city is prime: allowed in 3NF. title city → theatre has a key on the left. <strong>3NF, not BCNF.</strong></p></div>
+<div class="q" style="flex:1 1 300px"><h4>The studio relation is not in 3NF</h4><p>{title, year, studioName, president, presAddr}, key {title, year}. studioName → president: studioName is not a superkey and president is not prime. <strong>Not 3NF</strong> (so not BCNF either).</p></div>
+</div>
+<p>Every BCNF relation is in 3NF (the first clause already holds for every FD), but not the other way round.</p>
+
+<h2>2. The 3NF synthesis algorithm (slide 58)</h2>
+<pre>3NF_synthesis(R, F):
+  Step 1. Find a minimal basis G of F (Chapter 8).
+  Step 2. Merge FDs with the same left side: X → A, X → B, … become X → AB…
+  Step 3. For each FD X → A in G, make a relation with schema XA.
+  Step 4. If none of these schemas is a superkey of R, add one more relation
+          whose schema is a key of R.
+  Step 5. If a schema is a subset of another, remove it.</pre>
+<ul>
+  <li><strong>Step 3 preserves every FD:</strong> each FD of the minimal basis lies entirely inside one relation, so it can be checked there.</li>
+  <li><strong>Step 4 makes the join lossless:</strong> a relation containing a key lets the chase reach an all-plain row (book §3.5.3).</li>
+  <li>Each resulting relation is in 3NF (proof in the book, beyond the syllabus). The book's version has three steps: minimal basis, one schema per FD, add a key; merging left sides and dropping subsets are tidying steps that change nothing important.</li>
+</ul>
+<p class="tbl-note">Slide numbering slip: slide 58's Step 4 says “relation schemas from Step 2”, meaning the schemas made in Step 3; slide 59 then numbers the same steps 1–4 differently (its Step 2 is the algorithm's Step 3 + Step 5, its Step 3 is the algorithm's Step 4).</p>
+
+<h2>3. Slide 59's example</h2>
+<p>R(A, B, C, D, E) with AB → C, C → B, A → D.</p>
+<ol>
+  <li><strong>Minimal basis.</strong> No FD is implied by the other two: (AB)⁺ with {C → B, A → D} is ABD (no C); C⁺ with {AB → C, A → D} is C; A⁺ with {AB → C, C → B} is A. No left side can shrink: A⁺ = AD and B⁺ = B under all three FDs, so neither contains C. (The slide writes “if we remove A1 or B”; it means A or B.)</li>
+  <li><strong>Schemas:</strong> S₁(A, B, C), S₂(B, C), S₃(A, D). S₂ ⊂ S₁, so drop it.</li>
+  <li><strong>Keys of R:</strong> A and E are on no right side; D is only on a right side. (AE)⁺ = ADE. Adding B: (ABE)⁺ = ABCDE. Adding C: (ACE)⁺ = ACE + B (C → B) + D = ABCDE. So the keys are <strong>{A, B, E}</strong> and <strong>{A, C, E}</strong> (slide: “verify?”: verified). Neither S₁ nor S₃ contains a key (E is missing), so add S₄(A, B, E).</li>
+  <li><strong>Final:</strong> S₁(A, B, C), S₃(A, D), S₄(A, B, E).</li>
+</ol>
+<p>Note that S₁(A, B, C) with AB → C and C → B is in 3NF but not BCNF: C → B has a non-superkey on the left, but B is prime in S₁ (S₁'s keys are AB and AC). The textbook's Exercise 3.5.4 asks to verify losslessness with the chase; enter <code>A B C D E</code>, <code>AB -> C; C -> B; A -> D</code> and <code>ABC; AD; ABE</code> into the chase tool of Chapter 12.</p>
+
+<figure class="wide">
+<span class="anim-tag">Interactive tool</span>
+<div id="tool"></div>
+<figcaption><b>Tool 5: 3NF synthesis.</b> Preset: slide 59. Try Bookings (<code>title theatre city</code>; <code>theatre -> city; title city -> theatre</code>): the result is the single relation Bookings itself.</figcaption>
+</figure>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+<div id="try1"></div>
+
+<h3>Exam questions</h3>
+<div class="exam">
+  <div class="exam-src">DB QB · 23-24 1c · 9 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-1 | 2023–24 · 9 marks</div>
+  <div class="exam-q"><p>Discuss an example where a table is in 3NF, but not in BCNF. Then, modify the design to satisfy BCNF.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><strong>Example: Bookings(title, theatre, city)</strong> with FDs theatre → city (a theatre is in one city) and title city → theatre (a movie plays in at most one theatre per city).</p>
+    <p>Keys: {title, city} (determines theatre) and {title, theatre} (determines city). {theatre, city}⁺ = {theatre, city}, so it is not a key. Prime attributes: title, theatre, city (all of them).</p>
+    <ul>
+      <li><strong>3NF:</strong> title city → theatre has a key on the left. theatre → city has a non-superkey on the left, but city is prime. So every FD passes: <strong>3NF</strong>.</li>
+      <li><strong>Not BCNF:</strong> theatre → city has theatre⁺ = {theatre, city} ≠ R on the left.</li>
+    </ul>
+    <p>Sample data shows the redundancy BCNF would remove: (Antz, Guild, Menlo Park), (Shrek, Guild, Menlo Park): the city of Guild is stored once per movie.</p>
+    <p><strong>BCNF design:</strong> split on theatre → city: <strong>Theatre(theatre, city)</strong> with key theatre, and <strong>Showing(theatre, title)</strong> with key {theatre, title}. Both are in BCNF and the join is lossless (theatre is the key of Theatre). The price: title city → theatre is no longer enforceable inside one table (Chapter 13); it must be checked with a join, a trigger or an assertion. A designer chooses between the 3NF table (all FDs enforceable, a little redundancy) and the BCNF tables (no redundancy, one FD needs a join).</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">DB QB · Jan 20 14 · 10 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-2 | 2018–19 · 10 marks</div>
+  <div class="exam-q"><p>“A table in 3NF may fail to meet the criteria of BCNF” do you agree? Show an appropriate example to validate your claim.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><strong>Yes.</strong> BCNF requires a superkey on the left of every nontrivial FD. 3NF also accepts an FD whose left side is not a superkey, provided every attribute on its right is prime. An FD of that kind is fine in 3NF and breaks BCNF.</p>
+    <p><strong>Example:</strong> Teaching(student, course, teacher). Rules: each teacher teaches one course (teacher → course); for each course a student has one teacher (student course → teacher).</p>
+    <ul>
+      <li>Keys: {student, course} ((student, course)⁺ adds teacher) and {student, teacher} (teacher gives course). All three attributes are prime.</li>
+      <li>3NF: student course → teacher has a key on the left; teacher → course has a prime right side. In 3NF.</li>
+      <li>BCNF: teacher → course, and teacher⁺ = {teacher, course} is not a superkey. Not in BCNF.</li>
+    </ul>
+    <div id="teach"></div>
+    <p>The redundancy: “Dr. Rahman teaches DB” is stored once per student he teaches. Decomposing into (teacher, course) and (student, teacher) reaches BCNF but loses student course → teacher.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">BUET QBank · CSE 303 | L-3/T-1 | 2014–15 · 10 marks (2013–14: 5 marks, first part only)</div>
+  <div class="exam-q"><p>Show an example where a table is in 3NF, but not in BCNF. Then modify the design to satisfy BCNF.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>Abstract example: R(A, B, C) with AB → C and C → B.</p>
+    <ul>
+      <li>Keys: (AB)⁺ = ABC, so AB is a key; (AC)⁺ = ABC (C → B), so AC is a key. Neither A, B nor C alone is a superkey. Prime attributes: A, B, C.</li>
+      <li>3NF: AB → C has a key on the left; C → B has a prime right side (B is in the key AB). In 3NF.</li>
+      <li>BCNF: C → B, C⁺ = {B, C} is not a superkey. Not BCNF.</li>
+    </ul>
+    <p>Instance showing the redundancy: (a1, b1, c1), (a2, b1, c1), (a3, b1, c1): the fact c1 → b1 is stored three times.</p>
+    <p><strong>BCNF design:</strong> split on C → B: R₁(C, B) with key C, and R₂(A, C) with key AC. Lossless, since the common attribute C is a key of R₁. Both pieces are in BCNF (two attributes each). AB → C is not preserved: it spans both pieces.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">DB QB · 19-20 8b · 10 marks &nbsp;|&nbsp; BUET QBank · CSE 215 | L-2/T-2 | 2019–20 · 10 marks</div>
+  <div class="exam-q"><p>What do you know by BCNF and 3NF? What is the major difference between them? Let R be a schema that is not in BCNF and α → β be the functional dependency that causes a violation of BCNF. How can R be decomposed such that R will be in BCNF?</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><strong>BCNF:</strong> R is in BCNF if for every nontrivial FD α → β that holds on R, α is a superkey of R.</p>
+    <p><strong>3NF:</strong> R is in 3NF if for every nontrivial FD α → β, either α is a superkey, or every attribute of β − α is prime (belongs to some candidate key).</p>
+    <p><strong>Major difference:</strong> 3NF has the extra escape clause “or β − α is prime”, so 3NF allows some redundancy that BCNF forbids (example: Bookings, theatre → city). In exchange, every relation has a 3NF decomposition that is both lossless and dependency preserving (synthesis algorithm), while a BCNF decomposition is always lossless but may lose dependencies. BCNF ⊂ 3NF: every BCNF relation is in 3NF.</p>
+    <p><strong>Decomposing on the violation α → β:</strong> replace R by</p>
+    <ul>
+      <li>R₁ = α ∪ β (slides: use α⁺ instead of α ∪ β, which moves everything α determines at once), and</li>
+      <li>R₂ = R − (β − α) (slides: α ∪ (R − α⁺)).</li>
+    </ul>
+    <p>α is in both pieces and is a key of R₁ (α → β), so the decomposition is lossless. Project the FDs onto R₁ and R₂ and, if either still violates BCNF, repeat on it. The process stops because each piece is smaller, and two-attribute relations are always in BCNF. Example: R(A, B, C) with A → B, key AC: α → β = A → B gives R₁(A, B) and R₂(A, C), both BCNF.</p>
+  </div></details>
+</div>
+
+<div class="key"><p><strong>Summary:</strong> 3NF: every nontrivial FD has a superkey on the left or only prime attributes (members of some key) on the right. It is weaker than BCNF and allows FDs like theatre → city. The synthesis algorithm (minimal basis, one relation per left side, add a key relation if needed, drop subsets) always produces 3NF relations with a lossless join and every FD preserved.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="lecture.js"></script>
+<script>
+FD.synthTool('#tool', { attrs: 'A B C D E', fds: 'AB -> C; C -> B; A -> D' });
+$('#teach').innerHTML = inst(['student', 'course', 'teacher'], [['Rafi', 'DB', 'Dr. Rahman'], ['Nila', 'DB', 'Dr. Rahman'], ['Rafi', 'OS', 'Dr. Karim']], { cell: { '0,1': 'hl', '0,2': 'hl', '1,1': 'hl', '1,2': 'hl' } });
+flashcards('#cards', [
+  { f: '3NF', b: 'Every nontrivial X → Y: X is a superkey, or every attribute of Y − X is prime.' },
+  { f: 'Prime attribute', b: 'Member of some (candidate) key. Not “of a superkey” (slide 57 slip).' },
+  { f: 'BCNF vs 3NF', b: 'BCNF ⊂ 3NF; 3NF allows a prime right side with a non-superkey left side.' },
+  { f: '3NF synthesis steps', b: 'Minimal basis; merge left sides; one schema per FD; add a key schema if none; drop subsets.' },
+  { f: 'What synthesis guarantees', b: '3NF, lossless join, dependency preservation.' },
+  { f: 'Slide 59 result', b: 'S₁(A, B, C), S₃(A, D), S₄(A, B, E).' },
+]);
+quiz('#quiz', [
+  { q: 'R(A, B, C) with A → B, key AC. Is R in 3NF?', opts: ['Yes', 'No'], a: 1, why: 'A is not a superkey and B is not prime.' },
+  { q: 'R(A, B, C) with AB → C, C → A. 3NF? BCNF?', opts: ['3NF and BCNF', '3NF only', 'BCNF only', 'neither'], a: 1, why: 'Keys AB, BC. C → A: A is prime, so 3NF; C is not a superkey, so not BCNF.' },
+  { q: 'Step 4 of synthesis (add a key relation) ensures…', opts: ['dependency preservation', 'a lossless join', 'BCNF', 'a minimal basis'], a: 1, why: 'The chase succeeds from the key relation\'s row.' },
+  { q: 'Every relation produced by 3NF synthesis is in BCNF.', opts: ['True', 'False'], a: 1, why: 'Slide 59\'s S₁(A, B, C) with C → B is 3NF but not BCNF.' },
+]);
+ask('#try1', { q: 'R(A, B, C, D) with A → B, C → D. How many relations does 3NF synthesis produce?', a: 3, hint: 'Two FDs give AB and CD; is a key inside either?', why: 'AB, CD, plus the key relation AC.' });
+</script>
+</body>
+</html>
