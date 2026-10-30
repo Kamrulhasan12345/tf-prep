@@ -34,7 +34,7 @@
     qs.on_topic = { type: 'noul', instructions: 'The `student_answer` is a genuine attempt to answer the `question`.' };
     qs.error = { type: 'noul', instructions: 'The `student_answer` contains a factual error when compared with the `model_answer`.' };
     qs.overall = { type: 'score', criteria: LEVELS, instructions: 'Compared with the `model_answer`, how well does the `student_answer` answer the `question`?' };
-    const body = JSON.stringify({ model: 'amos-1-medium', questions: qs,
+    const body = JSON.stringify({ model: 'amos-1-large', questions: qs,
       state: { question, model_answer: model.slice(0, 12000), student_answer: student.slice(0, 8000) } });
     let r;
     for (let n = 0; n < 4; n++) {   // retry 429/503 like the helper does
