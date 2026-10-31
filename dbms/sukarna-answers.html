@@ -1,0 +1,811 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Answering Sukarna Sir's Questions</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="assets/book.css">
+<style>
+.card { border-top: 1px solid var(--line); padding-top: 1.1em; margin-top: 1.8em; }
+.card > h3 { margin-top: 0; }
+.asked { font: 13px var(--mono); color: var(--muted); margin: -.3em 0 .8em; }
+.tmpl { border-left: 3px solid var(--green); padding: .1em 0 .1em 1em; margin: .8em 0; }
+.tmpl > b { font: 600 12px var(--mono); letter-spacing: .04em; color: var(--green); }
+.tmpl ol { margin: .3em 0 0; }
+.lose { border-left: 3px solid var(--red); padding: .1em 0 .1em 1em; margin: .8em 0; }
+.lose > b { font: 600 12px var(--mono); letter-spacing: .04em; color: var(--red); }
+.lose ul { margin: .3em 0 0; }
+.card details { margin: .8em 0; border: 1px solid var(--line); border-radius: 6px; padding: .5em .9em; }
+.card details > summary { cursor: pointer; font-weight: 600; }
+.card details[open] > summary { margin-bottom: .5em; }
+.prompt { font-style: italic; }
+.practice { font: 13px var(--mono); }
+.paper { font: 14px/1.6 var(--mono); white-space: pre-wrap; background: var(--plate); border-radius: 6px; padding: .7em 1em; overflow-x: auto; }
+.finder td:first-child { font-style: italic; }
+.finder td:last-child { white-space: nowrap; }
+@media print { nav.toc, .mtoc { display: none !important; } .card details { border: 0; padding: 0; } .card details > * { display: block; } }
+</style>
+</head>
+<body>
+<main>
+<div class="eyebrow"><a href="../">TF Prep</a> · <a href="index.html">CSE215</a> · Revision</div>
+<h1>Answering Sukarna sir's questions</h1>
+<p class="lede">This page skips the theory. It covers how to write answers that get full marks: every question type from Sukarna sir's half (Lec 01–08) in DB QB 2017–18 to 2024–25 and the older CSE 303 bank, and for each one, how to spot it, the steps to write on paper, a model answer, and where marks get lost.</p>
+
+<p class="key"><b>How to drill each card (about 10 minutes):</b> (1) read the italic question, (2) write your answer on paper using the template, (3) open <b>Model answer</b> and compare, (4) check yourself against the red <b>Marks lost by</b> list. When you get stuck on a concept, follow the <b>Practice</b> link to the chapter.</p>
+
+<h2 id="rules">1. Eight rules for every answer in this half</h2>
+<ol>
+<li><b>Verdict first and last.</b> Open with the answer (“Not conflict-serializable”) and end with it boxed, plus the reason in a few words (“cycle T₁ → T₂ → T₁”). Markers look for it before they read your working.</li>
+<li><b>Use a trace table instead of paragraphs</b> for anything step by step: locks, timestamps, wait-die, recovery, closures. One row per action, with columns <i>action · check · result</i>. A table is quicker to write and easier to mark.</li>
+<li><b>State your convention</b> before using it: “S lock before each read, X lock before each write, locks held until commit”, “chunks of M − 1 blocks, output not counted”, “bag semantics”. If the bank uses a different convention, a stated one still gets the marks.</li>
+<li><b>Name the rule each time you apply it</b>: “U1: log record before data”, “wait-die: older waits”, “TS < RT(X) → write too late → rollback”. Each named rule shows the marker you know why the step is right.</li>
+<li><b>Write “Show / Prove” answers in four parts:</b> Definitions → Claim → Argument (numbered steps) → ∎. Most of the marks are for writing the definitions correctly.</li>
+<li><b>Answer “Define / Explain with example” in three parts:</b> a one-sentence definition, a tiny concrete example, and one line on why it matters. Count about one point per 2 marks: a 5-mark question wants 3 points.</li>
+<li><b>For “Construct a schedule that is X but not Y”</b>, give the schedule and then check <i>both</i> properties out loud: why it is X, and why it is not Y.</li>
+<li><b>Number questions:</b> write the formula first, then the formula with the numbers put in, then the result with units (I/Os, tuples, runs). If the arithmetic slips, the first two lines still earn most of the marks.</li>
+</ol>
+
+<h2 id="finder">2. Which card? Match the wording</h2>
+<div class="tbl finder"><table>
+<tr><th>The question says…</th><th>Card</th></tr>
+<tr><td>“determine whether X → Y follows”, “is {A, B} a key”, “compute (AG)⁺”</td><td><a href="#c1">1</a></td></tr>
+<tr><td>“all nontrivial FDs … single attributes on the right”, “all keys”, “superkeys that are not keys”</td><td><a href="#c2">2</a></td></tr>
+<tr><td>“as a function of n, how many superkeys”</td><td><a href="#c3">3</a></td></tr>
+<tr><td>“decompose into BCNF”, “indicate all BCNF violations”, “projected FDs”</td><td><a href="#c4">4</a></td></tr>
+<tr><td>“is this decomposition lossless”</td><td><a href="#c5">5</a></td></tr>
+<tr><td>“canonical cover / minimal basis”, “3NF synthesis”</td><td><a href="#c6">6</a></td></tr>
+<tr><td>a real table or report + “normalize up to 3NF”, “dependency diagram”</td><td><a href="#c7">7</a></td></tr>
+<tr><td>“example in 3NF but not BCNF”, “do you agree”</td><td><a href="#c8">8</a></td></tr>
+<tr><td>anomalies, Armstrong's six rules, define BCNF/3NF/4NF, MVD, two-attribute relation is BCNF, choosing a PK</td><td><a href="#c9">9</a></td></tr>
+<tr><td>“construct precedence graph”, “is it conflict-serializable”, “all equivalent serial schedules”</td><td><a href="#c10">10</a></td></tr>
+<tr><td>“serializable or conflict-serializable or both”, “number of possible / serializable schedules”</td><td><a href="#c11">11</a></td></tr>
+<tr><td>“by swapping non-conflicting instructions”, “show the steps to transform”</td><td><a href="#c12">12</a></td></tr>
+<tr><td>“show that 2PL is conflict-serializable”, “show strict 2PL is ACR”</td><td><a href="#c13">13</a></td></tr>
+<tr><td>“insert shared and exclusive locks”, “maximise concurrency”</td><td><a href="#c14">14</a></td></tr>
+<tr><td>“deadlock due to lock upgrading”, “use update lock”</td><td><a href="#c15">15</a></td></tr>
+<tr><td>“lock table”, “hash values of data items are…”</td><td><a href="#c16">16</a></td></tr>
+<tr><td>“timestamp-based … show RT/WT”, “which actions roll back”, “Thomas write rule”</td><td><a href="#c17">17</a></td></tr>
+<tr><td>“timestamps vs locking”, “MVCC rules”, “isolation levels”</td><td><a href="#c18">18</a></td></tr>
+<tr><td>“recoverable or ACR”, “construct a schedule that is recoverable but not ACR”</td><td><a href="#c19">19</a></td></tr>
+<tr><td>“wait-for graph”, “choose … to rollback”</td><td><a href="#c20">20</a></td></tr>
+<tr><td>“wait-die / wound-wait”, “deadlock timestamps are…”</td><td><a href="#c21">21</a></td></tr>
+<tr><td>ACID, transaction states, “what is deadlock”, “which properties does recovery maintain”</td><td><a href="#c22">22</a></td></tr>
+<tr><td>undo log + “actions of the recovery manager &lt;X, V&gt;”</td><td><a href="#c23">23</a></td></tr>
+<tr><td>“last log record that must be sent to disk before…”</td><td><a href="#c24">24</a></td></tr>
+<tr><td>“nonquiescent checkpoint”, “oldest log record to scan”</td><td><a href="#c25">25</a></td></tr>
+<tr><td>redo or undo/redo log (4-field records) + “redo and undo phases”</td><td><a href="#c26">26</a></td></tr>
+<tr><td>“write the log records”, force vs steal</td><td><a href="#c27">27</a></td></tr>
+<tr><td>B(R), B(S), M given + “compute the I/O cost” of joins</td><td><a href="#c28">28</a></td></tr>
+<tr><td>“show the runs on each pass”, “number of runs / merge passes”</td><td><a href="#c29">29</a></td></tr>
+<tr><td>“write the steps / give an algorithm” for one-pass or two-pass S − R, ∪, δ, γ</td><td><a href="#c30">30</a></td></tr>
+<tr><td>“optimized logical plan”, “push down selection”, “query tree”</td><td><a href="#c31">31</a></td></tr>
+<tr><td>V(C, r1) … “compute the size of r1 ⋈ r2 ⋈ r3”</td><td><a href="#c32">32</a></td></tr>
+<tr><td>“true or counterexample” for an RA law, “min and max number of tuples”</td><td><a href="#c33">33</a></td></tr>
+<tr><td>NLJ vs block NLJ, hash vs sort-merge, hybrid hash, query-processing subsystems, pipelining</td><td><a href="#c34">34</a></td></tr>
+</table></div>
+
+<!-- ============================ LEC 01 ============================ -->
+<h2 id="l01">3. Lec 01 · FDs, keys and normal forms <small>(162 marks over 7 years)</small></h2>
+
+<div class="card" id="c1">
+<h3>Card 1 · Closure: does an FD follow? Is X a key?</h3>
+<p class="asked">Asked: 24-25 1b (10, compulsory) · 17-18 7a (10) · CSE303 16-17</p>
+<div class="tmpl"><b>TEMPLATE</b><ol>
+<li>For each set X, write X⁺ as a chain: “start {B, C}; BC → E adds E; BE → D adds D; …; nothing more fires.”</li>
+<li><b>Does X → Y follow?</b> Yes if Y ⊆ X⁺, no otherwise. Say which attribute is missing.</li>
+<li><b>Is X a key?</b> Two checks, both written down: (a) X⁺ = R, so X is a superkey; (b) for each subset of X with one attribute removed, the closure ≠ R, so X is minimal.</li>
+<li>Verdict line for each part.</li>
+</ol></div>
+<p class="prompt">R(A, B, C, D, E), FDs A → C, BE → D, CD → A, BC → E, AD → B. (i) Do BC → AD and AC → BD follow? (ii) Are {A, B} and {A, E} keys?</p>
+<details><summary>Model answer</summary>
+<p><b>(i)</b> (BC)⁺: start {B, C}; BC → E adds E; BE → D adds D; CD → A adds A. (BC)⁺ = ABCDE ⊇ AD, so <b>BC → AD follows</b>.</p>
+<p>(AC)⁺: start {A, C}; A → C adds nothing; every other FD needs B, D or E. (AC)⁺ = {A, C}, which lacks B and D, so <b>AC → BD does not follow</b>.</p>
+<p><b>(ii)</b> (AB)⁺: A → C adds C; BC → E adds E; BE → D adds D: ABCDE, a superkey. Subsets: A⁺ = AC, B⁺ = B, neither is R. <b>{A, B} is a key.</b></p>
+<p>(AE)⁺: A → C adds C; nothing else fires: ACE ≠ R. <b>{A, E} is not even a superkey, so not a key.</b></p>
+</details>
+<div class="lose"><b>MARKS LOST BY</b><ul>
+<li>Checking only “superkey” and forgetting minimality when the question asks “key”.</li>
+<li>Writing X⁺ = … with no chain of FDs, so the marker cannot see why.</li>
+</ul></div>
+<p class="practice">Practice → <a href="s01/05-attribute-closure.html">Attribute closure</a> · <a href="s01/06-finding-keys.html">Finding keys</a></p>
+</div>
+
+<div class="card" id="c2">
+<h3>Card 2 · All nontrivial FDs, all keys, superkeys that are not keys</h3>
+<p class="asked">Asked: 21-22 3b · 20-21 7c (15) · CSE303 10-11, 11-12, 15-16 (the standard textbook three-part question)</p>
+<div class="tmpl"><b>TEMPLATE</b><ol>
+<li><b>Classify the attributes:</b> on no right side → in every key; only on right sides → in no key. Write this sentence; it cuts down the work.</li>
+<li><b>Closure table</b> of the subsets (all 15 for four attributes; skip supersets of known keys). Columns: X · X⁺.</li>
+<li><b>(i) FDs:</b> for each X, the FDs are X → A for every A in X⁺ − X. List them, single attribute on the right.</li>
+<li><b>(ii) Keys:</b> the smallest X with X⁺ = R.</li>
+<li><b>(iii) Superkeys that are not keys:</b> every proper superset of a key. Count them as a check.</li>
+</ol></div>
+<p class="prompt">R(A, B, C, D), FDs AB → C, C → D, D → A. (i) All nontrivial FDs (single attribute on the right). (ii) All keys. (iii) Superkeys that are not keys.</p>
+<details><summary>Model answer</summary>
+<p>B appears on no right side, so B is in every key. Closures (only the useful rows): C⁺ = ACD, D⁺ = AD, AB⁺ = ABCD, AC⁺ = ACD, BC⁺ = ABCD, BD⁺ = ABCD, CD⁺ = ACD, A⁺ = A, B⁺ = B.</p>
+<p><b>(i)</b> 14 FDs: C → A, C → D, D → A, AB → C, AB → D, AC → D, BC → A, BC → D, BD → A, BD → C, CD → A, ABC → D, ABD → C, BCD → A.</p>
+<p><b>(ii)</b> B⁺ = B is not a superkey; AB, BC, BD all have closure ABCD. <b>Keys: AB, BC, BD.</b></p>
+<p><b>(iii)</b> <b>ABC, ABD, BCD, ABCD.</b></p>
+</details>
+<div class="lose"><b>MARKS LOST BY</b><ul>
+<li>Listing trivial FDs (AB → A), or listing FDs whose left side contains an attribute already on the right.</li>
+<li>Missing FDs whose left side has three attributes (ABC → D counts).</li>
+<li>Skipping the closure table: without it the lists look guessed.</li>
+</ul></div>
+<p class="practice">Practice → <a href="s01/06-finding-keys.html">Finding keys</a> (5 bank questions with full closure tables)</p>
+</div>
+
+<div class="card" id="c3">
+<h3>Card 3 · Count superkeys as a function of n</h3>
+<p class="asked">Asked: 24-25 1a (3, compulsory) · CSE303 15-16 (6)</p>
+<div class="tmpl"><b>TEMPLATE</b><ol>
+<li>“A superkey is any set that contains a key.”</li>
+<li>One key of k attributes: the other n − k attributes are free, so there are <b>2ⁿ⁻ᵏ</b> superkeys.</li>
+<li>Two keys K₁, K₂: inclusion–exclusion: 2ⁿ⁻|K₁| + 2ⁿ⁻|K₂| − 2ⁿ⁻|K₁ ∪ K₂|.</li>
+<li>Check with the smallest n by listing the sets.</li>
+</ol></div>
+<p class="prompt">(i) Only key is A₁. (ii) Only keys are {A₁, A₂} and {A₁, A₃}.</p>
+<details><summary>Model answer</summary>
+<p><b>(i)</b> A₁ plus any subset of the other n − 1: <b>2ⁿ⁻¹</b>.</p>
+<p><b>(ii)</b> Containing {A₁, A₂}: 2ⁿ⁻². Containing {A₁, A₃}: 2ⁿ⁻². Containing both ({A₁, A₂, A₃}): 2ⁿ⁻³. Total 2ⁿ⁻² + 2ⁿ⁻² − 2ⁿ⁻³ = <b>3 · 2ⁿ⁻³</b>. Check n = 3: A₁A₂, A₁A₃, A₁A₂A₃ = 3 ✓.</p>
+<p>(Keys {A₁} and {A₂, A₃}: 2ⁿ⁻¹ + 2ⁿ⁻² − 2ⁿ⁻³.)</p>
+</details>
+<div class="lose"><b>MARKS LOST BY</b><ul><li>Adding the two counts without subtracting the overlap.</li></ul></div>
+<p class="practice">Practice → <a href="s01/03-keys-and-superkeys.html">Keys and superkeys</a></p>
+</div>
+
+<div class="card" id="c4">
+<h3>Card 4 · BCNF decomposition</h3>
+<p class="asked">Asked: 24-25 2a (16) · 21-22 3c (10–20) · 20-21 7b (10) · 17-18 7b (15) · CSE303 10-11, 12-13, 15-16. The most frequent long question in Lec 01.</p>
+<div class="tmpl"><b>TEMPLATE</b><ol>
+<li><b>Keys of R</b> (use Card 2's classification trick).</li>
+<li><b>Violations:</b> for each FD X → Y write X⁺; if X⁺ ≠ R, it is a violation. List them all if asked.</li>
+<li><b>Split on one violation X → Y:</b> R₁ = X⁺, R₂ = X ∪ (R − X⁺).</li>
+<li><b>Project the FDs</b> onto each piece (closures of subsets, kept inside the piece). Write each piece's FDs and key.</li>
+<li>Repeat on any piece that still violates BCNF.</li>
+<li><b>Final schema</b> with keys underlined, then one closing line: “lossless (BCNF splits always are); dependency preserving? yes/no, because FD … spans pieces.”</li>
+</ol></div>
+<p class="prompt">R(A, B, C, D, E), FDs AB → C, DE → C, B → D. Decompose into BCNF; show the final schema with keys.</p>
+<details><summary>Model answer</summary>
+<p><b>Key.</b> A, E are on no right side. (AE)⁺ = AE; (ABE)⁺: B → D, AB → C → ABCDE. ACE⁺ = ACE, ADE⁺ = ACDE. Only key: <b>ABE</b>.</p>
+<p><b>Violations.</b> AB⁺ = ABCD, DE⁺ = CDE, B⁺ = BD: none = R, so all three FDs violate BCNF.</p>
+<p><b>Split on AB → C:</b> R₁ = ABCD, R₂ = AB ∪ E = ABE. R₂: no nontrivial FDs, key ABE, BCNF. R₁: AB → C, B → D (DE → C needs E), key AB; B → D violates.</p>
+<p><b>Split R₁ on B → D:</b> R₃ = BD (key B), R₄ = ABC (AB → C, key AB). Both BCNF.</p>
+<p><b>Final:</b> R₂(<u>A, B, E</u>), R₃(<u>B</u>, D), R₄(<u>A, B</u>, C). Lossless. <b>Not dependency preserving:</b> DE → C has no piece containing D, E and C.</p>
+</details>
+<div class="lose"><b>MARKS LOST BY</b><ul>
+<li>Splitting as (X, Y) and (R − Y) without using X⁺: correct only when X⁺ = X ∪ Y.</li>
+<li>Copying the original FDs onto a piece instead of projecting them (missed derived FDs, or FDs that mention missing attributes).</li>
+<li>No keys in the final schema (“including all keys” is in the question for a reason).</li>
+</ul></div>
+<p class="practice">Practice → <a href="s01/11-bcnf.html">BCNF</a> · <a href="s01/13-dependency-preservation.html">Dependency preservation</a> · <a href="s01/10-projecting-fds.html">Projecting FDs</a></p>
+</div>
+
+<div class="card" id="c5">
+<h3>Card 5 · Is the decomposition lossless?</h3>
+<p class="asked">Asked: 19-20 8c (5–10) · inside many BCNF/3NF questions</p>
+<div class="tmpl"><b>TEMPLATE</b><ol>
+<li><b>Two pieces:</b> compute (R₁ ∩ R₂)⁺. Lossless iff it contains R₁ or R₂ (“the common attributes are a key of one piece”).</li>
+<li><b>Three or more pieces:</b> chase tableau: one row per piece, plain letters for its attributes, subscripted otherwise; apply FDs to equate; lossless iff some row becomes all plain.</li>
+<li>Verdict line.</li>
+</ol></div>
+<p class="prompt">R(A, B, C, D, E) → (A, B, C), (A, D, E); FDs A → BC, CD → E, B → D, E → A.</p>
+<details><summary>Model answer</summary>
+<p>R₁ ∩ R₂ = {A}. A⁺: A → BC adds B, C; B → D adds D; CD → E adds E: A⁺ = ABCDE ⊇ R₁. A is a key of R₁, so the decomposition is <b>lossless</b>.</p>
+</details>
+<div class="lose"><b>MARKS LOST BY</b><ul><li>Saying “lossless because they share A” without computing A⁺: sharing an attribute is not enough.</li></ul></div>
+<p class="practice">Practice → <a href="s01/12-lossless-join.html">Lossless joins and the chase</a></p>
+</div>
+
+<div class="card" id="c6">
+<h3>Card 6 · Canonical cover, then 3NF synthesis</h3>
+<p class="asked">Asked: CSE303 16-17 (9) · 3NF synthesis is the follow-up in normalization questions</p>
+<div class="tmpl"><b>TEMPLATE</b><ol>
+<li><b>Split</b> right sides into single attributes; drop duplicates.</li>
+<li><b>Redundant FDs:</b> for each FD X → A, compute X⁺ using the <i>other</i> FDs. If A is in it, delete the FD. Write one line per test.</li>
+<li><b>Shrink left sides:</b> for XY → A, if X⁺ (using all FDs) contains A, replace it with X → A.</li>
+<li><b>3NF synthesis:</b> one relation per left side (X plus everything it determines) → if no relation contains a key of R, add one that is a key → drop relations contained in another.</li>
+<li>Closing line: “3NF synthesis is lossless and dependency preserving.”</li>
+</ol></div>
+<p class="prompt">R(A, B, C), F = {A → BC, B → C, A → B, AB → C}. (a) Canonical cover. (b) Lossless decomposition and the normal forms of the pieces.</p>
+<details><summary>Model answer</summary>
+<p><b>(a)</b> Split: A → B, A → C, B → C, AB → C. Tests: A → B: A⁺ without it = AC, keep. A → C: A⁺ without it = ABC, <b>remove</b>. B → C: B⁺ = B, keep. AB → C: (AB)⁺ under {A → B, B → C} = ABC, <b>remove</b>. F<sub>c</sub> = {A → B, B → C}.</p>
+<p><b>(b)</b> Key A. Synthesis: R₁(<u>A</u>, B), R₂(<u>B</u>, C). R₁ contains the key A, so nothing is added. Lossless: R₁ ∩ R₂ = B and B → C (B is a key of R₂). Both pieces are in BCNF (and so 3NF). The original R was only 2NF (B → C is transitive).</p>
+</details>
+<div class="lose"><b>MARKS LOST BY</b><ul>
+<li>Testing an FD for redundancy with itself still in the set (everything looks redundant).</li>
+<li>Forgetting the “add a key relation” step.</li>
+</ul></div>
+<p class="practice">Practice → <a href="s01/08-minimal-basis.html">Minimal basis</a> · <a href="s01/14-third-normal-form.html">3NF synthesis</a></p>
+</div>
+
+<div class="card" id="c7">
+<h3>Card 7 · Normalize a real table up to 3NF</h3>
+<p class="asked">Asked: 23-24 2a (15) · 22-23 7a (20) · 21 CT2 (14) · Jan 20 8 (10) · CSE303 13-14, 14-15. The highest-mark Lec 01 question.</p>
+<div class="tmpl"><b>TEMPLATE</b> (8 parts; each one is usually worth marks)<ol>
+<li><b>Why normalize</b> (if asked): remove redundancy and the update / insertion / deletion anomalies. Give one example of each <i>from their table</i>.</li>
+<li><b>Assumptions</b> you read from the rows (“an invoice has one date: 211347's rows agree”).</li>
+<li><b>FDs</b>, each with its evidence from the rows.</li>
+<li><b>Key</b> of the whole table.</li>
+<li><b>Dependency diagram:</b> key attributes in boxes on top; arrows below; label each arrow <i>partial</i> or <i>transitive</i>.</li>
+<li><b>1NF:</b> atomic values, one row per (key), repeating groups removed. Write the 1NF schema.</li>
+<li><b>2NF:</b> one new table per part of the key that has a partial dependency.</li>
+<li><b>3NF:</b> one new table per transitive dependency. Final schema: PK underlined, FKs marked with “→ Table”.</li>
+</ol></div>
+<p class="prompt">INVOICE table: INV_NUM, PROD_NUM, SALE_DATE, PROD_LABEL, VEND_CODE, VEND_NAME, QUANT_SOLD, PROD_PRICE (one row per product line of an invoice).</p>
+<details><summary>Model answer (condensed)</summary>
+<p><b>FDs:</b> INV_NUM → SALE_DATE; PROD_NUM → PROD_LABEL, VEND_CODE, PROD_PRICE; VEND_CODE → VEND_NAME; INV_NUM, PROD_NUM → QUANT_SOLD. <b>Key</b> {INV_NUM, PROD_NUM}.</p>
+<p><b>Diagram:</b> partial: INV_NUM → SALE_DATE, PROD_NUM → PROD_LABEL, VEND_CODE, PROD_PRICE. Transitive: VEND_CODE → VEND_NAME.</p>
+<p><b>1NF:</b> INVOICE_LINE(<u>INV_NUM, PROD_NUM</u>, SALE_DATE, PROD_LABEL, VEND_CODE, VEND_NAME, QUANT_SOLD, PROD_PRICE).</p>
+<p><b>2NF:</b> INVOICE(<u>INV_NUM</u>, SALE_DATE); PRODUCT(<u>PROD_NUM</u>, PROD_LABEL, VEND_CODE, VEND_NAME, PROD_PRICE); LINE(<u>INV_NUM, PROD_NUM</u>, QUANT_SOLD).</p>
+<p><b>3NF:</b> INVOICE(<u>INV_NUM</u>, SALE_DATE); PRODUCT(<u>PROD_NUM</u>, PROD_LABEL, VEND_CODE → VENDOR, PROD_PRICE); VENDOR(<u>VEND_CODE</u>, VEND_NAME); LINE(<u>INV_NUM</u> → INVOICE, <u>PROD_NUM</u> → PRODUCT, QUANT_SOLD).</p>
+</details>
+<div class="lose"><b>MARKS LOST BY</b><ul>
+<li>No dependency diagram when the question says “by drawing dependency diagram”.</li>
+<li>Jumping straight to 3NF without writing the 1NF and 2NF stages.</li>
+<li>Unstated assumptions: if the table is ambiguous (can a price change?), write the assumption you chose.</li>
+<li>Checking 2NF against only the primary key when the table has other candidate keys.</li>
+</ul></div>
+<p class="practice">Practice → <a href="s01/17-normalizing-tables.html">Workshop: normalizing real tables</a> · <a href="s01/16-first-and-second-normal-form.html">1NF, 2NF, 3NF</a></p>
+</div>
+
+<div class="card" id="c8">
+<h3>Card 8 · “A table in 3NF but not in BCNF”</h3>
+<p class="asked">Asked: 23-24 1c (9, compulsory) · Jan 20 14 (10) · 19-20 8b · 17-18 7c · CSE303 13-14, 14-15. Learn one example by heart.</p>
+<div class="tmpl"><b>TEMPLATE</b><ol>
+<li>Write “Yes, I agree” if the question asks for agreement, then give the two definitions (BCNF: every nontrivial X → Y has X a superkey; 3NF: or every attribute of Y − X is prime).</li>
+<li>Schema + FDs + keys.</li>
+<li>3NF check: the bad FD's right side is prime.</li>
+<li>BCNF check: its left side is not a superkey.</li>
+<li>Two sample rows that show the redundancy.</li>
+<li>Fix: decompose on the bad FD; mention which FD is lost.</li>
+</ol></div>
+<details><summary>Model answer</summary>
+<p><b>Bookings(title, theatre, city)</b>, FDs: theatre → city; title city → theatre. Keys: {title, city} and {title, theatre}, so all three attributes are prime.</p>
+<p><b>3NF:</b> theatre → city has a prime right side (city); title city → theatre has a key on the left. In 3NF.</p>
+<p><b>Not BCNF:</b> theatre⁺ = {theatre, city} ≠ R, so theatre is not a superkey.</p>
+<p><b>Redundancy:</b> (Antz, Guild, Menlo Park), (Shrek, Guild, Menlo Park): Guild's city is stored once per movie.</p>
+<p><b>BCNF design:</b> Theatre(<u>theatre</u>, city) and Showing(<u>theatre, title</u>). Lossless (theatre is a key of Theatre). Price: title city → theatre is no longer enforceable in one table.</p>
+</details>
+<div class="lose"><b>MARKS LOST BY</b><ul><li>Giving an example that is not even 3NF (the right side of the bad FD is not prime).</li><li>Skipping the “modify the design” half.</li></ul></div>
+<p class="practice">Practice → <a href="s01/14-third-normal-form.html">Third normal form</a></p>
+</div>
+
+<div class="card" id="c9">
+<h3>Card 9 · Lec 01 theory short answers</h3>
+<p class="asked">Asked: anomalies (CSE303 11-12, 12-13, 13-14) · six rules (19-20 8d) · BCNF/3NF/4NF (CSE303 10-11, 17 marks) · MVD (17-18 7c) · two-attribute BCNF (CSE303 15-16) · PK choice (CSE303 13-14)</p>
+<div class="tmpl"><b>READY ANSWERS</b><ol>
+<li><b>Anomalies</b> (use one table for all three: Student(id, name, dept, deptHead)): <i>redundancy</i>: deptHead is repeated per student; <i>update</i>: changing a head means changing many rows, and missing one makes the data inconsistent; <i>deletion</i>: deleting the last student of a department loses its head; <i>insertion</i>: a new department cannot be stored until it has a student.</li>
+<li><b>Six rules</b> with one example each: reflexivity (Y ⊆ X ⇒ X → Y), augmentation (X → Y ⇒ XZ → YZ), transitivity, union (X → Y, X → Z ⇒ X → YZ), decomposition (X → YZ ⇒ X → Y), pseudotransitivity (X → Y, YW → Z ⇒ XW → Z). Close with: “the first three are Armstrong's axioms, sound and complete; the last three are derived from them.”</li>
+<li><b>BCNF / 3NF / 4NF:</b> one definition each, then: <b>4NF ⊂ BCNF ⊂ 3NF ⊂ 2NF ⊂ 1NF</b>. BCNF may lose FDs, 3NF never does; 4NF also removes redundancy from MVDs.</li>
+<li><b>MVD X ↠ Y:</b> for any two tuples that agree on X, swapping their Y values gives two tuples that are also in R. Example: Course(course, teacher, book), course ↠ teacher (teachers and books are independent).</li>
+<li><b>Any two-attribute relation R(A, B) is in BCNF:</b> four cases: no nontrivial FD; only A → B (A is a key); only B → A (B is a key); both (both are keys). In every case, each nontrivial FD has a key on the left. ∎</li>
+<li><b>Choosing a PK:</b> unique, never NULL, minimal, stable (never changes), short. <b>Multivalued attribute:</b> move it to its own table (owner key, value) with key on both.</li>
+</ol></div>
+<p class="practice">Practice → <a href="s01/09-anomalies-and-decomposition.html">Anomalies</a> · <a href="s01/07-armstrongs-axioms.html">Armstrong's axioms</a> · <a href="s01/18-beyond-the-slides.html">4NF</a> · <a href="s01/15-multivalued-dependencies.html">MVDs</a></p>
+</div>
+
+<!-- ============================ LEC 02 ============================ -->
+<h2 id="l02">4. Lec 02 · Serializability and 2PL <small>(108 marks)</small></h2>
+
+<div class="card" id="c10">
+<h3>Card 10 · Precedence graph: conflict-serializable?</h3>
+<p class="asked">Asked: 24-25 1d (8, compulsory) · 22-23 1c (12, compulsory) · 21-22 7c · 19-20 4a · Jan 20 1b · 17-18 2a (21) · 6 CSE303 years</p>
+<div class="tmpl"><b>TEMPLATE</b><ol>
+<li>Rule sentence: “Arc Tᵢ → Tⱼ when an action of Tᵢ precedes a conflicting action of Tⱼ on the same element (different transactions, at least one write).”</li>
+<li><b>Go element by element</b>: write each element's actions in order, then its arcs. Write “r–r: no arc” where it applies; it shows the marker you checked.</li>
+<li>Draw the graph (circles + arrows).</li>
+<li><b>Cycle?</b> Name it: “T₃ → T₄ → T₃, so not conflict-serializable.”</li>
+<li><b>Acyclic?</b> Give the topological order(s). “All equivalent serial schedules” = every topological order; list them all.</li>
+</ol></div>
+<p class="prompt">(i) r₁(A); w₂(A); w₃(A); w₂(B); r₂(C); r₂(B); w₂(C) &nbsp; (ii) w₁(A); r₂(A); w₂(B); r₂(B); w₃(C); r₄(C); w₄(D); r₃(D); r₁(C)</p>
+<details><summary>Model answer</summary>
+<p><b>(i)</b> A: r₁, w₂, w₃ → 1→2, 1→3, 2→3. B, C: only T₂. Arcs {1→2, 1→3, 2→3}: acyclic. <b>Conflict-serializable, order (T₁, T₂, T₃)</b> (the only topological order).</p>
+<p><b>(ii)</b> A: w₁ before r₂ → 1→2. B: only T₂. C: w₃ before r₄ → 3→4; w₃ before r₁ → 3→1; r₄, r₁ both reads: no arc. D: w₄ before r₃ → 4→3. <b>Cycle 3 → 4 → 3: not conflict-serializable.</b></p>
+</details>
+<div class="lose"><b>MARKS LOST BY</b><ul>
+<li>Drawing an arc for two reads.</li>
+<li>Drawing arcs only between neighbouring actions: every pair on the element counts (w₁ … w₃ also gives 1→3).</li>
+<li>Giving one serial order when the question asks for <i>all</i>.</li>
+</ul></div>
+<p class="practice">Practice → <a href="s02/04-precedence-graphs.html">Precedence graphs</a> (11 bank questions)</p>
+</div>
+
+<div class="card" id="c11">
+<h3>Card 11 · Serializable but not conflict-serializable; counting schedules</h3>
+<p class="asked">Asked: 23-24 5a (12, compulsory) · 24-25 2b (6–9) · CSE303 12-13</p>
+<div class="tmpl"><b>TEMPLATE</b><ol>
+<li>Do Card 10 first. Acyclic ⇒ both serializable and conflict-serializable; done.</li>
+<li>Cyclic ⇒ check <b>view-equivalence</b> with each candidate serial order: same <i>reads-from</i> for every read, and the same <i>last writer</i> for every element. A match ⇒ serializable (this needs blind writes).</li>
+<li><b>Counting:</b> total interleavings = C(n₁ + n₂, n₁). Find the conflicting pairs; a schedule is bad when two conflicts point in opposite directions. Count the bad ones; a small table of all schedules is the safest proof.</li>
+</ol></div>
+<p class="prompt">(ii) w₁(X); w₂(Y); w₁(Y); w₂(X); w₃(X) — serializable, conflict-serializable, both?</p>
+<details><summary>Model answer</summary>
+<p>X: w₁, w₂, w₃ → 1→2, 1→3, 2→3. Y: w₂ before w₁ → 2→1. Cycle 1 → 2 → 1: <b>not conflict-serializable</b>.</p>
+<p>No reads, so only the last writers matter: X by T₃, Y by T₁. Serial (T₂, T₁, T₃) leaves Y = T₁'s value and X = T₃'s value. <b>Serializable, equivalent to (T₂, T₁, T₃)</b>, because of the blind writes.</p>
+<p><b>Counting example</b> (T₁: r₁(A); w₁(B), T₂: r₂(A); w₂(A); w₂(B)): C(5, 2) = 10 schedules; conflicts r₁(A)/w₂(A) and w₁(B)/w₂(B); 3 schedules have them in opposite directions. Answer: <b>10 possible, 7 conflict-serializable, 7 serializable</b> (the 3 bad ones match no serial order's reads-from + last writer).</p>
+</details>
+<div class="lose"><b>MARKS LOST BY</b><ul><li>Saying “cycle ⇒ not serializable”. A cycle only rules out <i>conflict</i>-serializable.</li></ul></div>
+<p class="practice">Practice → <a href="s02/03-conflicts.html">Conflicts</a> · <a href="s02/02-serial-and-serializable.html">Serial and serializable</a></p>
+</div>
+
+<div class="card" id="c12">
+<h3>Card 12 · Transform to serial by swapping</h3>
+<p class="asked">Asked: CSE303 10-11, 14-15, 15-16 (20 marks)</p>
+<div class="tmpl"><b>TEMPLATE</b><ol>
+<li>Get the target serial order from the precedence graph (Card 10).</li>
+<li>Move actions one adjacent swap at a time. After each swap, write the new schedule and the reason: “r₁(B) ↔ w₂(A): different elements, no conflict”.</li>
+<li>End with the serial schedule, and “verified by the precedence graph: arcs only T₁ → T₂”.</li>
+</ol></div>
+<p class="prompt">r₁(A); w₁(A); r₂(A); w₂(A); r₁(B); w₁(B); r₂(B); w₂(B)</p>
+<details><summary>Model answer</summary>
+<p>Arcs: A gives 1→2, B gives 1→2. Target (T₁, T₂).</p>
+<div class="paper">r₁(A) w₁(A) r₂(A) w₂(A) r₁(B) w₁(B) r₂(B) w₂(B)
+r₁(A) w₁(A) r₂(A) r₁(B) w₂(A) w₁(B) r₂(B) w₂(B)   r₁(B)↔w₂(A): different elements
+r₁(A) w₁(A) r₁(B) r₂(A) w₂(A) w₁(B) r₂(B) w₂(B)   r₁(B)↔r₂(A): different elements
+r₁(A) w₁(A) r₁(B) r₂(A) w₁(B) w₂(A) r₂(B) w₂(B)   w₁(B)↔w₂(A): different elements
+r₁(A) w₁(A) r₁(B) w₁(B) r₂(A) w₂(A) r₂(B) w₂(B)   w₁(B)↔r₂(A): different elements</div>
+<p>Result: the serial schedule (T₁, T₂), so the original is conflict-serializable.</p>
+</details>
+<div class="lose"><b>MARKS LOST BY</b><ul><li>Swapping two actions of the same transaction, or two conflicting actions.</li><li>Jumping several positions at once without showing each swap.</li></ul></div>
+<p class="practice">Practice → <a href="s02/03-conflicts.html">Conflicts and swaps</a></p>
+</div>
+
+<div class="card" id="c13">
+<h3>Card 13 · Proofs: 2PL ⇒ conflict-serializable; strict 2PL ⇒ ACR</h3>
+<p class="asked">Asked: 24-25 1c (9, compulsory) · 23-24 7a (10) · 23-24 5b and 22-23 1d (5, compulsory) · CSE303 12-13</p>
+<div class="tmpl"><b>TEMPLATE: 2PL ⇒ conflict-serializable</b> (induction on n)<ol>
+<li><b>Definitions:</b> 2PL = every lock precedes every unlock in each transaction; conflict-serializable = conflict-equivalent to a serial schedule.</li>
+<li><b>Basis</b> n = 1: already serial.</li>
+<li><b>Step:</b> let uᵢ(X) be the <i>first unlock</i> in S, by Tᵢ. Claim: every action of Tᵢ can be swapped to the front.</li>
+<li><b>Contradiction:</b> suppose wⱼ(Y) comes before a conflicting wᵢ(Y). Then … wⱼ(Y) … uⱼ(Y) … lᵢ(Y) … wᵢ(Y). Since uᵢ(X) is first, uᵢ(X) ≤ uⱼ(Y) &lt; lᵢ(Y): Tᵢ locks after unlocking, which breaks 2PL.</li>
+<li>So S ≡ (Tᵢ's actions)(the rest); the rest is a 2PL schedule of n − 1 transactions, serializable by the hypothesis. ∎ Serial order = order of first unlocks.</li>
+</ol></div>
+<div class="tmpl"><b>TEMPLATE: strict 2PL ⇒ ACR</b><ol>
+<li><b>Definitions:</b> strict 2PL = 2PL and X locks are held until after commit/abort; ACR = transactions read only committed values.</li>
+<li>Tⱼ reads X last written by Tᵢ. Tᵢ held xlᵢ(X) to write; Tⱼ needs slⱼ(X), which conflicts, so it must wait for uᵢ(X).</li>
+<li>Strictness: uᵢ(X) comes after Tᵢ commits or aborts. Committed ⇒ Tⱼ reads a committed value. Aborted ⇒ X was restored first, so Tⱼ reads the earlier committed value.</li>
+<li>No dirty reads ⇒ ACR. ∎</li>
+</ol></div>
+<p>When “define strict 2PL” comes first (24-25 1c), give the definition, then the proof. A timeline line helps: xlᵢ(X) wᵢ(X) … [Tⱼ waits] … cᵢ uᵢ(X) slⱼ(X) rⱼ(X).</p>
+<div class="lose"><b>MARKS LOST BY</b><ul><li>Proving with one example: an example is not a proof.</li><li>Missing the definitions (half the marks in a 5-mark question).</li></ul></div>
+<p class="practice">Practice → <a href="s02/07-two-phase-locking.html">Two-phase locking</a> · <a href="s04/03-strict-locking.html">Strict 2PL</a></p>
+</div>
+
+<!-- ============================ LEC 03 ============================ -->
+<h2 id="l03">5. Lec 03 · Locking and timestamps <small>(115 marks)</small></h2>
+
+<div class="card" id="c14">
+<h3>Card 14 · Insert S/X locks and unlocks</h3>
+<p class="asked">Asked: 20-21 3b (15) · CSE303 12-13, 13-14, 16-17</p>
+<div class="tmpl"><b>TEMPLATE</b><ol>
+<li>Convention: S lock before a read, X lock before a write, and say whether you are using 2PL.</li>
+<li>Write each transaction on its own line with locks and unlocks. For 2PL with the most concurrency: take every lock first, then release each S lock as soon as the last lock is taken, and each X lock right after its write.</li>
+<li>Run the given order as a trace: <i>request · granted/denied (who holds) · who waits</i>.</li>
+<li>Finish with the order the actions actually ran in and the equivalent serial order.</li>
+</ol></div>
+<p class="prompt">r₁(A); r₂(B); r₃(C); w₁(B); w₂(C); w₃(D) — insert locks to maximise concurrency.</p>
+<details><summary>Model answer</summary>
+<div class="paper">T₁: sl₁(A) r₁(A) xl₁(B) u₁(A) w₁(B) u₁(B)
+T₂: sl₂(B) r₂(B) xl₂(C) u₂(B) w₂(C) u₂(C)
+T₃: sl₃(C) r₃(C) xl₃(D) u₃(C) w₃(D) u₃(D)</div>
+<p>Trace: three S locks granted. xl₁(B) denied (T₂ holds S on B) → T₁ waits. xl₂(C) denied (T₃ holds S on C) → T₂ waits. xl₃(D) granted; T₃ unlocks C and writes D → T₂ gets C, unlocks B, writes C → T₁ gets B and finishes.</p>
+<p>Executed: r₁(A) r₂(B) r₃(C) w₃(D) w₂(C) w₁(B) ≡ serial <b>(T₃, T₂, T₁)</b>.</p>
+</details>
+<div class="lose"><b>MARKS LOST BY</b><ul><li>Unlocking before the transaction's last lock (not 2PL) without saying so.</li><li>Not showing who waits for whom.</li></ul></div>
+<p class="practice">Practice → <a href="s03/01-shared-exclusive-locks.html">Shared and exclusive locks</a></p>
+</div>
+
+<div class="card" id="c15">
+<h3>Card 15 · Upgrade deadlock, fixed with update locks</h3>
+<p class="asked">Asked: 24-25 2c (12) · 23-24 7b (12) · 22-23 3c (10). Asked in all three recent years.</p>
+<div class="tmpl"><b>TEMPLATE</b><ol>
+<li>Deadlock schedule: both take S, then both ask for X → each waits for the other. Draw the waits-for cycle.</li>
+<li>Fix: replace the first S with U (ulᵢ). Rule: “U is compatible with S, but nothing is compatible with U once it is held, so only one transaction can hold U on A.”</li>
+<li>Show the new run: the second ul waits <i>before holding anything</i>, so there is no cycle.</li>
+<li>If the question asks “does U solve it?” for <i>different</i> elements (24-25 2c), answer no: U only prevents upgrade deadlocks on the same element.</li>
+</ol></div>
+<p class="prompt">T₁: sl₁(A); r₁(A); xl₁(A); w₁(A); u₁(A); c₁ and the same for T₂. (i) Deadlock from upgrading. (ii) Fix with update locks.</p>
+<details><summary>Model answer</summary>
+<p><b>(i)</b> sl₁(A); r₁(A); sl₂(A); r₂(A); xl₁(A) <i>denied</i>; xl₂(A) <i>denied</i>. Each upgrade needs the other's S released: T₁ → T₂ → T₁. Deadlock.</p>
+<p><b>(ii)</b> T₁: ul₁(A); r₁(A); xl₁(A); w₁(A); u₁(A); c₁ (T₂ likewise). ul₂(A) waits while T₁ holds U; T₁ upgrades to X freely, finishes, unlocks; then T₂ runs. No S–S overlap, so no cycle.</p>
+</details>
+<div class="lose"><b>MARKS LOST BY</b><ul><li>Getting the U/S compatibility backwards (holding S, a U request <i>is</i> granted; holding U, an S request is not).</li></ul></div>
+<p class="practice">Practice → <a href="s03/02-upgrades-and-update-locks.html">Upgrades and update locks</a></p>
+</div>
+
+<div class="card" id="c16">
+<h3>Card 16 · Draw the lock table</h3>
+<p class="asked">Asked: 21-22 5b (10) · 19-20 4b (5–15) · CSE303 10-11, 15-16 (15)</p>
+<div class="tmpl"><b>TEMPLATE</b><ol>
+<li>One sentence on the structure: “a hash table on the element; each bucket chains the locked elements that hash there; each element has a list of (Tx, mode, granted/waiting) nodes, granted first, waiting at the tail in FIFO order.”</li>
+<li>Draw the array indexed by hash value; hang element nodes off each bucket; hang request nodes off each element.</li>
+<li>Explain the rules in 3 lines: <b>request</b> (append; grant if compatible with all granted and nobody is waiting ahead), <b>unlock</b> (delete the node; grant the next compatible waiters), <b>abort</b> (delete all of the transaction's nodes).</li>
+<li>For a sequence of instructions: show the table after each step, or after the important steps.</li>
+</ol></div>
+<details><summary>Model drawing (A, B, C hash to 5, 1, 8)</summary>
+<div class="paper">[1] → B : (T2, S, granted) → (T1, S, granted)
+[5] → A : (T1, S, granted) → (T2, S, granted)
+[8] → C : (T1, S, granted) → (T2, S, granted)
+then WRITE(A) by T1:
+[5] → A : (T1, S, granted) → (T2, S, granted) → (T1, X, waiting)</div>
+<p>To implement 2PL: the scheduler inserts the lock requests and releases all of a transaction's locks only at commit/abort (strict 2PL), so the lock table always holds the growing phase.</p>
+</details>
+<div class="lose"><b>MARKS LOST BY</b><ul><li>A plain table of “item | lock” with no hash chains: the question asks for the data structure.</li><li>Granting a request that is compatible while an earlier request is still waiting (FIFO).</li></ul></div>
+<p class="practice">Practice → <a href="s03/03-lock-table.html">The lock table</a></p>
+</div>
+
+<div class="card" id="c17">
+<h3>Card 17 · Timestamp ordering trace (+ Thomas write rule)</h3>
+<p class="asked">Asked: 23-24 8b (12) · 22-23 4a (12) · 22-23 2a (9–18) · CSE303 10-11, 15-16 (×2)</p>
+<div class="tmpl"><b>TEMPLATE</b><ol>
+<li>Write the rules first (each one is a mark):
+<br>r<sub>T</sub>(X): TS ≥ WT(X) → read, RT(X) = max(RT, TS); otherwise <b>read too late → rollback</b>.
+<br>w<sub>T</sub>(X): TS ≥ RT(X) and TS ≥ WT(X) → write, WT(X) = TS. TS &lt; RT(X) → <b>write too late → rollback</b>. RT ≤ TS &lt; WT → <b>Thomas: skip the write</b> (or rollback if Thomas is not in use).</li>
+<li>Table: <i>action · check (with numbers) · result / updated timestamp</i>.</li>
+<li>When a transaction rolls back, say so and cancel its later actions.</li>
+<li>List the rollbacks again at the end.</li>
+</ol></div>
+<p class="prompt">r₁(A); w₂(A); r₂(B); r₄(C); r₃(B); w₂(B); w₃(B); r₄(A); w₄(C); r₁(C) with TS(Tᵢ) = i, all RT, WT = 0.</p>
+<details><summary>Model answer</summary>
+<div class="tbl"><table>
+<tr><th>action</th><th>check</th><th>result</th></tr>
+<tr><td>r₁(A)</td><td>1 ≥ WT 0</td><td>RT(A) = 1</td></tr>
+<tr><td>w₂(A)</td><td>2 ≥ RT 1, 2 ≥ WT 0</td><td>WT(A) = 2</td></tr>
+<tr><td>r₂(B)</td><td>2 ≥ 0</td><td>RT(B) = 2</td></tr>
+<tr><td>r₄(C)</td><td>4 ≥ 0</td><td>RT(C) = 4</td></tr>
+<tr><td>r₃(B)</td><td>3 ≥ 0</td><td>RT(B) = 3</td></tr>
+<tr><td>w₂(B)</td><td>2 &lt; RT(B) = 3</td><td><b>rollback T₂</b> (write too late)</td></tr>
+<tr><td>w₃(B)</td><td>3 ≥ 3, 3 ≥ 0</td><td>WT(B) = 3</td></tr>
+<tr><td>r₄(A)</td><td>4 ≥ WT(A)</td><td>RT(A) = 4</td></tr>
+<tr><td>w₄(C)</td><td>4 ≥ 4, 4 ≥ 0</td><td>WT(C) = 4</td></tr>
+<tr><td>r₁(C)</td><td>1 &lt; WT(C) = 4</td><td><b>rollback T₁</b> (read too late)</td></tr>
+</table></div>
+<p><b>Thomas example:</b> T₁: r₁(A); w₁(A), T₂: w₂(A), TS 1 &lt; 2. Schedule r₁(A); w₂(A); w₁(A): at w₁(A), 1 ≥ RT 1 but 1 &lt; WT 2, so the write is obsolete and skipped. Equivalent serial order (T₁, T₂).</p>
+</details>
+<div class="lose"><b>MARKS LOST BY</b><ul><li>Setting RT = TS instead of max(RT, TS).</li><li>Applying Thomas to a read (it is only for writes).</li></ul></div>
+<p class="practice">Practice → <a href="s03/05-timestamp-rules.html">Timestamp rules</a> · <a href="s03/04-timestamps.html">Timestamps</a></p>
+</div>
+
+<div class="card" id="c18">
+<h3>Card 18 · Lec 03 theory: timestamps vs locks, MVCC, isolation levels</h3>
+<p class="asked">Asked: 23-24 7c (13) · 21-22 6c (15) · CSE303 13-14 (granularity, B+ tree locking)</p>
+<div class="tmpl"><b>READY ANSWERS</b><ol>
+<li><b>Timestamps win</b> when most transactions are read-only or conflicts are rare (no lock overhead, no deadlock). <b>Locking wins</b> when conflicts are frequent: locks delay transactions, while timestamps roll them back and waste work.</li>
+<li><b>MVCC rules:</b> each write creates a version X<sub>t</sub> with WT = t. A read by T returns the version with the largest WT ≤ TS(T), and never rolls back. A write by T is rolled back if the version T would overwrite (largest WT ≤ TS(T)) has RT &gt; TS(T). Versions older than every active transaction can be deleted. Example: TS 1 reads A₀ even after T₂ wrote A₂.</li>
+<li><b>Isolation levels</b> (one example schedule each): <i>read uncommitted</i>: may read uncommitted data (dirty read: T₂ reads T₁'s write, then T₁ aborts). <i>Read committed</i>: no dirty reads, but reading the same row twice can give two values (a non-repeatable read). <i>Repeatable read</i>: re-reads match, but new rows can appear (phantoms). <i>Serializable</i>: none of these.</li>
+<li><b>Lock granularity:</b> large items (a whole table) mean little lock overhead but low concurrency; small items (rows) mean high concurrency but many locks. Intention locks (IS, IX) let both coexist.</li>
+<li><b>Trees:</b> 2PL holds the root lock until the end, so it serializes everyone. Tree protocol: first lock anywhere, then lock a node only while holding its parent, release any time, never relock.</li>
+</ol></div>
+<p class="practice">Practice → <a href="s03/06-mvcc.html">MVCC</a> · <a href="s03/07-isolation-levels.html">Isolation levels</a> · <a href="s03/08-beyond-the-slides.html">Beyond the slides</a></p>
+</div>
+
+<!-- ============================ LEC 04 ============================ -->
+<h2 id="l04">6. Lec 04 · Recoverability and deadlocks <small>(110 marks)</small></h2>
+
+<div class="card" id="c19">
+<h3>Card 19 · Recoverable / ACR / strict; construct “X but not Y”</h3>
+<p class="asked">Asked: 24-25 3a (9–12) · 23-24 8c (10) · 22-23 4b (11)</p>
+<div class="tmpl"><b>TEMPLATE</b><ol>
+<li>Definitions, one line each: <b>recoverable</b>: if Tⱼ reads from Tᵢ, Tᵢ commits before Tⱼ commits. <b>ACR</b>: every read comes after the writer's commit. <b>Strict</b>: no read <i>or write</i> of X until X's last writer has committed or aborted. Strict ⊂ ACR ⊂ recoverable.</li>
+<li>For each schedule, find the reads-from pairs, writing step numbers.</li>
+<li>Table: <i>schedule · reads-from · recoverable? (commit order) · ACR? (read vs commit)</i>.</li>
+<li><b>Construct:</b> to get a dirty read, put rⱼ after wᵢ. Its position relative to cᵢ decides ACR; the order of the commits decides recoverability. Check both properties under the schedule.</li>
+</ol></div>
+<p class="prompt">S1: r1(A); w1(A); r2(A); w2(A); c2; r1(B); w1(B); c1 &nbsp; S2: r1(A); w1(A); r2(B); w2(B); c2; r1(B); w1(B); c1 &nbsp; S3: r1(A); w1(A); r2(B); w2(B); r1(B); c2; w1(B); c1</p>
+<details><summary>Model answer</summary>
+<div class="tbl"><table>
+<tr><th></th><th>reads-from</th><th>recoverable?</th><th>ACR?</th></tr>
+<tr><td>S1</td><td>r2(A) from T1</td><td><b>No</b>: c2 before c1</td><td>No</td></tr>
+<tr><td>S2</td><td>r1(B) from T2</td><td><b>Yes</b>: c2 before c1</td><td><b>Yes</b>: r1(B) after c2</td></tr>
+<tr><td>S3</td><td>r1(B) from T2</td><td><b>Yes</b>: c2 before c1</td><td><b>No</b>: r1(B) before c2</td></tr>
+</table></div>
+<p><b>Construct</b> (T1: r1(A); w1(A); c1, T2: r2(A); c2): recoverable not ACR: r1(A); w1(A); r2(A); c1; c2. Serializable not recoverable: r1(A); w1(A); r2(A); c2; c1 (one arc T1 → T2, but T2 commits first). ACR: r1(A); w1(A); c1; r2(A); c2.</p>
+</details>
+<div class="lose"><b>MARKS LOST BY</b><ul><li>Treating a read of the <i>initial</i> value as a dirty read.</li><li>Calling S1 “ACR but not recoverable”: impossible, since ACR ⊂ recoverable.</li></ul></div>
+<p class="practice">Practice → <a href="s04/02-recoverable-acr.html">Recoverable and ACR</a> · <a href="s04/01-dirty-data.html">Dirty data</a></p>
+</div>
+
+<div class="card" id="c20">
+<h3>Card 20 · Waits-for graph and choosing a victim</h3>
+<p class="asked">Asked: 22-23 4c (12) · deadlock definition: 17-18 3c + CSE303 ×3</p>
+<div class="tmpl"><b>TEMPLATE</b><ol>
+<li>Convention: S before a read, X before a write, held to the end.</li>
+<li>Trace table: <i>action · lock · granted / denied (holder) · edge Tᵢ → Tⱼ (waiter → holder)</i>.</li>
+<li>List the edges, draw the graph, name the cycle.</li>
+<li>Victim: by the rule given, but <b>only from the transactions on the cycle</b>. Redraw the graph after the rollback.</li>
+</ol></div>
+<p class="prompt">r1(A); r2(B); w1(C); r3(D); w3(B); w2(C); w4(A); w1(D); roll back the highest-numbered transaction.</p>
+<details><summary>Model answer</summary>
+<p>w3(B) denied (T2 has S) → T3→T2. w2(C) denied (T1 has X) → T2→T1. w4(A) denied (T1 has S) → T4→T1. w1(D) denied (T3 has S) → T1→T3.</p>
+<p>Cycle <b>T1 → T3 → T2 → T1</b>: deadlock. T4 only waits on it, so rolling back T4 would not help. Victim: <b>T3</b>, the highest-numbered transaction on the cycle. After the rollback: T2→T1, T4→T1; no cycle.</p>
+</details>
+<div class="lose"><b>MARKS LOST BY</b><ul><li>Picking T4 because it is the highest-numbered overall.</li><li>Drawing edges from holder to waiter.</li></ul></div>
+<p class="practice">Practice → <a href="s04/05-deadlocks-waits-for.html">Waits-for graph</a></p>
+</div>
+
+<div class="card" id="c21">
+<h3>Card 21 · Wait-die / wound-wait table</h3>
+<p class="asked">Asked: 24-25 3b (10–12) · 23-24 8a (13) · 22-23 3d (10). Asked in all three recent years.</p>
+<div class="tmpl"><b>TEMPLATE</b><ol>
+<li>Rules (smaller timestamp = older): <b>wait-die</b>: older requester waits, younger requester dies. <b>Wound-wait</b>: older requester wounds the holder (holder rolls back), younger requester waits. Restarted transactions keep their old timestamp.</li>
+<li>Table: <i>action · lock · conflict with · decision (with the age comparison written out)</i>.</li>
+<li>On a rollback: release the victim's locks, cancel its waits, and grant the freed lock to the requester.</li>
+<li>Final state: who holds what, who waits, who was rolled back.</li>
+</ol></div>
+<p class="prompt">r1(A); r2(B); w1(C); r3(D); w3(B); w2(C); w4(A); w1(D); w1(B), TS = 1, 2, 3, 4. Wound-wait, no restarts.</p>
+<details><summary>Model answer</summary>
+<div class="tbl"><table>
+<tr><th>action</th><th>conflict</th><th>decision</th></tr>
+<tr><td>r1(A), r2(B), w1(C), r3(D)</td><td>none</td><td>granted</td></tr>
+<tr><td>w3(B)</td><td>T2 S(B)</td><td>T3 (3) younger than T2: <b>T3 waits</b></td></tr>
+<tr><td>w2(C)</td><td>T1 X(C)</td><td>T2 younger than T1: <b>T2 waits</b></td></tr>
+<tr><td>w4(A)</td><td>T1 S(A)</td><td>T4 younger: <b>T4 waits</b></td></tr>
+<tr><td>w1(D)</td><td>T3 S(D)</td><td>T1 older: <b>T1 wounds T3</b>; T1 gets D</td></tr>
+<tr><td>w1(B)</td><td>T2 S(B)</td><td>T1 older: <b>T1 wounds T2</b>; T1 gets B</td></tr>
+</table></div>
+<p>End: T1 holds A, B, C, D; T4 waits for A; T2 and T3 rolled back.</p>
+</details>
+<div class="lose"><b>MARKS LOST BY</b><ul><li>Mixing up the two schemes. Memory trick: in both schemes the <i>older</i> transaction never gets killed; the name says what happens to the <i>requester</i> when it is older (wait / wound).</li><li>Giving a restarted transaction a new timestamp.</li></ul></div>
+<p class="practice">Practice → <a href="s04/07-wait-die-wound-wait.html">Wait-die and wound-wait</a></p>
+</div>
+
+<div class="card" id="c22">
+<h3>Card 22 · Lec 04 theory: ACID, states, deadlock</h3>
+<p class="asked">Asked: ACID (20-21 2c, Jan 20 1a, CSE303 ×4) · states (CSE303 10-11) · recovery manager (CSE303 12-13) · buffers (20-21, 10 marks)</p>
+<div class="tmpl"><b>READY ANSWERS</b><ol>
+<li><b>ACID</b> on one example, “transfer 100 from A to B”: <i>Atomicity</i>: both updates or neither (a crash after the debit must not lose 100). <i>Consistency</i>: A + B is unchanged. <i>Isolation</i>: a concurrent reader never sees the money in neither account. <i>Durability</i>: after “success”, a crash does not undo it. Why they matter for concurrency: without I, interleavings cause lost updates and dirty reads.</li>
+<li><b>Recovery manager</b> maintains <b>Atomicity and Durability</b>. (Concurrency control: Isolation; the programmer and constraints: Consistency.)</li>
+<li><b>States:</b> active → partially committed → committed; active → failed → aborted; partially committed → failed. Draw these as boxes and arrows.</li>
+<li><b>Deadlock:</b> a set of transactions where each waits for a lock held by another in the set. Example: T1 holds A and wants B, T2 holds B and wants A. Handled by timeouts, waits-for graphs, ordering, or wait-die/wound-wait.</li>
+<li><b>Buffers:</b> INPUT(X) disk → buffer; READ(X, t) buffer → local variable; WRITE(X, t) local → buffer; OUTPUT(X) buffer → disk.</li>
+</ol></div>
+<p class="practice">Practice → <a href="s04/09-beyond-the-slides.html">Beyond the slides</a> · <a href="s05/03-primitive-operations.html">Primitive operations</a></p>
+</div>
+
+<!-- ============================ LEC 05-06 ============================ -->
+<h2 id="l05">7. Lec 05–06 · Logging and recovery <small>(106 marks)</small></h2>
+
+<div class="card" id="c23">
+<h3>Card 23 · Undo-log recovery: list the &lt;X, V&gt; actions</h3>
+<p class="asked">Asked: 22-23 2c (9) · 17-18 4a (12)</p>
+<div class="tmpl"><b>TEMPLATE</b><ol>
+<li>Rule sentence: “Scan backward from the last record; for an update of a transaction with no COMMIT, write its old value; ignore committed ones.”</li>
+<li>Walk the log backward one record per line: “&lt;T, C, 30&gt;: T uncommitted → &lt;C, 30&gt;”.</li>
+<li>Action list in order, then “write &lt;ABORT T&gt; and flush”.</li>
+<li>Case “everyone committed”: “no action (U2 guarantees the data is on disk)”.</li>
+</ol></div>
+<p class="prompt">&lt;START T&gt;; &lt;T,A,10&gt;; &lt;START U&gt;; &lt;U,B,20&gt;; &lt;T,C,30&gt;; &lt;U,D,40&gt;; &lt;COMMIT U&gt;; &lt;T,E,50&gt;; &lt;COMMIT T&gt;. Last record on disk: (i) &lt;COMMIT U&gt; (ii) &lt;T,E,50&gt; (iii) &lt;COMMIT T&gt;.</p>
+<details><summary>Model answer</summary>
+<p><b>(i)</b> U committed, T not: &lt;C, 30&gt;, &lt;A, 10&gt;, then &lt;ABORT T&gt;.</p>
+<p><b>(ii)</b> &lt;E, 50&gt;, &lt;C, 30&gt;, &lt;A, 10&gt;, then &lt;ABORT T&gt;.</p>
+<p><b>(iii)</b> Both committed: <b>no action</b>.</p>
+</details>
+<div class="lose"><b>MARKS LOST BY</b><ul><li>Listing the actions forward instead of backward.</li><li>Undoing a committed transaction.</li></ul></div>
+<p class="practice">Practice → <a href="s05/06-undo-recovery.html">Undo recovery</a></p>
+</div>
+
+<div class="card" id="c24">
+<h3>Card 24 · “Last log record that must reach disk before …”</h3>
+<p class="asked">Asked: 22-23 2d (7) · 22-23 3a (8)</p>
+<div class="tmpl"><b>TEMPLATE</b><ol>
+<li>Write the rule: <b>Undo</b>: U1 (an update record goes to disk before its data element), U2 (all data before COMMIT). <b>Redo</b>: R1 (update records <i>and COMMIT</i> before any data element). <b>Undo/redo</b>: update record before data (WAL), no rule about COMMIT.</li>
+<li>Answer with the record, then the reason (“log records are flushed in order, so everything before it goes too”).</li>
+</ol></div>
+<details><summary>Model answer (&lt;START T&gt;; &lt;T,A,10&gt;; &lt;T,B,20&gt;; &lt;COMMIT T&gt;)</summary>
+<p>Undo, before new A: <b>&lt;T, A, 10&gt;</b> (U1; COMMIT must <i>not</i> be there yet, by U2). Undo, before new B: <b>&lt;T, B, 20&gt;</b>. Redo, before A and B: <b>&lt;COMMIT T&gt;</b> (R1).</p>
+<p>Checkpoint (3a): before &lt;START CKPT(T, U)&gt; is written: the record just before it. Before &lt;END CKPT&gt; (undo): the COMMIT of the last listed transaction to finish.</p>
+</details>
+<div class="lose"><b>MARKS LOST BY</b><ul><li>Answering &lt;COMMIT T&gt; for undo logging.</li></ul></div>
+<p class="practice">Practice → <a href="s06/01-redo-logging.html">Redo logging</a> · <a href="s05/05-undo-logging-rules.html">U1 and U2</a></p>
+</div>
+
+<div class="card" id="c25">
+<h3>Card 25 · Nonquiescent checkpoint: where does recovery stop?</h3>
+<p class="asked">Asked: 22-23 3a + 3b (18) · 17-18 4a (12) · 20-21 4b (15) · theory 19-20 4c, CSE303 12-13</p>
+<div class="tmpl"><b>TEMPLATE</b><ol>
+<li>Write the checkpoint record with its list: &lt;START CKPT(active transactions)&gt;.</li>
+<li>Place &lt;END CKPT&gt;: for an <b>undo</b> log, after every listed transaction has <i>committed</i>; for a <b>redo</b> log, after all data of transactions committed before START CKPT has been flushed.</li>
+<li>Recovery, undo log scanning backward: <b>END CKPT met first</b> → stop at its START CKPT. <b>START CKPT met first</b> (crash during the checkpoint) → go back to the earliest &lt;START T&gt; of the listed transactions that have not committed.</li>
+<li>Then do Card 23 or Card 26 over that range.</li>
+</ol></div>
+<p class="prompt">Undo log of S, T, U, V (22-23 3b): checkpoint starts after &lt;U,B,20&gt;. Crash after (i) &lt;V,B,80&gt; (ii) &lt;T,E,50&gt;. How far back?</p>
+<details><summary>Model answer</summary>
+<p>Record: &lt;START CKPT(T, U)&gt;. END CKPT goes right after &lt;COMMIT T&gt;.</p>
+<p><b>(i)</b> END CKPT is on the log, so the scan meets it first → stop at <b>&lt;START CKPT(T, U)&gt;</b>. Undo V: &lt;B, 80&gt;, &lt;F, 70&gt;.</p>
+<p><b>(ii)</b> No END CKPT. U has committed, T has not → back to <b>&lt;START T&gt;</b>. Undo: &lt;E, 50&gt;, &lt;F, 70&gt;, &lt;C, 30&gt;, &lt;A, 10&gt;.</p>
+</details>
+<div class="lose"><b>MARKS LOST BY</b><ul><li>Using the redo stopping rule on an undo log, or the other way round.</li><li>Stopping at START CKPT when END CKPT was never written.</li></ul></div>
+<p class="practice">Practice → <a href="s05/07-checkpointing.html">Undo checkpointing</a> · <a href="s06/02-redo-checkpointing.html">Redo checkpointing</a> · <a href="s06/04-undo-redo-checkpointing.html">Undo/redo checkpointing</a></p>
+</div>
+
+<div class="card" id="c26">
+<h3>Card 26 · Redo or undo/redo recovery: redo phase, undo phase</h3>
+<p class="asked">Asked: 24-25 3c (11) · 23-24 6c (12) · CSE303 11-12, 13-14, 14-15</p>
+<div class="tmpl"><b>TEMPLATE</b><ol>
+<li>Record format: &lt;T, X, old, new&gt;. Split the transactions into <b>committed</b> and <b>uncommitted</b> at the crash point; write both lists.</li>
+<li><b>Redo phase</b> (forward): for committed transactions only, write the <i>new</i> value.</li>
+<li><b>Undo phase</b> (backward): for uncommitted transactions, write the <i>old</i> value.</li>
+<li>Output exactly as asked: a sequence of &lt;X, V&gt;, then the abort records and the final values.</li>
+<li>Redo log only (3 fields, value = new): just the redo phase; uncommitted transactions are ignored.</li>
+</ol></div>
+<p class="prompt">&lt;T0 start&gt;; &lt;T0,A,40,60&gt;; &lt;T1 start&gt;; &lt;T1,B,100,150&gt;; &lt;T0,C,50,100&gt;; &lt;T2 start&gt;; &lt;T2,D,100,70&gt;; &lt;T1,C,20,50&gt;; &lt;T1 commit&gt;; &lt;T2,C,60,80&gt; | crash here</p>
+<details><summary>Model answer</summary>
+<p>Committed: T1. Uncommitted: T0, T2.</p>
+<p><b>Redo</b> (forward, T1): &lt;B, 150&gt;, &lt;C, 50&gt;.</p>
+<p><b>Undo</b> (backward, T0, T2): &lt;C, 60&gt;, &lt;D, 100&gt;, &lt;C, 50&gt;, &lt;A, 40&gt;. Log &lt;T0 abort&gt;, &lt;T2 abort&gt;.</p>
+<p>Final: A = 40, B = 150, C = 50, D = 100.</p>
+<p>(If the question uses Silberschatz's “repeat history” wording, the redo phase replays <i>every</i> update forward; mention that in one line.)</p>
+</details>
+<div class="lose"><b>MARKS LOST BY</b><ul><li>Undo phase written forward.</li><li>Using the new value in the undo phase or the old value in the redo phase.</li></ul></div>
+<p class="practice">Practice → <a href="s06/03-undo-redo-logging.html">Undo/redo logging</a> · <a href="s06/01-redo-logging.html">Redo logging</a></p>
+</div>
+
+<div class="card" id="c27">
+<h3>Card 27 · Write the log records; force vs steal</h3>
+<p class="asked">Asked: 24-25 4a (7) · CSE303 10-11, 15-16 (15)</p>
+<div class="tmpl"><b>TEMPLATE</b><ol>
+<li>Per transaction: &lt;T start&gt;, one &lt;T, X, old, new&gt; per WRITE (compute the values), &lt;T commit&gt;. Reads produce no records.</li>
+<li>Force/steal: define both, then the 2×2 table.</li>
+</ol></div>
+<details><summary>Model answer</summary>
+<p>A1 = 1000, A2 = 2000, A3 = 3000; T20: A1 += 100, A3 −= 100; T21: A2 += 10%:</p>
+<div class="paper">&lt;T20 start&gt; &lt;T20, A1, 1000, 1100&gt; &lt;T20, A3, 3000, 2900&gt; &lt;T20 commit&gt;
+&lt;T21 start&gt; &lt;T21, A2, 2000, 2200&gt; &lt;T21 commit&gt;</div>
+<p><b>Force</b>: all of T's dirty buffers are written to disk at commit. <b>Steal</b>: buffers changed by an uncommitted transaction may be written to disk.</p>
+<p>Steal ⇒ undo needed. No-force ⇒ redo needed. Undo logging = steal + force; redo = no-steal + no-force; undo/redo = steal + no-force. <b>Under force, the redo phase does nothing.</b></p>
+</details>
+<p class="practice">Practice → <a href="s06/06-beyond-the-slides.html">Beyond the slides</a></p>
+</div>
+
+<!-- ============================ LEC 07-08 ============================ -->
+<h2 id="l07">8. Lec 07–08 · Query execution <small>(195 marks, the most in this half)</small></h2>
+
+<div class="card" id="c28">
+<h3>Card 28 · I/O cost of joins, and which one to choose</h3>
+<p class="asked">Asked: 22-23 1b (8, compulsory) · 24-25 5d (6) · 24-25 8a (5) · CSE303 12-13, 13-14, 14-15</p>
+<div class="tmpl"><b>TEMPLATE</b> (for each algorithm)<ol>
+<li>Name the smaller relation and state the convention (output not counted; chunks of M − 1).</li>
+<li><b>Feasibility check with numbers</b>, e.g. “hash join needs min(B) ≤ M²: 4000 ≤ 10,201 ✓”.</li>
+<li>Formula → formula with numbers → result.</li>
+<li>Rank the algorithms and recommend one.</li>
+</ol>
+<div class="paper">block NL : B(S) + ⌈B(S)/(M−1)⌉·B(R)      S = smaller, outer
+sort-merge: 3(B(R)+B(S))   needs B(R)+B(S) ≤ M²
+simple sort-join: 5(B(R)+B(S))   needs max(B) ≤ M(M−1)
+hash join: 3(B(R)+B(S))   needs min(B) ≤ M²</div></div>
+<p class="prompt">B(R) = 8000, B(S) = 4000, M = 101: block NL, sort-based, hash join.</p>
+<details><summary>Model answer</summary>
+<p><b>Block NL</b> (S outer, 100-block chunks): 4000 + 40 × 8000 = <b>324,000</b>.</p>
+<p><b>Sort-based:</b> sort-merge needs 12,000 ≤ 10,201 ✗ (120 sublists &gt; 101 buffers). Simple sort-join: 8000 ≤ 10,100 ✓ → 5 × 12,000 = <b>60,000</b>.</p>
+<p><b>Hash:</b> 4000 ≤ 10,201 ✓ → 3 × 12,000 = <b>36,000</b>.</p>
+<p>Ranking: hash &lt; sort &lt; block NL. <b>Hash vs sort-merge in general:</b> same 3(B(R) + B(S)) when both fit, but hash needs less memory (√min vs √sum). Prefer sort-merge when the inputs are already sorted, the output must be sorted, the data is skewed, or the condition is a range.</p>
+</details>
+<div class="lose"><b>MARKS LOST BY</b><ul><li>Using the efficient sort-merge cost without checking that it fits.</li><li>Putting the larger relation in the outer loop.</li><li>Using a different convention (e.g. M − 2 chunks) without stating it.</li></ul></div>
+<p class="practice">Practice → <a href="s08/06-choosing-a-join.html">Choosing a join</a> · <a href="s08/01-nested-loop-joins.html">Nested-loop joins</a></p>
+</div>
+
+<div class="card" id="c29">
+<h3>Card 29 · External sort: show the runs on each pass</h3>
+<p class="asked">Asked: 24-25 5c (10, compulsory) · 19-20 3a (20) · Jan 20 2a (15) · 23 CT4 · CSE303 13-14, 14-15</p>
+<div class="tmpl"><b>TEMPLATE</b><ol>
+<li>Numbers: runs N = ⌈B/M⌉; fan-in = M − 1; merge passes = ⌈log<sub>M−1</sub> N⌉.</li>
+<li>Table: <i>pass · runs on disk after the pass</i>. Pass 0 sorts M blocks at a time.</li>
+<li>Cost: B(2·passes + 1) without the final write (2B per pass with it). Seeks, if asked: count them separately.</li>
+<li>Formula derivation (if asked): pass 0 reads and writes B (2B); each merge pass reads and writes B (2B); the final pass is not written: 2B·(passes) + B.</li>
+</ol></div>
+<p class="prompt">12 tuples, 1 per block, M = 3, sort on name.</p>
+<details><summary>Model answer</summary>
+<p>N = 12/3 = 4 runs, fan-in 2, passes = log₂ 4 = 2.</p>
+<div class="paper">Pass 0: (emu kangaroo wallaby) (lion platypus wombat) (meerkat warthog zebra) (baboon hornbill hyena)
+Pass 1: (emu kangaroo lion platypus wallaby wombat) (baboon hornbill hyena meerkat warthog zebra)
+Pass 2: baboon emu hornbill hyena kangaroo lion meerkat platypus wallaby warthog wombat zebra</div>
+<p>I/O: 12 × (2·2 + 1) = 60 (72 if the result is written).</p>
+</details>
+<div class="lose"><b>MARKS LOST BY</b><ul><li>Merging M runs at once (it is M − 1, one buffer is for output).</li><li>Not keeping each run's tuples sorted in pass 0.</li></ul></div>
+<p class="practice">Practice → <a href="s08/02-tpmms.html">TPMMS</a></p>
+</div>
+
+<div class="card" id="c30">
+<h3>Card 30 · “Write the steps of a one-/two-pass algorithm for …”</h3>
+<p class="asked">Asked: 22-23 2b (10) · 23-24 6a (14) · 22-23 1a (10, compulsory) · 17-18 1c (6) · 21-22 8a · CSE303 12-13 (20), 13-14, 16-17</p>
+<div class="tmpl"><b>TEMPLATE</b> (same 5 parts for any operator)<ol>
+<li><b>Assumption:</b> which relation stays in memory (the smaller one) and what has to fit.</li>
+<li><b>Phases, numbered:</b> what is read, the in-memory structure, <i>what its search key is</i> (whole tuple for ∪ ∩ − δ; grouping attributes for γ; join attributes for ⋈).</li>
+<li><b>Per-tuple action:</b> output / discard / update the count.</li>
+<li><b>Why it is correct:</b> one line (“equal tuples hash to the same bucket, so comparing bucket i with bucket i is enough”).</li>
+<li><b>Cost and memory:</b> one-pass B(R) + B(S), needs min(B) ≤ M − 1. Two-pass 3(B(R) + B(S)), needs √ of the right quantity.</li>
+</ol></div>
+<p class="prompt">Two-pass hash-based R − S; memory and disk I/O.</p>
+<details><summary>Model answer</summary>
+<p><b>Phase 1:</b> hash R on the whole tuple into M − 1 buckets, writing them to disk; same for S with the same h.</p>
+<p><b>Phase 2:</b> for each i: load Sᵢ into memory (hash table on the whole tuple); stream Rᵢ; output each tuple not found in the table.</p>
+<p><b>Correct:</b> equal tuples go to the same bucket index, so R − S = ⋃(Rᵢ − Sᵢ).</p>
+<p><b>I/O</b> 2(B(R) + B(S)) + (B(R) + B(S)) = 3(B(R) + B(S)). <b>Memory:</b> each Sᵢ ≈ B(S)/(M − 1) ≤ M − 1 ⇒ B(S) ≤ M² (approx.; load the smaller of each pair).</p>
+</details>
+<div class="lose"><b>MARKS LOST BY</b><ul><li>No memory condition: “analyze memory” is half the question.</li><li>Keying the structure on the wrong attributes.</li></ul></div>
+<p class="practice">Practice → <a href="s08/05-hash-based.html">Hash-based</a> · <a href="s08/03-sort-based-operations.html">Sort-based operations</a> · <a href="s07/07-one-pass-binary.html">One-pass binary</a> · <a href="s07/06-one-pass-unary.html">One-pass unary</a></p>
+</div>
+
+<div class="card" id="c31">
+<h3>Card 31 · Optimized logical query plan (query tree)</h3>
+<p class="asked">Asked: 23-24 5d (7, compulsory) · 21-22 8b (15) · 20-21 8b (10) · 19-20 3b (15) · 17-18 2b (9) · CSE303 12-13</p>
+<div class="tmpl"><b>TEMPLATE</b><ol>
+<li><b>RA expression</b> of the SQL (π over σ over ×) — “first an expression”.</li>
+<li><b>Initial tree</b>: draw it.</li>
+<li><b>Split</b> each conjunctive σ into single conditions.</li>
+<li><b>Push each σ down</b> to the lowest node that has all its attributes (name the law: σ commutes with × / ⋈).</li>
+<li><b>σ with a join condition over × → ⋈</b>.</li>
+<li><b>Push π down</b>, keeping the attributes needed above (join attributes too).</li>
+<li><b>Final tree</b> + one justification line: “filters before joins make every intermediate result smaller”.</li>
+</ol></div>
+<p class="prompt">σ<sub>a&gt;100, b=20, c=d, f&lt;100</sub>((R × S) ⋈ T), R(a, b, c), S(d, e), T(e, f, g).</p>
+<details><summary>Model answer</summary>
+<p>Split into four σ's. a &gt; 100, b = 20 touch only R → onto R. f &lt; 100 only T → onto T. c = d needs R and S → onto (R × S), which turns it into ⋈<sub>c=d</sub>.</p>
+<p class="formula">(σ<sub>a&gt;100 ∧ b=20</sub>(R) ⋈<sub>c=d</sub> S) ⋈ σ<sub>f&lt;100</sub>(T)</p>
+<p>The outer ⋈ is still natural on e. R × S is never formed.</p>
+<p><b>IN subquery</b> (StarsIn … IN (SELECT name FROM MovieStar WHERE …)): π<sub>title</sub>(StarsIn ⋈<sub>starName = name</sub> π<sub>name</sub>(σ<sub>cond</sub>(MovieStar))).</p>
+</details>
+<div class="lose"><b>MARKS LOST BY</b><ul><li>Expression only, no tree, or the other way round. The question usually asks for both.</li><li>Projecting away a join attribute too early.</li></ul></div>
+<p class="practice">Practice → <a href="s08/07-beyond-the-slides.html">Beyond the slides: optimization</a> · <a href="i12/07-query-trees.html">Query trees (Ishrak L12)</a></p>
+</div>
+
+<div class="card" id="c32">
+<h3>Card 32 · Estimate the size of a join</h3>
+<p class="asked">Asked: 21-22 5a (15)</p>
+<div class="tmpl"><b>TEMPLATE</b><ol>
+<li>Formula: T(R ⋈ S) = T(R)·T(S) / max(V(R, Y), V(S, Y)); σ<sub>A=c</sub>: T/V(R, A).</li>
+<li>Join two at a time. After each join, say what V the result keeps for the next join attribute (“V(E, r1 ⋈ r2) = V(E, r2) = 50”).</li>
+<li>Check with the other join order (it must give the same number).</li>
+</ol></div>
+<details><summary>Model answer</summary>
+<p>r1 ⋈ r2 on C: 1000 × 1500 / max(900, 1100) ≈ 1363.6. Then ⋈ r3 on E: 1363.6 × 750 / max(50, 100) ≈ <b>10,227</b>. Check: r2 ⋈ r3 = 1500 × 750/100 = 11,250; × 1000/1100 ≈ 10,227 ✓.</p>
+</details>
+<div class="lose"><b>MARKS LOST BY</b><ul><li>Dividing by the V of the wrong attribute at the second join (the bank's own answer does this).</li></ul></div>
+<p class="practice">Practice → <a href="s08/07-beyond-the-slides.html">Beyond the slides</a></p>
+</div>
+
+<div class="card" id="c33">
+<h3>Card 33 · RA law true/false; min and max tuples</h3>
+<p class="asked">Asked: 23-24 6b (9) · 20-21 8a (5) · 21-22 4c / 20-21 8d (8)</p>
+<div class="tmpl"><b>TEMPLATE</b><ol>
+<li>State the semantics (bags or sets).</li>
+<li><b>False</b> → the smallest counterexample: two tuples, computed on both sides, and “{1} ≠ {1, 1}”.</li>
+<li><b>True</b> → a one-line argument per tuple (“σ keeps or drops each tuple independently”).</li>
+<li><b>Min/max:</b> table <i>expression · min · max · when</i>.</li>
+</ol></div>
+<details><summary>Model answer</summary>
+<p>δ(π<sub>A</sub>(R)) = π<sub>A</sub>(δ(R)): <b>false</b>. R = {(1,1), (1,2)}: left {1}, right {1, 1}.</p>
+<p>δ(σ<sub>c</sub>(R)) = σ<sub>c</sub>(δ(R)): <b>true</b>. π<sub>L</sub>(R ∪ S) = π<sub>L</sub>(R) ∪ π<sub>L</sub>(S): <b>true</b> for bags and sets.</p>
+<p>π<sub>a</sub>(R ∩ S) ≠ π<sub>a</sub>(R) ∩ π<sub>a</sub>(S): R = {(1, 2)}, S = {(1, 3)}: left ∅, right {1}.</p>
+<p>Bags: A ∩ B: 0 to min(nₐ, n_b); σ(A) − B: 0 to nₐ; A ∪ B: exactly nₐ + n_b; A ⟕ B: nₐ to nₐ·max(n_b, 1).</p>
+</details>
+<p class="practice">Practice → <a href="s08/07-beyond-the-slides.html">Beyond the slides</a></p>
+</div>
+
+<div class="card" id="c34">
+<h3>Card 34 · Lec 07–08 theory short answers</h3>
+<p class="asked">Asked: NLJ vs block NLJ (24-25 8a) · hash vs sort-merge (24-25 5d) · hybrid hash (23-24 5c, 11) · subsystems (CSE303 12-13) · pipelining (19-20 3b, 21-22 8a) · index cost (CSE303 14-15) · OR with indexes (18-19)</p>
+<div class="tmpl"><b>READY ANSWERS</b><ol>
+<li><b>Tuple NLJ vs block NLJ:</b> tuple-based: for each tuple of R, scan S: up to T(R)·T(S) I/Os. Block-based: read M − 1 blocks of the smaller S, then scan R once per chunk: B(S) + B(S)B(R)/(M − 1). Same result, far fewer I/Os.</li>
+<li><b>Hybrid hash join:</b> while partitioning S, keep k buckets in memory; R tuples that hash to them join at once, so those buckets are never written or re-read. Cost ≈ (3 − 2M/B(S))(B(R) + B(S)). Memory: k buckets + buffers for the rest.</li>
+<li><b>Query-processing subsystems:</b> parser (parse tree) → preprocessor (semantic check, views) → logical plan generator → rewriter / optimizer (cost-based, uses catalog statistics) → physical plan → execution engine (iterators) using the buffer manager.</li>
+<li><b>Iterators and pipelining:</b> Open / GetNext / Close; each operator pulls tuples from its children, so no intermediate result is written to disk. Blocking operators (sort, γ, set difference) must read their whole input before output, so they gain little; δ can pipeline by outputting the first copy it sees.</li>
+<li><b>Index costs</b> (t<sub>T</sub> transfer, t<sub>S</sub> seek, h<sub>i</sub> height): primary B+ equality on key (h<sub>i</sub> + 1)(t<sub>T</sub> + t<sub>S</sub>); comparison h<sub>i</sub>(t<sub>T</sub> + t<sub>S</sub>) + t<sub>S</sub> + b·t<sub>T</sub>. <b>salary = x OR district = y</b> with two secondary indexes: get both pointer sets, take their <i>union</i>, then fetch the records (sort the pointers first to save seeks).</li>
+</ol></div>
+<p class="practice">Practice → <a href="s07/01-query-processor.html">Query processor</a> · <a href="s07/05-iterators-pipelining.html">Iterators</a> · <a href="s08/07-beyond-the-slides.html">Beyond the slides</a></p>
+</div>
+
+<h2 id="next">9. Order to drill</h2>
+<ol>
+<li><b>Compulsory Q1/Q5 cards first:</b> 10, 13, 28, 29, 31, 8, 3, 1.</li>
+<li><b>Long-answer cards:</b> 7, 4, 21, 15, 17, 19, 25, 26.</li>
+<li><b>The rest</b>, then the theory cards (9, 18, 22, 34) read aloud once.</li>
+</ol>
+<p class="practice">See also → <a href="last-night.html">Last-night checklist</a> (formula sheet, traps, timed plan).</p>
+</main>
+<script src="assets/book.js"></script>
+</body>
+</html>
