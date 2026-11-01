@@ -1,0 +1,335 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The 555 Timer · EEE 263 Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Oscillators · Chapter 7 · Sedra §18.6 · Khairul FG s.13–16 · types S-06, S-07</div>
+<h1>The 555 Timer: Monostable and Astable</h1>
+<p class="lede">A 555 question has appeared in <b>every paper since 2018–19</b>: 2018–19, 2019–20 (29⅔ marks), 2020–21, 2021–22 (two parts), 2022–23, 2023–24 (two questions, 30 marks) and 2024–25. It is the highest-frequency oscillator type of the last four exams, and almost always a design: "f and duty cycle given, find \(R_A\), \(R_B\)". Two constants do everything: \(\ln 2 = 0.693\) (astable) and \(\ln 3 \approx 1.1\) (monostable). The one idea that separates full marks from half: a duty cycle below 50% needs a steering diode.</p>
+
+<h2>1. Inside the 555</h2>
+<figure><div id="fig-int"></div><figcaption><b>Figure 1.</b> Internal block diagram (Sedra Fig. 18.29; the 2023–24 and 2024–25 papers print it). Three equal resistors set \(V_{TH} = \tfrac23V_{CC}\) and \(V_{TL} = \tfrac13V_{CC}\).</figcaption></figure>
+<dl class="def">
+  <dt>Comparator 1</dt><dd>+ = Threshold (pin 6), − = \(\tfrac23V_{CC}\). Output high (resets the flip-flop) when the threshold voltage exceeds \(\tfrac23V_{CC}\).</dd>
+  <dt>Comparator 2</dt><dd>+ = \(\tfrac13V_{CC}\), − = Trigger (pin 2). Output high (sets the flip-flop) when the trigger falls below \(\tfrac13V_{CC}\).</dd>
+  <dt>SR flip-flop</dt><dd>S = 1 → Q = 1 (output high, discharge transistor off); R = 1 → Q = 0 (output low, \(\bar Q\) = 1 turns the discharge transistor \(Q_1\) on, shorting pin 7 to ground). R = S = 0 holds.</dd>
+  <dt>Pins</dt><dd>1 ground, 2 trigger, 3 output, 4 reset (tie to \(V_{CC}\)), 5 control voltage (0.01 µF to ground for noise), 6 threshold, 7 discharge, 8 \(V_{CC}\).</dd>
+</dl>
+<p>Every timing result comes from one capacitor law: a capacitor heading from \(V_0\) toward \(V_\infty\) through \(R\):</p>
+<div class="formula">\[ v_C(t) = V_\infty - (V_\infty - V_0)\,e^{-t/RC} \;\Rightarrow\; t = RC\,\ln\frac{V_\infty - V_0}{V_\infty - V_{end}} \]</div>
+
+<h2>2. Monostable (one-shot): T = RC ln 3 ≈ 1.1RC (type S-07)</h2>
+<figure><div id="fig-mono"></div><figcaption><b>Figure 2.</b> 555 monostable: R from \(V_{CC}\) to pins 6 and 7, C to ground, trigger on pin 2.</figcaption></figure>
+<p><b>Operation.</b> Stable state: Q = 0, the discharge transistor is on, so C is held at 0 V and the output is low. A negative trigger pulse below \(\tfrac13V_{CC}\) sets the flip-flop: output goes high, the transistor turns off, and C charges through R toward \(V_{CC}\). When \(v_C\) reaches \(\tfrac23V_{CC}\), comparator 1 resets the flip-flop: output low, C is discharged quickly. The pulse width is the charging time from 0 to \(\tfrac23V_{CC}\):</p>
+<div class="formula">\[ v_C = V_{CC}\big(1 - e^{-t/RC}\big) = \tfrac23V_{CC} \;\Rightarrow\; T = RC\ln 3 = 1.0986\,RC \approx 1.1\,RC \]</div>
+<figure><div id="fig-mwave"></div><figcaption><b>Figure 3.</b> Monostable waveforms: trigger (narrow, below \(V_{CC}/3\)), capacitor ramp from 0 to \(2V_{CC}/3\) then fast discharge, output high for T.</figcaption></figure>
+<div class="method"><h4>Method · monostable design</h4><ol>
+<li>\(T = 1.1RC\) (or \(RC\ln3\); say which).</li>
+<li>Pick C (often given: 1 µF, 10 µF). \(R = T/(1.1C)\); keep R between 1 kΩ and 1 MΩ, otherwise change C.</li>
+<li>Draw the connection diagram (pins 4, 8 to \(V_{CC}\); 5 via 0.01 µF; 6 and 7 together at the R–C node; trigger into 2) and the waveforms. The trigger pulse must be shorter than T.</li>
+</ol></div>
+<div id="dr-mono"></div>
+
+<h2>3. Astable: free-running square wave (type S-06)</h2>
+<figure><div id="fig-ast"></div><figcaption><b>Figure 4.</b> 555 astable: \(R_A\) from \(V_{CC}\) to pin 7, \(R_B\) from pin 7 to the capacitor node (pins 2 and 6). The diode across \(R_B\) (anode at pin 7) is only for duty cycle below 50%; leave it out for the standard circuit.</figcaption></figure>
+<p><b>Operation.</b> Pins 2 and 6 both watch \(v_C\), so the capacitor swings between \(\tfrac13V_{CC}\) and \(\tfrac23V_{CC}\):</p>
+<ul>
+<li><b>Output high (charging):</b> transistor off; C charges toward \(V_{CC}\) through \(R_A + R_B\), from \(\tfrac13\) to \(\tfrac23V_{CC}\): \(t_H = (R_A + R_B)C\ln\dfrac{V_{CC} - V_{CC}/3}{V_{CC} - 2V_{CC}/3} = (R_A + R_B)C\ln 2\).</li>
+<li><b>Output low (discharging):</b> at \(\tfrac23V_{CC}\) the flip-flop resets; pin 7 is grounded, so C discharges toward 0 through \(R_B\) only, from \(\tfrac23\) to \(\tfrac13V_{CC}\): \(t_L = R_BC\ln 2\).</li>
+</ul>
+<div class="formula">\[ \begin{gathered} t_H = 0.693(R_A + R_B)C,\quad t_L = 0.693R_BC,\quad T = 0.693(R_A + 2R_B)C \\ f = \frac{1.44}{(R_A + 2R_B)C},\quad D = \frac{R_A + R_B}{R_A + 2R_B} \end{gathered} \]</div>
+<p>D is always above 50% for this circuit (charging goes through more resistance than discharging). It approaches 50% only when \(R_A \ll R_B\) (Khairul s.16).</p>
+<figure><div id="fig-awave"></div><figcaption><b>Figure 5.</b> Astable waveforms (drawn for \(R_A = 7\) kΩ, \(R_B = 3\) kΩ): \(v_C\) between \(V_{CC}/3\) and \(2V_{CC}/3\); output high while charging.</figcaption></figure>
+<div class="method"><h4>Method · astable analysis</h4><ol>
+<li>\(t_H = 0.693(R_A + R_B)C\) (output high, charging), \(t_L = 0.693R_BC\).</li>
+<li>\(T = t_H + t_L\), \(f = 1/T\), \(D = t_H/T\).</li>
+<li>\(v_C\) limits: \(V_{CC}/3\) and \(2V_{CC}/3\) (independent of \(V_{CC}\) in timing: f does not depend on the supply).</li>
+<li>"How does f depend on C?": \(f = 1.44/((R_A + 2R_B)C) \propto 1/C\), a rectangular hyperbola.</li>
+</ol></div>
+<div id="wk-an"></div>
+<div id="dr-an"></div>
+
+<h2>4. Astable design for given f and D</h2>
+<div class="method"><h4>Method · design (decide the circuit from D first)</h4><ol>
+<li>\(T = 1/f\), \(t_H = D\,T\), \(t_L = T - t_H\). Pick C (given, or so that the resistors are 1–100 kΩ).</li>
+<li><b>D &gt; 50%: standard circuit.</b> \(R_B = \dfrac{t_L}{0.693C}\), then \(R_A = \dfrac{t_H}{0.693C} - R_B\). (Shortcut: \(R_A/R_B = (2D - 1)/(1 - D)\); D = 75% gives \(R_A = 2R_B\), D = 60% gives \(R_B = 2R_A\).)</li>
+<li><b>D ≤ 50%: steering diode across \(R_B\)</b> (anode at pin 7, cathode at the capacitor). Charging now goes through \(R_A\) and the diode only; discharging through \(R_B\) into pin 7 (diode reverse biased). With an ideal diode: \(t_H = 0.693R_AC\), \(t_L = 0.693R_BC\), so \(R_A = \dfrac{t_H}{0.693C}\), \(R_B = \dfrac{t_L}{0.693C}\), \(D = \dfrac{R_A}{R_A + R_B}\).</li>
+<li>Alternative for D &lt; 50%: design a standard astable for \(1 - D\) and invert the output (e.g. a transistor or logic inverter).</li>
+<li>Check: recompute f and D. Draw the circuit with values and the output waveform (high for \(t_H\), low for \(t_L\)).</li>
+</ol></div>
+<p>The standard formula forced onto D &lt; 50% gives a negative \(R_A\): that is the signal you need the diode.</p>
+<div id="wk-des"></div>
+<div id="dr-des"></div>
+
+<div class="trap"><h4>Traps (where marks go)</h4><ul>
+<li>Using 1.1 (monostable) in an astable or 0.693 in a monostable.</li>
+<li>Swapping \(t_H\) and \(t_L\): the output is <b>high while charging</b>, and charging goes through \(R_A + R_B\).</li>
+<li>Using the standard circuit for D ≤ 50% (negative \(R_A\)). Say "steering diode across \(R_B\)" and draw it.</li>
+<li>Forgetting the connection details in the drawing: pins 4 and 8 to \(V_{CC}\), 5 through 0.01 µF, 2 and 6 tied together.</li>
+<li>Answering "frequency" with \(1/t_H\). \(f = 1/(t_H + t_L)\).</li>
+</ul></div>
+
+<h2>Exam questions</h2>
+
+<div class="exam">
+  <div class="exam-src">2024–25 · Sec A · Q4(a) · 15 marks</div>
+  <div class="exam-q"><p>The internal circuit of a 555 timer is shown (Figure 1). Design a circuit using a 555 to generate a 100 kHz square wave with duty cycle 40%. Draw the final connection diagram with component values.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>\(T = 1/100\text{ kHz} = 10\) µs; \(t_H = 0.4T = 4\) µs, \(t_L = 6\) µs.</p>
+    <p>D &lt; 50% is impossible with the standard astable (\(D = (R_A + R_B)/(R_A + 2R_B) &gt; 0.5\)). Use a <b>steering diode across \(R_B\)</b> (anode at pin 7): charging through \(R_A\) only, discharging through \(R_B\).</p>
+    <p>Choose C = 1 nF: \(R_A = \dfrac{t_H}{0.693C} = \dfrac{4\times10^{-6}}{0.693\times10^{-9}} = 5.77\) kΩ; \(R_B = \dfrac{6\times10^{-6}}{0.693\times10^{-9}} = 8.66\) kΩ.</p>
+    <p>Check: \(D = 5.77/(5.77 + 8.66) = 0.40\), \(T = 0.693\times14.43\text{k}\times1\text{n} = 10\) µs.</p>
+    <p>Connection diagram (Figure 4 with the diode): \(V_{CC}\) to pins 8 and 4; \(R_A\) = 5.77 kΩ from \(V_{CC}\) to pin 7; \(R_B\) = 8.66 kΩ from pin 7 to pins 2–6; diode across \(R_B\), anode at pin 7; C = 1 nF from pins 2–6 to ground; 0.01 µF from pin 5 to ground; output at pin 3 (high 4 µs, low 6 µs).</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2023–24 · Sec B · Q8(b) · 12 marks</div>
+  <div class="exam-q"><p>A 555 timer is connected as in the figure (standard astable, internal diagram drawn). The capacitor is 1 nF. Find \(R_A\) and \(R_B\) for an oscillation frequency of 50 kHz and duty cycle 60%. What measures can be taken to achieve duty cycle below 50%?</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>\(T = 1/50\text{ kHz} = 20\) µs; \(t_H = 0.6\times20 = 12\) µs, \(t_L = 8\) µs.</p>
+    <p>\(t_L = 0.693R_BC \Rightarrow R_B = \dfrac{8\times10^{-6}}{0.693\times10^{-9}} = 11.54\) kΩ.</p>
+    <p>\(t_H = 0.693(R_A + R_B)C \Rightarrow R_A + R_B = \dfrac{12\times10^{-6}}{0.693\times10^{-9}} = 17.31\) kΩ, so \(R_A = 5.77\) kΩ. (Check: \(R_B = 2R_A\) for 60%.)</p>
+    <p><b>D &lt; 50%:</b> (1) connect a diode across \(R_B\) (anode at the discharge pin, cathode at the capacitor) so C charges through \(R_A\) only: \(D = R_A/(R_A + R_B)\), then choose \(R_A &lt; R_B\); or (2) design for \(1 - D\) and invert the output.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2023–24 · Sec B · Q6(a) · 18 marks</div>
+  <div class="exam-q"><p>With proper connection diagram, explain the monostable mode of operation of a 555 timer. Design a monostable multivibrator using a 555 timer that generates an output pulse of duration T = 100 ms. Draw the waveforms of output voltage and trigger voltage of your design.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>Draw Figure 2 (with the internal blocks of Figure 1 if time allows). Operation: in the stable state Q = 0, the discharge transistor holds C at 0 V, output low. A negative trigger below \(V_{CC}/3\) makes comparator 2 set the flip-flop: output high, transistor off, C charges through R toward \(V_{CC}\): \(v_C = V_{CC}(1 - e^{-t/RC})\). At \(v_C = \tfrac23V_{CC}\) comparator 1 resets the flip-flop: output low, C discharged. The circuit waits for the next trigger.</p>
+    <p>Pulse width: \(\tfrac23 = 1 - e^{-T/RC} \Rightarrow T = RC\ln3 = 1.1RC\).</p>
+    <p><b>Design:</b> choose C = 1 µF: \(R = \dfrac{0.1}{1.0986\times10^{-6}} = 91.0\) kΩ (91 kΩ standard; with 1.1, 90.9 kΩ). (Equally valid: C = 10 µF, R = 9.1 kΩ.)</p>
+    <p><b>Waveforms</b> (Figure 3): trigger normally at \(V_{CC}\), a short negative spike below \(V_{CC}/3\) at t = 0 (narrower than 100 ms); output high from 0 to 100 ms, then low; \(v_C\) rises exponentially from 0 to \(2V_{CC}/3\) at 100 ms, then drops to 0.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2022–23 · Sec B · Q7(b) · 15 marks &nbsp;|&nbsp; same question 2021–22 Sec A Q2(b)(ii) (10 marks)</div>
+  <div class="exam-q"><p>Design a square wave generator with 10 ms period and 75% duty cycle with 555 timer.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>\(t_H = 7.5\) ms, \(t_L = 2.5\) ms. D &gt; 50%: standard astable.</p>
+    <p>Choose C = 1 µF: \(R_B = \dfrac{2.5\times10^{-3}}{0.693\times10^{-6}} = 3.61\) kΩ; \(R_A + R_B = \dfrac{7.5\times10^{-3}}{0.693\times10^{-6}} = 10.82\) kΩ, so \(R_A = 7.21\) kΩ (= \(2R_B\), as expected for 75%).</p>
+    <p>Draw Figure 4 without the diode: \(R_A\) = 7.21 kΩ, \(R_B\) = 3.61 kΩ, C = 1 µF, 0.01 µF on pin 5. Output: high 7.5 ms, low 2.5 ms.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2021–22 · Sec A · Q2(b)(i) · 10 marks</div>
+  <div class="exam-q"><p>To get an output pulse of 10 ms width when trigger is applied, an external resistor and a 1 µF capacitor are connected with a 555 timer. What should be the value of the resistor?</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>Monostable: \(T = 1.1RC\). \(R = \dfrac{10\times10^{-3}}{1.1\times10^{-6}} = 9.09\) kΩ (9.10 kΩ with \(\ln3\)); use 9.1 kΩ. Connect R from \(V_{CC}\) to pins 6–7, C from pins 6–7 to ground, trigger into pin 2.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2020–21 · Sec A · Q3(a) · 20 marks</div>
+  <div class="exam-q"><p>Design an oscillator circuit using a 555 timer IC which has a square-wave output with oscillation frequency 20 kHz and duty cycle 25%. Provide the necessary illustration of the designed circuit and draw the wave shape.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>\(T = 50\) µs, \(t_H = 12.5\) µs, \(t_L = 37.5\) µs. D &lt; 50%: steering diode across \(R_B\).</p>
+    <p>C = 1 nF: \(R_A = \dfrac{12.5\times10^{-6}}{0.693\times10^{-9}} = 18.0\) kΩ; \(R_B = \dfrac{37.5\times10^{-6}}{0.693\times10^{-9}} = 54.1\) kΩ. Check \(D = 18.0/72.1 = 0.25\).</p>
+    <p>Alternative: standard astable for 75% (\(R_A = 2R_B\): \(R_B\) = 18.0 kΩ, \(R_A\) = 36.1 kΩ with 1 nF) followed by an inverter.</p>
+    <p>Draw Figure 4 with the diode and values; wave shape: output high 12.5 µs, low 37.5 µs; \(v_C\) between \(V_{CC}/3\) and \(2V_{CC}/3\), rising faster (through \(R_A\)) than it falls (through \(R_B\)).</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2019–20 (exam held January 2021) · Sec B · Q6(b) · 29⅔ marks</div>
+  <div class="exam-q"><p>Consider the 555 circuit with \(R_A\) = 7 kΩ (\(V_{CC}\) to pin 7), \(R_B\) = 3 kΩ (pin 7 to pins 2, 6), C = 0.5 µF, \(V_{CC}\) = 10 V, 0.01 µF on pin 5. (i) Draw the waveshapes of \(V_C\) and \(V_O\). (ii) Determine output low time \(t_{low}\) and output high time \(t_{high}\). (iii) Find the duty cycle and free-running frequency. (iv) How does the free-running frequency depend on C? Discuss with a graph. (v) Design the resistors and capacitor so that the duty cycle becomes 0.40.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><b>(i)</b> Figure 5: \(V_C\) swings exponentially between 3.33 V and 6.67 V (rising through \(R_A + R_B\), falling through \(R_B\)); \(V_O\) ≈ 10 V while \(V_C\) rises, ≈ 0 V while it falls.</p>
+    <p><b>(ii)</b> \(t_{high} = 0.693\times(7 + 3)\text{k}\times0.5\text{µ} = 3.47\) ms; \(t_{low} = 0.693\times3\text{k}\times0.5\text{µ} = 1.04\) ms.</p>
+    <p><b>(iii)</b> \(T = 4.51\) ms, \(f = 222\) Hz, \(D = 3.47/4.51 = 0.769\) (76.9%).</p>
+    <p><b>(iv)</b> \(f = \dfrac{1.44}{(R_A + 2R_B)C} = \dfrac{1.44}{13\text{k}\cdot C}\): inversely proportional to C (graph of f against C is a rectangular hyperbola; f against 1/C is a straight line through the origin). Doubling C halves f; D does not change with C.</p>
+    <p><b>(v)</b> D = 0.40 &lt; 0.5 needs a diode across \(R_B\): \(D = R_A/(R_A + R_B) = 0.4 \Rightarrow R_B = 1.5R_A\). Keeping the same frequency (T = 4.51 ms) and C = 0.5 µF: \(R_A = \dfrac{0.4\times4.51\text{ ms}}{0.693\times0.5\text{ µF}} = 5.20\) kΩ, \(R_B = 7.80\) kΩ. (Any pair with \(R_B = 1.5R_A\) works, e.g. 10 kΩ, 15 kΩ, 0.1 µF giving 577 Hz.)</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2018–19 · Sec B · Q6(b) · 20 marks &nbsp;|&nbsp; also class test 2018 (Sedra exercise)</div>
+  <div class="exam-q"><p>Design a circuit using 555 IC which results in a square wave with oscillation frequency of 100 kHz and 75% duty cycle. Also draw your designed circuit and output wave shape.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>\(T = 10\) µs, \(t_H = 7.5\) µs, \(t_L = 2.5\) µs; standard astable.</p>
+    <p>C = 1 nF: \(R_B = \dfrac{2.5\times10^{-6}}{0.693\times10^{-9}} = 3.61\) kΩ; \(R_A = \dfrac{7.5\times10^{-6}}{0.693\times10^{-9}} - R_B = 10.82 - 3.61 = 7.21\) kΩ.</p>
+    <p>Draw Figure 4 (no diode) with these values; output high 7.5 µs, low 2.5 µs, period 10 µs.</p>
+  </div></details>
+</div>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+
+<div class="key"><p><strong>Summary:</strong> thresholds \(V_{CC}/3\) and \(2V_{CC}/3\). Monostable: \(T = RC\ln3 \approx 1.1RC\). Astable: \(t_H = 0.693(R_A + R_B)C\) (output high, charging), \(t_L = 0.693R_BC\), \(f = 1.44/((R_A + 2R_B)C)\), \(D = (R_A + R_B)/(R_A + 2R_B) &gt; 50\%\). Design: \(t_H = DT\), \(t_L = (1 - D)T\); D &gt; 50%: \(R_B\) from \(t_L\), then \(R_A\); D ≤ 50%: diode across \(R_B\), \(R_A = t_H/(0.693C)\), \(R_B = t_L/(0.693C)\).</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/eee.js"></script>
+<script>
+const tu = v => v < 1e-3 ? 'µs' : v < 1 ? 'ms' : 's', fu = v => v < 1e3 ? 'Hz' : 'kHz';
+// 555 drawn as a box (no 555 element in the simulator export)
+const box555 = [['W', [200, 40], [320, 40], [320, 220], [200, 220], [200, 40]], ['t', [260, 196], '555'],
+  ['t', [206, 104], '7 DIS', 'start', 'sm'], ['t', [206, 144], '6 THR', 'start', 'sm'], ['t', [206, 174], '2 TRIG', 'start', 'sm'],
+  ['t', [240, 56], '8', 'middle', 'sm'], ['t', [290, 56], '4', 'middle', 'sm'], ['t', [314, 134], '3', 'end', 'sm'],
+  ['t', [240, 214], '1', 'middle', 'sm'], ['t', [290, 214], '5', 'middle', 'sm'],
+  ['W', [240, 220], [240, 240]], ['gnd', [240, 240]], ['C', [290, 220], [290, 270], '0.01 µF'], ['gnd', [290, 270]],
+  ['W', [320, 130], [360, 130]], ['open', [360, 130], 'vO']];
+const astFig = (diode, lab = {}) => sch([...box555,
+  ['rail', [120, 10], '+VCC'], ['W', [120, 10], [290, 10]], ['W', [240, 10], [240, 40]], ['W', [290, 10], [290, 40]], ['dot', [240, 10]],
+  ['R', [120, 10], [120, 100], lab.RA || 'RA', -1], ['W', [120, 100], [200, 100]], ['dot', [120, 100]],
+  ['R', [120, 100], [120, 170], lab.RB || 'RB', -1], ['W', [120, 170], [200, 170]], ['dot', [120, 170]], ['dot', [160, 170]], ['W', [160, 170], [160, 140], [200, 140]],
+  ['C', [120, 170], [120, 240], lab.C || 'C', -1], ['gnd', [120, 240]],
+  ...(diode ? [['W', [120, 100], [20, 100]], ['D', [20, 100], [20, 170], 'D', -1], ['W', [20, 170], [120, 170]]] : []),
+], { w: 400, h: 290, sim: false });
+const monoFig = (lab = {}) => sch([...box555,
+  ['rail', [120, 10], '+VCC'], ['W', [120, 10], [290, 10]], ['W', [240, 10], [240, 40]], ['W', [290, 10], [290, 40]], ['dot', [240, 10]],
+  ['R', [120, 10], [120, 100], lab.R || 'R', -1], ['W', [120, 100], [200, 100]], ['dot', [120, 100]], ['dot', [160, 100]], ['W', [160, 100], [160, 140], [200, 140]],
+  ['C', [120, 100], [120, 240], lab.C || 'C', -1], ['gnd', [120, 240]],
+  ['open', [180, 260], 'vtrig'], ['W', [180, 260], [180, 170], [200, 170]],
+], { w: 400, h: 290, sim: false });
+$('#fig-ast').innerHTML = astFig(true);
+$('#fig-mono').innerHTML = monoFig();
+
+$('#fig-int').innerHTML = sch([
+  ['rail', [100, 16], 'VCC (8)'], ['R', [100, 16], [100, 76], 'R'], ['R', [100, 76], [100, 140], 'R'], ['R', [100, 140], [100, 200], 'R'], ['gnd', [100, 200]],
+  ['dot', [100, 76]], ['dot', [100, 140]], ['W', [100, 76], [160, 76]], ['W', [100, 140], [160, 140]],
+  ['opamp', [160, 60], { plusTop: true }], ['W', [160, 44], [150, 44], [150, 10]], ['open', [150, 10], 'Threshold (6)'],
+  ['opamp', [160, 156], { plusTop: true }], ['W', [160, 172], [150, 172], [150, 230]], ['open', [150, 230], 'Trigger (2)'],
+  ['t', [200, 64], '1', 'middle', 'sm'], ['t', [200, 160], '2', 'middle', 'sm'],
+  ['W', [240, 60], [280, 60]], ['W', [240, 156], [280, 156]], ['W', [280, 40], [360, 40], [360, 180], [280, 180], [280, 40]],
+  ['t', [288, 64], 'R', 'start'], ['t', [288, 160], 'S', 'start'], ['t', [352, 84], 'Q', 'end'], ['t', [352, 154], 'Q̄', 'end'], ['t', [320, 116], 'FF', 'middle', 'sm'],
+  ['W', [360, 80], [420, 80]], ['open', [420, 80], 'Out (3)'], ['W', [360, 150], [380, 150]], ['R', [380, 150], [440, 150], '100 Ω'],
+  ['npn', [440, 150], { label: 'Q₁' }], ['W', [480, 110], [520, 110]], ['open', [520, 110], 'Dis (7)'], ['W', [480, 190], [480, 210]], ['gnd', [480, 210]],
+  ['t', [92, 80], '2VCC/3', 'end', 'sm'], ['t', [92, 144], 'VCC/3', 'end', 'sm'],
+], { w: 600, h: 250, sim: false });
+
+// waveforms: vC and vO for given tH, tL (astable) or monostable
+const wave555 = (tH, tL) => {
+  const T = tH + tL, sx = 340 / (2.4 * T), y = v => 110 - v * 90, it = [];
+  let t = 0, pts = [], vo = [];
+  const t1 = tH / Math.LN2, t2 = tL / Math.LN2;
+  pts.push([40, y(1 / 3)]);
+  while (t < 2.4 * T) {
+    for (let k = 1; k <= 12; k++) { const tt = Math.min(tH * k / 12, 2.4 * T - t); pts.push([40 + (t + tt) * sx, y(1 - (2 / 3) * Math.exp(-tt / t1))]); }
+    vo.push([40 + t * sx, 150], [40 + (t + tH) * sx, 150], [40 + (t + tH) * sx, 190]); t += tH; if (t >= 2.4 * T) break;
+    for (let k = 1; k <= 12; k++) { const tt = Math.min(tL * k / 12, 2.4 * T - t); pts.push([40 + (t + tt) * sx, y((2 / 3) * Math.exp(-tt / t2))]); }
+    vo.push([40 + (t + tL) * sx, 190], [40 + (t + tL) * sx, 150]); t += tL;
+  }
+  pts = pts.filter(p => p[0] <= 380.5); vo = vo.filter(p => p[0] <= 380.5);
+  return sch([['W', [40, 10], [40, 200]], ['W', [40, 110], [390, 110]], ['W', [40, 200], [390, 200]],
+    ['W', ...pts], ['W', [40, 150], ...vo], ['W', [36, y(2 / 3)], [390, y(2 / 3)]], ['W', [36, y(1 / 3)], [390, y(1 / 3)]],
+    ['t', [34, y(2 / 3) + 4], '2VCC/3', 'end', 'sm'], ['t', [34, y(1 / 3) + 4], 'VCC/3', 'end', 'sm'], ['t', [46, 20], 'vC', 'start'], ['t', [34, 154], 'vO', 'end'],
+    ['t', [40 + tH * sx / 2, 144], 'tH', 'middle', 'sm'], ['t', [40 + (tH + tL / 2) * sx, 184], 'tL', 'middle', 'sm'],
+  ], { w: 400, h: 210, sim: false });
+};
+$('#fig-awave').innerHTML = wave555(0.693 * 10e3 * 0.5e-6, 0.693 * 3e3 * 0.5e-6);
+$('#fig-mwave').innerHTML = (() => {
+  const y = v => 150 - v * 80, pts = [[40, y(0)], [80, y(0)]];
+  for (let k = 1; k <= 20; k++) { const tt = k / 20; pts.push([80 + 200 * tt, y(1 - Math.exp(-tt * Math.log(3)))]); }
+  pts.push([281, y(0)], [380, y(0)]);
+  return sch([['W', [40, 0], [40, 260]], ['W', [40, 40], [380, 40], ], ['W', [40, 40], [80, 40], [82, 66], [86, 40]],
+    ['W', [36, y(2 / 3)], [380, y(2 / 3)]], ['W', ...pts], ['W', [40, 250], [80, 250], [80, 205], [280, 205], [280, 250], [380, 250]],
+    ['t', [34, 44], 'vtrig', 'end', 'sm'], ['t', [90, 64], '< VCC/3', 'start', 'sm'], ['t', [34, y(2 / 3) + 4], '2VCC/3', 'end', 'sm'], ['t', [34, 140], 'vC', 'end'], ['t', [34, 230], 'vO', 'end'],
+    ['t', [180, 198], 'T = 1.1RC', 'middle', 'sm']], { w: 400, h: 270, sim: false });
+})();
+
+drill('#dr-mono', { id: 's07-555-monostable', title: '555 monostable: resistor for a pulse width, or pulse width from R and C', gen(r) {
+  const rev = r() < 0.35;
+  const caps = [100e-6, 47e-6, 22e-6, 10e-6, 4.7e-6, 2.2e-6, 1e-6, 470e-9, 220e-9, 100e-9, 47e-9, 22e-9, 10e-9, 4.7e-9, 2.2e-9, 1e-9];
+  if (rev) {
+    const R = r.E(1e3, 1e6), C = r.pick(caps), T = R * C * Math.log(3);
+    return {
+      given: `A 555 monostable uses R = ${si(R, 'Ω')} and C = ${si(C, 'F')}. Find the output pulse width T.`,
+      fig: monoFig({ R: 'R ' + si(R, 'Ω'), C: 'C ' + si(C, 'F') }),
+      ask: [{ l: 'T', v: T, u: tu(T), tol: 0.02 }],
+      steps: [{ t: `\\(T = RC\\ln3 = ${num(R)}\\times${num(C)}\\times1.0986 = ${si(T, 's')}\\) (1.1RC gives ${si(1.1 * R * C, 's')})`, a: { l: 'T', v: T, u: tu(T) } }] };
+  }
+  const T = +Math.exp(Math.log(10e-6) + r() * Math.log(1e6)).toPrecision(2);
+  const C = caps.find(c => { const R = T / (1.1 * c); return R >= 1e3 && R <= 1e6; }); if (!C) return null;
+  const R = T / (Math.log(3) * C);
+  return {
+    given: `Design a 555 monostable for an output pulse of ${si(T, 's')} using C = ${si(C, 'F')}. Find R.`,
+    fig: monoFig({ C: 'C ' + si(C, 'F') }),
+    ask: [{ l: 'R', v: R, u: 'kΩ', tol: 0.02 }],
+    steps: [{ t: `\\(R = \\dfrac{T}{C\\ln3} = \\dfrac{${num(T)}}{${num(C)}\\times1.0986} = ${si(R, 'Ω')}\\) (with 1.1: ${si(T / (1.1 * C), 'Ω')}; both accepted)`, a: { l: 'R', v: R, u: 'kΩ' } }] };
+} });
+
+worked('#wk-an', {
+  given: '2019–20 values: \\(R_A\\) = 7 kΩ, \\(R_B\\) = 3 kΩ, C = 0.5 µF, \\(V_{CC}\\) = 10 V.',
+  fig: astFig(false, { RA: 'RA 7 kΩ', RB: 'RB 3 kΩ', C: 'C 0.5 µF' }),
+  steps: [
+    { t: '\\(t_H = 0.693\\times10\\text{k}\\times0.5\\text{µ} = 3.47\\) ms', a: { l: 't_H', v: 3.466e-3, u: 'ms' } },
+    { t: '\\(t_L = 0.693\\times3\\text{k}\\times0.5\\text{µ} = 1.04\\) ms', a: { l: 't_L', v: 1.040e-3, u: 'ms' } },
+    { t: '\\(f = 1/(3.47 + 1.04)\\text{ ms} = 222\\) Hz', a: { l: 'f', v: 221.95, u: 'Hz' } },
+    { t: '\\(D = 3.47/4.51 = 76.9\\%\\); \\(v_C\\) between 3.33 V and 6.67 V', a: { l: 'D', v: 76.92, u: '%' } },
+  ] });
+
+drill('#dr-an', { id: 's06-555-astable-analysis', title: '555 astable analysis: high time, low time, frequency, duty cycle', gen(r) {
+  const Vcc = r.pick([5, 9, 10, 12, 15]), RA = r.E(1e3, 100e3), RB = r.E(1e3, 100e3), C = r.pick([1, 2.2, 4.7, 10, 22, 47, 100, 220, 470, 1000, 2200]) * 1e-9;
+  const tH = Math.LN2 * (RA + RB) * C, tL = Math.LN2 * RB * C, T = tH + tL, f = 1 / T, D = tH / T * 100;
+  return {
+    given: `A 555 astable (no diode) has \\(R_A\\) = ${si(RA, 'Ω')}, \\(R_B\\) = ${si(RB, 'Ω')}, C = ${si(C, 'F')}, \\(V_{CC}\\) = ${Vcc} V. Find \\(t_H\\), \\(t_L\\), f, D and the upper capacitor voltage.`,
+    fig: astFig(false, { RA: 'RA ' + si(RA, 'Ω'), RB: 'RB ' + si(RB, 'Ω'), C: 'C ' + si(C, 'F') }),
+    ask: [{ l: 't_H', v: tH, u: tu(tH) }, { l: 't_L', v: tL, u: tu(tL) }, { l: 'f', v: f, u: fu(f) }, { l: 'D', v: D, u: '%', tol: 0.01 }, { l: 'v_{C,max}', v: 2 * Vcc / 3, u: 'V' }],
+    steps: [
+      { t: `\\(t_H = 0.693(R_A + R_B)C = 0.693\\times${num(RA + RB)}\\times${num(C)} = ${si(tH, 's')}\\)`, a: { l: 't_H', v: tH, u: tu(tH) } },
+      { t: `\\(t_L = 0.693R_BC = 0.693\\times${num(RB)}\\times${num(C)} = ${si(tL, 's')}\\)`, a: { l: 't_L', v: tL, u: tu(tL) } },
+      { t: `\\(T = ${si(T, 's')}\\), \\(f = 1/T = ${si(f, 'Hz')}\\)`, a: { l: 'f', v: f, u: fu(f) } },
+      { t: `\\(D = t_H/T = ${num(D)}\\%\\)`, a: { l: 'D', v: D, u: '%', tol: 0.01 } },
+      { t: `\\(v_C\\) swings ${num(Vcc / 3)} V to ${num(2 * Vcc / 3)} V`, a: { l: 'v_{C,max}', v: 2 * Vcc / 3, u: 'V' } },
+    ] };
+} });
+
+worked('#wk-des', {
+  given: 'Design for f = 1 kHz, D = 30%, C = 0.1 µF.',
+  steps: [
+    'T = 1 ms, \\(t_H\\) = 0.3 ms, \\(t_L\\) = 0.7 ms. D &lt; 50%, so put a diode across \\(R_B\\).',
+    { t: '\\(R_A = \\dfrac{0.3\\times10^{-3}}{0.693\\times10^{-7}} = 4.33\\) kΩ', a: { l: 'R_A', v: 4328, u: 'kΩ' } },
+    { t: '\\(R_B = \\dfrac{0.7\\times10^{-3}}{0.693\\times10^{-7}} = 10.1\\) kΩ', a: { l: 'R_B', v: 10099, u: 'kΩ' } },
+    'Check: D = 4.33/(4.33 + 10.1) = 0.30. (Without the diode: \\(R_B\\) = 10.1 kΩ and \\(R_A = 0.3/0.0693 - 10.1 = -5.8\\) kΩ: impossible.)',
+  ] });
+
+drill('#dr-des', { id: 's06-555-astable-design', title: '555 astable design for given f and duty cycle (diode when D below 50%)', gen(r) {
+  const f = +Math.exp(Math.log(10) + r() * Math.log(2e4)).toPrecision(2), D = r.pick([0.25, 0.3, 0.4, 0.45, 0.6, 2 / 3, 0.7, 0.75, 0.8]);
+  const T = 1 / f, tH = D * T, tL = T - tH, diode = D <= 0.5;
+  const caps = [100e-6, 47e-6, 22e-6, 10e-6, 4.7e-6, 2.2e-6, 1e-6, 470e-9, 220e-9, 100e-9, 47e-9, 22e-9, 10e-9, 4.7e-9, 2.2e-9, 1e-9, 470e-12, 220e-12, 100e-12];
+  const sol = c => diode ? [tH / (Math.LN2 * c), tL / (Math.LN2 * c)] : [tH / (Math.LN2 * c) - tL / (Math.LN2 * c), tL / (Math.LN2 * c)];
+  const C = caps.find(c => { const [a, b] = sol(c); return a >= 1e3 && b >= 1e3 && a <= 200e3 && b <= 200e3; }); if (!C) return null;
+  const [RA, RB] = sol(C);
+  return {
+    given: `Design a 555 square-wave generator for f = ${si(f, 'Hz')} and duty cycle ${num(D * 100, 3)}% using C = ${si(C, 'F')}. Decide whether a steering diode is needed, then find \\(R_A\\) and \\(R_B\\).`,
+    ask: [{ l: 'R_A', v: RA, u: 'kΩ' }, { l: 'R_B', v: RB, u: 'kΩ' }],
+    steps: [
+      `\\(T = ${si(T, 's')}\\), \\(t_H = ${si(tH, 's')}\\), \\(t_L = ${si(tL, 's')}\\). ${diode ? 'D ≤ 50%: <b>diode across \\(R_B\\)</b>; \\(t_H = 0.693R_AC\\), \\(t_L = 0.693R_BC\\).' : 'D &gt; 50%: standard circuit.'}`,
+      { t: `\\(R_B = \\dfrac{t_L}{0.693C} = \\dfrac{${num(tL)}}{0.693\\times${num(C)}} = ${si(RB, 'Ω')}\\)`, a: { l: 'R_B', v: RB, u: 'kΩ' } },
+      { t: diode ? `\\(R_A = \\dfrac{t_H}{0.693C} = ${si(RA, 'Ω')}\\)` : `\\(R_A = \\dfrac{t_H}{0.693C} - R_B = ${si(tH / (Math.LN2 * C), 'Ω')} - ${si(RB, 'Ω')} = ${si(RA, 'Ω')}\\)`, a: { l: 'R_A', v: RA, u: 'kΩ' } },
+    ],
+    fig: astFig(diode, { RA: 'RA ?', RB: 'RB ?', C: 'C ' + si(C, 'F') }) };
+} });
+
+flashcards('#cards', [
+  { f: '555 thresholds', b: 'V_CC/3 (trigger comparator) and 2V_CC/3 (threshold comparator).' },
+  { f: 'Monostable pulse width', b: 'T = RC ln3 ≈ 1.1RC' },
+  { f: 'Astable high time', b: 't_H = 0.693(R_A + R_B)C (charging, output high)' },
+  { f: 'Astable low time', b: 't_L = 0.693 R_B C (discharging through R_B into pin 7)' },
+  { f: 'Astable f and D', b: 'f = 1.44/((R_A + 2R_B)C), D = (R_A + R_B)/(R_A + 2R_B) > 50%' },
+  { f: 'D below 50%?', b: 'Diode across R_B (anode at pin 7): t_H = 0.693R_AC, t_L = 0.693R_BC. Or invert a (1 − D) design.' },
+  { f: 'D = 75%', b: 'R_A = 2R_B' },
+  { f: 'Pins', b: '1 GND, 2 TRIG, 3 OUT, 4 RESET, 5 CV (0.01 µF), 6 THR, 7 DIS, 8 VCC' },
+]);
+quiz('#quiz', [
+  { q: '555 monostable with R = 10 kΩ, C = 10 µF: pulse width ≈', opts: ['69 ms', '110 ms', '100 ms', '1.1 s'], a: 1, why: '1.1 × 10⁴ × 10⁻⁵ = 0.11 s.' },
+  { q: 'R_A = R_B = 10 kΩ, C = 10 nF (standard astable). Duty cycle:', opts: ['50%', '66.7%', '75%', '33.3%'], a: 1, why: '(10 + 10)/(10 + 20) = 2/3.' },
+  { q: 'Which design needs a steering diode?', opts: ['D = 75%', 'D = 60%', 'D = 40%', 'D = 90%'], a: 2, why: 'The standard circuit always gives D > 50%.' },
+  { q: 'While the 555 output is high in astable mode, the capacitor', opts: ['discharges through R_B', 'charges through R_A + R_B', 'is held at 0 V', 'charges through R_B only'], a: 1, why: 'Discharge transistor off; charging path V_CC → R_A → R_B → C.' },
+  { q: 'Doubling C in a 555 astable', opts: ['doubles f', 'halves f and keeps D', 'halves D', 'changes nothing'], a: 1, why: 'f ∝ 1/C; D depends only on resistors.' },
+  { q: 'Does the astable frequency depend on V_CC?', opts: ['Yes, f ∝ V_CC', 'No: thresholds are fixed fractions of V_CC', 'Yes, f ∝ 1/V_CC', 'Only below 5 V'], a: 1, why: 'Both thresholds scale with V_CC, so the ln 2 times do not change.' },
+]);
+</script>
+</body>
+</html>

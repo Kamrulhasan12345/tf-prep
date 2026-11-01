@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Active Filters · EEE 263 Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Op-amps · Chapter 7 · Sedra §17.1–17.4 · types O-08, O-09 · low priority</div>
+<h1>Active Filters</h1>
+<p class="lede">Filter analysis and design came in every paper from 2011–12 to 2017–18 (about 180 marks in all) and not once since 2018–19; the class notes only sketch them. Do this chapter after the high-priority ones. Everything reduces to two first-order sections and one rule: replace C by \(1/(sC)\) and use \(H = -Z_f/Z_{in}\).</p>
+
+<h2>1. First-order sections</h2>
+<div class="tbl"><table>
+<tr><th>Filter</th><th>Circuit (inverting)</th><th>\(H(s)\)</th><th>Gain, cutoff</th></tr>
+<tr><td>Low-pass</td><td>\(R_1\) in; \(R_f \parallel C_f\) feedback</td><td>\(-\dfrac{R_f/R_1}{1 + sR_fC_f}\)</td><td>\(|A| = R_f/R_1\), \(f_c = \dfrac{1}{2\pi R_fC_f}\)</td></tr>
+<tr><td>High-pass</td><td>\(C_1\) in series with \(R_1\); \(R_f\) feedback</td><td>\(-\dfrac{R_f}{R_1}\cdot\dfrac{sR_1C_1}{1 + sR_1C_1}\)</td><td>\(|A| = R_f/R_1\), \(f_c = \dfrac{1}{2\pi R_1C_1}\)</td></tr>
+<tr><td>Band-pass (one op-amp)</td><td>\(R_1\)–\(C_1\) in series in; \(R_2 \parallel C_2\) feedback</td><td>\(-\dfrac{sR_2C_1}{(1 + sR_1C_1)(1 + sR_2C_2)}\)</td><td>\(\omega_L = \frac{1}{R_1C_1}\), \(\omega_H = \frac{1}{R_2C_2}\) (needs \(R_1C_1 &gt; R_2C_2\)); mid-band gain \(-R_2/R_1\)</td></tr>
+</table></div>
+<p>A first-order section rolls off at <b>−20 dB/decade = −6 dB/octave</b>: for \(f \gg f_c\), \(|H| \propto 1/f\), so ×10 in f costs 20 dB and ×2 costs \(20\log2 = 6.02\) dB. At \(f_c\): −3 dB and ∓45°.</p>
+<figure><div id="fig-lpf"></div><figcaption><b>Figure 1.</b> First-order inverting low-pass filter: gain \(-R_f/R_1\) below \(f_c = 1/(2\pi R_fC_f)\).</figcaption></figure>
+
+<div class="method"><h4>Method · analyse a filter circuit (O-08)</h4><ol>
+<li>Replace every C by \(1/(sC)\); write \(H = -Z_f/Z_{in}\) (or KCL at each virtual ground for several op-amps).</li>
+<li>Bring \(H(s)\) to a standard form. Type from the limits: \(s \to 0\) and \(s \to \infty\). Order = degree of the denominator.</li>
+<li>\(f_c = \omega_c/2\pi\). To ask "does a signal at f pass?", evaluate \(|H(j2\pi f)|\).</li>
+<li>Check the pole: a pole in the right half-plane means positive feedback (unstable).</li>
+</ol></div>
+<div class="method"><h4>Method · design (O-09)</h4><ol>
+<li>LPF: choose \(C_f\) so that \(R_f = \dfrac{1}{2\pi f_cC_f}\) is between 1 kΩ and 1 MΩ; then \(R_1 = R_f/|A|\).</li>
+<li>HPF: choose \(C_1\), \(R_1 = \dfrac{1}{2\pi f_cC_1}\), \(R_f = |A|R_1\).</li>
+<li>Wide band-pass (\(f_H/f_L \ge 10\)): HPF(\(f_L\)) cascaded with LPF(\(f_H\)); gains multiply.</li>
+<li>Band-stop: LPF(\(f_L\)) and HPF(\(f_H\)) in parallel into a summer; narrow notch: input minus a band-pass.</li>
+<li>−40 dB/dec with one op-amp: unity-gain Sallen–Key, \(R_1 = R_2 = R\), \(C_1\) (feedback) \(= 2C_2\) (to ground), \(R = \dfrac{1}{2\pi f_c\sqrt{C_1C_2}}\) (Butterworth, Q = 0.707).</li>
+<li>State the op-amp requirement: gain–bandwidth ≥ gain × \(f_c\).</li>
+</ol></div>
+<div id="dr-lpf"></div>
+<div id="dr-id"></div>
+
+<div class="trap"><h4>Traps</h4><ul>
+<li>ω vs f: \(\sin(1000\pi t)\) is 500 Hz, not 1000 Hz.</li>
+<li>In a cascade the stages interact: a 20 k–200 kHz HPF+LPF has true −3 dB points of 16.9 kHz and 237 kHz (fine to ignore when \(f_H/f_L \ge 10\), but say so).</li>
+<li>"40 dB" is ambiguous (−40 dB/dec slope, or 40 dB gain): give the one you assume and mention the other.</li>
+<li>Band-pass from one op-amp needs \(R_1C_1 &gt; R_2C_2\), otherwise the corner frequencies are swapped.</li>
+</ul></div>
+
+<h2>Exam questions</h2>
+<div class="exam">
+  <div class="exam-src">2017–18 · Sec B · Q6(b) · 10⅔ marks</div>
+  <div class="exam-q"><p>Design a second-order band-pass filter with \(f_{CL}\) = 20 kHz and \(f_{CH}\) = 200 kHz.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>\(f_H/f_L = 10\): cascade a first-order HPF (20 kHz) and a first-order LPF (200 kHz), unity gain each.</p>
+    <p>HPF: \(C_1\) = 1 nF, \(R_1 = \dfrac{1}{2\pi\times20\text{k}\times1\text{n}} = 7.96\) kΩ, \(R_{f1}\) = 7.96 kΩ. LPF: \(C_2\) = 100 pF, \(R_{f2} = \dfrac{1}{2\pi\times200\text{k}\times100\text{p}} = 7.96\) kΩ, \(R_2\) = 7.96 kΩ. Overall gain +1 (two inversions). (The interaction moves the true −3 dB points to 16.9 kHz and 237 kHz, with mid-band gain 0.909.)</p>
+  </div></details>
+</div>
+<div class="exam">
+  <div class="exam-src">2017–18 · Sec B · Q6(a) · 18 marks &nbsp;|&nbsp; also 2016–17 Sec A Q2(a) (20 marks)</div>
+  <div class="exam-q"><p>For the op-amp circuit with \(R_1\) and \(C_1\) in series at the input and \(R_2 \parallel C_2\) in the feedback path, determine the type of filter by computing the transfer function.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>\(Z_{in} = R_1 + \frac{1}{sC_1} = \frac{1 + sR_1C_1}{sC_1}\), \(Z_f = \frac{R_2}{1 + sR_2C_2}\). \(H = -\frac{Z_f}{Z_{in}} = -\dfrac{sR_2C_1}{(1 + sR_1C_1)(1 + sR_2C_2)}\).</p>
+    <p>\(s \to 0\): \(H \to 0\); \(s \to \infty\): \(H \to 0\); in between (for \(R_1C_1 &gt; R_2C_2\)) \(|H| \approx R_2/R_1\). So it is a <b>band-pass</b> filter, second order, with \(\omega_L = 1/(R_1C_1)\), \(\omega_H = 1/(R_2C_2)\), mid-band gain \(-R_2/R_1\).</p>
+  </div></details>
+</div>
+<div class="exam">
+  <div class="exam-src">2016–17 · Sec A · Q1(a) · 21⅔ marks</div>
+  <div class="exam-q"><p>A non-inverting amplifier (\(R_1\) to ground, \(R_2\) feedback) has its + input fed from \(V_{in}\) through \(R_{in}\), with \(C_{in}\) from the + input to ground and a capacitor C from the + input to the output. Find the differential equation the circuit solves (i) without C and (ii) with C. For what C does it become a plain non-inverting amplifier?</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>Let \(A = 1 + R_2/R_1\), so \(v_+ = V_{out}/A\). KCL at the + node: \(\frac{V_{in} - v_+}{R_{in}} = C_{in}\dot v_+ + C(\dot v_+ - \dot V_{out})\).</p>
+    <p>(i) C = 0: \(A\,V_{in} = V_{out} + R_{in}C_{in}\,\dot V_{out}\) (first-order low-pass, DC gain A).</p>
+    <p>(ii) \(A\,V_{in} = V_{out} + R_{in}[C_{in} + C(1 - A)]\,\dot V_{out}\). The derivative term vanishes when \(C = \dfrac{C_{in}}{A - 1} = C_{in}\dfrac{R_1}{R_2}\), leaving \(V_{out} = A\,V_{in}\).</p>
+  </div></details>
+</div>
+<div class="exam">
+  <div class="exam-src">2015–16 · Sec B · Q8(a) · 23⅔ marks</div>
+  <div class="exam-q"><p>Op-amp 1 is an inverting summer: \(V_{in}\) enters through a capacitor C and a 2R resistor in series, and the output \(v_o\) is fed back through 5R; its output drives op-amp 2, an inverting integrator (R in, 2C feedback) whose output is \(v_o\). (i) Find H(s), the type, order and cutoff. (ii) With R = 10 kΩ and C = 0.1 µF, can a 100 Hz signal pass without distortion?</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>KCL at op-amp 1's virtual ground with op-amp 2 giving \(x = -2sRC\,v_o\): it reduces to \(sC\,V_{in} - sC\,v_o + v_o/(5R) = 0\), so \(H(s) = \dfrac{s}{s - 1/(5RC)}\).</p>
+    <p>First order, high-pass form, \(|\text{pole}| = 1/(5RC) = 200\) rad/s, \(f_c = 1/(10\pi RC) = 31.8\) Hz. (ii) At 100 Hz, \(|H| = \frac{628}{\sqrt{628^2 + 200^2}} = 0.95\): it would pass. But the pole is in the right half-plane (two inversions and the 5R path give positive feedback), so as drawn the circuit is unstable and saturates; state both the intended high-pass answer and this remark.</p>
+  </div></details>
+</div>
+<div class="exam">
+  <div class="exam-src">2015–16 · Sec B · Q8(b) · 23 marks</div>
+  <div class="exam-q"><p>\(v_{in} = 5 + 3\cos(300\pi t - 30°) + 8\sin(1000\pi t) + 7\sin(1600\pi t + 45°)\). Design Filter 1 and Filter 2 (in parallel) and a summing amplifier to obtain \(V_{out} = 7 + 12\sin(1000\pi t)\).</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>Components at 0, 150, 500 and 800 Hz. Keep DC (×1.4) and 500 Hz (×1.5).</p>
+    <p>Filter 1: inverting LPF, gain 1.4, \(f_c\) ≈ 11 Hz (far below 150 Hz): \(R_i\) = 10 kΩ, \(R_f\) = 14 kΩ ∥ \(C_f\) = 1 µF (\(f_c\) = 11.4 Hz). Filter 2: inverting band-pass at 500 Hz, gain 1.5, e.g. multiple-feedback with C = 0.1 µF, Q = 5: \(R_3\) = 31.8 kΩ, \(R_1\) = 10.6 kΩ, \(R_2\) = 328 Ω. Summer: inverting, unity (all 10 kΩ), so the two inversions cancel. Remark: 800 Hz is less than an octave from 500 Hz, so a Q = 5 band-pass still leaks some of it; a higher Q or a second stage improves rejection.</p>
+  </div></details>
+</div>
+<div class="exam">
+  <div class="exam-src">2014–15 · Sec B · Q7(a) · 20 marks</div>
+  <div class="exam-q"><p>Write the magnitude response of a −20 dB/decade low-pass filter. Why is it called −20 dB/decade? Can it also be called −6 dB/octave?</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>\(|H(f)| = \dfrac{A_0}{\sqrt{1 + (f/f_c)^2}}\); in dB, \(20\log A_0 - 10\log(1 + (f/f_c)^2)\). For \(f \gg f_c\), \(|H| \approx A_0f_c/f\): ten times the frequency gives one tenth the gain, −20 dB. Doubling f gives \(-20\log2 = -6.02\) dB, so yes, −6 dB/octave. At \(f_c\): −3 dB, phase −45°.</p>
+  </div></details>
+</div>
+<div class="exam">
+  <div class="exam-src">2014–15 · Sec B · Q7(b) · 20 marks</div>
+  <div class="exam-q"><p>Design a notch filter that eliminates 8–12 kHz. Give all values.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>Notch = input − band-pass. Band-pass (multiple feedback, \(A_0 = -1\)): \(f_0 = \sqrt{8\times12} = 9.80\) kHz, BW = 4 kHz, \(C_1 = C_2\) = 1 nF: \(R_3 = \frac{1}{\pi\,BW\,C} = 79.6\) kΩ, \(R_1 = R_3/(2|A_0|) = 39.8\) kΩ, \(\frac{1}{R_2} = 4\pi^2f_0^2C^2R_3 - \frac{1}{R_1}\) → \(R_2\) = 3.62 kΩ. Then an inverting summer adds \(v_{in}\) and the band-pass output (all 10 kΩ): zero at 9.80 kHz, −3 dB at 8 and 12 kHz. (Alternative: LPF at 8 kHz in parallel with HPF at 12 kHz, summed.)</p>
+  </div></details>
+</div>
+<div class="exam">
+  <div class="exam-src">2013–14 · Sec B · Q7(b) · 15 marks</div>
+  <div class="exam-q"><p>Design a "40 dB" low-pass filter with \(f_c\) = 1 kHz using only one op-amp.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>Reading −40 dB/decade: unity-gain Sallen–Key Butterworth, \(C_2\) = 10 nF (to ground), \(C_1\) = 20 nF (feedback), \(R = \frac{1}{2\pi\cdot1000\sqrt{20\text{n}\times10\text{n}}} = 11.25\) kΩ for both resistors. Reading 40 dB gain: first-order inverting LPF with \(C_f\) = 10 nF, \(R_f\) = 15.9 kΩ, \(R_1\) = 159 Ω (|A| = 100).</p>
+  </div></details>
+</div>
+<div class="exam">
+  <div class="exam-src">2013–14 · Sec B · Q6(b) · 15 marks</div>
+  <div class="exam-q"><p>A system blocks 20 Hz and 20 kHz but passes 10 kHz. Draw its frequency response and its block diagram.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a"><p>A band-pass with 20 Hz &lt; \(f_L\) &lt; 10 kHz and 10 kHz &lt; \(f_H\) &lt; 20 kHz: block diagram HPF(\(f_L\)) → LPF(\(f_H\)); response flat around 10 kHz, −3 dB at \(f_L\) and \(f_H\), −20 dB/dec per order outside.</p></div></details>
+</div>
+<div class="exam">
+  <div class="exam-src">2011–12 · Sec A · Q2(a) · 16 marks</div>
+  <div class="exam-q"><p>Draw a −20 dB/dec low-pass filter and write its design procedure. Design one with a cutoff of 100 kHz.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a"><p>Figure 1. Procedure: choose \(C_f\); \(R_f = 1/(2\pi f_cC_f)\); \(R_1 = R_f/|A|\). With \(C_f\) = 100 pF: \(R_f = \frac{1}{2\pi\times10^5\times10^{-10}} = 15.9\) kΩ; unity gain → \(R_1\) = 15.9 kΩ. The op-amp needs GBW ≥ 100 kHz × gain.</p></div></details>
+</div>
+
+<h2>Practice</h2>
+<h3>Quick check</h3><div id="quiz"></div>
+<div class="key"><p><strong>Summary:</strong> LPF: \(R_f\parallel C_f\) feedback, \(f_c = 1/(2\pi R_fC_f)\); HPF: series \(C_1R_1\) input, \(f_c = 1/(2\pi R_1C_1)\); gain \(R_f/R_1\); band-pass = HPF + LPF; −20 dB/dec = −6 dB/oct; analyse with \(H = -Z_f/Z_{in}\) and read the type from the limits.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/eee.js"></script>
+<script>
+const lpf = (R1 = 'R₁', Rf = 'R_f', Cf = 'C_f') => sch([
+  ['AC', [30, 90], [30, 150], 'vᵢ'], ['gnd', [30, 150]], ['W', [30, 90], [30, 74], [50, 74]], ['R', [50, 74], [120, 74], R1], ['W', [120, 74], [140, 74]], ['dot', [130, 74]],
+  ['opamp', [140, 90]], ['W', [140, 106], [130, 106], [130, 116]], ['gnd', [130, 116]],
+  ['W', [130, 74], [130, 40]], ['R', [130, 40], [230, 40], Rf], ['W', [230, 40], [240, 40], [240, 90]], ['W', [130, 40], [130, 0]], ['C', [130, 0], [240, 0], Cf], ['W', [240, 0], [240, 40]],
+  ['W', [220, 90], [260, 90]], ['dot', [240, 90]], ['open', [260, 90], 'vₒ'],
+], { w: 300, h: 170, pad: 60 });
+$('#fig-lpf').innerHTML = lpf('R₁ 10 kΩ', 'R_f 15.9 kΩ', 'C_f 10 nF');
+
+drill('#dr-lpf', { id: 'o09-lpf-design', title: 'Design a first-order low-pass filter', gen(r) {
+  const fc = r.pick([100, 200, 500]) * r.pick([1, 10, 100]), A = r.pick([1, 2, 5, 10, 20, 100]);
+  const C = [1e-9, 10e-9, 100e-9, 1e-6].find(c => { const R = 1 / (2 * Math.PI * fc * c); return R <= 1e6 && R >= 1e3; });
+  if (!C) return null;
+  const Rf = 1 / (2 * Math.PI * fc * C), R1 = Rf / A; if (R1 < 100) return null;
+  return {
+    given: `Design an inverting first-order low-pass filter with a passband gain of magnitude ${A} and \\(f_c\\) = ${si(fc, 'Hz')}. Use \\(C_f\\) = ${si(C, 'F')}. Find \\(R_f\\) and \\(R_1\\).`,
+    ask: [{ l: 'R_f', v: Rf, u: 'kΩ' }, { l: 'R_1', v: R1, u: 'kΩ' }],
+    steps: [
+      { t: `\\(R_f = \\dfrac{1}{2\\pi f_cC_f} = \\dfrac{1}{2\\pi\\times${num(fc)}\\times${si(C, 'F')}} = ${si(Rf, 'Ω')}\\)`, a: { l: 'R_f', v: Rf, u: 'kΩ' } },
+      { t: `\\(R_1 = R_f/|A| = ${si(Rf, 'Ω')}/${A} = ${si(R1, 'Ω')}\\)`, a: { l: 'R_1', v: R1, u: 'kΩ' } },
+    ] };
+} });
+drill('#dr-id', { id: 'o08-bandpass', title: 'One-op-amp band-pass: corners and mid-band gain', gen(r) {
+  const R1 = r.E(1e3, 22e3), C1 = r.pick([0.1e-6, 1e-6, 10e-9]), R2 = r.E(2.2e3, 100e3), C2 = r.pick([100e-12, 1e-9, 10e-9]);
+  const fL = 1 / (2 * Math.PI * R1 * C1), fH = 1 / (2 * Math.PI * R2 * C2); if (fH < 10 * fL) return null;
+  return {
+    given: `An inverting op-amp stage has \\(R_1\\) = ${si(R1, 'Ω')} in series with \\(C_1\\) = ${si(C1, 'F')} at the input and \\(R_2\\) = ${si(R2, 'Ω')} in parallel with \\(C_2\\) = ${si(C2, 'F')} in the feedback. Find \\(f_L\\), \\(f_H\\) and the mid-band gain magnitude.`,
+    ask: [{ l: 'f_L', v: fL, u: 'Hz' }, { l: 'f_H', v: fH, u: 'kHz' }, { l: '|A_M|', v: R2 / R1, u: 'V/V' }],
+    steps: [
+      `\\(H(s) = -\\dfrac{sR_2C_1}{(1 + sR_1C_1)(1 + sR_2C_2)}\\): a band-pass.`,
+      { t: `\\(f_L = \\dfrac{1}{2\\pi R_1C_1} = ${si(fL, 'Hz')}\\)`, a: { l: 'f_L', v: fL, u: 'Hz' } },
+      { t: `\\(f_H = \\dfrac{1}{2\\pi R_2C_2} = ${si(fH, 'Hz')}\\)`, a: { l: 'f_H', v: fH, u: 'kHz' } },
+      { t: `Mid-band (C₁ short, C₂ open): \\(|A_M| = R_2/R_1 = ${num(R2 / R1)}\\)`, a: { l: '|A_M|', v: R2 / R1, u: 'V/V' } },
+    ] };
+} });
+quiz('#quiz', [
+  { q: 'Inverting LPF, R_f = 10 kΩ, C_f = 10 nF. f_c ≈', opts: ['1.59 kHz', '10 kHz', '159 Hz', '15.9 kHz'], a: 0, why: '1/(2π × 10k × 10n) = 1.59 kHz.' },
+  { q: 'A first-order filter falls by how much per octave?', opts: ['3 dB', '6 dB', '20 dB', '40 dB'], a: 1, why: '20 log 2 ≈ 6 dB.' },
+  { q: 'H(s) → 0 as s → 0 and → constant as s → ∞. The filter is', opts: ['low-pass', 'high-pass', 'band-pass', 'all-pass'], a: 1, why: 'It blocks DC and passes high frequencies.' },
+  { q: 'sin(2000πt) has frequency', opts: ['2000 Hz', '1000 Hz', '318 Hz', '6283 Hz'], a: 1, why: 'ω = 2000π rad/s, f = ω/2π = 1000 Hz.' },
+]);
+</script>
+</body>
+</html>

@@ -1,0 +1,324 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Integrator and Differentiator · EEE 263 Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Op-amps · Chapter 3 · Sedra §2.5 · Khairul s.17–18 · Sadat L22 notes p.104 · type O-06 (+ the summing integrator of O-05)</div>
+<h1>The Integrator and the Differentiator</h1>
+<p class="lede">"Here are the input and output waveforms: design the circuit" is a near-annual op-amp question: 2014–15, 2015–16, 2016–17, 2017–18, 2018–19, 2019–20 (12 to 17 marks each), plus a summing integrator in 2020–21 (20 marks). The maths is one slope and one RC product. This chapter also covers the trap behind two wrong answers in the question bank: an uncharged integrator fed with a sine gives a cosine <i>plus a DC offset</i>.</p>
+
+<h2>1. The Miller integrator</h2>
+<figure><div class="figrow"><div id="fig-int"></div><div id="fig-dif"></div></div><figcaption><b>Figure 1.</b> Inverting integrator (first: R in, C in feedback) and differentiator (second: C in, R in feedback).</figcaption></figure>
+<p><b>Derivation.</b> Virtual ground at \(v_-\), so the input current is \(i = v_I/R\). It cannot enter the op-amp, so it charges \(C\). The capacitor voltage (left plate minus right plate) is \(v_C = 0 - v_O\), and \(i = C\,dv_C/dt\):</p>
+<div class="formula">\[ \frac{v_I}{R} = C\frac{d(-v_O)}{dt} \;\Rightarrow\; v_O(t) = -\frac{1}{RC}\int_0^t v_I(\tau)\,d\tau + v_O(0) \]</div>
+<dl class="def">
+  <dt>\(RC\)</dt><dd>Integrator time constant. A DC input \(V\) makes a ramp of slope \(-V/RC\).</dd>
+  <dt>\(v_O(0)\)</dt><dd>Initial output \(= -V_C(0)\). A reset switch across \(C\) opened at \(t = 0\) means \(v_O(0) = 0\) (uncharged). It is part of the answer: always state it.</dd>
+  <dt>Frequency domain</dt><dd>\(V_o/V_i = -1/(sRC)\): \(|H| = 1/(\omega RC)\), phase \(+90°\) (inversion −180°, integration −90°). Unity gain at \(\omega = 1/RC\).</dd>
+</dl>
+<p><b>Standard inputs.</b></p>
+<ul>
+<li><b>DC \(V\):</b> ramp \(v_O = v_O(0) - Vt/RC\) until it hits the rail \(\mp L\), then it stays there (2014–15 uses this on purpose).</li>
+<li><b>Square wave \(\pm V\), half-period \(t_h\):</b> straight segments of slope \(\mp V/RC\), so a triangle of peak-to-peak \(V t_h/RC\). If the switch opens in the middle of a half-cycle (first segment \(t_h/2\) long), the triangle is centred on 0 V.</li>
+<li><b>Pulse then zero:</b> ramp during the pulse, then the output <b>holds</b> (no current, capacitor keeps its charge).</li>
+</ul>
+<div class="method"><h4>Method · integrator output for a piecewise-constant input</h4><ol>
+<li>Start at \(v_O(0)\) (0 after a reset).</li>
+<li>For each interval of constant input \(V_k\) and length \(\Delta t_k\): \(\Delta v_O = -V_k\Delta t_k/RC\). Keep \(\Delta t\) in ms and \(RC\) in ms.</li>
+<li>Add up the vertices; join them with straight lines; clip at \(\pm L\).</li>
+<li>Design version: \(RC = |V|\,t_h/V_{pp}\) for a required peak-to-peak; pick \(R\) (or \(C\)), compute the other.</li>
+</ol></div>
+<h3>Worked example: 2017–18 Sec B Q5(b)</h3>
+<div id="wk-sq"></div>
+<div id="dr-sq"></div>
+<div id="dr-ramp"></div>
+
+<h2>2. A sine into an integrator: the DC term (the bank's two mistakes)</h2>
+<p>Feed \(v_I = V_p\sin\omega t\) into an integrator whose capacitor is uncharged at \(t = 0\):</p>
+<div class="formula">\[ v_O = -\frac{1}{RC}\int_0^t V_p\sin\omega\tau\,d\tau = -\frac{V_p}{\omega RC}\Big[1 - \cos\omega t\Big] = \underbrace{\frac{V_p}{\omega RC}\cos\omega t}_{\text{wanted}}\;\underbrace{-\;\frac{V_p}{\omega RC}}_{\text{DC offset}} \]</div>
+<p>The output is the expected cosine (amplitude \(V_p/\omega RC\), leading the input by 90°) <b>shifted down by its own amplitude</b>: it swings between 0 and \(-2V_p/\omega RC\). The phasor result \(-1/(j\omega RC)\) is the steady state with the "right" initial charge only. An ideal integrator never forgets the offset.</p>
+<p>The question bank's answers to 2023–24 Q5(b) and 2021–22 Q1(a) both made a cosine this way and so are off by a constant (+4 V and +0.5 V). Fixes, in order of preference:</p>
+<ol>
+<li><b>Use a differentiator</b> to make the cosine: \(-RC\dfrac{d}{dt}V_p\sin\omega t = -\omega RC\,V_p\cos\omega t\). No constant appears.</li>
+<li>Pre-charge the integrator capacitor so that \(v_O(0) = +V_p/\omega RC\) (state it explicitly).</li>
+<li>Practical integrator (resistor \(R_f\) across \(C\)): the offset decays with time constant \(R_fC\), but the gain and phase are then no longer exactly \(1/\omega RC\) and 90°.</li>
+</ol>
+<figure><div id="fig-sine"></div><figcaption><b>Figure 2.</b> \(R\) = 10 kΩ, \(C\) = 1 µF, \(v_I = \sin 100t\): \(1/(\omega RC) = 1\), so \(v_O = \cos100t - 1\) (accent) instead of \(\cos100t\) (dashed). Open the simulator: the output swings from 0 to −2 V.</figcaption></figure>
+<div id="wk-sine"></div>
+
+<h2>3. The differentiator</h2>
+<p><b>Derivation.</b> Virtual ground: the capacitor voltage is \(v_I\), so \(i = C\,dv_I/dt\); it flows through \(R\): \(0 - v_O = iR\):</p>
+<div class="formula">\[ v_O(t) = -RC\,\frac{dv_I}{dt}, \qquad \frac{V_o}{V_i} = -sRC,\;\; |H| = \omega RC \]</div>
+<ul>
+<li><b>Triangle in → square out:</b> each straight segment of slope \(S\) gives a constant \(-RC\,S\).</li>
+<li><b>Ramp in → step out</b>, constant in → zero out.</li>
+<li><b>Sine in:</b> \(V_p\sin\omega t \to -\omega RC\,V_p\cos\omega t\), amplitude \(\omega RCV_p\), no DC term.</li>
+</ul>
+<p><b>Practical versions.</b> The ideal differentiator's gain grows with frequency, so it amplifies noise (and tends to ring). Add a small resistor \(R_s\) in series with \(C\): gain levels off at \(-R/R_s\) above \(\omega = 1/(R_sC)\). The ideal integrator has infinite DC gain, so any offset voltage or bias current ramps it into saturation. Add \(R_f\) across \(C\): DC gain becomes \(-R_f/R\), and it integrates only above \(\omega = 1/(R_fC)\). Khairul s.17–18 also asks "can you build them with an inductor?": \(L\) at the input and \(R\) in feedback gives \(v_O = -\dfrac{R}{L}\int v_I\,dt\); \(R\) at the input and \(L\) in feedback gives \(v_O = -\dfrac{L}{R}\dfrac{dv_I}{dt}\).</p>
+
+<h2>4. Design from waveforms (type O-06)</h2>
+<div class="method"><h4>Method · given v<sub>in</sub> and v<sub>out</sub>, design the circuit</h4><ol>
+<li>Write both waveforms piece by piece (slopes in V/ms).</li>
+<li><b>Output constant where input is a ramp</b> → differentiator: \(K = v_{out}/(dv_{in}/dt)\). <b>Output a ramp where input is constant</b> → integrator: \(1/RC = |dv_{out}/dt|/|v_{in}|\).</li>
+<li><b>Sign.</b> The basic circuits invert. If \(K\) (or the integration sign) comes out positive, add a unity inverter (10 kΩ/10 kΩ) before or after, or use the opposite rail as the input.</li>
+<li><b>Two inputs</b> (2016–17): fit \(v_{out} = K_1\,dv_1/dt + K_2v_2\) from two intervals, check on a third, then build with a summer.</li>
+<li>Pick \(C\) (0.01 to 10 µF), compute \(R\) (keep it between 1 kΩ and a few MΩ). Check the peak output against the rails.</li>
+</ol></div>
+<h3>Worked example: 2015–16 Sec B Q5(c), triangle to square</h3>
+<div id="wk-dif"></div>
+<div id="dr-dif"></div>
+<div id="dr-sine"></div>
+
+<h2>5. Summing integrator</h2>
+<p>Several inputs \(v_k\) through \(R_k\) into the virtual ground, \(C\) in feedback. The currents add before they charge \(C\):</p>
+<div class="formula">\[ v_O = -\frac{1}{C}\int_0^t\left(\frac{v_1}{R_1} + \frac{v_2}{R_2}\right)d\tau + v_O(0) \;\xrightarrow{R_1 = R_2 = R}\; -\frac{1}{RC}\int_0^t (v_1 + v_2)\,d\tau \]</div>
+<p>This is how one op-amp produces a weighted sum of integrals; it is used again in <a href="04-expression-synthesis.html">expression synthesis</a> and in the analog computer.</p>
+
+<div class="trap"><h4>Traps (where marks go)</h4><ul>
+<li>A sine through an uncharged integrator gives \((V_p/\omega RC)(\cos\omega t - 1)\), not a pure cosine. Use a differentiator, or state the pre-charge.</li>
+<li>Units: slopes in V/ms with \(RC\) in ms, or V/s with \(RC\) in s; never mix.</li>
+<li>Forgetting the inversion: both basic circuits have a minus sign. Check the sign on the first segment.</li>
+<li>Half-length first segment (2017–18): the first ramp is only 1 ms, so the triangle is centred on 0, between −5 and +5 V.</li>
+<li>After a pulse ends the integrator holds its last value (2019–20); it does not return to 0.</li>
+<li>A ramp stops at the rail; the time to saturate is \(L\,RC/|V|\).</li>
+</ul></div>
+
+<h2>Exam questions</h2>
+
+<div class="exam">
+  <div class="exam-src">2020–21 · Sec B · Q7(a) · 20 marks · type O-05</div>
+  <div class="exam-q"><p>Design a circuit using ideal op-amps that would implement \(v_o \propto \int(v_1 + v_2)\,dt\). Write the final output expression in terms of the circuit components used in your design.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><b>Circuit:</b> summing integrator: \(v_1\) through \(R_1\) and \(v_2\) through \(R_2\) into the inverting input; \(C\) from the inverting input to the output; \(+\) grounded.</p>
+    <div id="fig-q2021"></div>
+    <p><b>Derivation:</b> virtual ground, so \(i_1 = v_1/R_1\), \(i_2 = v_2/R_2\); no current enters the op-amp, so \(i_C = i_1 + i_2\). With \(v_C = 0 - v_o\): \(C\dfrac{d(-v_o)}{dt} = \dfrac{v_1}{R_1} + \dfrac{v_2}{R_2}\).</p>
+    <p>\[ v_o(t) = -\frac{1}{C}\int_0^t\left(\frac{v_1}{R_1} + \frac{v_2}{R_2}\right)d\tau + v_o(0). \]</p>
+    <p>For a true \(\int(v_1 + v_2)\), make \(R_1 = R_2 = R\): \(v_o = -\dfrac{1}{RC}\int_0^t (v_1 + v_2)\,d\tau\) (with a reset, \(v_o(0) = 0\)). E.g. \(R\) = 100 kΩ, \(C\) = 1 µF gives \(-10\int(v_1 + v_2)dt\). If a positive constant is wanted, follow with a unity inverter: \(v_o = +\dfrac{1}{RC}\int(v_1 + v_2)dt\). In practice add a large resistor across \(C\) to stop offset drift.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2019–20 (January 2021 paper) · Sec B · Q5(a) · 17 marks</div>
+  <div class="exam-q"><p>The input \(v_I\) is a 1 V pulse from \(t\) = 0 to 1 ms and 0 afterwards. The output \(v_O\) ramps linearly from 0 down to −10 V at \(t\) = 1 ms and then stays at −10 V. Design the circuit.</p><div id="fig-w2021"></div></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>Constant input → ramp output: an integrator. The output goes negative for positive input, so the inverting integrator needs no extra inverter. After the pulse the input is 0 and the output holds at −10 V: exactly what an integrator does.</p>
+    <p>Slope: \(\dfrac{dv_O}{dt} = \dfrac{-10\text{ V}}{1\text{ ms}} = -10^4\) V/s \(= -\dfrac{v_I}{RC} = -\dfrac{1}{RC}\), so \(RC = 10^{-4}\) s = 0.1 ms.</p>
+    <p>Choose \(R\) = 10 kΩ, \(C\) = 10 nF (or 100 kΩ, 1 nF). Reset switch across \(C\) so that \(v_O(0) = 0\). Supplies must exceed 10 V (e.g. ±15 V).</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2018–19 · Sec B · Q6(a) · 16 marks</div>
+  <div class="exam-q"><p>Design a circuit using op-amp(s) for the given input \(v_i(t)\) and output \(v_o(t)\): \(v_i\) rises linearly from 0 at \(t\) = 0 to 10 V at 1 ms, then stays at 10 V. \(v_o\) = +1 V for 0 &lt; t &lt; 1 ms, then 0. (The output level is hand-written on the paper; it reads as +1 V.)</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>Ramp input → constant output; constant input → zero: a differentiator, \(v_o = K\,dv_i/dt\).</p>
+    <p>Slope \(= 10\text{ V}/1\text{ ms} = 10^4\) V/s. \(K = \dfrac{1}{10^4} = 10^{-4}\) s, and \(K\) is positive.</p>
+    <p>The inverting differentiator gives \(-RC\,dv_i/dt\), so use \(RC = 10^{-4}\) s (\(C\) = 0.1 µF in series at the input, \(R\) = 1 kΩ in feedback) giving \(-1\) V, followed by a unity inverter (10 kΩ/10 kΩ) giving +1 V. (Equivalent: invert \(v_i\) first, then differentiate.) If the hand-written level is a different value \(V\), only \(R\) changes: \(R = V/(10^4 C)\).</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2017–18 · Sec B · Q5(b) · 16 marks</div>
+  <div class="exam-q"><p>Inverting integrator (\(R\) from \(v_{in}\) to \(v_-\), \(C\) from \(v_-\) to \(v_o\), switch across \(C\) opened at \(t\) = 0), ±15 V. Input: +5 V for 0–1 ms, −5 V for 1–3 ms, +5 V for 3–5 ms, −5 V for 5–7 ms, +5 V after 7 ms. (i) If \(R\) = 10 kΩ and \(C\) = 0.1 µF, sketch \(v_o\) to scale. (ii) If \(R\) = 10 kΩ, what \(C\) gives a 2 V peak-to-peak output?</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>(i) \(RC = 10\text{ k}\Omega\times0.1\text{ µF} = 1\) ms. Slope \(= \mp5\text{ V}/1\text{ ms} = \mp5\) V/ms. Switch opens at 0, so \(v_o(0) = 0\).</p>
+    <p>0–1 ms: \(\Delta v_o = -5\times1/1 = -5\) V → −5 V. 1–3 ms: \(+5\times2/1 = +10\) V → +5 V. 3–5 ms: → −5 V. 5–7 ms: → +5 V. A triangle between −5 V and +5 V (10 V p-p, period 4 ms), starting at 0 and going down first; within ±15 V.</p>
+    <div id="fig-q1718"></div>
+    <p>(ii) In each full half-cycle (2 ms) \(\Delta v_o = 5\times2/RC\). Set it to 2 V: \(RC = 5\) ms, \(C = 5\text{ ms}/10\text{ k}\Omega = 0.5\) µF. The output is then a triangle between −1 V and +1 V (first ramp to −1 V at 1 ms).</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2016–17 · Sec A · Q2(c) · 15 marks</div>
+  <div class="exam-q"><p>Determine an op-amp circuit realisation for the given waveforms. \(V_1\): triangle, −4 V at \(t\) = 0, +4 V at 4 ms, −4 V at 8 ms, +4 V at 12 ms. \(V_2\): 0 for 0–1 ms, −5 V for 1–3 ms, 0 for 3–5 ms, +5 V for 5–7 ms, 0 for 7–9 ms, −5 V for 9–11 ms. \(V_{out}\): +10 (0–1), +4 (1–3), +10 (3–4), −10 (4–5), −4 (5–7), −10 (7–8), +10 (8–9), +4 (9–11), +10 V (11–12 ms).</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>\(V_{out}\) is constant where \(V_1\) is a straight line and changes sign with \(V_1\)'s slope: try \(V_{out} = K_1\dfrac{dV_1}{dt} + K_2V_2\).</p>
+    <p>\(dV_1/dt = \pm8\text{ V}/4\text{ ms} = \pm2\) V/ms \(= \pm2000\) V/s.</p>
+    <p>0–1 ms (\(V_2 = 0\)): \(10 = K_1\times2000 \Rightarrow K_1 = 5\) ms.</p>
+    <p>1–3 ms: \(4 = 10 + K_2(-5) \Rightarrow K_2 = 1.2\). Check 5–7 ms: \(-10 + 1.2\times5 = -4\) ✓; 9–11 ms: \(10 - 6 = 4\) ✓.</p>
+    <p>\[ V_{out} = (5\text{ ms})\frac{dV_1}{dt} + 1.2\,V_2 \]</p>
+    <p><b>Circuit (2 op-amps):</b> an inverting summer that produces \(-V_{out}\), followed by a unity inverter. The summer (feedback \(R_f\) = 12 kΩ) has two branches: \(V_1\) through a capacitor \(C\) with \(R_fC = 5\) ms (\(C\) = 0.417 µF; or \(R_f\) = 50 kΩ with \(C\) = 0.1 µF and a matching \(V_2\) resistor), and \(V_2\) through \(R_2 = R_f/1.2\) = 10 kΩ. Summer output: \(-5\text{ ms}\cdot dV_1/dt - 1.2V_2\); after the inverter: \(V_{out}\). (With the 50 kΩ choice: \(R_2 = 50/1.2 = 41.7\) kΩ.)</p>
+    <p>Alternative reading on the paper: \(10\,\text{sgn}(dV_1/dt)\) from a comparator on the slope; the differentiator form above gives the same waveform and is the intended linear answer.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2015–16 · Sec B · Q5(c) · 12 marks</div>
+  <div class="exam-q"><p>Input \(V_{in}\): triangle 0 → 4 V, peaks at 2 ms and 6 ms, zero at 0, 4, 8 ms. Output \(V_{out}\): +2 V for 0–2 ms, −2 V for 2–4 ms, repeating (period 4 ms). Design the circuit using op-amps.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>Piecewise-linear in, piecewise-constant out: differentiator. Slope \(= \pm4\text{ V}/2\text{ ms} = \pm2000\) V/s. \(V_{out} = +2\) V when the slope is positive, so \(K = +\dfrac{2}{2000} = +10^{-3}\) s.</p>
+    <p>Inverting differentiator with \(RC = 1\) ms (\(C\) = 0.1 µF, \(R\) = 10 kΩ) gives \(-10^{-3}\,dV_{in}/dt = \mp2\) V; follow it with a unity inverter (10 kΩ/10 kΩ) to get \(\pm2\) V in the right phase. Or put the inverter first (\(-V_{in}\)) and then the differentiator.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2014–15 · Sec B · Q5(c) · 15 marks</div>
+  <div class="exam-q"><p>Design a circuit using op-amps that gives the output waveform from a 1 V DC input: \(v_o\) rises linearly from 0 at \(t\) = 0 to +15 V at \(t\) = 5 s and stays at 15 V. Specify all R and C values. Use ±15 V for DC biasing.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>DC in → ramp out: integrator. Required slope \(= 15/5 = 3\) V/s, positive.</p>
+    <p><b>Design A (two op-amps):</b> integrator on the 1 V input: slope \(-1/RC = -3\) V/s, so \(RC = 1/3\) s: \(C\) = 1 µF, \(R\) = 333.3 kΩ. Output \(-3t\). Unity inverter (10 kΩ/10 kΩ): \(+3t\). At \(t\) = 5 s the integrator reaches −15 V (the rail) and stops, so \(v_o\) stays at +15 V, which is exactly the flat part of the waveform.</p>
+    <p><b>Design B (one op-amp):</b> feed the integrator from the −15 V rail instead: slope \(= +15/RC = 3 \Rightarrow RC = 5\) s (\(C\) = 1 µF, \(R\) = 5 MΩ); the output saturates at +15 V at \(t\) = 5 s. Both need a reset switch across \(C\) so that \(v_o(0) = 0\).</p>
+  </div></details>
+</div>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+
+<div class="key"><p><strong>Summary:</strong> integrator \(v_O = -\frac{1}{RC}\int_0^t v_I\,d\tau + v_O(0)\): DC → ramp of slope \(-V/RC\) to the rail, square → triangle of p-p \(Vt_h/RC\), sine → \((V_p/\omega RC)(\cos\omega t - 1)\) when uncharged. Differentiator \(v_O = -RC\,dv_I/dt\): triangle → square, sine → \(-\omega RCV_p\cos\omega t\) with no DC term. From waveforms: find the slope, take the ratio, fix the sign with an inverter, pick \(C\), compute \(R\).</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/eee.js"></script>
+<script>
+const k = v => si(v * 1e3, 'Ω');
+// single-input inverting stage at op-amp (160,96): kin/kf = 'R' | 'C' (input and feedback element), src = V label or {ac}
+const stageItems = (src, kin, lin, kf, lf, ac) => [
+  ac ? ['AC', [40, 80], [40, 140], src, -1, ac] : ['V', [40, 80], [40, 140], src, -1], ['gnd', [40, 140]], [kin, [40, 80], [130, 80], lin], ['W', [130, 80], [160, 80]], ['dot', [140, 80]],
+  ['W', [140, 80], [140, 30]], [kf, [140, 30], [260, 30], lf], ['W', [260, 30], [260, 96]], ['W', [240, 96], [290, 96]], ['dot', [260, 96]],
+  ['open', [290, 96], 'vₒ'], ['W', [160, 112], [140, 112], [140, 140]], ['gnd', [140, 140]], ['opamp', [160, 96]]];
+// waveform plot: series [{pts, cls, dash}], T (ms), v range, ticks
+function wave(series, { T, vmin, vmax, w = 440, h = 150, tt = [], vt = [], tl = 't (ms)' }) {
+  const X = t => 40 + t / T * (w - 60), Y = v => 10 + (vmax - v) / (vmax - vmin) * (h - 30), o = [];
+  o.push(`<line x1="${X(0)}" y1="${Y(0)}" x2="${X(T)}" y2="${Y(0)}" style="stroke:var(--muted)"/><line x1="${X(0)}" y1="${Y(vmax)}" x2="${X(0)}" y2="${Y(vmin)}" style="stroke:var(--muted)"/>`);
+  tt.forEach(t => o.push(`<text x="${X(t)}" y="${Y(0) + 13}" text-anchor="middle" class="lbl">${t}</text>`));
+  vt.forEach(v => o.push(`<line x1="${X(0) - 3}" y1="${Y(v)}" x2="${X(T)}" y2="${Y(v)}" style="stroke:var(--muted);stroke-dasharray:2 4;opacity:.5"/><text x="${X(0) - 6}" y="${Y(v) + 4}" text-anchor="end" class="lbl">${v}</text>`));
+  o.push(`<text x="${X(T)}" y="${Y(0) - 5}" text-anchor="end" class="lbl">${tl}</text>`);
+  series.forEach(s => o.push(`<polyline points="${s.pts.map(([t, v]) => X(t) + ',' + Y(v)).join(' ')}" style="fill:none;stroke:${s.cls === 'acc' ? 'var(--accent)' : 'var(--fg)'};stroke-width:${s.cls === 'acc' ? 2 : 1.4}${s.dash ? ';stroke-dasharray:5 4' : ''}"/>`));
+  return `<svg viewBox="0 0 ${w} ${h}" width="${w}" role="img" aria-label="Waveform">${o.join('')}</svg>`;
+}
+const curve = (f, T, n = 200) => Array.from({ length: n + 1 }, (_, i) => [i * T / n, f(i * T / n)]);
+
+$('#fig-int').innerHTML = sch(stageItems('vᵢ', 'R', 'R', 'C', 'C'), { w: 300, h: 160, sim: false });
+$('#fig-dif').innerHTML = sch(stageItems('vᵢ', 'C', 'C', 'R', 'R'), { w: 300, h: 160, sim: false });
+$('#fig-sine').innerHTML = sch(stageItems('sin 100t', 'R', '10 kΩ', 'C', '1 µF', { amp: 1, f: 15.9155 }), { w: 300, h: 160 }) +
+  wave([{ pts: curve(t => Math.cos(100 * t / 1000), 125.7), dash: 1 }, { pts: curve(t => Math.cos(100 * t / 1000) - 1, 125.7), cls: 'acc' }, { pts: curve(t => Math.sin(100 * t / 1000), 125.7) }],
+    { T: 125.7, vmin: -2.2, vmax: 1.2, tt: [0, 31.4, 62.8, 94.2], vt: [1, -1, -2], h: 170 });
+$('#fig-q1718').innerHTML = wave([{ pts: [[0, 5], [1, 5], [1, -5], [3, -5], [3, 5], [5, 5], [5, -5], [7, -5], [7, 5], [8, 5]] }, { pts: [[0, 0], [1, -5], [3, 5], [5, -5], [7, 5], [8, 0]], cls: 'acc' }],
+  { T: 8, vmin: -6, vmax: 6, tt: [1, 3, 5, 7], vt: [5, -5] });
+$('#fig-w2021').innerHTML = wave([{ pts: [[0, 0], [0, 1], [1, 1], [1, 0], [3, 0]] }, { pts: [[0, 0], [1, -10], [3, -10]], cls: 'acc' }], { T: 3, vmin: -11, vmax: 2, tt: [1, 2], vt: [1, -10] });
+
+worked('#wk-sq', {
+  given: 'R = 10 kΩ, C = 0.1 µF, switch opens at t = 0; input +5 V (0–1 ms), −5 V (1–3 ms), +5 V (3–5 ms), −5 V (5–7 ms). ±15 V.',
+  fig: sch(stageItems('vᵢₙ', 'R', '10 kΩ', 'C', '0.1 µF'), { w: 300, h: 160, sim: false }),
+  steps: [
+    { t: '\\(RC = 10\\times10^3\\times0.1\\times10^{-6} = 1\\) ms', a: { l: 'RC', v: 1e-3, u: 'ms' } },
+    { t: '0–1 ms: \\(\\Delta v_o = -5\\times1/1 = -5\\) V, so \\(v_o(1) = -5\\) V', a: { l: 'v_o(1\\text{ ms})', v: -5, u: 'V' } },
+    { t: '1–3 ms: \\(\\Delta v_o = -(-5)\\times2/1 = +10\\) V, so \\(v_o(3) = +5\\) V', a: { l: 'v_o(3\\text{ ms})', v: 5, u: 'V' } },
+    'Repeats: triangle between −5 and +5 V, 10 V p-p, inside the rails.',
+    { t: '(ii) 2 V p-p: \\(5\\times2/RC = 2 \\Rightarrow RC = 5\\) ms, \\(C = 5\\text{ ms}/10\\text{ k}\\Omega = 0.5\\) µF', a: { l: 'C', v: 0.5e-6, u: 'µF' } },
+  ] });
+
+drill('#dr-sq', { id: 'o06-square-triangle', title: 'Square wave into an integrator: choose C, find the first vertex', gen(r) {
+  const V = r.pick([1, 2, 5, 10]), th = r.pick([0.5, 1, 2, 4, 5]), Vpp = r.pick([1, 2, 4, 5, 10]), R = r.pick([1, 10, 100]); // ms, kΩ
+  const RC = V * th / Vpp, C = RC * 1e-3 / (R * 1e3), half = r() < 0.5, first = -V * (half ? th / 2 : th) / RC;
+  if (C < 1e-9 || C > 10e-6 || Vpp > 26) return null;
+  return {
+    given: `A square wave of ±${V} V with half-period ${th} ms drives an inverting integrator with \\(R\\) = ${k(R)}. The reset switch opens at \\(t\\) = 0, at ${half ? 'the middle' : 'the start'} of a positive half-cycle (so the first segment lasts ${half ? th / 2 : th} ms). Find \\(C\\) for an output of ${Vpp} V peak-to-peak, and the output at the end of the first segment.`,
+    ask: [{ l: 'C', v: C, u: 'µF' }, { l: 'v_o', v: first, u: 'V' }],
+    steps: [
+      `Each full half-cycle changes the output by \\(V t_h/RC\\). Set it equal to ${Vpp} V.`,
+      { t: `\\(RC = ${V}\\times${th}/${Vpp} = ${num(RC)}\\) ms, \\(C = ${num(RC)}\\text{ ms}/${k(R)} = ${si(C, 'F')}\\)`, a: { l: 'C', v: C, u: 'µF' } },
+      { t: `First segment (+${V} V for ${half ? th / 2 : th} ms): \\(\\Delta v_o = -${V}\\times${half ? th / 2 : th}/${num(RC)} = ${num(first)}\\) V`, a: { l: 'v_o', v: first, u: 'V' } },
+      half ? 'Half-length first segment: the triangle is centred on 0 V.' : 'Full-length first segment: the triangle runs between 0 and the value above (not centred on 0).',
+    ] };
+} });
+
+drill('#dr-ramp', { id: 'o06-dc-ramp', title: 'DC into an integrator: slope and time to saturate', gen(r) {
+  const V = r.pick([-1, 1]) * r.pick([0.5, 1, 2, 5, 15]), R = r.pick([10, 47, 100, 330, 1000]), Cu = r.pick([0.1, 0.47, 1, 10]), L = r.pick([10, 12, 15]);
+  const RC = R * 1e3 * Cu * 1e-6, S = -V / RC, ts = L / Math.abs(S);
+  if (ts < 1e-4 || ts > 200) return null;
+  return {
+    given: `An inverting integrator (\\(R\\) = ${k(R)}, \\(C\\) = ${Cu} µF, reset at \\(t\\) = 0) has a DC input of ${V} V. The output saturates at ±${L} V. Find the output slope and the time at which it saturates.`,
+    ask: [{ l: 'dv_o/dt', v: S, u: 'V/s' }, { l: 't_{sat}', v: ts, u: 's' }],
+    steps: [
+      `\\(RC = ${k(R)}\\times${Cu}\\text{ µF} = ${num(RC)}\\) s`,
+      { t: `\\(dv_o/dt = -V/RC = -(${V})/${num(RC)} = ${num(S)}\\) V/s (${S < 0 ? 'down' : 'up'})`, a: { l: 'dv_o/dt', v: S, u: 'V/s' } },
+      { t: `Reaches ${S < 0 ? '−' : '+'}${L} V at \\(t = ${L}/${num(Math.abs(S))} = ${num(ts)}\\) s, then stays there.`, a: { l: 't_{sat}', v: ts, u: 's' } },
+    ] };
+} });
+
+worked('#wk-sine', {
+  given: 'vᵢ = 2 sin(500t) V into an integrator with R = 20 kΩ, C = 0.1 µF, capacitor uncharged at t = 0. Find vₒ(t), its peak values, and the differentiator alternative.',
+  steps: [
+    { t: '\\(RC = 2\\) ms, \\(\\omega RC = 500\\times0.002 = 1\\)', a: { l: '\\omega RC', v: 1, u: '' } },
+    { t: '\\(v_o = -\\dfrac{1}{RC}\\int_0^t 2\\sin500\\tau\\,d\\tau = \\dfrac{2}{\\omega RC}(\\cos500t - 1) = 2\\cos500t - 2\\) V', a: { l: '\\text{DC offset}', v: -2, u: 'V' } },
+    { t: 'It swings between 0 and \\(-4\\) V, not ±2 V.', a: { l: 'v_{o,min}', v: -4, u: 'V' } },
+    'Phasor (steady-state) answer \\(2\\cos500t\\) assumes \\(v_o(0) = +2\\) V: pre-charge \\(C\\) to make it true.',
+    { t: 'Clean cosine: differentiator with \\(RC = 2\\) ms on \\(v_i\\): \\(-0.002\\times2\\times500\\cos500t = -2\\cos500t\\) (add an inverter for \\(+2\\cos500t\\)). Amplitude', a: { l: '|v_o|', v: 2, u: 'V' } },
+  ] });
+
+worked('#wk-dif', {
+  given: 'Vᵢₙ: triangle 0 → 4 V in 2 ms and back to 0 at 4 ms. Vₒᵤₜ: +2 V while Vᵢₙ rises, −2 V while it falls.',
+  fig: wave([{ pts: [[0, 0], [2, 4], [4, 0], [6, 4], [8, 0]] }, { pts: [[0, 2], [2, 2], [2, -2], [4, -2], [4, 2], [6, 2], [6, -2], [8, -2]], cls: 'acc' }], { T: 8, vmin: -3, vmax: 4.5, tt: [2, 4, 6], vt: [4, 2, -2] }),
+  steps: [
+    { t: 'Slope while rising: \\(4\\text{ V}/2\\text{ ms} = 2000\\) V/s', a: { l: 'dv/dt', v: 2000, u: 'V/s' } },
+    { t: '\\(K = v_{out}/(dv/dt) = 2/2000 = +1\\) ms (positive)', a: { l: 'K', v: 1e-3, u: 'ms' } },
+    { t: 'Differentiator \\(RC = 1\\) ms; with \\(C\\) = 0.1 µF, \\(R = 1\\text{ ms}/0.1\\text{ µF}\\)', a: { l: 'R', v: 10e3, u: 'kΩ' } },
+    'It gives \\(-RC\\,dv/dt\\): add a unity inverter (10 kΩ/10 kΩ) for the + sign.',
+  ] });
+
+drill('#dr-dif', { id: 'o06-differentiator-design', title: 'Triangle to square: size the differentiator', gen(r) {
+  const A = r.pick([2, 4, 5, 10]), bip = r() < 0.5, th = r.pick([0.5, 1, 2, 4, 5]), Vo = r.pick([1, 2, 5]), pos = r() < 0.5, Cu = r.pick([0.01, 0.1, 1]);
+  const dV = bip ? 2 * A : A, S = dV / th, K = Vo / S, R = K * 1e-3 / (Cu * 1e-6); // K in ms
+  if (R < 100 || R > 10e6) return null;
+  return {
+    given: `The input is a triangle from ${bip ? -A : 0} V to ${A} V, rising for ${th} ms and falling for ${th} ms. The required output is ${pos ? '+' : '−'}${Vo} V while the input rises and ${pos ? '−' : '+'}${Vo} V while it falls. Using \\(C\\) = ${Cu} µF, find \\(K = v_{out}/(dv_{in}/dt)\\) (signed) and the differentiator \\(R\\).`,
+    ask: [{ l: 'K', v: (pos ? 1 : -1) * K * 1e-3, u: 'ms' }, { l: 'R', v: R, u: 'kΩ' }],
+    steps: [
+      `Rising slope \\(= ${dV}\\text{ V}/${th}\\text{ ms} = ${num(S)}\\) V/ms.`,
+      { t: `\\(K = ${pos ? '+' : '−'}${Vo}/${num(S)} = ${pos ? '' : '−'}${num(K)}\\) ms`, a: { l: 'K', v: (pos ? 1 : -1) * K * 1e-3, u: 'ms' } },
+      { t: `\\(R = |K|/C = ${num(K)}\\text{ ms}/${Cu}\\text{ µF} = ${si(R, 'Ω')}\\)`, a: { l: 'R', v: R, u: 'kΩ' } },
+      pos ? 'K is positive, but the inverting differentiator gives −RC·dv/dt: add a unity inverter.' : 'K is negative: the plain inverting differentiator is enough.',
+    ] };
+} });
+
+drill('#dr-sine', { id: 'o06-sine-response', title: 'Sine into an integrator or differentiator', gen(r) {
+  const integ = r() < 0.6, Vp = r.pick([0.5, 1, 2, 5]), w = r.pick([100, 200, 500, 1000, 2000]), R = r.pick([1, 5, 10, 20, 50, 100]), Cu = r.pick([0.01, 0.1, 1]);
+  const wRC = w * R * 1e3 * Cu * 1e-6, amp = integ ? Vp / wRC : Vp * wRC;
+  if (amp < 0.1 || (integ ? 2 * amp : amp) > 13) return null;
+  return {
+    given: `\\(v_i = ${Vp}\\sin(${w}t)\\) V drives an ideal inverting ${integ ? 'integrator' : 'differentiator'} with \\(R\\) = ${k(R)}, \\(C\\) = ${Cu} µF${integ ? ' (capacitor uncharged at \\(t\\) = 0)' : ''}. Find the amplitude of the sinusoidal part of \\(v_o\\)${integ ? ' and the most negative value of \\(v_o\\)' : ' and \\(v_o\\) at \\(t\\) = 0'}.`,
+    ask: integ ? [{ l: '\\text{amplitude}', v: amp, u: 'V' }, { l: 'v_{o,min}', v: -2 * amp, u: 'V' }] : [{ l: '\\text{amplitude}', v: amp, u: 'V' }, { l: 'v_o(0)', v: -amp, u: 'V' }],
+    steps: integ ? [
+      `\\(\\omega RC = ${w}\\times${k(R)}\\times${Cu}\\text{ µF} = ${num(wRC)}\\)`,
+      { t: `\\(v_o = \\dfrac{${Vp}}{${num(wRC)}}(\\cos${w}t - 1)\\): amplitude \\(${num(amp)}\\) V`, a: { l: '\\text{amplitude}', v: amp, u: 'V' } },
+      { t: `DC offset \\(-${num(amp)}\\) V, so \\(v_o\\) swings from 0 to \\(${num(-2 * amp)}\\) V`, a: { l: 'v_{o,min}', v: -2 * amp, u: 'V' } },
+    ] : [
+      `\\(\\omega RC = ${num(wRC)}\\)`,
+      { t: `\\(v_o = -RC\\dfrac{d}{dt}${Vp}\\sin${w}t = -${num(amp)}\\cos${w}t\\): amplitude \\(${num(amp)}\\) V, no DC term`, a: { l: '\\text{amplitude}', v: amp, u: 'V' } },
+      { t: `\\(v_o(0) = -${num(amp)}\\) V`, a: { l: 'v_o(0)', v: -amp, u: 'V' } },
+    ] };
+} });
+
+$('#fig-q2021').innerHTML = sch([
+  ['open', [40, 80], ''], ['t', [34, 84], 'v₁', 'end'], ['R', [40, 80], [130, 80], 'R₁'], ['open', [40, 120], ''], ['t', [34, 124], 'v₂', 'end'], ['R', [40, 120], [130, 120], 'R₂'],
+  ['W', [130, 80], [170, 80]], ['W', [130, 120], [200, 120]], ['W', [170, 80], [170, 120]], ['dot', [170, 120]], ['dot', [170, 80]],
+  ['W', [170, 80], [170, 40]], ['C', [170, 40], [300, 40], 'C'], ['W', [300, 40], [300, 136]], ['W', [280, 136], [330, 136]], ['dot', [300, 136]], ['open', [330, 136], 'vₒ'],
+  ['W', [200, 152], [185, 152], [185, 180]], ['gnd', [185, 180]], ['opamp', [200, 136]]], { w: 360, h: 200, sim: false });
+
+flashcards('#cards', [
+  { f: 'Integrator', b: 'vₒ = −(1/RC)∫₀ᵗ vᵢ dτ + vₒ(0)' },
+  { f: 'Differentiator', b: 'vₒ = −RC·dvᵢ/dt' },
+  { f: 'Square ±V, half-period t_h, into integrator', b: 'Triangle, p-p = V·t_h/RC' },
+  { f: 'Sine into uncharged integrator', b: '(V_p/ωRC)(cos ωt − 1): a cosine plus a DC offset' },
+  { f: 'Clean cosine from a sine', b: 'Differentiator: −ωRC·V_p cos ωt, no constant.' },
+  { f: 'Practical integrator', b: 'R_f across C: DC gain −R_f/R, integrates above 1/(R_fC).' },
+  { f: 'Practical differentiator', b: 'R_s in series with C: gain limited to −R/R_s above 1/(R_sC).' },
+  { f: 'Summing integrator', b: 'vₒ = −(1/C)∫(v₁/R₁ + v₂/R₂)dt' },
+]);
+quiz('#quiz', [
+  { q: '+2 V DC into an integrator with RC = 4 ms. After 3 ms (reset at 0) vₒ =', opts: ['−1.5 V', '+1.5 V', '−6 V', '−0.67 V'], a: 0, why: '−2 × 3/4 = −1.5 V.' },
+  { q: 'Triangle with slope ±5 V/ms into a differentiator with RC = 0.2 ms gives', opts: ['±1 V square', '±25 V', '±0.04 V', 'a sine'], a: 0, why: '0.2 ms × 5 V/ms = 1 V, inverted per segment.' },
+  { q: 'sin(100t) into an uncharged integrator with RC = 10 ms gives', opts: ['cos 100t', 'cos 100t − 1', '−cos 100t', '1 − cos 100t'], a: 1, why: '−100∫₀ᵗ sin(100τ)dτ = cos 100t − 1.' },
+  { q: 'After a 1 V pulse ends, an ideal integrator output', opts: ['returns to 0', 'holds its last value', 'reverses', 'saturates'], a: 1, why: 'No input current, so the capacitor keeps its charge.' },
+  { q: 'To get +3t from a +1 V DC input with one op-amp, use', opts: ['an integrator on the −15 V rail with RC = 5 s', 'a differentiator', 'a non-inverting amplifier', 'an integrator with RC = 3 s'], a: 0, why: '−(−15)/RC = 3 V/s gives RC = 5 s.' },
+]);
+</script>
+</body>
+</html>

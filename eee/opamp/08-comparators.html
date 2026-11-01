@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Comparators and Interfaces · EEE 263 Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Op-amps · Chapter 8 · Sedra §18.4 · type O-11 · low priority</div>
+<h1>Comparators and Interfaces</h1>
+<p class="lede">An op-amp with no feedback is a comparator: its output slams to one rail or the other depending on which input is larger. Comparator-plus-logic design questions came in 2016–17 and 2017–18 (about 50 marks) and not since. Comparators with positive feedback (Schmitt triggers) are in <a href="../osc/05-schmitt-trigger.html">Oscillators Chapter 5</a>; this chapter covers the open-loop comparator and how to connect it to digital logic.</p>
+
+<h2>1. The open-loop comparator</h2>
+<div class="formula">\[ v_O = \begin{cases} L_+ &amp; v_+ &gt; v_- \\ L_- &amp; v_+ &lt; v_- \end{cases} \]</div>
+<ul>
+<li><b>Zero-crossing detector:</b> signal on +, − grounded. A sine in gives a square wave out at the same frequency.</li>
+<li><b>Level detector:</b> a reference \(V_{ref}\) on − (from a resistor divider): output high whenever \(v_i &gt; V_{ref}\).</li>
+<li><b>Logic levels:</b> with ±15 V supplies the output is about ±13 V, not 0/5 V. Use a single 0/+5 V supply, or clamp the output with a resistor and a diode (or a 5.1 V Zener), to drive gates.</li>
+<li><b>Noise:</b> near the threshold an open-loop comparator chatters; add hysteresis (a Schmitt trigger) if the input is noisy.</li>
+</ul>
+
+<h2>2. Several thresholds: the resistor ladder</h2>
+<div class="method"><h4>Method · range detector / coder</h4><ol>
+<li>List the thresholds \(T_1 &lt; T_2 &lt; \cdots\).</li>
+<li>Build a resistor string from \(V_{ref}\) to ground carrying a chosen current I (say 1 mA): each segment \(R = \Delta V / I\). The taps give the reference voltages.</li>
+<li>One comparator per threshold (input on +, tap on −): the outputs form a <b>thermometer code</b> (e.g. 000, 100, 110, 111).</li>
+<li>Write the truth table from thermometer code to the required output bits; impossible codes are don't-cares; minimise with a K-map (or use a multiplexer).</li>
+</ol></div>
+<div id="dr-ladder"></div>
+
+<h2>3. Waveform conversion chains</h2>
+<p>Comparator → square wave; T flip-flop → halves the frequency; integrator → triangle (slope = \(V_{sq}/RC\)). Design the RC from the required triangle: slope = peak / ramp time.</p>
+<div id="dr-chain"></div>
+
+<div class="trap"><h4>Traps</h4><ul>
+<li>Comparator outputs are about ±13 V unless you provide logic levels.</li>
+<li>Thermometer codes that cannot occur are don't-cares; use them in the K-map.</li>
+<li>An inverting integrator ramps <i>down</i> for a positive input: pick the flip-flop output (Q or Q̄) that makes the ramp go the required way.</li>
+<li>T flip-flop: state the triggering edge and the initial state.</li>
+</ul></div>
+
+<h2>Exam questions</h2>
+<div class="exam">
+  <div class="exam-src">2017–18 · Sec B · Q5(c) · 20⅔ marks</div>
+  <div class="exam-q"><p>The input is \(v_{in} = 5\sin\) with period 10 ms (100 Hz). The required output is a triangle that rises from 0 to +2 V over 0–10 ms and returns to 0 at 20 ms (50 Hz). Design it with op-amps and digital circuits; +5 V is logic 1 and −5 V is logic 0.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <ol>
+      <li>Zero-crossing comparator (±5 V output levels): a ±5 V square wave at 100 Hz.</li>
+      <li>T flip-flop with T = 1, clocked by that square wave: a 50 Hz square wave. Use Q̄, which is −5 V during 0–10 ms.</li>
+      <li>Inverting integrator: with −5 V in, the output rises at \(5/RC\) V/s. Needed: 2 V in 10 ms = 200 V/s, so \(RC = 5/200 = 25\) ms (C = 1 µF, R = 25 kΩ). During 10–20 ms the input is +5 V and the output falls back to 0.</li>
+    </ol>
+    <p>Reset the integrator capacitor at start-up so the triangle starts at 0 V.</p>
+  </div></details>
+</div>
+<div class="exam">
+  <div class="exam-src">2016–17 · Sec A · Q1(b) · 25 marks</div>
+  <div class="exam-q"><p>Design a circuit with op-amps and digital logic that outputs a 3-bit code depending on the input range: 0–1.2 V → 010, 1.2–3.2 V → 110, 3.2–3.5 V → 001, 3.5–5 V → 111 (5 V = 1, 0 V = 0).</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><b>References:</b> a string from 5 V carrying 1 mA: 1.5 kΩ (5 → 3.5 V), 0.3 kΩ (3.5 → 3.2 V), 2 kΩ (3.2 → 1.2 V), 1.2 kΩ (1.2 → 0 V).</p>
+    <p><b>Comparators</b> (single 0/5 V supply so outputs are logic levels): \(C_1 = [v &gt; 1.2]\), \(C_2 = [v &gt; 3.2]\), \(C_3 = [v &gt; 3.5]\). Thermometer codes \(C_1C_2C_3\): 000, 100, 110, 111.</p>
+    <div class="tbl"><table><tr><th>Range</th><th>C₁C₂C₃</th><th>D₂D₁D₀</th></tr><tr><td>0–1.2</td><td>000</td><td>010</td></tr><tr><td>1.2–3.2</td><td>100</td><td>110</td></tr><tr><td>3.2–3.5</td><td>110</td><td>001</td></tr><tr><td>3.5–5</td><td>111</td><td>111</td></tr></table></div>
+    <p>With the other four codes as don't-cares: \(D_0 = C_2\), \(D_1 = \overline{C_2} + C_3\), \(D_2 = C_1\overline{C_2} + C_3\) (check every row).</p>
+  </div></details>
+</div>
+
+<h2>Practice</h2>
+<h3>Quick check</h3><div id="quiz"></div>
+<div class="key"><p><strong>Summary:</strong> open-loop op-amp = comparator; references from a resistor string (R = ΔV/I); comparator outputs form a thermometer code; convert with a truth table and don't-cares; give the outputs logic levels; comparator → flip-flop → integrator converts waveforms, with RC from the required slope.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/eee.js"></script>
+<script>
+drill('#dr-ladder', { id: 'o11-ladder', title: 'Resistor ladder for comparator thresholds', gen(r) {
+  const pool = [0.5, 0.8, 1, 1.2, 1.5, 2, 2.5, 3, 3.2, 3.5, 4, 4.5];
+  const t = [...new Set([r.pick(pool), r.pick(pool), r.pick(pool)])].sort((a, b) => a - b);
+  if (t.length < 3 || t[1] - t[0] < 0.3 || t[2] - t[1] < 0.3) return null;
+  const I = r.pick([0.5, 1, 2]); // mA
+  const Rs = [t[0] / I, (t[1] - t[0]) / I, (t[2] - t[1]) / I, (5 - t[2]) / I];
+  return {
+    given: `Thresholds ${t.join(' V, ')} V are needed from a 5 V reference with a string current of ${I} mA. Find the four resistors from ground up (R_a: 0 → ${t[0]} V, R_b, R_c, R_d: ${t[2]} → 5 V).`,
+    ask: [{ l: 'R_a', v: Rs[0] * 1e3, u: 'kΩ' }, { l: 'R_b', v: Rs[1] * 1e3, u: 'kΩ' }, { l: 'R_c', v: Rs[2] * 1e3, u: 'kΩ' }, { l: 'R_d', v: Rs[3] * 1e3, u: 'kΩ' }],
+    steps: [`Each segment: \\(R = \\Delta V / I\\) with I = ${I} mA (V/mA = kΩ).`,
+      { t: `\\(R_a = ${t[0]}/${I} = ${num(Rs[0])}\\) kΩ, \\(R_b = ${num(t[1] - t[0])}/${I} = ${num(Rs[1])}\\) kΩ`, a: { l: 'R_b', v: Rs[1] * 1e3, u: 'kΩ' } },
+      { t: `\\(R_c = ${num(t[2] - t[1])}/${I} = ${num(Rs[2])}\\) kΩ, \\(R_d = ${num(5 - t[2])}/${I} = ${num(Rs[3])}\\) kΩ`, a: { l: 'R_d', v: Rs[3] * 1e3, u: 'kΩ' } }] };
+} });
+drill('#dr-chain', { id: 'o11-chain', title: 'Comparator, flip-flop, integrator: choose RC', gen(r) {
+  const f = r.pick([50, 100, 200, 500]), N = r.pick([1, 2]), Vp = r.pick([1, 2, 4, 5]), Vs = r.pick([5, 10]);
+  const th = N / (2 * f), RC = Vs * th / Vp;
+  return {
+    given: `A ${f} Hz sine drives a zero-crossing comparator with ±${Vs} V outputs${N === 2 ? ', followed by a T flip-flop (÷2) with ±' + Vs + ' V levels' : ''}, then an inverting integrator. The triangle must ramp between 0 and ${Vp} V. Find the integrator time constant RC.`,
+    ask: [{ l: 'RC', v: RC, u: 'ms' }],
+    steps: [`The square wave reaching the integrator has frequency ${num(f / N)} Hz, so each ramp lasts \\(${num(th * 1e3)}\\) ms.`,
+      { t: `Slope needed \\(= ${Vp}/${num(th * 1e3)}\\text{ ms}\\); slope given \\(= ${Vs}/RC\\). So \\(RC = ${Vs}\\times${num(th * 1e3)}\\text{ ms}/${Vp} = ${num(RC * 1e3)}\\) ms`, a: { l: 'RC', v: RC, u: 'ms' } }] };
+} });
+quiz('#quiz', [
+  { q: 'A zero-crossing detector fed with a 1 kHz sine outputs', opts: ['a 1 kHz square wave', 'a 2 kHz square wave', 'a triangle', 'DC'], a: 0, why: 'The output flips at every zero crossing: same frequency.' },
+  { q: 'Three comparators on a ladder produce how many valid codes?', opts: ['3', '4', '8', '6'], a: 1, why: 'A thermometer code with 3 bits has 4 valid states.' },
+  { q: 'A comparator on ±15 V drives a 5 V gate directly. The problem?', opts: ['None', 'Output about ±13 V exceeds logic levels', 'It is too slow', 'It needs feedback'], a: 1, why: 'Clamp the output or use a 0/5 V supply.' },
+]);
+</script>
+</body>
+</html>

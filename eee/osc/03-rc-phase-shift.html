@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RC Phase-Shift Oscillator · EEE 263 Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Oscillators · Chapter 3 · Sedra §18.3.2 · Khairul s.19–23 · Sadat L26, notes p.119–121 · type S-02</div>
+<h1>The RC Phase-Shift Oscillator</h1>
+<p class="lede">Asked in 2015–16 (20⅔ marks), 2017–18 (18) and 2021–22 (26⅔, a full derivation). Three numbers carry the whole topic: <b>29</b> and \(\sqrt6\) for the plain ladder, <b>8</b> and \(\sqrt3\) when buffers separate the sections. The derivation is long but mechanical, and the 2015–16 circuit has a twist (the last section is loaded) that most solutions miss.</p>
+
+<h2>1. The idea: 180° from the amplifier, 180° from the network</h2>
+<p>An <b>inverting</b> amplifier gives 180°. For a loop phase of 0° (360°), the RC network must give another 180° at \(\omega_0\). One RC section gives less than 90° (it only reaches 90° at zero or infinite frequency, where it passes nothing), so at least <b>three</b> sections are needed. The network attenuates; the amplifier gain must make up the loss.</p>
+
+<h2>2. Buffered sections: ω₀ = 1/(√3 RC), gain 8 (Sadat p.119–121, Khairul s.19–22)</h2>
+<figure><div id="fig-buf"></div><figcaption><b>Figure 1.</b> Three CR high-pass sections, each followed by a voltage follower, and an inverting amplifier \(-R_2/R\) (the third R is its input resistor into the virtual ground). Simulator values: R = 10 kΩ, C = 10 nF, \(R_2\) = 82 kΩ (just above 8R); it runs near 9.2 kHz after a moment to build up, clipping at ±15 V.</figcaption></figure>
+<p>The followers draw no current, so each section is an independent divider:</p>
+<div class="formula">\[ \frac{V_1}{V_o} = \frac{R}{R + \frac{1}{j\omega C}} = \frac{j\omega RC}{1 + j\omega RC}, \qquad \beta(j\omega) = \Big(\frac{j\omega RC}{1 + j\omega RC}\Big)^3, \qquad A = -\frac{R_2}{R} \]</div>
+<p>Expand \((1 + x)^3 = 1 + 3x + 3x^2 + x^3\) with \(x = j\omega RC\):</p>
+<div class="formula">\[ \beta(j\omega) = \frac{-j\omega RC(\omega RC)^2}{(1 - 3\omega^2R^2C^2) + j\omega RC(3 - \omega^2R^2C^2)} \]</div>
+<p>\(\angle A = 180^\circ\), so we need \(\angle\beta = 180^\circ\). The numerator is imaginary, so the real part of the denominator must vanish:</p>
+<div class="formula">\[ 1 - 3\omega_0^2R^2C^2 = 0 \;\Rightarrow\; \omega_0 = \frac{1}{\sqrt3\,RC}, \qquad \beta(\omega_0) = \frac{-\frac13}{3 - \frac13} = -\frac18, \qquad \frac{R_2}{R} \ge 8 \]</div>
+<p><b>Why "phase shift"</b> (Sadat p.121, Khairul s.22): at \(\omega_0\), each section gives \(\dfrac{j/\sqrt3}{1 + j/\sqrt3} = \tfrac12\angle60^\circ\). Three of them: \(\tfrac18\angle180^\circ\). The inverting amplifier with gain 8 restores 1∠360°.</p>
+
+<h2>3. The unbuffered ladder: ω₀ = 1/(√6 RC), gain 29 (2021–22 derivation)</h2>
+<figure><div id="fig-lad"></div><figcaption><b>Figure 2.</b> Classic phase-shift oscillator: C–R–C–R–C–R ladder; the third R goes into the op-amp's virtual ground (it is the inverting amplifier's input resistor). Simulator: R = 10 kΩ, C = 1 nF, \(R_f\) = 300 kΩ (just above 29R); about 6.5 kHz.</figcaption></figure>
+<p>Now each section loads the previous one, so work <b>backwards from the virtual ground</b> with a current \(i\) in the last R. Let \(k = \dfrac{1}{sRC}\) (so a capacitor drops \(i\cdot kR\)):</p>
+<ul>
+<li>Node c (third R): \(v_c = iR\). The third C carries \(i\): \(v_b = iR + ikR = iR(1 + k)\).</li>
+<li>Second R carries \(v_b/R = i(1 + k)\); second C carries \(i + i(1 + k) = i(2 + k)\): \(v_a = v_b + i(2 + k)kR = iR(1 + 3k + k^2)\).</li>
+<li>First R carries \(i(1 + 3k + k^2)\); first C carries \(i(2 + k) + i(1 + 3k + k^2) = i(3 + 4k + k^2)\): \(v_o = v_a + i(3 + 4k + k^2)kR\).</li>
+</ul>
+<div class="formula">\[ v_o = iR\,(1 + 6k + 5k^2 + k^3), \qquad \text{amplifier output } = -R_f\,i \;\Rightarrow\; L = \frac{-R_f/R}{1 + 6k + 5k^2 + k^3} \]</div>
+<p>At \(s = j\omega\), \(k = -jX\) with \(X = \dfrac{1}{\omega RC}\): \(k^2 = -X^2\), \(k^3 = jX^3\).</p>
+<div class="formula">\[ 1 + 6k + 5k^2 + k^3 = (1 - 5X^2) + j(X^3 - 6X) \]</div>
+<p><b>Phase:</b> \(L\) must be real and positive, so the bracket must be real (and negative): \(X^2 = 6\), i.e. \(\omega_0 = \dfrac{1}{\sqrt6\,RC}\), \(f_0 = \dfrac{1}{2\pi\sqrt6\,RC}\).</p>
+<p><b>Magnitude:</b> bracket \(= 1 - 30 = -29\), so \(L = \dfrac{R_f}{29R} \ge 1\): \(\boxed{R_f \ge 29R}\) (i.e. \(\beta = -1/29\), \(|A| \ge 29\)).</p>
+<p>Low-pass ladder (series R, shunt C, driven by an amplifier with high input resistance): by the same algebra with \(k = sRC\), \(\omega_0 = \sqrt6/(RC)\) and the gain is again 29.</p>
+
+<div class="tbl"><table>
+<tr><th>Topology</th><th>\(\omega_0\)</th><th>\(\beta(\omega_0)\)</th><th>Gain needed</th></tr>
+<tr><td>Ladder, high-pass (series C, shunt R)</td><td>\(1/(\sqrt6\,RC)\)</td><td>\(-1/29\)</td><td>\(R_f \ge 29R\)</td></tr>
+<tr><td>Ladder, low-pass (series R, shunt C)</td><td>\(\sqrt6/(RC)\)</td><td>\(-1/29\)</td><td>29</td></tr>
+<tr><td>Buffered, high-pass</td><td>\(1/(\sqrt3\,RC)\)</td><td>\(-1/8\)</td><td>\(R_2 \ge 8R\)</td></tr>
+<tr><td>Buffered, low-pass</td><td>\(\sqrt3/(RC)\)</td><td>\(-1/8\)</td><td>8</td></tr>
+<tr><td>Buffered low-pass, last section loaded by \(R_i\) (2015–16)</td><td>\(\sqrt{3 + 2R/R_i}\,/(RC)\)</td><td>\(-\dfrac{1}{2(2 + R/R_i)^2}\)</td><td>\(R_f/R_i \ge 2(2 + R/R_i)^2\)</td></tr>
+</table></div>
+
+<div class="method"><h4>Method · phase-shift analysis</h4><ol>
+<li><b>Identify the topology:</b> buffers between sections? high-pass (series C) or low-pass (series R)? Is the last section loaded by the amplifier's input resistor?</li>
+<li>Write \(\beta\): a product of sections if buffered; work back from the virtual ground (or nodal analysis) if not.</li>
+<li>Inverting amplifier: \(\beta(\omega_0)\) must be real and <b>negative</b>. Set the imaginary part of the denominator (or of \(1/\beta\)) to zero → \(\omega_0\).</li>
+<li>\(|A| \ge 1/|\beta(\omega_0)|\) → \(R_f\) (or \(R_2\)) relation. Say "slightly greater" for start-up.</li>
+<li>Design: pick C, compute R from the \(\omega_0\) formula, then \(R_f\) from the gain.</li>
+</ol></div>
+<div id="wk-lad"></div>
+<div id="dr-an"></div>
+<div id="dr-des"></div>
+
+<h2>4. Buffered, but the last section is loaded (2015–16)</h2>
+<figure><div id="fig-load"></div><figcaption><b>Figure 3.</b> 2015–16 Q7(b): two RC low-pass sections with followers, then a third R–C whose node \(V_f\) feeds \(R_i\) into the virtual ground of the inverting amplifier. \(R_i\) is in parallel with the last C, so the third section is <b>not</b> independent.</figcaption></figure>
+<p>First two sections: \(\dfrac{1}{1 + sRC}\) each. Third: \(Z_p = R_i \parallel \dfrac{1}{sC}\), so \(\dfrac{V_f}{V_{in3}} = \dfrac{Z_p}{R + Z_p} = \dfrac{1}{1 + R/R_i + sRC}\). With \(a = 1 + R/R_i\) and \(x = \omega RC\):</p>
+<div class="formula">\[ L(j\omega) = -\frac{R_f}{R_i}\cdot\frac{1}{(1 + jx)^2(a + jx)}, \qquad (1 + jx)^2(a + jx) = \big[a(1 - x^2) - 2x^2\big] + j\big[x(1 - x^2) + 2ax\big] \]</div>
+<p>Imaginary part zero: \(x^2 = 1 + 2a = 3 + 2R/R_i\). Real part there: \(a(-2a) - 2(1 + 2a) = -2(a + 1)^2\). So</p>
+<div class="formula">\[ \omega_0 = \frac{\sqrt{3 + 2R/R_i}}{RC}, \qquad \frac{R_f}{R_i} \ge 2\Big(2 + \frac{R}{R_i}\Big)^2 \iff R_f \ge 8R_i + 8R + \frac{2R^2}{R_i} \]</div>
+<p>With \(R_i = R\): \(\omega_0 = \sqrt5/(RC)\), \(R_f = 18R\). Only if \(R_i \gg R\) does it reduce to the textbook \(\sqrt3/(RC)\) and 8. Many solutions quote √3 and 8 here; write the exact result and say what it reduces to.</p>
+<div id="dr-load"></div>
+
+<h2>5. Transistor versions</h2>
+<p>Replace the op-amp by a single-transistor inverting stage: a common-source MOSFET (gain \(-g_mR_D\)) or common-emitter BJT (\(-g_mR_C\)). The ladder is unchanged, so the conditions are the same in the ideal case: \(\omega_0 = 1/(\sqrt6\,RC)\) and \(|A| = g_mR_D \ge 29\). Two practical corrections (state them, no need to compute unless asked): the stage's output resistance \(R_D\) adds to the first section, and for a BJT the base input resistance \(r_\pi \parallel R_B\) replaces (or is in parallel with) the last shunt R. A MOSFET's infinite gate resistance makes it the cleaner choice: take \(v_{gs}\) across the third R.</p>
+
+<div class="trap"><h4>Traps (where marks go)</h4><ul>
+<li>Using \(1/(2\pi\sqrt6RC)\) and 29 for a buffered circuit. Buffered = \(\sqrt3\) and 8.</li>
+<li>Forgetting that the third R (into the virtual ground) is part of the network. Without it the ladder has only two shunt R's.</li>
+<li>High-pass vs low-pass: \(\sqrt6\) (or \(\sqrt3\)) goes in the denominator for high-pass, numerator for low-pass.</li>
+<li>Missing \(2\pi\) when the question asks for \(f_0\).</li>
+<li>2015–16: ignoring the loading of the last section by \(R_i\).</li>
+<li>The amplifier must be inverting; β at \(\omega_0\) is negative.</li>
+</ul></div>
+
+<h2>Exam questions</h2>
+
+<div class="exam">
+  <div class="exam-src">2021–22 · Sec A · Q1(b) · 26⅔ marks</div>
+  <div class="exam-q"><p>For an R-C phase shift oscillator, derive the expression of oscillation frequency. Also derive the conditions for Barkhausen criteria to be satisfied. You may assume that in the feedback part of the oscillator all the resistors are of the same value and all the capacitors are of the same value.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>Draw Figure 2: inverting amplifier (\(R_f\) feedback; + grounded); three C–R sections from the output, the third R being the amplifier's input resistor to the virtual ground. Barkhausen: \(A\beta = 1\) (magnitude 1, phase 0°). The amplifier gives 180°, so the network must give 180°.</p>
+    <p>Let \(i\) be the current into the virtual ground through the third R and \(k = 1/(sRC)\). Working back: \(v_c = iR\); \(v_b = iR(1 + k)\); current in second C \(= i(2 + k)\), \(v_a = iR(1 + 3k + k^2)\); current in first C \(= i(3 + 4k + k^2)\); \(v_o = iR(1 + 6k + 5k^2 + k^3)\).</p>
+    <p>The amplifier output (the new \(v_o\)) is \(-R_fi\). Loop gain: \(L = \dfrac{-R_f/R}{1 + 6k + 5k^2 + k^3}\).</p>
+    <p>With \(s = j\omega\), \(k = -j/(\omega RC)\): denominator \(= \Big[1 - \dfrac{5}{\omega^2R^2C^2}\Big] + j\Big[\dfrac{1}{\omega^3R^3C^3} - \dfrac{6}{\omega RC}\Big]\).</p>
+    <p><b>Frequency (phase condition):</b> \(L\) real requires the imaginary part zero: \(\omega_0^2R^2C^2 = \dfrac16\), so \(\omega_0 = \dfrac{1}{\sqrt6\,RC}\), \(f_0 = \dfrac{1}{2\pi\sqrt6\,RC}\).</p>
+    <p><b>Gain (magnitude condition):</b> at \(\omega_0\) the denominator is \(1 - 5\times6 = -29\), so \(\beta = -\dfrac{1}{29}\) and \(L = \dfrac{R_f}{29R}\). Barkhausen \(|L| = 1\) gives \(R_f = 29R\) (\(|A| = 29\)); for start-up \(R_f\) slightly greater than \(29R\), with amplitude limited by saturation or a limiter.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2017–18 · Sec B · Q6(c) · 18 marks</div>
+  <div class="exam-q"><p>For the oscillator circuit shown (Figure 1: inverting amplifier with \(R_f\); three CR sections, each separated by a buffer; the third R returns to the amplifier's inverting input), find the oscillation frequency (ω), β-network gain (β) and amplifier gain (A). Also design this oscillator for an oscillation frequency of 1 kHz. Note: each stage is separated by a buffer, hence each stage gives a phase shift of 60° and three stages give a total of 180°. Here β = V₂/V₁. (The figure draws the buffers' feedback to the wrong input; read them as voltage followers.)</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>Each section: \(\dfrac{j\omega RC}{1 + j\omega RC}\), phase \(90^\circ - \tan^{-1}(\omega RC)\). For 60° per stage: \(\tan^{-1}(\omega_0RC) = 30^\circ\), \(\omega_0RC = 1/\sqrt3\):</p>
+    <p>\(\omega_0 = \dfrac{1}{\sqrt3\,RC}\), \(f_0 = \dfrac{1}{2\pi\sqrt3\,RC}\).</p>
+    <p>Each stage's magnitude at \(\omega_0\): \(\dfrac{1/\sqrt3}{\sqrt{1 + 1/3}} = \dfrac12\). So \(\beta = V_2/V_1 = \big(\tfrac12\big)^3\angle180^\circ = -\dfrac18\).</p>
+    <p>\(A\beta = 1 \Rightarrow A = -8\), i.e. \(R_f/R = 8\) (slightly more to start).</p>
+    <p><b>Design for 1 kHz:</b> \(RC = \dfrac{1}{2\pi\sqrt3\times1000} = 91.89\) µs. Choose C = 10 nF: R = 9.19 kΩ (use 9.1 kΩ); \(R_f = 8R = 73.5\) kΩ (use 75 kΩ, slightly above).</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2015–16 · Sec B · Q7(b) · 20⅔ marks</div>
+  <div class="exam-q"><p>For the RC phase-shift oscillator shown (Figure 3: inverting amplifier A1 with \(R_i\), \(R_f\), ±15 V; three R–C low-pass sections, the first two followed by voltage followers A2, A3, the third feeding \(V_f\) back through \(R_i\); all R equal, all C equal): (i) determine the oscillation frequency f₀ and obtain the relationship between \(R_i\) and \(R_f\) for sustained oscillation; (ii) how can you generate a 100 kHz signal from this oscillator?</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><b>(i)</b> Sections 1 and 2 are buffered: \(\dfrac{1}{1 + sRC}\) each. Section 3 is loaded by \(R_i\) (to the virtual ground): \(\dfrac{V_f}{V_{in3}} = \dfrac{1}{1 + R/R_i + sRC}\). Amplifier \(-R_f/R_i\).</p>
+    <p>\(L(j\omega) = \dfrac{-R_f/R_i}{(1 + jx)^2(a + jx)}\), \(x = \omega RC\), \(a = 1 + R/R_i\). The denominator is \([a(1 - x^2) - 2x^2] + j[x(3 + 2R/R_i - x^2)]\).</p>
+    <p>Imaginary part zero: \(x^2 = 3 + 2R/R_i\), so \(f_0 = \dfrac{\sqrt{3 + 2R/R_i}}{2\pi RC}\).</p>
+    <p>Real part at \(\omega_0\): \(-2(a + 1)^2 = -2(2 + R/R_i)^2\). Sustained oscillation: \(\dfrac{R_f}{R_i} = 2\Big(2 + \dfrac{R}{R_i}\Big)^2\), i.e. \(R_f = 8R_i + 8R + 2R^2/R_i\).</p>
+    <p>With \(R_i = R\): \(f_0 = \dfrac{\sqrt5}{2\pi RC}\), \(R_f = 18R_i\). (If \(R_i \gg R\), this reduces to the ideal buffered result \(f_0 = \sqrt3/(2\pi RC)\), \(R_f = 8R_i\).)</p>
+    <p><b>(ii)</b> Choose RC for 100 kHz. With \(R_i = R\) and C = 100 pF: \(R = \dfrac{\sqrt5}{2\pi\times10^5\times10^{-10}} = 35.6\) kΩ, \(R_i\) = 35.6 kΩ, \(R_f = 18R = 641\) kΩ (slightly more to start). Use op-amps with enough gain-bandwidth and slew rate at 100 kHz (the ±15 V output swing at 100 kHz needs a slew rate above \(2\pi f V_p \approx 9\) V/µs), or tune frequency by changing C (ganged) since \(f_0 \propto 1/C\).</p>
+  </div></details>
+</div>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+
+<div class="key"><p><strong>Summary:</strong> inverting amplifier (180°) + three RC sections (180° at \(\omega_0\)). Ladder: \(\omega_0 = 1/(\sqrt6 RC)\), \(\beta = -1/29\), \(R_f \ge 29R\), derived by working back from the virtual ground with \(k = 1/(sRC)\). Buffered: each section \(\tfrac12\angle60^\circ\), \(\omega_0 = 1/(\sqrt3 RC)\), \(\beta = -1/8\), \(R_2 \ge 8R\). Low-pass versions put the root in the numerator. Check whether the last section is loaded (2015–16: \(\omega_0 = \sqrt{3 + 2R/R_i}/(RC)\), \(R_f/R_i = 2(2 + R/R_i)^2\)).</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/eee.js"></script>
+<script>
+const V = x => [1, { val: x }];
+// buffered CR (high-pass) phase-shift oscillator
+const bufFig = (R = 1e4, C = 1e-8, R2 = 8.2e4) => sch([
+  ['C', [20, 104], [80, 104], 'C', ...V(C)], ['W', [80, 104], [140, 104]], ['dot', [100, 104]], ['R', [100, 104], [100, 180], 'R', ...V(R)], ['gnd', [100, 180]],
+  ['opamp', [140, 120], { plusTop: true }], ['W', [220, 120], [240, 120]], ['dot', [230, 120]], ['W', [230, 120], [230, 160], [130, 160], [130, 136], [140, 136]],
+  ['C', [240, 120], [300, 120], 'C', ...V(C)], ['W', [300, 120], [340, 120], [340, 104], [360, 104]], ['dot', [320, 120]], ['R', [320, 120], [320, 200], 'R', ...V(R)], ['gnd', [320, 200]],
+  ['opamp', [360, 120], { plusTop: true }], ['W', [440, 120], [460, 120]], ['dot', [450, 120]], ['W', [450, 120], [450, 160], [350, 160], [350, 136], [360, 136]],
+  ['C', [460, 120], [520, 120], 'C', ...V(C)], ['R', [520, 120], [600, 120], 'R', ...V(R)], ['W', [600, 120], [620, 120]], ['dot', [610, 120]],
+  ['opamp', [620, 136]], ['W', [620, 152], [600, 152]], ['gnd', [600, 152]],
+  ['W', [610, 120], [610, 60]], ['R', [610, 60], [720, 60], 'R₂', ...V(R2)], ['W', [720, 60], [720, 136], [700, 136]], ['dot', [720, 136]],
+  ['W', [720, 136], [740, 136], [740, 240], [0, 240], [0, 104], [20, 104]], ['t', [748, 132], 'Vₒ', 'start'], ['t', [104, 96], 'V₁', 'start', 'sm'], ['t', [324, 112], 'V₂', 'start', 'sm'],
+], { w: 780, h: 250 });
+$('#fig-buf').innerHTML = bufFig();
+
+// unbuffered high-pass ladder
+const ladFig = (R = 1e4, C = 1e-9, Rf = 3e5) => sch([
+  ['C', [20, 104], [80, 104], 'C', ...V(C)], ['W', [80, 104], [120, 104]], ['dot', [100, 104]], ['R', [100, 104], [100, 180], 'R', ...V(R)], ['gnd', [100, 180]],
+  ['C', [120, 104], [180, 104], 'C', ...V(C)], ['W', [180, 104], [220, 104]], ['dot', [200, 104]], ['R', [200, 104], [200, 180], 'R', ...V(R)], ['gnd', [200, 180]],
+  ['C', [220, 104], [280, 104], 'C', ...V(C)], ['R', [280, 104], [380, 104], 'R', ...V(R)], ['W', [380, 104], [400, 104]], ['dot', [380, 104]],
+  ['opamp', [400, 120]], ['W', [400, 136], [370, 136]], ['gnd', [370, 136]],
+  ['W', [380, 104], [380, 50]], ['R', [380, 50], [500, 50], 'Rf', ...V(Rf)], ['W', [500, 50], [500, 120], [480, 120]], ['dot', [500, 120]],
+  ['W', [500, 120], [520, 120], [520, 230], [0, 230], [0, 104], [20, 104]], ['t', [528, 116], 'vₒ', 'start'],
+  ['t', [104, 96], 'a', 'start', 'sm'], ['t', [204, 96], 'b', 'start', 'sm'], ['t', [286, 96], 'c', 'start', 'sm'],
+], { w: 560, h: 240 });
+$('#fig-lad').innerHTML = ladFig();
+
+// 2015-16 loaded buffered low-pass
+const loadFig = () => sch([
+  ['opamp', [120, 120]], ['W', [120, 136], [110, 136]], ['gnd', [110, 136]],
+  ['R', [20, 104], [100, 104], 'Ri'], ['W', [100, 104], [120, 104]], ['dot', [100, 104]],
+  ['W', [100, 104], [100, 50]], ['R', [100, 50], [220, 50], 'Rf'], ['W', [220, 50], [220, 120], [200, 120]], ['dot', [220, 120]],
+  ['R', [220, 120], [290, 120], 'R'], ['W', [290, 120], [320, 120], [320, 104], [340, 104]], ['dot', [300, 120]], ['C', [300, 120], [300, 190], 'C'], ['gnd', [300, 190]],
+  ['opamp', [340, 120], { plusTop: true }], ['W', [420, 120], [430, 120]], ['dot', [430, 120]], ['W', [430, 120], [430, 160], [330, 160], [330, 136], [340, 136]],
+  ['R', [430, 120], [500, 120], 'R'], ['W', [500, 120], [530, 120], [530, 104], [550, 104]], ['dot', [510, 120]], ['C', [510, 120], [510, 190], 'C'], ['gnd', [510, 190]],
+  ['opamp', [550, 120], { plusTop: true }], ['W', [630, 120], [640, 120]], ['dot', [640, 120]], ['W', [640, 120], [640, 160], [540, 160], [540, 136], [550, 136]],
+  ['R', [640, 120], [700, 120], 'R'], ['W', [700, 120], [740, 120]], ['dot', [710, 120]], ['C', [710, 120], [710, 190], 'C'], ['gnd', [710, 190]],
+  ['W', [740, 120], [740, 240], [0, 240], [0, 104], [20, 104]], ['t', [716, 112], 'Vf', 'start', 'sm'], ['t', [208, 112], 'Vₒ', 'end', 'sm'],
+], { w: 760, h: 250, sim: false });
+$('#fig-load').innerHTML = loadFig();
+
+worked('#wk-lad', {
+  given: 'Ladder phase-shift oscillator (Figure 2) with R = 10 kΩ, C = 1 nF. Find f₀, β(ω₀) and the minimum \\(R_f\\).',
+  steps: [
+    { t: '\\(\\omega_0 = \\dfrac{1}{\\sqrt6\\,RC} = \\dfrac{1}{2.449\\times10^4\\times10^{-9}} = 40.8\\) krad/s', a: { l: '\\omega_0', v: 40825, u: 'rad/s' } },
+    { t: '\\(f_0 = \\omega_0/2\\pi = 6.50\\) kHz', a: { l: 'f_0', v: 6497, u: 'kHz' } },
+    { t: '\\(\\beta(\\omega_0) = -1/29 = -0.0345\\)', a: { l: '\\beta', v: -1 / 29, u: 'V/V' } },
+    { t: '\\(R_f \\ge 29R = 290\\) kΩ', a: { l: 'R_{f,min}', v: 2.9e5, u: 'kΩ' } },
+  ] });
+
+const TOPO = {
+  'ladder, high-pass (series C, shunt R)': { w: (R, C) => 1 / (Math.sqrt(6) * R * C), g: 29, f: '\\dfrac{1}{\\sqrt6\\,RC}' },
+  'ladder, low-pass (series R, shunt C)': { w: (R, C) => Math.sqrt(6) / (R * C), g: 29, f: '\\dfrac{\\sqrt6}{RC}' },
+  'buffered, high-pass (series C, shunt R)': { w: (R, C) => 1 / (Math.sqrt(3) * R * C), g: 8, f: '\\dfrac{1}{\\sqrt3\\,RC}' },
+  'buffered, low-pass (series R, shunt C)': { w: (R, C) => Math.sqrt(3) / (R * C), g: 8, f: '\\dfrac{\\sqrt3}{RC}' },
+};
+drill('#dr-an', { id: 's02-phase-shift-analysis', title: 'Phase-shift oscillator: f0, beta and minimum gain', gen(r) {
+  const name = r.pick(Object.keys(TOPO)), t = TOPO[name];
+  const R = r.pick([1, 2.2, 4.7, 10, 15, 22, 47, 100]) * 1e3, C = r.pick([0.1, 0.22, 0.47, 1, 2.2, 4.7, 10, 22, 47, 100]) * 1e-9;
+  const w0 = t.w(R, C), f0 = w0 / (2 * Math.PI); if (f0 < 50 || f0 > 3e5) return null;
+  return {
+    given: `A three-section RC phase-shift oscillator, ${name}, uses R = ${si(R, 'Ω')} and C = ${si(C, 'F')} with an inverting amplifier of gain −A. Find f₀, β(ω₀) and the minimum A.`,
+    ask: [{ l: 'f_0', v: f0, u: 'Hz' }, { l: '\\beta(\\omega_0)', v: -1 / t.g, u: 'V/V' }, { l: 'A_{min}', v: t.g, u: 'V/V' }],
+    steps: [
+      { t: `\\(\\omega_0 = ${t.f} = ${num(w0)}\\) rad/s, \\(f_0 = ${num(f0)}\\) Hz`, a: { l: 'f_0', v: f0, u: 'Hz' } },
+      { t: `${t.g === 8 ? 'Buffered: each section ½∠60°, so β = (½)³∠180° = −1/8' : 'Ladder: β(ω₀) = −1/29'}`, a: { l: '\\beta(\\omega_0)', v: -1 / t.g, u: 'V/V' } },
+      { t: `\\(A_{min} = 1/|\\beta| = ${t.g}\\) (e.g. \\(R_f = ${t.g}R = ${si(t.g * R, 'Ω')}\\) if R is the input resistor)`, a: { l: 'A_{min}', v: t.g, u: 'V/V' } },
+    ] };
+} });
+
+drill('#dr-des', { id: 's02-phase-shift-design', title: 'Phase-shift oscillator design: R and Rf for a given f0', gen(r) {
+  const buf = r() < 0.5, f0 = +Math.exp(Math.log(200) + r() * Math.log(500)).toPrecision(2);
+  const k = buf ? Math.sqrt(3) : Math.sqrt(6);
+  const caps = [1e-6, 470e-9, 220e-9, 100e-9, 47e-9, 22e-9, 10e-9, 4.7e-9, 2.2e-9, 1e-9, 470e-12, 220e-12, 100e-12];
+  const C = caps.find(c => { const R = 1 / (2 * Math.PI * k * f0 * c); return R >= 3e3 && R <= 50e3; }); if (!C) return null;
+  const R = 1 / (2 * Math.PI * k * f0 * C), g = buf ? 8 : 29;
+  return {
+    given: `Design a ${buf ? 'buffered (each CR section followed by a voltage follower)' : 'plain three-section CR ladder'} phase-shift oscillator for f₀ = ${si(f0, 'Hz')} using C = ${si(C, 'F')}. The third R is the inverting amplifier's input resistor. Find R and the minimum feedback resistor \\(R_f\\).`,
+    ask: [{ l: 'R', v: R, u: 'kΩ' }, { l: 'R_{f,min}', v: g * R, u: 'kΩ' }],
+    steps: [
+      { t: `\\(R = \\dfrac{1}{2\\pi${buf ? '\\sqrt3' : '\\sqrt6'}\\,f_0C} = \\dfrac{1}{2\\pi\\times${num(k)}\\times${num(f0)}\\times${num(C)}} = ${num(R / 1e3)}\\) kΩ`, a: { l: 'R', v: R, u: 'kΩ' } },
+      { t: `\\(R_f \\ge ${g}R = ${num(g * R / 1e3)}\\) kΩ (slightly more to start)`, a: { l: 'R_{f,min}', v: g * R, u: 'kΩ' } },
+    ] };
+} });
+
+drill('#dr-load', { id: 's02-loaded-buffered', title: 'Buffered phase-shift with a loaded last section (2015-16 type)', gen(r) {
+  const R = r.pick([1, 2.2, 4.7, 10, 22, 47]) * 1e3, C = r.pick([0.1, 0.47, 1, 2.2, 4.7, 10]) * 1e-9, Ri = R * r.pick([0.5, 1, 2, 5]);
+  const a = 1 + R / Ri, w0 = Math.sqrt(1 + 2 * a) / (R * C), f0 = w0 / (2 * Math.PI), ratio = 2 * (a + 1) ** 2;
+  if (f0 > 5e5 || f0 < 50) return null;
+  return {
+    given: `Figure 3 circuit with R = ${si(R, 'Ω')}, C = ${si(C, 'F')}, \\(R_i\\) = ${si(Ri, 'Ω')}. Find f₀ and the \\(R_f\\) needed for sustained oscillation.`,
+    ask: [{ l: 'f_0', v: f0, u: 'kHz' }, { l: 'R_f', v: ratio * Ri, u: 'kΩ' }],
+    steps: [
+      `\\(a = 1 + R/R_i = ${num(a)}\\); \\(x^2 = (\\omega_0RC)^2 = 1 + 2a = ${num(1 + 2 * a)}\\)`,
+      { t: `\\(f_0 = \\dfrac{\\sqrt{${num(1 + 2 * a)}}}{2\\pi\\times${num(R)}\\times${num(C)}} = ${num(f0 / 1e3)}\\) kHz`, a: { l: 'f_0', v: f0, u: 'kHz' } },
+      { t: `\\(R_f/R_i = 2(a + 1)^2 = ${num(ratio)}\\), \\(R_f = ${num(ratio * Ri / 1e3)}\\) kΩ`, a: { l: 'R_f', v: ratio * Ri, u: 'kΩ' } },
+    ] };
+} });
+
+flashcards('#cards', [
+  { f: 'Ladder (unbuffered) phase shift', b: 'ω₀ = 1/(√6 RC), β = −1/29, R_f ≥ 29R' },
+  { f: 'Buffered phase shift', b: 'ω₀ = 1/(√3 RC), β = −1/8, R₂ ≥ 8R' },
+  { f: 'Per buffered section at ω₀', b: '½∠60°' },
+  { f: 'Why three sections?', b: 'One RC gives < 90°; 180° needs at least three.' },
+  { f: 'Low-pass versions', b: 'Root moves to the numerator: √6/(RC) or √3/(RC); same gains.' },
+  { f: 'Ladder derivation trick', b: 'Work back from the virtual ground with current i and k = 1/(sRC): v_o = iR(1 + 6k + 5k² + k³).' },
+  { f: '2015–16 loaded last section', b: 'ω₀ = √(3 + 2R/R_i)/(RC), R_f/R_i = 2(2 + R/R_i)²; R_i = R gives √5 and 18.' },
+]);
+quiz('#quiz', [
+  { q: 'A buffered CR phase-shift oscillator has R = 10 kΩ, C = 10 nF. f₀ ≈', opts: ['650 Hz', '919 Hz', '1.59 kHz', '9.19 kHz'], a: 1, why: '1/(2π√3·10⁻⁴) = 919 Hz.' },
+  { q: 'Minimum |A| for the plain three-section ladder:', opts: ['3', '8', '29', '18'], a: 2, why: 'β(ω₀) = −1/29.' },
+  { q: 'Why must the amplifier be inverting?', opts: ['To reduce the gain', 'The network gives 180° at ω₀; the amplifier supplies the other 180°', 'Op-amps cannot be non-inverting at high frequency', 'To make β positive'], a: 1, why: 'Total loop phase must be 360°.' },
+  { q: 'In the ladder, what is the third resistor?', opts: ['A bias resistor', 'The amplifier input resistor into the virtual ground', 'Not needed', 'The load'], a: 1, why: 'It completes the third section and sets A = −R_f/R.' },
+  { q: 'The 2015–16 circuit with R_i = R needs R_f =', opts: ['8R', '18R', '29R', '12.5R'], a: 1, why: '2(2 + 1)² = 18.' },
+]);
+</script>
+</body>
+</html>

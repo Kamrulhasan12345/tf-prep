@@ -1,0 +1,377 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wien-Bridge Oscillator · EEE 263 Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Oscillators · Chapter 2 · Sedra §18.3.1 · Khairul s.14–18 · Sadat L26, notes p.117–119 · type S-01 · CT-4</div>
+<h1>The Wien-Bridge Oscillator (and Any "Find f₀ and the Start Condition" Circuit)</h1>
+<p class="lede">The Wien bridge was asked in 2012–13, 2013–14, 2014–15, 2019–20 (28⅔ marks, the general unequal-component derivation) and 2023–24 (17 marks, compulsory). It alternates with Colpitts as the "derive the oscillator" question. Your own CT-4 used the same method on a two-section RC/RL circuit. This chapter teaches the general derivation once, the equal-component shortcut, design, the limiter version, and the cascade method so that any unfamiliar oscillator can be done on a blank page.</p>
+
+<h2>1. Circuit and operating principle</h2>
+<p>A <b>non-inverting amplifier</b> \(A = 1 + R_2/R_1\) (0° phase) drives a <b>lead-lag network</b>: a series arm \(Z_S = R_A + 1/(sC_A)\) from the output to the + input, and a shunt arm \(Z_P = R_B \parallel C_B\) from the + input to ground (Sadat's notation).</p>
+<figure><div id="fig-wien"></div><figcaption><b>Figure 1.</b> Wien-bridge oscillator. In the 2019–20 paper the same parts are called \(C_1, R_1\) (series), \(R_2 \parallel C_2\) (shunt), \(R_3\) (feedback) and \(R_4\) (to ground). The equal-part version in the simulator (10 kΩ, 16 nF, \(R_2/R_1\) = 2.1) runs near 1 kHz; the op-amp clips at ±15 V without a limiter, and the oscillation needs a moment to build up.</figcaption></figure>
+<ul>
+<li><b>Low frequencies:</b> \(C_A\) is open, so \(\beta \to 0\) with a phase lead (+90°).</li>
+<li><b>High frequencies:</b> \(C_B\) shorts the + input, \(\beta \to 0\) with a phase lag (−90°).</li>
+<li><b>At one frequency \(\omega_0\)</b> in between, the phase is exactly 0°. The amplifier also has 0°, so the loop phase is 0° only there: that is the oscillation frequency. At \(\omega_0\) (equal parts) \(\beta = 1/3\), so the amplifier must supply a gain of at least 3.</li>
+<li><b>Why "bridge"</b> (Sadat p.119): \(Z_S\), \(Z_P\), \(R_2\), \(R_1\) form a four-arm bridge across the output, with the op-amp inputs across its middle. At \(\omega_0\) with gain exactly 3 the bridge is balanced.</li>
+</ul>
+
+<h2>2. General derivation (unequal parts: 2019–20, 28⅔ marks)</h2>
+<p>Write this as the exam answer. Break the loop at the + input (it draws no current, so \(Z_S\) and \(Z_P\) form a plain divider):</p>
+<div class="formula">\[ Z_S = R_A + \frac{1}{sC_A} = \frac{1 + sR_AC_A}{sC_A}, \qquad Z_P = R_B \parallel \frac{1}{sC_B} = \frac{R_B}{1 + sR_BC_B} \]</div>
+<div class="formula">\[ \begin{aligned} \beta(s) = \frac{Z_P}{Z_P + Z_S} &= \frac{sR_BC_A}{sR_BC_A + (1 + sR_AC_A)(1 + sR_BC_B)} \\ &= \frac{sR_BC_A}{(1 + s^2R_AR_BC_AC_B) + s(R_AC_A + R_BC_B + R_BC_A)} \end{aligned} \]</div>
+<div class="formula">\[ A(j\omega)\beta(j\omega) = \Big(1 + \frac{R_2}{R_1}\Big)\frac{j\omega R_BC_A}{(1 - \omega^2R_AR_BC_AC_B) + j\omega(R_AC_A + R_BC_B + R_BC_A)} \]</div>
+<p><b>Phase condition.</b> The numerator is purely imaginary, so the phase is 0 when the real part of the denominator vanishes; then the \(j\omega\) cancels:</p>
+<div class="formula">\[ 1 - \omega_0^2R_AR_BC_AC_B = 0 \;\Rightarrow\; \omega_0 = \frac{1}{\sqrt{R_AR_BC_AC_B}}, \qquad f_0 = \frac{1}{2\pi\sqrt{R_AR_BC_AC_B}} \]</div>
+<p><b>Magnitude condition.</b> At \(\omega_0\): \(\beta(\omega_0) = \dfrac{R_BC_A}{R_AC_A + R_BC_B + R_BC_A}\). Require \(A\beta(\omega_0) \ge 1\):</p>
+<div class="formula">\[ 1 + \frac{R_2}{R_1} \ge \frac{R_AC_A + R_BC_B + R_BC_A}{R_BC_A} = 1 + \frac{R_A}{R_B} + \frac{C_B}{C_A} \;\Rightarrow\; \frac{R_2}{R_1} \ge \frac{R_A}{R_B} + \frac{C_B}{C_A} \]</div>
+<p>In the 2019–20 labels (\(C_1\), \(R_1\) series; \(R_2 \parallel C_2\) shunt; gain \(A_V\)) this is exactly the "show that" in the paper: \(A_V \ge 1 + R_1/R_2 + C_2/C_1\). The question bank prints \(C_1/C_2\): a misprint. Derive the ratio from your own labels and you cannot get it wrong (the shunt capacitor is on top).</p>
+
+<h2>3. Equal parts: f₀ = 1/(2πRC), gain 3</h2>
+<p>With \(R_A = R_B = R\) and \(C_A = C_B = C\), divide through (Khairul s.16–17):</p>
+<div class="formula">\[ \begin{gathered} L(j\omega) = \frac{1 + R_2/R_1}{3 + j\big(\omega RC - \frac{1}{\omega RC}\big)} \\ \omega_0 = \frac{1}{RC},\quad \beta(\omega_0) = \frac{1}{3},\quad 1 + \frac{R_2}{R_1} \ge 3 \iff R_2 \ge 2R_1 \end{gathered} \]</div>
+<p>Choose \(R_2/R_1\) <b>slightly greater than 2</b> (e.g. 2.03 to 2.1) so oscillation starts, and limit the amplitude (Section 4). Exactly 2 only sustains an oscillation that already exists; much more than 2 gives a clipped, distorted sine.</p>
+
+<div class="method"><h4>Method · Wien analysis</h4><ol>
+<li>Identify the series arm (\(R_A, C_A\)) and shunt arm (\(R_B \parallel C_B\)), and the amplifier gain \(1 + R_2/R_1\).</li>
+<li>\(f_0 = 1/(2\pi\sqrt{R_AR_BC_AC_B})\) (equal parts: \(1/(2\pi RC)\)). If \(\omega\) is asked, do not divide by \(2\pi\).</li>
+<li>\(1/\beta(\omega_0) = 1 + R_A/R_B + C_B/C_A\) (equal parts: 3).</li>
+<li>Start condition: \(R_2/R_1 \ge R_A/R_B + C_B/C_A\) (equal: \(R_2 \ge 2R_1\)), "slightly greater" in practice.</li>
+</ol></div>
+<div id="wk-gen"></div>
+<div id="dr-gen"></div>
+
+<div class="method"><h4>Method · Wien design for a given f₀ (or ω₀)</h4><ol>
+<li>Choose equal parts. Pick a standard \(C\) (1 nF to 1 µF) so that \(R = 1/(2\pi f_0C)\) lands between about 1 kΩ and 100 kΩ (small R loads the op-amp; huge R is noisy and comparable to op-amp input resistance).</li>
+<li>\(R = 1/(2\pi f_0 C)\) (or \(R = 1/(\omega_0C)\)).</li>
+<li>Gain: \(R_1 = 10\) kΩ, \(R_2 = 20\) kΩ for exactly 3; state "\(R_2\) slightly above 20 kΩ (e.g. 21 kΩ) plus a diode limiter" for reliable start-up.</li>
+<li>State \(\beta(\omega_0) = 1/3\) if asked for "the gain of the feedback network".</li>
+</ol></div>
+<div id="wk-des"></div>
+<div id="dr-des"></div>
+
+<h2>4. Amplitude stabilisation: Wien with a diode limiter (Sedra Fig. 18.6, Khairul s.18)</h2>
+<p>Set \(R_2/R_1\) a little above 2 so the poles sit just in the right half-plane; the oscillation grows until the diodes start to conduct and reduce the effective gain. With the limiter, the output is a clean sine of predictable amplitude.</p>
+<figure><div id="fig-wl"></div><figcaption><b>Figure 2.</b> Sedra's Wien oscillator with limiter: \(R_s = R_p\) = 10 kΩ, \(C_s = C_p\) = 16 nF, \(R_1\) = 10 kΩ, \(R_2\) = 20.3 kΩ; \(R_3 = R_6\) = 3 kΩ to ±15 V, \(R_4 = R_5\) = 1 kΩ. \(D_1\), \(D_2\) connect the string nodes a, b to the − input (node \(v_1\)).</figcaption></figure>
+<p><b>Poles.</b> \(1 - L(s) = 0\) with \(L = \dfrac{1 + R_2/R_1}{3 + sCR + 1/(sCR)}\) gives \((sCR)^2 - (A - 3)(sCR) + 1 = 0\). With \(A = 3.03\): \(sCR = 0.015 \pm j\,0.9999\), i.e. \(s = \frac{10^5}{16}(0.015 \pm j)\): right half-plane, so it grows.</p>
+<p><b>Amplitude.</b> In steady state at \(\omega_0\), the + input is \(v_O/3\), and the − input \(v_1\) equals it. \(D_2\) turns on at the positive peak when \(v_b = v_1 + V_D\), where \(v_b = v_O\frac{R_6}{R_5 + R_6} - 15\frac{R_5}{R_5 + R_6}\):</p>
+<div class="formula">\[ 0.75\,\hat v_O - 3.75 = \frac{\hat v_O}{3} + 0.7 \;\Rightarrow\; \hat v_O = \frac{4.45}{0.4167} = 10.68\text{ V} \;\Rightarrow\; 21.36\text{ V peak-to-peak} \]</div>
+<div id="dr-wl"></div>
+
+<h2>5. The general method for any "find f₀ and the start condition" circuit (your CT-4)</h2>
+<p>CT-4 gave a circuit you had not seen: two passive first-order sections, each followed by an op-amp (a voltage follower after the first, a non-inverting amplifier \(K = 1 + R_2/R_1\) after the second), with \(V_o\) fed back to the start. Because each section feeds an op-amp input (no current), <b>the sections do not load each other</b> and the loop gain is just a product.</p>
+<figure><div id="fig-ct4a"></div><figcaption><b>Figure 3.</b> CT-4 Set A (odd IDs): RC low-pass, follower, RL high-pass, non-inverting amplifier.</figcaption></figure>
+<figure><div id="fig-ct4b"></div><figcaption><b>Figure 4.</b> CT-4 Set B (even IDs): CR high-pass, follower, LR low-pass, non-inverting amplifier.</figcaption></figure>
+<div class="tbl"><table>
+<tr><th>Section (series → shunt)</th><th>Transfer function</th><th>Time constant</th><th>Type</th></tr>
+<tr><td>R series, C shunt</td><td>\(\dfrac{1}{1 + s\tau}\)</td><td>\(\tau = RC\)</td><td>low-pass</td></tr>
+<tr><td>C series, R shunt</td><td>\(\dfrac{s\tau}{1 + s\tau}\)</td><td>\(\tau = RC\)</td><td>high-pass</td></tr>
+<tr><td>R series, L shunt</td><td>\(\dfrac{s\tau}{1 + s\tau}\)</td><td>\(\tau = L/R\)</td><td>high-pass</td></tr>
+<tr><td>L series, R shunt</td><td>\(\dfrac{1}{1 + s\tau}\)</td><td>\(\tau = L/R\)</td><td>low-pass</td></tr>
+</table></div>
+<div class="method"><h4>Method · cascade of buffered sections</h4><ol>
+<li>Write each section's transfer function from the table (a divider: shunt / (series + shunt)). Multiply by the amplifier gains: \(L(s) = K\,H_1(s)H_2(s)\).</li>
+<li>Set \(s = j\omega\). One low-pass and one high-pass: \(L = \dfrac{K\,j\omega\tau_{HP}}{(1 - \omega^2\tau_1\tau_2) + j\omega(\tau_1 + \tau_2)}\). Numerator imaginary → real part of the denominator = 0: \(\omega_0 = 1/\sqrt{\tau_1\tau_2}\) (the geometric mean of the two corner frequencies).</li>
+<li>At \(\omega_0\): \(L = K\,\tau_{HP}/(\tau_1 + \tau_2)\). Start: \(K &gt; 1 + \tau_{LP}/\tau_{HP}\).</li>
+<li>Unfamiliar or loaded network? Do nodal analysis for \(\beta(j\omega)\) instead, then the same two conditions. Or write the characteristic equation \(1 - L(s) = 0\) as a polynomial: oscillation at \(s = j\omega_0\) needs the \(s^1\) coefficient to be zero (sustain) or negative (start), and \(\omega_0^2\) = (constant term)/(\(s^2\) coefficient).</li>
+</ol></div>
+<p><b>Set A</b>: \(\tau_1 = R_AC_A\) (low-pass), \(\tau_2 = L_B/R_B\) (high-pass).</p>
+<div class="formula">\[ \begin{gathered} L(s) = \frac{K s\tau_2}{(1 + s\tau_1)(1 + s\tau_2)},\quad \omega_0 = \frac{1}{\sqrt{\tau_1\tau_2}} = \sqrt{\frac{R_B}{R_AC_AL_B}} \\ K &gt; 1 + \frac{\tau_1}{\tau_2} \iff \frac{R_2}{R_1} &gt; \frac{R_AR_BC_A}{L_B} \end{gathered} \]</div>
+<p><b>Set B</b>: \(\tau_1 = R_AC_A\) (high-pass), \(\tau_2 = L_B/R_B\) (low-pass). Same \(\omega_0\); the roles swap:</p>
+<div class="formula">\[ \begin{gathered} L(s) = \frac{K s\tau_1}{(1 + s\tau_1)(1 + s\tau_2)},\quad \omega_0 = \sqrt{\frac{R_B}{R_AC_AL_B}} \\ K &gt; 1 + \frac{\tau_2}{\tau_1} \iff \frac{R_2}{R_1} &gt; \frac{L_B}{R_AR_BC_A} \end{gathered} \]</div>
+<p>Pole check (why "&gt;" is the start condition): \(1 - L = 0\) gives \(\tau_1\tau_2s^2 + (\tau_1 + \tau_2 - K\tau_{HP})s + 1 = 0\); the poles cross into the right half-plane exactly when \(K\tau_{HP} &gt; \tau_1 + \tau_2\). With \(\tau_1 = \tau_2\) the minimum gain is 2 (compare Wien's 3, where the two sections load each other).</p>
+<div id="wk-ct4"></div>
+<div id="dr-ct4"></div>
+<p><b>Variants.</b> The 2015–16 paper (Q7(a), 26 marks) used a Wien-type ladder with inductors (series L, shunt \(R_1\), then \(R_2\), shunt L); it is worked in <a href="04-lc-and-crystal.html">Chapter 4</a> by the same nodal method. The assignment's RL oscillator with an op-amp integrator-like stage is in the class-test block below.</p>
+
+<div class="trap"><h4>Traps (where marks go)</h4><ul>
+<li>ω versus f: "ω₀ = 1000 rad/s" means \(RC = 1\) ms, no \(2\pi\).</li>
+<li>The amplifier is <b>non-inverting</b> (gain \(1 + R_2/R_1\), not \(R_2/R_1\)). "Gain 3" means \(R_2 = 2R_1\).</li>
+<li>Unequal parts: \(R_2/R_1 \ge R_A/R_B + C_B/C_A\). The capacitor ratio is shunt over series; the bank's \(C_1/C_2\) is a misprint.</li>
+<li>Say both: exactly 3 to sustain, slightly more than 3 to start, plus amplitude control.</li>
+<li>In CT-4-type circuits the minimum gain is \(1 + \tau_{LP}/\tau_{HP}\): put the low-pass time constant on top. Swapping them is the classic Set A / Set B mistake.</li>
+</ul></div>
+
+<h2>Exam questions</h2>
+
+<div class="exam">
+  <div class="exam-src">2023–24 · Sec B · Q5(a) · 17 marks · compulsory</div>
+  <div class="exam-q"><p>Define Barkhausen criterion. Describe the operating principle of an op-amp based Wien bridge oscillator. Derive the conditions for the Barkhausen criterion to be satisfied in this oscillator and the expression of oscillation frequency.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><b>Barkhausen criterion.</b> For an amplifier \(A\) with positive feedback through \(\beta\), \(A_f = A/(1 - A\beta)\). The circuit oscillates at \(\omega_0\) (finite output, zero input) when \(A(j\omega_0)\beta(j\omega_0) = 1\): \(|A\beta| = 1\) and \(\angle A\beta = 0^\circ\) (360°). In practice \(|A\beta|\) is made slightly greater than 1 for start-up, with non-linear amplitude limiting.</p>
+    <p><b>Circuit and principle.</b> Draw Figure 1 with equal parts: non-inverting amplifier \(A = 1 + R_2/R_1\); series \(R\)–\(C\) from output to the + input; parallel \(R \parallel C\) from the + input to ground. The RC network is a lead-lag (band-pass) network: lead at low frequency, lag at high frequency, zero phase at one frequency. Since the amplifier has 0° phase, the loop phase is 0° only there, so the circuit oscillates at that frequency; the amplifier gain makes up the network's loss of 3.</p>
+    <p><b>Derivation.</b> \(Z_s = R + \dfrac{1}{sC}\), \(Y_p = \dfrac{1}{R} + sC\). \(\beta = \dfrac{Z_p}{Z_p + Z_s} = \dfrac{1}{1 + Z_sY_p} = \dfrac{1}{3 + sCR + \frac{1}{sCR}}\).</p>
+    <p>\(L(j\omega) = \dfrac{1 + R_2/R_1}{3 + j\big(\omega CR - \frac{1}{\omega CR}\big)}\).</p>
+    <p>Phase condition: imaginary part zero, \(\omega_0CR = \dfrac{1}{\omega_0CR}\), so \(\omega_0 = \dfrac{1}{RC}\), \(f_0 = \dfrac{1}{2\pi RC}\).</p>
+    <p>Magnitude condition: at \(\omega_0\), \(\beta = 1/3\), so \(1 + R_2/R_1 = 3\), i.e. \(R_2 = 2R_1\) to sustain; \(R_2/R_1\) slightly greater than 2 to start, with a diode limiter (or the op-amp's saturation) to hold the amplitude.</p>
+    <p>(General case, for full marks if you have time: \(\omega_0 = 1/\sqrt{R_AR_BC_AC_B}\) and \(R_2/R_1 \ge R_A/R_B + C_B/C_A\), Section 2.)</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2019–20 (exam held January 2021) · Sec B · Q7(a) · 28⅔ marks</div>
+  <div class="exam-q"><p>Consider the circuit of resistors, capacitors and an op-amp in the figure (C₁ and R₁ in series from \(v_o\) to the + input; R₂ ∥ C₂ from the + input to ground; R₃ from \(v_o\) to the − input; R₄ from the − input to ground). (i) What conditions must hold for it to operate as a sinusoidal oscillator? (ii) Derive the oscillation frequency. (iii) The op-amp with R₃ and R₄ forms a non-inverting amplifier of gain \(A_V\); show that \(A_V \ge 1 + R_1/R_2 + C_2/C_1\) for sustained oscillation. (iv) If R₁ = R₂ = 10 kΩ and C₁ = C₂ = 0.1 µF, design R₃ and R₄ so that oscillation sustains.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><b>(i)</b> Barkhausen: the loop gain \(A_V\beta(j\omega_0) = 1\), i.e. \(|A_V\beta| = 1\) and total loop phase 0° (360°) at one frequency \(\omega_0\); for start-up \(|A_V\beta|\) slightly greater than 1, with amplitude limiting.</p>
+    <p><b>(ii)</b> \(Z_1 = R_1 + \dfrac{1}{sC_1}\), \(Z_2 = \dfrac{R_2}{1 + sR_2C_2}\). \(\dfrac{1}{\beta} = 1 + \dfrac{Z_1}{Z_2} = 1 + \Big(R_1 + \dfrac{1}{sC_1}\Big)\Big(\dfrac{1}{R_2} + sC_2\Big)\)</p>
+    <p>\(= 1 + \dfrac{R_1}{R_2} + \dfrac{C_2}{C_1} + sR_1C_2 + \dfrac{1}{sR_2C_1}\). At \(s = j\omega\): \(\dfrac{1}{\beta} = 1 + \dfrac{R_1}{R_2} + \dfrac{C_2}{C_1} + j\Big(\omega R_1C_2 - \dfrac{1}{\omega R_2C_1}\Big)\).</p>
+    <p>The amplifier has 0° phase, so \(\beta\) must be real: \(\omega_0R_1C_2 = \dfrac{1}{\omega_0R_2C_1}\), giving \(\omega_0 = \dfrac{1}{\sqrt{R_1R_2C_1C_2}}\), \(f_0 = \dfrac{1}{2\pi\sqrt{R_1R_2C_1C_2}}\).</p>
+    <p><b>(iii)</b> At \(\omega_0\): \(\beta = \dfrac{1}{1 + R_1/R_2 + C_2/C_1}\). Sustained oscillation needs \(A_V\beta \ge 1\): \(A_V = 1 + \dfrac{R_3}{R_4} \ge 1 + \dfrac{R_1}{R_2} + \dfrac{C_2}{C_1}\). (Shown.)</p>
+    <p><b>(iv)</b> \(f_0 = \dfrac{1}{2\pi\sqrt{10^4\cdot10^4\cdot10^{-7}\cdot10^{-7}}} = \dfrac{1}{2\pi\times10^{-3}} = 159.2\) Hz. \(A_V \ge 1 + 1 + 1 = 3\), so \(R_3 \ge 2R_4\). Choose \(R_4\) = 10 kΩ, \(R_3\) = 20 kΩ (sustain); in practice \(R_3\) ≈ 21 kΩ (slightly above 2R₄) with a diode limiter for start-up and a clean amplitude.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2014–15 · Sec B · Q8(a) · 20 marks (17 + 3)</div>
+  <div class="exam-q"><p>Design a Wien bridge oscillator with an oscillation frequency of 1 kHz. What is the gain of the feedback network of your design? Specify all values of resistors and capacitors used.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>Draw Figure 1 with equal parts. \(f_0 = 1/(2\pi RC)\).</p>
+    <p>Choose \(C\) = 10 nF: \(R = \dfrac{1}{2\pi\times1000\times10^{-8}} = 15.92\) kΩ (use 15.9 kΩ, or 16 kΩ giving 995 Hz).</p>
+    <p>Feedback network gain at \(f_0\): \(\beta = V_f/V_o = 1/3\) (phase 0°).</p>
+    <p>Amplifier: \(A = 1 + R_2/R_1 \ge 3\). \(R_1\) = 10 kΩ, \(R_2\) = 20 kΩ (to sustain); choose \(R_2\) slightly larger, e.g. 21 kΩ, so oscillation starts, and add a diode limiter (or rely on saturation) to fix the amplitude.</p>
+    <p><b>Final values:</b> \(R_A = R_B\) = 15.9 kΩ, \(C_A = C_B\) = 10 nF, \(R_1\) = 10 kΩ, \(R_2\) = 20 kΩ (≈ 21 kΩ for start-up). Check: \(f_0 = 1/(2\pi\times15.9\text{k}\times10\text{n}) = 1.00\) kHz.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2013–14 · Sec B · Q6(a) · 16⅔ marks</div>
+  <div class="exam-q"><p>Design a Wien-bridge oscillator with an oscillation frequency of 1000 rad/s. Available capacitors are 0.1 µF, 1 µF and 100 pF.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>\(\omega_0 = 1/(RC) = 1000\) rad/s, so \(RC = 1\) ms (ω is given: no \(2\pi\)).</p>
+    <p>Try each capacitor: 0.1 µF → \(R\) = 10 kΩ; 1 µF → \(R\) = 1 kΩ (heavy load on the op-amp output); 100 pF → \(R\) = 10 MΩ (too large: comparable to stray and input resistances, noisy). Choose <b>C = 0.1 µF, R = 10 kΩ</b>.</p>
+    <p>Gain: \(1 + R_2/R_1 \ge 3\): \(R_1\) = 10 kΩ, \(R_2\) = 20 kΩ (slightly more, e.g. 21 kΩ, for reliable start-up, with a limiter). \(f_0 = 1000/2\pi = 159\) Hz.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2012–13 · Sec B · Q8(a) · 17 marks</div>
+  <div class="exam-q"><p>Draw a Wien-bridge oscillator circuit and describe its operating principle.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>Draw Figure 1 (equal R and C). Principle, in points:</p>
+    <p>1. It is a positive-feedback loop: non-inverting amplifier \(A = 1 + R_2/R_1\) (phase 0°) and the RC lead-lag network \(\beta\) feeding the + input.</p>
+    <p>2. The network gives a phase lead at low frequency and a lag at high frequency; at \(f_0 = 1/(2\pi RC)\) its phase is 0° and \(\beta = 1/3\). Only at this frequency is the loop phase 0°, so only this frequency is sustained (Barkhausen).</p>
+    <p>3. Magnitude: \(A\beta = 1\) needs \(A = 3\), i.e. \(R_2 = 2R_1\). For start-up \(R_2\) is made slightly larger than \(2R_1\): noise at \(f_0\) grows.</p>
+    <p>4. Amplitude is stabilised by a non-linear element: diode limiter across the feedback (Sedra), a lamp/thermistor in \(R_1\)/\(R_2\), or a JFET as a variable resistor (AGC), which reduces the gain to exactly 3 at the final amplitude.</p>
+    <p>5. The four arms \(Z_s\), \(Z_p\), \(R_2\), \(R_1\) form a bridge across the output with the op-amp inputs across its diagonal; it balances at \(f_0\) with gain 3. Used for audio-frequency sine generators (low distortion, easy tuning with a ganged capacitor).</p>
+  </div></details>
+</div>
+
+<h3>Class tests and assignment</h3>
+
+<div class="exam">
+  <div class="exam-src">CT-4 (your batch, Jan 2026) · Set A (odd IDs)</div>
+  <div class="exam-q"><p>Assuming ideal op-amps in the given oscillator (Figure 3: \(R_A\) series and \(C_A\) shunt, voltage follower, \(R_B\) series and \(L_B\) shunt, non-inverting amplifier with \(R_1\), \(R_2\), output fed back to the input), find (i) the frequency of oscillation, (ii) the condition for oscillation to start.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>The follower and the ideal + input draw no current, so the sections do not load each other. Let \(\tau_1 = R_AC_A\), \(\tau_2 = L_B/R_B\), \(K = 1 + R_2/R_1\).</p>
+    <p>\(H_1 = \dfrac{1}{1 + s\tau_1}\) (RC low-pass), \(H_2 = \dfrac{sL_B}{R_B + sL_B} = \dfrac{s\tau_2}{1 + s\tau_2}\) (RL high-pass). \(L(s) = \dfrac{Ks\tau_2}{(1 + s\tau_1)(1 + s\tau_2)}\).</p>
+    <p>\(L(j\omega) = \dfrac{Kj\omega\tau_2}{(1 - \omega^2\tau_1\tau_2) + j\omega(\tau_1 + \tau_2)}\). Numerator imaginary, so phase 0 needs \(1 - \omega_0^2\tau_1\tau_2 = 0\):</p>
+    <p><b>(i)</b> \(\omega_0 = \dfrac{1}{\sqrt{\tau_1\tau_2}} = \sqrt{\dfrac{R_B}{R_AC_AL_B}}\), \(f_0 = \dfrac{1}{2\pi}\sqrt{\dfrac{R_B}{R_AC_AL_B}}\).</p>
+    <p><b>(ii)</b> At \(\omega_0\): \(L = \dfrac{K\tau_2}{\tau_1 + \tau_2}\). Start: \(L &gt; 1 \Rightarrow 1 + \dfrac{R_2}{R_1} &gt; 1 + \dfrac{\tau_1}{\tau_2} \Rightarrow \dfrac{R_2}{R_1} &gt; \dfrac{R_AR_BC_A}{L_B}\) (equality just sustains).</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">CT-4 (your batch, Jan 2026) · Set B (even IDs)</div>
+  <div class="exam-q"><p>Same question for Figure 4: \(C_A\) series and \(R_A\) shunt, voltage follower, \(L_B\) series and \(R_B\) shunt, non-inverting amplifier \(K = 1 + R_2/R_1\).</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>\(H_1 = \dfrac{s\tau_1}{1 + s\tau_1}\) (CR high-pass, \(\tau_1 = R_AC_A\)), \(H_2 = \dfrac{R_B}{R_B + sL_B} = \dfrac{1}{1 + s\tau_2}\) (LR low-pass, \(\tau_2 = L_B/R_B\)).</p>
+    <p>\(L(j\omega) = \dfrac{Kj\omega\tau_1}{(1 - \omega^2\tau_1\tau_2) + j\omega(\tau_1 + \tau_2)}\).</p>
+    <p><b>(i)</b> Same frequency: \(\omega_0 = \sqrt{\dfrac{R_B}{R_AC_AL_B}}\).</p>
+    <p><b>(ii)</b> At \(\omega_0\): \(L = \dfrac{K\tau_1}{\tau_1 + \tau_2} &gt; 1 \Rightarrow \dfrac{R_2}{R_1} &gt; \dfrac{\tau_2}{\tau_1} = \dfrac{L_B}{R_AR_BC_A}\).</p>
+    <p>Numerical check (\(R_A\) = 1 kΩ, \(C_A\) = 0.1 µF, \(R_B\) = 2 kΩ, \(L_B\) = 50 mH): \(\omega_0\) = 20 krad/s (3.18 kHz); minimum \(K\) = 5 for Set A, 1.25 for Set B.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">Assignment Q10 (EEE 263 assignment, same set as EDC 2-1) · op-amp oscillator with inductors</div>
+  <div class="exam-q"><p>Find the oscillation frequency and the condition for sustained oscillation. Op-amp 1: + grounded, − input node \(n_1\), feedback inductor \(L\) from \(n_1\) to its output \(v_f\). Network: \(L\) from \(v_o\) to node \(v_1\); \(R\) from \(v_1\) to \(n_1\); \(R\) from \(v_1\) to \(v_f\). Op-amp 2 is inverting: \(R_1\) from \(v_f\) to its − input, \(R_2\) to its output \(v_o\).</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>The two stages load each other through node \(v_1\), so use nodal analysis and the characteristic equation.</p>
+    <p>Op-amp 1 (virtual ground at \(n_1\)): \(v_1/R = -v_f/(sL)\), so \(v_1 = -\dfrac{R}{sL}v_f\). Op-amp 2: \(v_o = -Kv_f\) with \(K = R_2/R_1\).</p>
+    <p>KCL at \(v_1\): \(\dfrac{v_o - v_1}{sL} = \dfrac{v_1}{R} + \dfrac{v_1 - v_f}{R}\). Substitute and multiply by \(s^2L^2R/v_f\):</p>
+    <p>\(s^2L^2 + sLR(2 - K) + R^2 = 0\).</p>
+    <p>Poles on the \(j\omega\) axis need the \(s\) term to vanish: \(K = R_2/R_1 = 2\). Then \(s^2 = -R^2/L^2\): \(\omega_0 = R/L\), \(f_0 = R/(2\pi L)\). For start-up \(R_2 &gt; 2R_1\) (poles move into the right half-plane).</p>
+  </div></details>
+</div>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+
+<div class="key"><p><strong>Summary:</strong> Wien = non-inverting amplifier + lead-lag network. General: \(\omega_0 = 1/\sqrt{R_AR_BC_AC_B}\), \(R_2/R_1 \ge R_A/R_B + C_B/C_A\). Equal parts: \(f_0 = 1/(2\pi RC)\), \(\beta = 1/3\), \(R_2 = 2R_1\) (slightly more to start, limiter for amplitude). Design: pick C so R is 1–100 kΩ, then \(R = 1/(2\pi f_0C)\). For any new circuit: break the loop, multiply buffered sections (or do nodal analysis), phase 0 → \(\omega_0\), \(|L(\omega_0)| \ge 1\) → gain. For one LP and one HP buffered section: \(\omega_0 = 1/\sqrt{\tau_1\tau_2}\), \(K &gt; 1 + \tau_{LP}/\tau_{HP}\).</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/eee.js"></script>
+<script>
+// Wien oscillator. v = {RA, CA, RB, CB, R1, R2} in Ω/F (numbers) or null for symbolic labels only.
+const wienFig = (v, lab = {}) => {
+  const P = (k, d) => v ? [1, { val: v[k] }] : [];
+  const L = (k, d) => lab[k] || d;
+  return sch([
+    ['opamp', [200, 120], { plusTop: true }], ['W', [280, 120], [340, 120]], ['dot', [340, 120]],
+    ['W', [200, 136], [180, 136], [180, 190]], ['R', [180, 190], [340, 190], L('R2', 'R₂'), ...P('R2')], ['W', [340, 190], [340, 120]], ['dot', [180, 190]],
+    ['R', [180, 190], [180, 260], L('R1', 'R₁'), ...P('R1')], ['gnd', [180, 260]],
+    ['W', [340, 120], [340, 30]], ['C', [340, 30], [280, 30], L('CA', 'CA'), ...P('CA')], ['R', [280, 30], [200, 30], L('RA', 'RA'), ...P('RA')],
+    ['W', [200, 30], [160, 30], [160, 104], [200, 104]], ['dot', [160, 30]],
+    ['W', [160, 30], [20, 30]], ['dot', [100, 30]], ['R', [100, 30], [100, 110], L('RB', 'RB'), ...P('RB')], ['C', [20, 30], [20, 110], L('CB', 'CB'), ...P('CB')],
+    ['W', [20, 110], [100, 110]], ['gnd', [60, 110]], ['t', [350, 116], 'vₒ', 'start'], ['t', [166, 96], '+ in', 'start', 'sm'],
+  ], { w: 380, h: 280, sim: !!v });
+};
+$('#fig-wien').innerHTML = wienFig({ RA: 1e4, CA: 16e-9, RB: 1e4, CB: 16e-9, R1: 1e4, R2: 2.1e4 });
+
+worked('#wk-gen', {
+  given: 'Unequal Wien network: series \\(R_A\\) = 10 kΩ, \\(C_A\\) = 10 nF; shunt \\(R_B\\) = 20 kΩ, \\(C_B\\) = 5 nF; \\(R_1\\) = 10 kΩ. Find f₀, β(ω₀) and the minimum \\(R_2\\).',
+  steps: [
+    { t: '\\(R_AR_BC_AC_B = 10^4\\cdot2\\times10^4\\cdot10^{-8}\\cdot5\\times10^{-9} = 10^{-8}\\) s², so \\(\\omega_0 = 10^4\\) rad/s', a: { l: '\\omega_0', v: 1e4, u: 'rad/s' } },
+    { t: '\\(f_0 = 10^4/2\\pi = 1.59\\) kHz', a: { l: 'f_0', v: 1591.5, u: 'kHz' } },
+    { t: '\\(1/\\beta = 1 + R_A/R_B + C_B/C_A = 1 + 0.5 + 0.5 = 2\\), so \\(\\beta(\\omega_0) = 0.5\\)', a: { l: '\\beta(\\omega_0)', v: 0.5, u: 'V/V' } },
+    { t: '\\(R_2/R_1 \\ge 0.5 + 0.5 = 1\\): \\(R_{2,min}\\) = 10 kΩ (gain 2 is enough here, not 3)', a: { l: 'R_{2,min}', v: 1e4, u: 'kΩ' } },
+  ] });
+
+drill('#dr-gen', { id: 's01-wien-analysis', title: 'Wien bridge analysis: f0, beta and minimum gain resistor', gen(r) {
+  const eq = r() < 0.35;
+  const RA = r.pick([1, 2.2, 4.7, 10, 15, 22, 47, 100]) * 1e3, CA = r.pick([1, 2.2, 4.7, 10, 22, 47, 100]) * 1e-9;
+  const RB = eq ? RA : r.pick([1, 2.2, 4.7, 10, 15, 22, 47, 100]) * 1e3, CB = eq ? CA : r.pick([1, 2.2, 4.7, 10, 22, 47, 100]) * 1e-9;
+  const R1 = r.pick([4.7, 10, 22]) * 1e3;
+  const w0 = 1 / Math.sqrt(RA * RB * CA * CB), f0 = w0 / (2 * Math.PI), ib = 1 + RA / RB + CB / CA, R2 = (ib - 1) * R1;
+  if (f0 < 50 || f0 > 2e5 || ib > 12) return null;
+  return {
+    given: `Wien oscillator (Figure 1): series arm \\(R_A\\) = ${si(RA, 'Ω')}, \\(C_A\\) = ${si(CA, 'F')}; shunt arm \\(R_B\\) = ${si(RB, 'Ω')}, \\(C_B\\) = ${si(CB, 'F')}; \\(R_1\\) = ${si(R1, 'Ω')}. Find f₀, β(ω₀) and the minimum \\(R_2\\) for oscillation.`,
+    fig: wienFig({ RA, CA, RB, CB, R1, R2: R2 * 1.05 }),
+    ask: [{ l: 'f_0', v: f0, u: 'Hz' }, { l: '\\beta(\\omega_0)', v: 1 / ib, u: 'V/V' }, { l: 'R_{2,min}', v: R2, u: 'kΩ' }],
+    steps: [
+      { t: `\\(\\omega_0 = 1/\\sqrt{R_AR_BC_AC_B} = 1/\\sqrt{${num(RA)}\\cdot${num(RB)}\\cdot${num(CA)}\\cdot${num(CB)}} = ${num(w0)}\\) rad/s, \\(f_0 = ${num(f0)}\\) Hz`, a: { l: 'f_0', v: f0, u: 'Hz' } },
+      { t: `\\(1/\\beta = 1 + ${num(RA / 1e3)}/${num(RB / 1e3)} + ${num(CB * 1e9)}/${num(CA * 1e9)} = ${num(ib)}\\), \\(\\beta = ${num(1 / ib)}\\)`, a: { l: '\\beta(\\omega_0)', v: 1 / ib, u: 'V/V' } },
+      { t: `\\(R_2/R_1 \\ge ${num(ib - 1)}\\): \\(R_{2,min} = ${num(ib - 1)}\\times${num(R1 / 1e3)} = ${num(R2 / 1e3)}\\) kΩ`, a: { l: 'R_{2,min}', v: R2, u: 'kΩ' } },
+    ] };
+} });
+
+worked('#wk-des', {
+  given: 'Design a Wien oscillator for f₀ = 2 kHz using C = 4.7 nF, \\(R_1\\) = 10 kΩ.',
+  steps: [
+    { t: '\\(R = \\dfrac{1}{2\\pi f_0C} = \\dfrac{1}{2\\pi\\times2000\\times4.7\\times10^{-9}} = 16.9\\) kΩ (between 1 and 100 kΩ: good)', a: { l: 'R', v: 16931, u: 'kΩ' } },
+    { t: '\\(\\beta(\\omega_0) = 1/3\\), so \\(A = 1 + R_2/R_1 \\ge 3\\)', a: { l: 'A_{min}', v: 3, u: 'V/V' } },
+    { t: '\\(R_2 = 2R_1 = 20\\) kΩ to sustain; use ≈ 21 kΩ with a diode limiter to start.', a: { l: 'R_2', v: 2e4, u: 'kΩ' } },
+  ] });
+
+drill('#dr-des', { id: 's01-wien-design', title: 'Wien bridge design: R for a given f0 or omega0', gen(r) {
+  const useW = r() < 0.4;
+  const f0 = Math.exp(Math.log(100) + r() * (Math.log(5e4) - Math.log(100)));
+  const fr = +f0.toPrecision(2), w = 2 * Math.PI * fr, wr = +w.toPrecision(2);
+  const target = useW ? wr : 2 * Math.PI * fr; // rad/s
+  const caps = [100e-6, 47e-6, 22e-6, 10e-6, 4.7e-6, 2.2e-6, 1e-6, 470e-9, 220e-9, 100e-9, 47e-9, 22e-9, 10e-9, 4.7e-9, 2.2e-9, 1e-9, 470e-12, 220e-12, 100e-12];
+  const C = caps.find(c => { const R = 1 / (target * c); return R >= 5e3 && R <= 50e3; });
+  if (!C) return null;
+  const R = 1 / (target * C), R1 = 1e4;
+  return {
+    given: `Design an equal-component Wien-bridge oscillator for ${useW ? `ω₀ = ${num(wr)} rad/s` : `f₀ = ${si(fr, 'Hz')}`}. Use C = ${si(C, 'F')} and \\(R_1\\) = 10 kΩ. Find R, the feedback-network gain β at the oscillation frequency, and \\(R_2\\) for sustained oscillation.`,
+    ask: [{ l: 'R', v: R, u: 'kΩ' }, { l: '\\beta', v: 1 / 3, u: 'V/V' }, { l: 'R_2', v: 2 * R1, u: 'kΩ' }],
+    steps: [
+      { t: useW ? `\\(R = \\dfrac{1}{\\omega_0C} = \\dfrac{1}{${num(wr)}\\times${num(C)}} = ${num(R / 1e3)}\\) kΩ (ω given: no 2π)` : `\\(R = \\dfrac{1}{2\\pi f_0C} = \\dfrac{1}{2\\pi\\times${num(fr)}\\times${num(C)}} = ${num(R / 1e3)}\\) kΩ`, a: { l: 'R', v: R, u: 'kΩ' } },
+      { t: '\\(\\beta(\\omega_0) = 1/3\\) for equal parts', a: { l: '\\beta', v: 1 / 3, u: 'V/V' } },
+      { t: '\\(1 + R_2/R_1 = 3 \\Rightarrow R_2 = 20\\) kΩ (slightly more, with a limiter, to start)', a: { l: 'R_2', v: 2e4, u: 'kΩ' } },
+    ] };
+} });
+
+// Wien with limiter (Sedra Fig. 18.6)
+const wlFig = (o = {}) => sch([
+  ['opamp', [240, 140], { plusTop: true }], ['W', [320, 140], [460, 140]], ['dot', [380, 140]], ['dot', [460, 140]],
+  ['W', [380, 140], [380, 30]], ['C', [380, 30], [320, 30], 'Cs', 1, { val: 16e-9 }], ['R', [320, 30], [240, 30], 'Rs', 1, { val: 1e4 }],
+  ['W', [240, 30], [200, 30], [200, 124], [240, 124]], ['dot', [200, 30]], ['W', [200, 30], [80, 30]], ['dot', [140, 30]],
+  ['R', [140, 30], [140, 110], 'Rp', 1, { val: 1e4 }], ['C', [80, 30], [80, 110], 'Cp', 1, { val: 16e-9 }], ['W', [80, 110], [140, 110]], ['gnd', [110, 110]],
+  ['W', [240, 156], [220, 156], [220, 210]], ['dot', [220, 210]], ['R', [220, 210], [380, 210], 'R₂', 1, { val: o.R2 || 20.3e3 }], ['W', [380, 210], [380, 140]],
+  ['R', [220, 210], [130, 210], 'R₁', 1, { val: 1e4 }], ['gnd', [130, 210]],
+  ['rail', [460, 40], '+15 V'], ['R', [460, 40], [460, 100], 'R₃', -1, { val: o.R3 || 3e3 }], ['R', [460, 100], [460, 140], 'R₄', -1, { val: o.R4 || 1e3 }], ['dot', [460, 100]],
+  ['R', [460, 140], [460, 180], 'R₅', -1, { val: o.R4 || 1e3 }], ['dot', [460, 180]], ['R', [460, 180], [460, 240], 'R₆', -1, { val: o.R3 || 3e3 }], ['rail', [460, 240], '−15 V', false],
+  ['W', [220, 210], [220, 300], [520, 300], [520, 100]], ['D', [520, 100], [460, 100], 'D₁', -1], ['dot', [520, 180]], ['D', [460, 180], [520, 180], 'D₂', -1],
+  ['t', [468, 92], 'a', 'start'], ['t', [468, 196], 'b', 'start'], ['t', [228, 236], 'v₁', 'start'], ['t', [330, 132], 'vO', 'start'],
+], { w: 560, h: 320 });
+$('#fig-wl').innerHTML = wlFig();
+
+drill('#dr-wl', { id: 's01-wien-limiter-amplitude', title: 'Wien with diode limiter: output amplitude', gen(r) {
+  const V = r.pick([12, 15]), Rs = r.pick([2.2, 3, 4.7, 6.8, 10]), rr = r.pick([0.47, 1, 1.5, 2.2]); // R3=R6 = Rs (to rails), R4=R5 = rr
+  const k = Rs / (rr + Rs); if (k <= 1 / 3 + 0.05) return null;
+  const vp = (0.7 + V * rr / (rr + Rs)) / (k - 1 / 3);
+  if (vp > V - 0.5) return null;
+  return {
+    given: `In the Wien oscillator of Figure 2 the limiter uses \\(R_3 = R_6\\) = ${Rs} kΩ (to ±${V} V) and \\(R_4 = R_5\\) = ${rr} kΩ, \\(V_D\\) = 0.7 V. The bridge has equal parts, so at f₀ the − input is \\(v_O/3\\). Find the peak and peak-to-peak output.`,
+    ask: [{ l: '\\hat v_O', v: vp, u: 'V' }, { l: 'v_{O,pp}', v: 2 * vp, u: 'V' }],
+    steps: [
+      `Node b: \\(v_b = v_O\\dfrac{R_6}{R_5 + R_6} - ${V}\\dfrac{R_5}{R_5 + R_6} = ${num(k)}\\,v_O - ${num(V * rr / (rr + Rs))}\\)`,
+      { t: `D₂ turns on when \\(v_b = v_O/3 + 0.7\\): \\(${num(k)}\\hat v_O - ${num(V * rr / (rr + Rs))} = \\hat v_O/3 + 0.7 \\Rightarrow \\hat v_O = \\dfrac{${num(0.7 + V * rr / (rr + Rs))}}{${num(k - 1 / 3)}} = ${num(vp)}\\) V`, a: { l: '\\hat v_O', v: vp, u: 'V' } },
+      { t: `Symmetric limiter: \\(v_{O,pp} = 2\\times${num(vp)} = ${num(2 * vp)}\\) V`, a: { l: 'v_{O,pp}', v: 2 * vp, u: 'V' } },
+    ] };
+} });
+
+// CT-4 figures. set 'A': R_A series, C_A shunt, R_B series, L_B shunt; 'B': swapped.
+const ct4Fig = (set, v) => {
+  const A = set === 'A', P = k => v ? [1, { val: v[k] }] : [];
+  return sch([
+    ['W', [520, 100], [540, 100], [540, 20], [20, 20], [20, 84]],
+    A ? ['R', [20, 84], [100, 84], 'RA', ...P('RA')] : ['C', [20, 84], [100, 84], 'CA', ...P('CA')], ['W', [100, 84], [160, 84]], ['dot', [110, 84]],
+    A ? ['C', [110, 84], [110, 160], 'CA', ...P('CA')] : ['R', [110, 84], [110, 160], 'RA', ...P('RA')], ['gnd', [110, 160]],
+    ['opamp', [160, 100], { plusTop: true }], ['W', [240, 100], [270, 100]], ['dot', [250, 100]], ['W', [250, 100], [250, 140], [150, 140], [150, 116], [160, 116]],
+    A ? ['R', [270, 100], [350, 100], 'RB', ...P('RB')] : ['L', [270, 100], [350, 100], 'LB', ...P('LB')], ['W', [350, 100], [380, 100], [380, 84], [420, 84]], ['dot', [360, 100]],
+    A ? ['L', [360, 100], [360, 180], 'LB', ...P('LB')] : ['R', [360, 100], [360, 180], 'RB', ...P('RB')], ['gnd', [360, 180]],
+    ['opamp', [420, 100], { plusTop: true }], ['W', [500, 100], [520, 100]], ['dot', [520, 100]],
+    ['W', [420, 116], [400, 116], [400, 170]], ['dot', [400, 170]], ['R', [400, 170], [520, 170], 'R₂', ...P('R2')], ['W', [520, 170], [520, 100]],
+    ['R', [400, 170], [400, 240], 'R₁', ...P('R1')], ['gnd', [400, 240]], ['t', [548, 96], 'Vₒ', 'start'],
+  ], { w: 580, h: 260, sim: !!v });
+};
+$('#fig-ct4a').innerHTML = ct4Fig('A', { RA: 1e3, CA: 1e-7, RB: 2e3, LB: 0.05, R1: 1e4, R2: 4.2e4 });
+$('#fig-ct4b').innerHTML = ct4Fig('B', { RA: 1e3, CA: 1e-7, RB: 2e3, LB: 0.05, R1: 1e4, R2: 3e3 });
+
+worked('#wk-ct4', {
+  given: 'CT-4 Set A with \\(R_A\\) = 1 kΩ, \\(C_A\\) = 0.1 µF, \\(R_B\\) = 2 kΩ, \\(L_B\\) = 50 mH. Find f₀ and the minimum \\(R_2/R_1\\).',
+  steps: [
+    { t: '\\(\\tau_1 = R_AC_A = 10^3\\times10^{-7} = 100\\) µs (low-pass)', a: { l: '\\tau_1', v: 1e-4, u: 'µs' } },
+    { t: '\\(\\tau_2 = L_B/R_B = 0.05/2000 = 25\\) µs (high-pass)', a: { l: '\\tau_2', v: 2.5e-5, u: 'µs' } },
+    { t: '\\(\\omega_0 = 1/\\sqrt{\\tau_1\\tau_2} = 1/\\sqrt{2.5\\times10^{-9}} = 20\\,000\\) rad/s, \\(f_0 = 3.18\\) kHz', a: { l: 'f_0', v: 3183, u: 'kHz' } },
+    { t: '\\(R_2/R_1 &gt; \\tau_{LP}/\\tau_{HP} = 100/25 = 4\\) (K &gt; 5). For Set B with the same parts: \\(R_2/R_1 &gt; 25/100 = 0.25\\).', a: { l: '(R_2/R_1)_{min}', v: 4, u: '' } },
+  ] });
+
+drill('#dr-ct4', { id: 's01-ct4-cascade', title: 'CT-4 cascade oscillator: f0 and start condition', gen(r) {
+  const set = r() < 0.5 ? 'A' : 'B';
+  const RA = r.pick([1, 2.2, 4.7, 10]) * 1e3, CA = r.pick([10, 22, 47, 100, 220]) * 1e-9, RB = r.pick([0.5, 1, 2, 4.7, 10]) * 1e3, LB = r.pick([10, 22, 47, 100, 220]) * 1e-3;
+  const t1 = RA * CA, t2 = LB / RB, w0 = 1 / Math.sqrt(t1 * t2), f0 = w0 / (2 * Math.PI);
+  const ratio = set === 'A' ? t1 / t2 : t2 / t1;
+  if (ratio > 50 || ratio < 0.02 || f0 > 2e5) return null;
+  return {
+    given: `CT-4 Set ${set} (Figure ${set === 'A' ? 3 : 4}) with \\(R_A\\) = ${si(RA, 'Ω')}, \\(C_A\\) = ${si(CA, 'F')}, \\(R_B\\) = ${si(RB, 'Ω')}, \\(L_B\\) = ${si(LB, 'H')}. Find f₀ and the minimum ratio \\(R_2/R_1\\) for oscillation to start.`,
+    fig: ct4Fig(set, null),
+    ask: [{ l: 'f_0', v: f0, u: 'Hz' }, { l: '(R_2/R_1)_{min}', v: ratio, u: '' }],
+    steps: [
+      `\\(\\tau_1 = R_AC_A = ${si(t1, 's')}\\) (${set === 'A' ? 'RC low-pass' : 'CR high-pass'}), \\(\\tau_2 = L_B/R_B = ${si(t2, 's')}\\) (${set === 'A' ? 'RL high-pass' : 'LR low-pass'})`,
+      { t: `\\(\\omega_0 = 1/\\sqrt{\\tau_1\\tau_2} = ${num(w0)}\\) rad/s, \\(f_0 = ${num(f0)}\\) Hz`, a: { l: 'f_0', v: f0, u: 'Hz' } },
+      { t: `\\(R_2/R_1 &gt; \\tau_{LP}/\\tau_{HP} = ${set === 'A' ? '\\tau_1/\\tau_2' : '\\tau_2/\\tau_1'} = ${num(ratio)}\\)`, a: { l: '(R_2/R_1)_{min}', v: ratio, u: '' } },
+    ] };
+} });
+
+flashcards('#cards', [
+  { f: 'Wien f₀ (general)', b: 'ω₀ = 1/√(R_A R_B C_A C_B)' },
+  { f: 'Wien gain condition (general)', b: 'R₂/R₁ ≥ R_A/R_B + C_B/C_A (shunt C over series C)' },
+  { f: 'Wien equal parts', b: 'f₀ = 1/(2πRC), β = 1/3, R₂ = 2R₁ (slightly more to start)' },
+  { f: '"Gain of the feedback network"', b: 'β(ω₀) = 1/3 for equal parts.' },
+  { f: 'ω₀ = 1000 rad/s', b: 'RC = 1 ms: no 2π.' },
+  { f: 'Wien amplitude control', b: 'Diode limiter, lamp/thermistor, or JFET AGC: gain falls to exactly 3 at the final amplitude.' },
+  { f: 'Buffered LP + HP sections', b: 'ω₀ = 1/√(τ₁τ₂); K > 1 + τ_LP/τ_HP.' },
+  { f: 'RL / LR time constant', b: 'τ = L/R' },
+]);
+quiz('#quiz', [
+  { q: 'Equal-part Wien with R = 10 kΩ, C = 10 nF oscillates at', opts: ['10 kHz', '1.59 kHz', '159 Hz', '6.28 kHz'], a: 1, why: '1/(2π·10⁴·10⁻⁸) = 1.59 kHz.' },
+  { q: 'Wien with R_A = R_B, C_B = 2C_A. Minimum R₂/R₁ is', opts: ['2', '3', '1.5', '4'], a: 1, why: 'R_A/R_B + C_B/C_A = 1 + 2 = 3.' },
+  { q: 'Why is the Wien amplifier non-inverting?', opts: ['To get a gain of exactly 1', 'The network has 0° phase at f₀, so the amplifier must add 0°', 'To reduce distortion', 'Inverting amps cannot have gain 3'], a: 1, why: 'Loop phase must be 0°; the lead-lag network gives 0° at f₀.' },
+  { q: 'CT-4 Set B (CR high-pass then LR low-pass). The start condition is R₂/R₁ >', opts: ['R_A R_B C_A / L_B', 'L_B /(R_A R_B C_A)', '2', 'R_B/R_A'], a: 1, why: 'τ_LP/τ_HP = (L_B/R_B)/(R_A C_A).' },
+  { q: 'With R₂/R₁ = 2.5 in an equal-part Wien and no limiter, the output', opts: ['decays', 'is a clean sine', 'grows until it clips at the supply, distorted', 'oscillates at 3f₀'], a: 2, why: 'Loop gain 3.5/3 > 1 keeps growing until saturation.' },
+  { q: 'Assignment RL oscillator: s²L² + sLR(2 − K) + R² = 0. It oscillates at', opts: ['ω = L/R', 'ω = R/L with K = 2', 'ω = 2R/L', 'ω = 1/√(LR)'], a: 1, why: 'The s term vanishes at K = 2; then ω₀² = R²/L².' },
+]);
+</script>
+</body>
+</html>

@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Diode-Connected MOSFETs · EEE 263 Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">MOSFET · Chapter 4 · Sedra §5.3 (Ex D5.9, P5.49–5.51) · Sadat L20, notes p.91 · type M-02</div>
+<h1>Diode-Connected Transistors and Sizing</h1>
+<p class="lede">"Find W (and R) for the indicated voltages" is the most repeated MOSFET DC question: 2012–13, 2013–14, 2014–15 and twice in 2023–24 (15 + 15 marks), plus two class tests. It is also the easiest: a diode-connected MOSFET is always saturated, so there is no region to guess, and each device is one line of algebra.</p>
+
+<h2>1. Why a diode-connected MOSFET is always saturated</h2>
+<p>Tie the gate to the drain. Then \(V_{DS} = V_{GS}\), and since \(V_{GS} - V_t &lt; V_{GS}\):</p>
+<div class="formula">\[ V_{DS} = V_{GS} &gt; V_{GS} - V_t = V_{OV} \quad\Longrightarrow\quad \text{saturation (whenever } V_{GS} &gt; V_t) \]</div>
+<p>Equivalently \(V_{GD} = 0 &lt; V_t\): the channel is always pinched off at the drain. Sadat sir's box (L20, notes p.91): "MOSFETs with G and D shorted can either be in (1) saturation or (2) cut-off. No triode mode." Write this one line in every answer; it replaces the region check. The same holds for a PMOS with gate tied to drain (\(V_{SD} = V_{SG} &gt; |V_{OV}|\)).</p>
+<p>So the device is a two-terminal element with a square-law i–v curve, a "diode" with threshold \(V_t\) (CT-2 2022 asked exactly this):</p>
+<div class="formula">\[ i = \tfrac12k_n'(W/L)(v - V_t)^2 \;\;(v \ge V_t), \qquad i = 0 \;\;(v &lt; V_t) \]</div>
+<figure><div id="fig-curve"></div><figcaption><b>Figure 1.</b> i–v of a diode-connected NMOS (\(V_t\) = 1 V, \(k_n\) = 1 mA/V²): zero up to \(V_t\), then a parabola. Compare the exponential pn diode: here the "turn-on" is sharp at \(V_t\).</figcaption></figure>
+
+<h2>2. Sizing for given voltages and current</h2>
+<div class="method"><h4>Method · find W and R (5 steps)</h4><ol>
+<li>State: gate tied to drain ⇒ \(V_{GD} = 0 &lt; V_t\) ⇒ saturation.</li>
+<li>For each device, \(V_{GS} = V_{\text{its drain}} - V_{\text{its source}}\). In a stack the source of the upper device is the drain of the lower one. PMOS: \(V_{SG} = V_S - V_D\).</li>
+<li>\(V_{OV} = V_{GS} - V_t\) (PMOS: \(V_{SG} - |V_{tp}|\)).</li>
+<li>\(\dfrac{W}{L} = \dfrac{2I}{k_n'V_{OV}^2}\), then \(W = (W/L)\times L\). Devices in series carry the same \(I\).</li>
+<li>Resistors by Ohm's law: \(R = \Delta V/I\) (µA × kΩ: 120 µA × 12.5 kΩ = 1.5 V).</li>
+</ol></div>
+<figure><div id="fig-q2324"></div><figcaption><b>Figure 2.</b> 2023–24 Sec A Q2(c): R from +5 V, Q1 diode-connected from 3.5 V to 1.5 V, Q2 diode-connected from 1.5 V to ground, 120 µA.</figcaption></figure>
+<h3>Worked example: 2023–24 Sec A Q2(c)</h3>
+<div id="wk-stack"></div>
+<div id="dr-size"></div>
+
+<h3>PMOS version: Sedra P5.49 (highlighted)</h3>
+<figure><div id="fig-p"></div><figcaption><b>Figure 3.</b> Diode-connected PMOS: source at the supply, gate and drain at \(V_D\), R from \(V_D\) to ground (2023–24 Sec A Q4(c), Sedra P5.49).</figcaption></figure>
+<div id="wk-p"></div>
+
+<h2>3. Analysis: R and W known, find the voltage</h2>
+<p>The reverse question (and the first step of every current mirror in the next chapter): a resistor \(R\) from \(V_{DD}\) feeds a diode-connected NMOS. KVL \(V_{DD} = IR + V_t + V_{OV}\) with \(I = \tfrac12k_nV_{OV}^2\) gives the same quadratic as the source-resistor bias of chapter 3:</p>
+<div class="formula">\[ \tfrac12k_nR\,V_{OV}^2 + V_{OV} - (V_{DD} - V_t) = 0 \;\Rightarrow\; V_{OV} = \frac{-1 + \sqrt{1 + 2k_nR(V_{DD} - V_t)}}{k_nR} \]</div>
+<p>Reject the negative root (\(V_{GS} &lt; V_t\): no current). For a PMOS with R to ground, replace \(V_{DD} - V_t\) by \(V_{DD} - |V_{tp}|\) and \(V_{GS}\) by \(V_{SG}\).</p>
+<figure><div id="fig-n"></div><figcaption><b>Figure 4.</b> Diode-connected NMOS fed through R (2013–14 Sec B Q5(a), Sedra Ex D5.9).</figcaption></figure>
+<div id="dr-ana"></div>
+
+<h3>Parallel devices and unequal devices</h3>
+<p>Two identical diode-connected devices in parallel behave like one device with twice the \(k_n\) (twice the width). Two unequal devices in series carry the same current, so \(\sqrt{k_1}\,V_{OV1} = \sqrt{k_2}\,V_{OV2}\): the narrow device needs the larger overdrive. Both ideas appear in the assignment and in Sedra P5.59 below.</p>
+
+<div class="trap"><h4>Traps (where marks go)</h4><ul>
+<li>Using the node voltage instead of the device's own \(V_{GS}\): in a stack, Q1's \(V_{GS}\) is \(3.5 - 1.5 = 2\) V, not 3.5 V.</li>
+<li>Forgetting the ½ (doubles W) or mixing µm with W/L (answer W in µm, not W/L).</li>
+<li>Labels swapped between papers: 2014–15 numbers the bottom device Q1, 2023–24 numbers the top device Q1. Read the figure.</li>
+<li>PMOS signs: use \(V_{SG}\) and \(|V_{tp}|\); \(V_{tp} = -0.7\) V means \(|V_{tp}| = 0.7\) V.</li>
+<li>Bringing λ into a bias calculation: bias normally ignores it (2013–14 gives \(V_A\) = 50 V; the textbook answer is 25 kΩ without it).</li>
+<li>Writing a region check "assume saturation … verify". Not wrong, but the one-line reason (\(V_{GD} = 0 &lt; V_t\)) is better and faster.</li>
+</ul></div>
+
+<h2>Exam questions</h2>
+
+<div class="exam">
+  <div class="exam-src">2023–24 · Sec A · Q2(c) · 15 marks</div>
+  <div class="exam-q"><p>The NMOS transistors in the circuit (Figure 2) have \(V_t\) = 1 V, \(\mu_nC_{ox}\) = 120 µA/V², λ = 0 and \(L_1 = L_2\) = 1 µm. Find the required gate widths of Q1 and Q2 and the value of R to obtain the indicated voltages (3.5 V at Q1's drain, 1.5 V at the Q1–Q2 junction). The current in the resistance is 120 µA.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>Both transistors have gate tied to drain: \(V_{GD} = 0 &lt; V_t\), so both are saturated. Series connection: both carry 120 µA.</p>
+    <p><b>Q2</b> (bottom): \(V_{GS2} = 1.5 - 0 = 1.5\) V, \(V_{OV2} = 0.5\) V. \(120 = \tfrac12(120)(W_2/1)(0.5)^2 \Rightarrow W_2/L = 8\), <b>\(W_2 = 8\) µm</b>.</p>
+    <p><b>Q1</b> (top): \(V_{GS1} = 3.5 - 1.5 = 2\) V, \(V_{OV1} = 1\) V. \(120 = \tfrac12(120)(W_1/1)(1)^2 \Rightarrow\) <b>\(W_1 = 2\) µm</b>.</p>
+    <p><b>R</b> \(= (5 - 3.5)/0.12 = 12.5\) kΩ.</p>
+    <p>(One of the two senior 2023–24 solution files stops before computing R.)</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2023–24 · Sec A · Q4(c) · 15 marks</div>
+  <div class="exam-q"><p>The PMOS transistor (source at +5 V, gate tied to drain, R from drain to ground) has \(V_t\) = −0.7 V, \(\mu_pC_{ox}\) = 60 µA/V², L = 0.8 µm, λ = 0. Find W and R to establish a drain current of 115 µA and \(V_D\) = 3.5 V.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>Gate tied to drain: \(V_{SD} = V_{SG} &gt; |V_{OV}|\), so saturated.</p>
+    <p>\(V_{SG} = 5 - 3.5 = 1.5\) V, \(|V_{OV}| = 1.5 - 0.7 = 0.8\) V.</p>
+    <p>\(115 = \tfrac12(60)(W/L)(0.8)^2 = 19.2\,(W/L) \Rightarrow W/L = 5.99\), <b>\(W = 5.99\times0.8 = 4.79\) µm</b>.</p>
+    <p><b>R</b> \(= 3.5/0.115 = 30.43\) kΩ.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2014–15 · Sec A · Q4(b) · 16 marks</div>
+  <div class="exam-q"><p>The NMOS transistors have \(V_t\) = 1 V, \(\mu_nC_{ox}\) = 120 µA/V², \(L_1 = L_2\) = 1 µm. R from +5 V to the drain of Q2 (at +3.5 V); Q2 diode-connected down to Q1's drain (+1.5 V); Q1 diode-connected to ground. The current is 120 µA. Find \(W_1\), \(W_2\) and R.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>Same circuit as 2023–24 Q2(c) with the labels swapped: here <b>Q1 is the bottom device</b>. Both diode-connected ⇒ saturated.</p>
+    <p>Q1: \(V_{GS} = 1.5\) V, \(V_{OV} = 0.5\) V ⇒ <b>\(W_1 = \dfrac{2\times120\times1}{120\times0.25} = 8\) µm</b>. Q2: \(V_{GS} = 2\) V, \(V_{OV} = 1\) V ⇒ <b>\(W_2 = 2\) µm</b>. <b>R</b> \(= 1.5/0.12 = 12.5\) kΩ.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2013–14 · Sec B · Q5(a) · 16⅔ marks &nbsp;|&nbsp; Sedra Example 5.x</div>
+  <div class="exam-q"><p>Design the circuit (R from +3 V to the drain of a diode-connected NMOS, source grounded) to obtain \(I_D\) = 80 µA. \(V_t\) = 0.6 V, \(\mu_nC_{ox}\) = 200 µA/V², L = 0.8 µm, W = 4 µm, \(V_A\) = 50 V.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>Diode-connected ⇒ saturated. \(k_n = 0.2\times4/0.8 = 1\) mA/V².</p>
+    <p>Neglecting λ (normal for bias): \(0.08 = \tfrac12(1)V_{OV}^2 \Rightarrow V_{OV} = 0.4\) V, \(V_{GS} = V_D = 1.0\) V. <b>R = (3 − 1)/0.08 = 25 kΩ</b>.</p>
+    <p>With λ = 1/\(V_A\) = 0.02 V⁻¹ and \(V_{DS} = V_{GS}\): \(0.08 = \tfrac12V_{OV}^2(1 + 0.02V_{GS})\); iterating gives \(V_{GS}\) = 0.996 V and R = 25.05 kΩ. The difference is 0.2 %, which is why bias work drops λ.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2012–13 · Sec B · Q5(c) · 14 marks</div>
+  <div class="exam-q"><p>Three diode-connected NMOS in series from +5 V to ground (Q3 on top, then Q2, then Q1), with the Q3–Q2 junction at 3.5 V and the Q2–Q1 junction at 1.5 V; I = 120 µA. \(V_t\) = 1 V, \(\mu_nC_{ox}\) = 120 µA/V², \(L_1 = L_2 = L_3\) = 1 µm. Find \(W_1\), \(W_2\), \(W_3\).</p><div id="fig-q1213"></div></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>All three are diode-connected ⇒ saturated; all carry 120 µA. \(W = \dfrac{2IL}{k_n'V_{OV}^2} = \dfrac{2}{V_{OV}^2}\) µm here.</p>
+    <p>Q1: \(V_{GS} = 1.5\), \(V_{OV} = 0.5\) ⇒ <b>\(W_1\) = 8 µm</b>. Q2: \(V_{GS} = 2\), \(V_{OV} = 1\) ⇒ <b>\(W_2\) = 2 µm</b>. Q3: \(V_{GS} = 5 - 3.5 = 1.5\), \(V_{OV} = 0.5\) ⇒ <b>\(W_3\) = 8 µm</b>. (Body effect ignored.)</p>
+  </div></details>
+</div>
+
+<h3>Class tests</h3>
+
+<div class="exam">
+  <div class="exam-src">CT-2 2022 · 10 marks</div>
+  <div class="exam-q"><p>Find the i–v relationship of the two-terminal device formed by an NMOS with its gate connected to its drain (+ terminal) and its source as the − terminal. Parameters \(V_t\), \(k_n'(W/L)\).</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>\(v = v_{GS} = v_{DS}\). For \(v &lt; V_t\) there is no channel: \(i = 0\). For \(v \ge V_t\): \(v_{DS} = v_{GS} &gt; v_{GS} - V_t\), so the device is saturated and \(i = \tfrac12k_n'(W/L)(v - V_t)^2\). It never enters triode. Sketch: zero up to \(V_t\), then a parabola (Figure 1).</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">CT-4 2018 · 8 marks &nbsp;|&nbsp; the same CT also set Sedra Ex D5.9 (highlighted)</div>
+  <div class="exam-q"><p>Diode-connected NMOS fed from 1.8 V through R. \(V_t\) = 0.5 V, \(\mu_nC_{ox}\) = 0.4 mA/V², W/L = 0.72 µm/0.18 µm. Find \(I_D\) and R for \(V_D\) = 0.8 V. (D5.9: the same with \(V_D\) = 0.7 V.)</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>Saturated (gate tied to drain). W/L = 4, \(k_n\) = 1.6 mA/V².</p>
+    <p>\(V_D\) = 0.8 V: \(V_{OV}\) = 0.3 V, <b>\(I_D = \tfrac12(1.6)(0.09) = 72\) µA</b>, <b>R = (1.8 − 0.8)/0.072 = 13.9 kΩ</b>.</p>
+    <p>D5.9, \(V_D\) = 0.7 V: \(V_{OV}\) = 0.2 V, \(I_D\) = 32 µA, <b>R = 1.1/0.032 = 34.4 kΩ</b>.</p>
+  </div></details>
+</div>
+
+<h3>Highlighted textbook problems and assignment</h3>
+
+<div class="exam">
+  <div class="exam-src">Sedra 7e P5.50 · highlighted by the teacher</div>
+  <div class="exam-q"><p>+2.5 V → R → 1.8 V node; Q2 diode-connected from 1.8 V down to 1.0 V; Q1 diode-connected from 1.0 V to ground; current 0.5 mA. \(V_t\) = 0.5 V, \(\mu_nC_{ox}\) = 250 µA/V², L = 0.25 µm. Find R, \(W_1\), \(W_2\).</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><b>R = (2.5 − 1.8)/0.5 = 1.4 kΩ.</b> Q1: \(V_{OV} = 1.0 - 0.5 = 0.5\) V, W/L = \(2\times500/(250\times0.25) = 16\), <b>\(W_1\) = 4 µm</b>. Q2: \(V_{OV} = 0.8 - 0.5 = 0.3\) V, W/L = \(1000/(250\times0.09) = 44.4\), <b>\(W_2\) = 11.1 µm</b>.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">Sedra 7e P5.51 · highlighted by the teacher</div>
+  <div class="exam-q"><p>Three diode-connected NMOS stacked from 2.5 V to ground with junctions at 1.5 V and 0.8 V, carrying 90 µA. \(V_t\) = 0.5 V, \(\mu_nC_{ox}\) = 90 µA/V², L = 0.5 µm. Find \(W_1\) (bottom), \(W_2\), \(W_3\) (top).</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>\(W = \dfrac{2IL}{k_n'V_{OV}^2} = \dfrac{2\times90\times0.5}{90\,V_{OV}^2} = \dfrac{1}{V_{OV}^2}\) µm.</p>
+    <p>Q1: \(V_{GS}\) = 0.8, \(V_{OV}\) = 0.3 ⇒ <b>11.1 µm</b>. Q2: \(V_{GS}\) = 0.7, \(V_{OV}\) = 0.2 ⇒ <b>25 µm</b>. Q3: \(V_{GS}\) = 1.0, \(V_{OV}\) = 0.5 ⇒ <b>4 µm</b>.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">Sedra 7e P5.49 · highlighted by the teacher</div>
+  <div class="exam-q"><p>Diode-connected PMOS, source at 1.8 V, R from \(V_D\) to ground. \(V_t\) = −0.5 V, \(\mu_pC_{ox}\) = 100 µA/V², L = 0.18 µm. Find W and R for \(I_D\) = 180 µA and \(V_D\) = 1 V.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>\(V_{SG}\) = 0.8 V, \(|V_{OV}|\) = 0.3 V. W/L = \(2\times180/(100\times0.09) = 40\), <b>W = 7.2 µm</b>. <b>R = 1/0.18 = 5.56 kΩ</b>.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">Sedra 7e P5.59(b), (c) · highlighted by the teacher</div>
+  <div class="exam-q"><p>\(\mu_nC_{ox} = 3\mu_pC_{ox}\) = 270 µA/V², \(|V_t|\) = 0.5 V, W/L = 3 µm/1 µm for both devices. (b) A diode-connected PMOS (source at the supply) sits on top of a diode-connected NMOS (source grounded); find the middle node \(V_4\) and the current. (c) Repeat with \(W_p\) = 9 µm. (The supply is +3 V: the book answers below need it.)</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>\(k_n = 0.27\times3 = 0.81\) mA/V², \(k_p = 0.09\times3 = 0.27\) mA/V². Same current: \(\sqrt{k_p}\,(3 - V_4 - 0.5) = \sqrt{k_n}\,(V_4 - 0.5)\).</p>
+    <p>(b) \(0.5196(2.5 - V_4) = 0.9(V_4 - 0.5) \Rightarrow\) <b>\(V_4\) = 1.232 V</b>, \(I = \tfrac12(0.81)(0.732)^2 = 0.217\) mA.</p>
+    <p>(c) \(W_p\) = 9 µm makes \(k_p = k_n\): symmetric, <b>\(V_5\) = 1.5 V</b>, \(I = \tfrac12(0.81)(1)^2 = 0.405\) mA. Widening the PMOS by \(\mu_n/\mu_p\) = 3 balances the pair, the idea behind CMOS inverter sizing.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">Assignment Q6 (EEE 263 assignment set)</div>
+  <div class="exam-q"><p>Three diode-connected NMOS, \(k_n\) = 1 mA/V², \(V_t\) = 2 V. M1: drain and gate at +5 V, source at \(v_o\). M2 and M3 in parallel from \(v_o\) to ground (each diode-connected). Find \(v_o\) and the current.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>All saturated. KCL at \(v_o\): \(\tfrac12(5 - v_o - 2)^2 = 2\times\tfrac12(v_o - 2)^2\) (M2 ∥ M3 = double width).</p>
+    <p>\((3 - v_o)^2 = 2(v_o - 2)^2 \Rightarrow v_o^2 - 2v_o - 1 = 0 \Rightarrow\) <b>\(v_o = 1 + \sqrt2 = 2.414\) V</b> (reject \(1 - \sqrt2\): below \(V_t\)). Current in M1: \(\tfrac12(0.586)^2 = 0.172\) mA (= \(3 - 2\sqrt2\)).</p>
+  </div></details>
+</div>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+
+<div class="key"><p><strong>Summary:</strong> gate tied to drain ⇒ \(V_{GD} = 0 &lt; V_t\) ⇒ always saturated (or off). Each device: \(V_{GS}\) from its own two terminals, \(V_{OV} = V_{GS} - V_t\), \(W = 2IL/(k'V_{OV}^2)\). Series devices share the current; resistors follow from Ohm's law. In reverse (R known), solve \(\tfrac12k_nRV_{OV}^2 + V_{OV} - (V_{DD} - V_t) = 0\) and keep the positive root.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/eee.js"></script>
+<script>
+const schP = (items, o) => items.reduce((s, it) => {
+  if (it[0] !== 'pmos') return s;
+  const [gx, gy] = it[1], f = it[2] && it[2].flip ? -1 : 1;
+  return s.replace(`<line x1="${gx + 40 * f}" y1="${gy + 10}" x2="${gx + 25 * f}" y2="${gy + 10}" class="arr"/>`, `<line x1="${gx + 40 * f}" y1="${gy - 10}" x2="${gx + 25 * f}" y2="${gy - 10}" class="arr"/>`);
+}, sch(items, o));
+const kO = (vt, k) => ({ vt, k: k * 1e-3 });
+const mA = 1e-3, kOhm = 1e3, um = 1e-6;
+
+// stack of n diode-connected NMOS under a resistor R (bottom device to ground). names: top node first.
+function stackFig(n, R, vdd, vt, ks, names) {
+  const it = [['rail', [200, 20], vdd]];
+  if (R !== null) it.push(['R', [200, 20], [200, 80], 'R ' + R]); else it.push(['W', [200, 20], [200, 80]]);
+  for (let i = 0; i < n; i++) {
+    const gy = 120 + 80 * i;
+    it.push(['nmos', [160, gy], kO(vt, ks[i])], ['W', [160, gy], [130, gy], [130, gy - 40], [200, gy - 40]], ['dot', [200, gy - 40]], ['t', [208, gy - 46], names[i], 'start']);
+    it.push(['t', [254, gy + 4], names.dev[i], 'start']);
+  }
+  it.push(['gnd', [200, 80 + 80 * n]]);
+  return sch(it, { w: 320, h: 110 + 80 * n });
+}
+const nm = (a, d) => Object.assign(a, { dev: d });
+$('#fig-q2324').innerHTML = stackFig(2, '12.5 kΩ', '+5 V', 1, [0.24, 0.96], nm(['3.5 V', '1.5 V'], ['Q1', 'Q2']));
+$('#fig-q1213').innerHTML = stackFig(3, null, '+5 V', 1, [0.24, 0.96, 0.24], nm(['', '3.5 V', '1.5 V'], ['Q3', 'Q2', 'Q1']));
+
+const pFig = (vdd, r, vt, k) => schP([
+  ['rail', [200, 40], vdd], ['W', [200, 40], [200, 100]], ['pmos', [160, 140], kO(vt, k)],
+  ['W', [160, 140], [130, 140], [130, 180], [200, 180]], ['dot', [200, 180]], ['t', [208, 196], 'VD', 'start'],
+  ['R', [200, 180], [200, 260], 'R ' + r], ['gnd', [200, 260]],
+], { w: 280, h: 290 });
+$('#fig-p').innerHTML = pFig('+1.8 V', '5.56 kΩ', 0.5, 4);
+
+const nFig = (vdd, r, vt, k) => sch([
+  ['rail', [200, 20], vdd], ['R', [200, 20], [200, 100], 'R ' + r], ['nmos', [160, 140], kO(vt, k)],
+  ['W', [160, 140], [130, 140], [130, 100], [200, 100]], ['dot', [200, 100]], ['t', [208, 94], 'VD', 'start'], ['gnd', [200, 180]],
+], { w: 280, h: 210 });
+$('#fig-n').innerHTML = nFig('+3 V', '25 kΩ', 0.6, 1);
+
+// i-v curve of a diode-connected NMOS
+(() => {
+  const X = v => 40 + v * 70, Y = i => 200 - i * 36; // 0..4 V, 0..4.5 mA
+  const pts = []; for (let v = 0; v <= 4.0001; v += 0.05) pts.push([X(v), Y(v < 1 ? 0 : 0.5 * (v - 1) ** 2)]);
+  $('#fig-curve').innerHTML = `<svg class="sch" viewBox="0 0 360 240" width="360" role="img" aria-label="Square-law i-v curve">
+    <line x1="40" y1="200" x2="340" y2="200" class="arr"/><line x1="40" y1="200" x2="40" y2="20" class="arr"/>
+    <polyline points="${pts.map(p => p.join(',')).join(' ')}" class="nf hi"/>
+    <line x1="${X(1)}" y1="196" x2="${X(1)}" y2="204"/><text x="${X(1)}" y="218" text-anchor="middle" class="sl">Vₜ</text>
+    <text x="336" y="218" text-anchor="end" class="sl">v</text><text x="48" y="28" class="sl">i</text>
+    <text x="${X(1.3)}" y="${Y(3.6)}" class="sl acc">½kₙ(v − Vₜ)²</text></svg>`;
+})();
+
+worked('#wk-stack', {
+  given: '\\(V_t\\) = 1 V, \\(k_n\\)′ = 120 µA/V², L = 1 µm, I = 120 µA; Q1 from 3.5 V to 1.5 V, Q2 from 1.5 V to ground, R from 5 V.',
+  steps: [
+    'Gate tied to drain in both ⇒ \\(V_{GD} = 0 &lt; V_t\\) ⇒ saturated. Same current in both.',
+    { t: 'Q2: \\(V_{GS} = 1.5\\) V, \\(V_{OV} = 0.5\\) V, \\(W/L = \\dfrac{2\\times120}{120\\times0.25} = 8\\) ⇒ \\(W_2 = 8\\) µm', a: { l: 'W_2', v: 8e-6, u: 'µm', mul: um } },
+    { t: 'Q1: \\(V_{GS} = 3.5 - 1.5 = 2\\) V, \\(V_{OV} = 1\\) V, \\(W/L = \\dfrac{2\\times120}{120\\times1} = 2\\) ⇒ \\(W_1 = 2\\) µm', a: { l: 'W_1', v: 2e-6, u: 'µm', mul: um } },
+    { t: '\\(R = (5 - 3.5)\\text{ V}/120\\text{ µA} = 12.5\\) kΩ', a: { l: 'R', v: 12500, u: 'kΩ' } },
+  ] });
+
+worked('#wk-p', {
+  given: 'PMOS, source at 1.8 V, gate = drain = \\(V_D\\) = 1 V, R to ground; \\(V_{tp}\\) = −0.5 V, \\(\\mu_pC_{ox}\\) = 100 µA/V², L = 0.18 µm, \\(I_D\\) = 180 µA.',
+  steps: [
+    'Gate tied to drain ⇒ \\(V_{SD} = V_{SG}\\) ⇒ saturated.',
+    { t: '\\(V_{SG} = 1.8 - 1 = 0.8\\) V, \\(|V_{OV}| = 0.8 - 0.5 = 0.3\\) V', a: { l: '|V_{OV}|', v: 0.3, u: 'V' } },
+    { t: '\\(W/L = \\dfrac{2\\times180}{100\\times0.09} = 40\\) ⇒ \\(W = 40\\times0.18 = 7.2\\) µm', a: { l: 'W', v: 7.2e-6, u: 'µm', mul: um } },
+    { t: '\\(R = 1\\text{ V}/0.18\\text{ mA} = 5.56\\) kΩ', a: { l: 'R', v: 5556, u: 'kΩ' } },
+  ] });
+
+drill('#dr-size', { id: 'm02-size', title: 'Size W of diode-connected devices and find R', gen(r) {
+  const pmos = r() < 0.3, n = pmos ? 1 : r.pick([1, 2, 2, 3]);
+  const Vt = r.pick([0.4, 0.5, 0.6, 0.7, 0.8, 1.0]), kp = r.pick([50, 60, 90, 100, 120, 200, 400]), L = r.pick([0.18, 0.25, 0.5, 0.8, 1]), I = r.step(50, 500, 10), VDD = r.pick([1.8, 3, 3.3, 5]);
+  const ov = [...Array(n)].map(() => r.step(0.2, 1.2, 0.05)), vgs = ov.map(o => +(Vt + o).toFixed(3)), tot = vgs.reduce((a, b) => a + b, 0);
+  if (tot > VDD - 0.3) return null;
+  const W = ov.map(o => 2 * I * L / (kp * o * o)); if (W.some(w => w < 0.5 || w > 200)) return null;
+  if (pmos) {
+    const VD = +(VDD - vgs[0]).toFixed(3), R = VD / I * 1e3; // kΩ
+    return {
+      given: `Diode-connected PMOS: source at +${VDD} V, gate and drain at \\(V_D\\) = ${num(VD)} V, R from the drain to ground. \\(V_{tp}\\) = −${Vt} V, \\(\\mu_pC_{ox}\\) = ${kp} µA/V², L = ${L} µm, λ = 0. Find W and R for \\(I_D\\) = ${I} µA.`,
+      fig: pFig('+' + VDD + ' V', '', Vt, kp * W[0] / L / 1000),
+      ask: [{ l: 'W', v: W[0] * um, u: 'µm', mul: um }, { l: 'R', v: R * kOhm, u: 'kΩ' }],
+      steps: [
+        'Gate tied to drain ⇒ \\(V_{SD} = V_{SG} &gt; |V_{OV}|\\) ⇒ saturated.',
+        { t: `\\(V_{SG} = ${VDD} - ${num(VD)} = ${num(vgs[0])}\\) V, \\(|V_{OV}| = ${num(vgs[0])} - ${Vt} = ${num(ov[0])}\\) V`, a: { l: '|V_{OV}|', v: ov[0], u: 'V' } },
+        { t: `\\(W/L = \\dfrac{2\\times${I}}{${kp}\\times${num(ov[0])}^2} = ${num(W[0] / L)}\\) ⇒ \\(W = ${num(W[0] / L)}\\times${L} = ${num(W[0])}\\) µm`, a: { l: 'W', v: W[0] * um, u: 'µm', mul: um } },
+        { t: `\\(R = ${num(VD)}\\text{ V}/${I}\\text{ µA} = ${num(R)}\\) kΩ`, a: { l: 'R', v: R * kOhm, u: 'kΩ' } },
+      ] };
+  }
+  const nodes = []; let acc = 0; for (let i = n - 1; i >= 0; i--) { acc += vgs[i]; nodes[i] = acc; } // nodes[i] = drain of device i (0 = top)
+  const R = (VDD - nodes[0]) / I * 1e3;
+  const lab = i => `Q${n - i}`; // bottom device is Q1
+  return {
+    given: `R from +${VDD} V feeds ${n === 1 ? 'a diode-connected NMOS' : `${n} diode-connected NMOS in series (Q1 at the bottom)`}. ${n === 1 ? `\\(V_D\\) = ${num(nodes[0])} V.` : `Node voltages from the top: ${nodes.map(v => num(v) + ' V').join(', ')}.`} \\(V_t\\) = ${Vt} V, \\(\\mu_nC_{ox}\\) = ${kp} µA/V², L = ${L} µm, λ = 0, I = ${I} µA. Find each W and R.`,
+    fig: stackFig(n, '', '+' + VDD + ' V', Vt, W.map(w => kp * w / L / 1000), nm(nodes.map(v => num(v) + ' V'), [...Array(n)].map((_, i) => lab(i)))),
+    ask: [...W.map((w, i) => ({ l: `W_${n - i}`, v: w * um, u: 'µm', mul: um })).reverse(), { l: 'R', v: R * kOhm, u: 'kΩ' }],
+    steps: [
+      'Every device has gate tied to drain ⇒ \\(V_{GD} = 0 &lt; V_t\\) ⇒ saturated. Series ⇒ same current.',
+      ...W.map((w, i) => ({ t: `${lab(i)}: \\(V_{GS} = ${num(nodes[i])} - ${num(i === n - 1 ? 0 : nodes[i + 1])} = ${num(vgs[i])}\\) V, \\(V_{OV} = ${num(ov[i])}\\) V, \\(W/L = \\dfrac{2\\times${I}}{${kp}\\times${num(ov[i])}^2} = ${num(w / L)}\\) ⇒ \\(W = ${num(w)}\\) µm`, a: { l: `W_${n - i}`, v: w * um, u: 'µm', mul: um } })).reverse(),
+      { t: `\\(R = (${VDD} - ${num(nodes[0])})\\text{ V}/${I}\\text{ µA} = ${num(R)}\\) kΩ`, a: { l: 'R', v: R * kOhm, u: 'kΩ' } },
+    ] };
+} });
+
+drill('#dr-ana', { id: 'm02-analysis', title: 'Diode-connected MOSFET fed by R: find V and I', gen(r) {
+  const pmos = r() < 0.4, VDD = r.pick([1.8, 3, 5, 10]), Vt = r.pick([0.4, 0.5, 0.7, 1]), k = r.pick([0.25, 0.5, 1, 1.6, 2, 4]), R = r.pick([1, 2, 4.7, 10, 15, 22, 33]);
+  const X = VDD - Vt; if (X < 0.3) return null;
+  const b = k * R, vov = (-1 + Math.sqrt(1 + 2 * b * X)) / b, vov2 = (-1 - Math.sqrt(1 + 2 * b * X)) / b, I = k * vov * vov / 2;
+  const VD = pmos ? VDD - Vt - vov : Vt + vov;
+  return {
+    given: pmos ? `Diode-connected PMOS, source at +${VDD} V, R = ${R} kΩ from drain to ground. \\(|V_{tp}|\\) = ${Vt} V, \\(k_p\\) = ${k} mA/V². Find \\(I_D\\) and \\(V_D\\).`
+      : `R = ${R} kΩ from +${VDD} V to a diode-connected NMOS (source grounded). \\(V_t\\) = ${Vt} V, \\(k_n\\) = ${k} mA/V². Find \\(I_D\\) and \\(V_D\\).`,
+    fig: pmos ? pFig('+' + VDD + ' V', R + ' kΩ', Vt, k) : nFig('+' + VDD + ' V', R + ' kΩ', Vt, k),
+    ask: [{ l: 'I_D', v: I * mA, u: 'mA' }, { l: 'V_D', v: VD, u: 'V' }],
+    steps: [
+      'Gate tied to drain ⇒ saturated.',
+      pmos ? `KVL: \\(${VDD} = ${Vt} + |V_{OV}| + I\\times${R}\\) with \\(I = \\tfrac12(${k})V_{OV}^2\\) ⇒ \\(${num(b / 2)}V_{OV}^2 + V_{OV} - ${num(X)} = 0\\)`
+        : `KVL: \\(${VDD} = I\\times${R} + ${Vt} + V_{OV}\\) with \\(I = \\tfrac12(${k})V_{OV}^2\\) ⇒ \\(${num(b / 2)}V_{OV}^2 + V_{OV} - ${num(X)} = 0\\)`,
+      { t: `\\(|V_{OV}| = ${num(vov)}\\) V (reject ${num(vov2)} V: \\(|V_{GS}| &lt; |V_t|\\), no channel)`, a: { l: 'V_{OV}', v: vov, u: 'V' } },
+      { t: `\\(I_D = \\tfrac12(${k})(${num(vov)})^2 = ${num(I)}\\) mA`, a: { l: 'I_D', v: I * mA, u: 'mA' } },
+      { t: pmos ? `\\(V_D = I_DR = ${num(I)}\\times${R} = ${num(VD)}\\) V (check: \\(${VDD} - ${num(VD)} = ${num(Vt + vov)} = |V_t| + |V_{OV}|\\) ✓)` : `\\(V_D = V_t + V_{OV} = ${num(VD)}\\) V (check: \\(${VDD} - ${num(I)}\\times${R} = ${num(VDD - I * R)}\\) ✓)`, a: { l: 'V_D', v: VD, u: 'V' } },
+    ] };
+} });
+
+flashcards('#cards', [
+  { f: 'Diode-connected MOSFET region', b: 'Saturation (or cut-off). V_GD = 0 < V_t, never triode.' },
+  { f: 'i–v of the two-terminal device', b: 'i = ½k_n(v − V_t)² for v ≥ V_t, else 0.' },
+  { f: 'W from I and V_OV', b: 'W = 2IL / (k′·V_OV²)' },
+  { f: 'V_GS of the upper device in a stack', b: 'Its drain voltage minus its source voltage (= the lower device\'s drain).' },
+  { f: 'PMOS diode-connected', b: 'V_SG = V_S − V_D, |V_OV| = V_SG − |V_tp|.' },
+  { f: 'Two identical devices in parallel', b: 'Act as one device with 2k (double W).' },
+  { f: 'R known, find V', b: '½k_nR·V_OV² + V_OV − (V_DD − V_t) = 0, positive root.' },
+]);
+quiz('#quiz', [
+  { q: 'k′ = 100 µA/V², L = 1 µm, I = 50 µA, V_OV = 0.5 V. W =', opts: ['2 µm', '4 µm', '1 µm', '8 µm'], a: 1, why: 'W = 2·50·1/(100·0.25) = 4 µm.' },
+  { q: 'In a stack, Q1 (top) has its drain at 3.5 V and source at 1.5 V. Its V_GS is', opts: ['3.5 V', '1.5 V', '2 V', '5 V'], a: 2, why: 'V_GS = V_G − V_S = 3.5 − 1.5 = 2 V (gate = drain).' },
+  { q: 'Doubling V_OV at the same current needs W to', opts: ['halve', 'double', 'become a quarter', 'stay the same'], a: 2, why: 'W ∝ 1/V_OV².' },
+  { q: 'A PMOS with V_tp = −0.7 V is diode-connected with its source at 5 V and drain at 3.5 V. |V_OV| =', opts: ['0.8 V', '2.2 V', '1.5 V', '4.3 V'], a: 0, why: 'V_SG = 1.5 V, minus 0.7 V.' },
+  { q: 'Why do bias calculations usually ignore λ?', opts: ['λ is zero in saturation', 'It changes I_D by only ~λ·V_DS, a fraction of a percent here', 'It only affects PMOS', 'It makes the device triode'], a: 1, why: '2013–14: 25.05 kΩ with λ vs 25 kΩ without.' },
+]);
+</script>
+</body>
+</html>

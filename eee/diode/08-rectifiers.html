@@ -1,0 +1,390 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rectifiers and Battery Chargers · EEE 263 Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Diodes · Chapter 8 · Sedra §4.5.1–4.5.3 · Sadat L6 (notes p.20, slide 14 #4), L8 (notes p.26–31) · Khairul s.31–33 · types D-07 (no capacitor), D-11</div>
+<h1>Rectifiers and Battery Chargers</h1>
+<p class="lede">A rectifier without a capacitor appeared in 2011–12, 2018–19, 2019–20, 2020–21, 2021–22, 2022–23 and 2023–24: seven papers, 10 to 23 marks, and the same Sedra numbers (12 V rms, 0.7 V, 100 Ω, or 120 V through 10:1 into 1 kΩ) keep coming back. The battery charger (2011–12, 2015–16) uses the same "fraction of the cycle the diode conducts" idea Sadat sir taught in L6. With a filter capacitor the problem becomes the peak rectifier of <a href="09-peak-rectifier.html">Chapter 9</a>.</p>
+
+<h2>1. The three rectifiers</h2>
+<p>All three use the constant-voltage-drop model (Sadat sir: "if not specified, it is always CVD"). \(V_s\) is the <b>peak</b> of the sinusoid driving the diodes: \(V_s = \sqrt2V_{rms}\), after dividing by the transformer turns ratio.</p>
+<dl class="def">
+  <dt>Half-wave (HW)</dt><dd>One diode in series with \(R\). \(v_O = v_S - V_D\) while \(v_S &gt; V_D\), else 0. PIV \(= V_s\).</dd>
+  <dt>Centre-tapped full-wave (CT)</dt><dd>Two diodes, each driven by one half of a centre-tapped secondary (peak \(V_s\) each). \(v_O = |v_S| - V_D\). PIV \(= 2V_s - V_D\): when D2 is off its cathode is at \(V_s - V_D\) and its anode at \(-V_s\).</dd>
+  <dt>Bridge</dt><dd>Four diodes, ordinary secondary; two diodes conduct in each half-cycle. \(v_O = |v_S| - 2V_D\). PIV \(= V_s - V_D\): the off diode is in parallel with (on diode + load).</dd>
+  <dt>Dead zone</dt><dd>The output is zero while \(|v_S|\) is below the drops in the path: conduction starts at \(\theta = \sin^{-1}(V_0/V_s)\) with \(V_0 = V_D\) (HW, CT) or \(2V_D\) (bridge), and ends at \(\pi - \theta\).</dd>
+</dl>
+<figure><div id="fig-hw"></div><figcaption><b>Figure 1.</b> Half-wave rectifier.</figcaption></figure>
+<figure><div id="fig-ct"></div><figcaption><b>Figure 2.</b> Centre-tapped full-wave rectifier. The two halves of the secondary are drawn as two sources in series; the centre tap is ground. D1 conducts on positive half-cycles, D2 on negative ones.</figcaption></figure>
+<figure><div id="fig-br"></div><figcaption><b>Figure 3.</b> Bridge rectifier. For \(v_s &gt; 0\) current flows through the top-left diode, \(R\), and the bottom-right diode; for \(v_s &lt; 0\) through the other two. The load current has the same direction in both halves.</figcaption></figure>
+<figure><div id="fig-wave"></div><figcaption><b>Figure 4.</b> Input (dashed) and bridge output (solid), \(V_s\) = 16.97 V, \(V_D\) = 0.7 V. The output peaks at \(V_s - 2V_D\) = 15.57 V and is zero for \(|v_s| &lt; 2V_D\) around each zero crossing. The output frequency is \(2f\).</figcaption></figure>
+<figure><div id="fig-vtc"></div><figcaption><b>Figure 5.</b> Transfer characteristics. Half-wave (left): 0 up to \(V_D\), then slope 1. Full-wave (right): a V with a dead zone \(\pm V_0\) (\(V_D\) for CT, \(2V_D\) for bridge).</figcaption></figure>
+<div class="tbl"><table>
+<thead><tr><th></th><th>Half-wave</th><th>Centre-tap</th><th>Bridge</th></tr></thead>
+<tbody>
+<tr><td>Diodes</td><td>1</td><td>2 (needs centre tap)</td><td>4</td></tr>
+<tr><td>Peak output</td><td>\(V_s - V_D\)</td><td>\(V_s - V_D\)</td><td>\(V_s - 2V_D\)</td></tr>
+<tr><td>\(V_{avg}\) (Sedra)</td><td>\(\frac{V_s}{\pi} - \frac{V_D}{2}\)</td><td>\(\frac{2V_s}{\pi} - V_D\)</td><td>\(\frac{2V_s}{\pi} - 2V_D\)</td></tr>
+<tr><td>PIV</td><td>\(V_s\)</td><td>\(2V_s - V_D\)</td><td>\(V_s - V_D\)</td></tr>
+<tr><td>Peak diode current</td><td colspan="3">peak output / \(R\)</td></tr>
+<tr><td>Output frequency</td><td>\(f\)</td><td>\(2f\)</td><td>\(2f\)</td></tr>
+</tbody></table></div>
+<p>Comparison (Sadat L8): centre-tap uses only two diodes and one drop; the bridge needs no centre-tapped transformer and has about half the PIV. "Lower PIV is better": a diode rated 5 V reverse fails in a circuit with PIV 6 V.</p>
+
+<h2>2. Average, rms and conduction fraction</h2>
+<p><b>Derivation asked in 2011–12 (bridge).</b> Each half-cycle repeats, so average over one half-period, ignoring the tiny dead zone:</p>
+<div class="formula">\[ V_O = \frac1\pi\int_0^\pi\left(V_s\sin\phi - 2V_{D0}\right)d\phi = \frac{1}{\pi}\Big[-V_s\cos\phi\Big]_0^\pi - 2V_{D0} = \frac{2}{\pi}V_s - 2V_{D0} \]</div>
+<p><b>Exact (with the dead zone).</b> Integrate only from \(\theta\) to \(\pi - \theta\), \(\theta = \sin^{-1}(V_0/V_s)\):</p>
+<div class="formula">\[ V_{avg,FW} = \frac{2V_s\cos\theta - V_0(\pi - 2\theta)}{\pi},\qquad V_{avg,HW} = \frac{2V_s\cos\theta - V_D(\pi - 2\theta)}{2\pi} \]</div>
+<p><b>rms</b> (Sadat notes p.29: \(V_{rms} = \sqrt{\frac1T\int v_o^2\,dt}\)). Ideal diodes: \(V_{rms} = V_s/2\) (HW), \(V_s/\sqrt2\) (FW). With a drop \(V_0\):</p>
+<div class="formula">\[ V_{rms,FW}^2 = \frac1\pi\Big[V_s^2\Big(\frac{\pi - 2\theta}{2} + \frac{\sin2\theta}{2}\Big) - 4V_sV_0\cos\theta + V_0^2(\pi - 2\theta)\Big],\qquad V_{rms,HW}^2 = \tfrac12V_{rms,FW}^2 \]</div>
+<p><b>Fraction of the cycle a diode conducts</b> \(= (\theta_2 - \theta_1)/360^\circ = (\pi - 2\theta)/2\pi\). It does not depend on \(R\) (Sadat L6). For a bridge each diode conducts just under half the cycle.</p>
+
+<h2>3. Rectifier without capacitor (type D-07)</h2>
+<div class="method"><h4>Method · six lines</h4><ol>
+<li>\(V_s = \sqrt2V_{rms}\) (divide a mains rms by the turns ratio first).</li>
+<li>Peak output \(V_s - V_0\), with \(V_0 = V_D\) (HW, CT) or \(2V_D\) (bridge).</li>
+<li>\(\theta = \sin^{-1}(V_0/V_s)\); fraction each diode conducts \(= (180^\circ - 2\theta)/360^\circ\).</li>
+<li>\(V_{avg}\): Sedra form \((2/\pi)V_s - V_0\) (or \(V_s/\pi - V_D/2\) HW); write the exact value too if asked "exactly".</li>
+<li>\(I_{avg} = V_{avg}/R\); peak diode current \(= (V_s - V_0)/R\).</li>
+<li>PIV: HW \(V_s\), CT \(2V_s - V_D\), bridge \(V_s - V_D\).</li>
+</ol></div>
+<h3>Worked example: 2023–24 Sec A Q3(a) (also 2022–23 Q4(b))</h3>
+<div id="wk-br"></div>
+<div id="dr-rect"></div>
+<div id="dr-rms"></div>
+
+<h3>Variant: two diodes and two resistors (2020–21)</h3>
+<p>Only one diode conducts in each half-cycle; solve each half by a divider. With \(R_1 = R_2 = R\) and load \(R_L\) the output is \(|v_o| = k|v_i|\), \(k = \dfrac{R\parallel R_L}{R + R\parallel R_L}\): a full-wave rectifier with gain \(k\). The off diode sees the whole input, so PIV \(= V_m\).</p>
+<figure><div id="fig-rb"></div><figcaption><b>Figure 6.</b> 2020–21 Sec B Q6(a): two-diode, two-resistor full-wave rectifier (ideal diodes, read from the scanned figure).</figcaption></figure>
+<div id="dr-rb"></div>
+
+<h2>4. Battery charger and "fraction of the cycle" (type D-11)</h2>
+<p>A source \(v_s = V_m\sin\omega t\) charges a battery \(V_B\) through \(R\) and a diode (Figure 7). The diode conducts only while \(v_s &gt; V_B + V_D\).</p>
+<figure><div id="fig-ch"></div><figcaption><b>Figure 7.</b> Battery charger.</figcaption></figure>
+<figure><div id="fig-chw"></div><figcaption><b>Figure 8.</b> 2015–16 numbers (\(V_m\) = 10 V, \(V_B\) = 5 V, ideal diode): the current flows only between 30° and 150°, a sine cap of peak 50 mA.</figcaption></figure>
+<div class="method"><h4>Method · battery charger</h4><ol>
+<li>State the model (ideal unless a drop is given; CVD alternative is a bonus line).</li>
+<li>\(\theta_1 = \sin^{-1}\dfrac{V_B + V_D}{V_m}\); conducts from \(\theta_1\) to \(180^\circ - \theta_1\); fraction \(= \dfrac{180^\circ - 2\theta_1}{360^\circ}\).</li>
+<li>Peak current at \(\omega t = 90^\circ\): \(I_p = (V_m - V_B - V_D)/R\). Draw \(i_D = (v_s - V_B - V_D)/R\) as a cap.</li>
+<li>Maximum reverse voltage at the negative peak: \(V_m + V_B\) (the battery adds).</li>
+<li>Average charging current, if asked: \(\dfrac{2V_m\cos\theta_1 - (V_B + V_D)(\pi - 2\theta_1)}{2\pi R}\).</li>
+</ol></div>
+<h3>Worked example: Sadat L6, slide 14 #4</h3>
+<div id="wk-ch"></div>
+<div id="dr-ch"></div>
+
+<div class="trap"><h4>Traps (where marks go)</h4><ul>
+<li>One \(V_D\) instead of two for a bridge.</li>
+<li>Average = \(2V_{o,peak}/\pi\) = 9.91 V (Gemini's answer for 2021–22): wrong. It is \((2/\pi)V_s - 2V_D\) = 9.40 V (exact 9.44 V).</li>
+<li>Centre-tap PIV is \(2V_s - V_D\), not \(V_s\); bridge PIV is \(V_s - V_D\).</li>
+<li>Forgetting the turns ratio, or using the rms value as the peak.</li>
+<li>Battery charger PIV is \(V_m + V_B\), not \(V_m\).</li>
+<li>Writing the conduction angle (170.5°) when the question asks for a fraction (47.4 %).</li>
+</ul></div>
+
+<h2>Exam questions</h2>
+
+<div class="exam">
+  <div class="exam-src">2023–24 · Sec A · Q3(a) · 10 marks &nbsp;|&nbsp; also 2022–23 Sec A Q4(b) · 16 marks (same question)</div>
+  <div class="exam-q"><p>A full-wave bridge rectifier with a 1 kΩ load operates from a 120 V (rms), 60 Hz household supply through a 10:1 step-down transformer with a single secondary winding. It uses four diodes, each modelled as a 0.7 V drop at any current. (i) What is the peak value of the rectified voltage across the load? (ii) For what fraction of a cycle does each diode conduct? (iii) What are the average voltage across and the average current through the load?</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>Secondary 12 V rms: \(V_s = 12\sqrt2 = 16.97\) V.</p>
+    <p><b>(i)</b> \(V_{o,p} = 16.97 - 2(0.7) = 15.57\) V.</p>
+    <p><b>(ii)</b> Conduction starts when \(v_s = 2V_D\): \(\theta = \sin^{-1}(1.4/16.97) = 4.73^\circ\), ends at \(175.27^\circ\). Each diode conducts \(170.54^\circ\) per cycle, i.e. \(170.54/360 = 47.4\%\).</p>
+    <p><b>(iii)</b> \(V_{avg} \approx \frac{2}{\pi}(16.97) - 1.4 = 9.40\) V (exact with the dead zone: 9.44 V). \(I_{avg} = 9.40/1 = 9.4\) mA (9.44 mA).</p>
+    <p>One senior solution stops before (iii); the other gives 9.4 V / 9.4 mA, correct.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2021–22 · Sec B · Q5(c) · 15 marks &nbsp;|&nbsp; also 2018–19 Sec A Q1(b) · 10 marks (peak current and PIV only) · Sadat slide 22</div>
+  <div class="exam-q"><p>For the bridge rectifier (Sedra Fig. 4.24), \(v_s\) is a 12 V (rms) sinusoid, \(V_D\) = 0.7 V and R = 100 Ω. Find the average of the output voltage \(v_o\), the peak diode current and the PIV.</p><div id="fig-q2122"></div></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>\(V_s = 16.97\) V; \(V_{o,p} = 16.97 - 1.4 = 15.57\) V.</p>
+    <p>\(V_{avg} = \frac2\pi(16.97) - 2(0.7) = 10.80 - 1.40 = 9.40\) V. (Exact: \(\theta = 4.73^\circ\), \(V_{avg} = [2(16.97)\cos4.73^\circ - 1.4(\pi - 0.165)]/\pi = 9.44\) V.)</p>
+    <p>Peak diode current \(= 15.57/100 = 155.7\) mA. PIV \(= V_s - V_D = 16.27\) V.</p>
+    <p>The Gemini question bank answers 9.91 V (\(2V_{o,p}/\pi\)): that ignores where the drop is subtracted and is wrong.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2020–21 · Sec B · Q6(a) · 23⅓ marks</div>
+  <div class="exam-q"><p>Draw the transfer curve of the circuit (Figure 6), assuming ideal diodes, \(R_1 = R_2\) = 20 kΩ and \(R_L\) = 10 kΩ. The input is a ±10 V sinusoid (period about 2 ms). (i) What is the maximum peak voltage of the output? (ii) What is the PIV? (iii) What is the average current through the load?</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><b>\(v_i &gt; 0\):</b> the bottom diode conducts, so the bottom end of the source sits at ground; the top diode is reverse biased by \(v_i\). \(R_2\parallel R_L = 6.67\) kΩ, so \(v_o = v_i\dfrac{6.67}{20 + 6.67} = v_i/4\).</p>
+    <p><b>\(v_i &lt; 0\):</b> by symmetry the top diode conducts and \(v_o = |v_i|/4\). Transfer curve: \(v_o = |v_i|/4\), a V of slopes ±1/4 through the origin (full-wave rectifier with gain 1/4).</p>
+    <p><b>(i)</b> \(V_{o,max} = 10/4 = 2.5\) V. <b>(ii)</b> PIV = 10 V (the off diode sees the full input). <b>(iii)</b> \(V_{avg} = \frac{2}{\pi}(2.5) = 1.59\) V, \(I_{L,avg} = 1.59/10 = 0.159\) mA.</p>
+    <p>The question-bank reading of the figure has the diodes reversed, giving \(v_o = -|v_i|/4\); magnitudes are identical. Say which way you read the diodes.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2019–20 (paper dated "January 2021") · Sec A · Q1(a) · 20 marks</div>
+  <div class="exam-q"><p>Draw the circuit of a full-wave rectifier with a centre-tapped secondary winding and the input and output voltage waveshapes. Comment on the values of the RC time constant for a rectifier circuit.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>Draw Figure 2. Waveforms: input sine of peak \(V_s\) on each half winding; output = \(|v_s| - V_D\), humps of peak \(V_s - V_D\) at twice the input frequency, zero for \(|v_s| &lt; V_D\) (dead zone of \(2\sin^{-1}(V_D/V_s)\) around each zero crossing). State: D1 conducts in positive half-cycles, D2 in negative; PIV \(= 2V_s - V_D\).</p>
+    <p>RC comment: add \(C\) across \(R\); need \(RC \gg T/2\) so \(V_r = V_p/(2fRC)\) is small and \(V_{dc} = V_p - V_r/2\); larger \(RC\) shrinks the ripple but shortens the conduction angle \(\sqrt{2V_r/V_p}\) and raises the peak diode current \(I_L(1 + 2\pi\sqrt{V_p/2V_r})\). Full answer in <a href="09-peak-rectifier.html">Chapter 9, section 7</a>.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2018–19 · Sec A · Q1(a) · 16⅔ marks</div>
+  <div class="exam-q"><p>Draw the circuit of a full-wave bridge rectifier and show the output waveshape for a sinusoidal input.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>Draw Figure 3 and Figure 4. Points to write: on the positive half the diagonal pair (top-left, bottom-right) conducts, on the negative half the other pair; the load current has the same direction both times. \(v_o = |v_s| - 2V_D\), peak \(V_s - 2V_D\), zero while \(|v_s| &lt; 2V_D\), frequency \(2f\). PIV per diode \(= V_s - V_D\), about half that of the centre-tap circuit, and no centre-tapped transformer is needed; the price is two diode drops.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2015–16 · Sec A · Q1(a) · 15 marks</div>
+  <div class="exam-q"><p>The circuit (Figure 7, R = 100 Ω) charges a 5 V battery. If \(v_s = 10\sin(100\pi t)\), find (i) the duty cycle (fraction of each cycle the diode conducts); (ii) draw the diode current waveform indicating the peak value; (iii) the maximum reverse-bias voltage across the diode.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>Ideal diode (none specified). \(f = 50\) Hz, \(T\) = 20 ms.</p>
+    <p><b>(i)</b> Conducts when \(10\sin\theta &gt; 5\): \(\theta_1 = 30^\circ\), \(\theta_2 = 150^\circ\). Fraction \(= 120/360 = 1/3\) (6.67 ms of every 20 ms).</p>
+    <p><b>(ii)</b> \(i_D = (10\sin\omega t - 5)/100\) A between 30° and 150° (1.67 ms to 8.33 ms), zero otherwise (Figure 8). Peak \(= (10 - 5)/100 = 50\) mA at 5 ms.</p>
+    <p><b>(iii)</b> At the negative peak: \(10 + 5 = 15\) V.</p>
+    <p>With a 0.7 V drop: \(\theta_1 = \sin^{-1}0.57 = 34.75^\circ\), fraction 30.7 %, peak 43 mA, PIV still 15 V.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2013–14 · Sec A · Q2(d) 5 marks + Q2(e) 10⅔ marks</div>
+  <div class="exam-q"><p>(d) Write a script in C that takes a sinusoidal input and provides a full-wave rectified output. (e) How does your program rectify the input? Is there any diode inside the processor? If not, what makes rectification possible?</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+<pre>#include &lt;stdio.h&gt;
+#include &lt;math.h&gt;
+int main(void) {
+    const double A = 10, f = 50, fs = 5000;      /* amplitude, signal and sample rate */
+    for (int n = 0; n &lt; 200; n++) {
+        double vin = A * sin(2 * M_PI * f * n / fs);
+        double vout = fabs(vin);                  /* full-wave; bridge-like: fmax(fabs(vin) - 1.4, 0) */
+        printf("%d %f %f\n", n, vin, vout);
+    }
+    return 0;
+}</pre>
+    <p>(e) The input is sampled into numbers (ADC); rectification is the arithmetic operation |x| (test the sign bit and negate negative samples). No rectifying diode is used in the data path: transistors acting as switches implement the logic (compare, conditional negate) in the ALU. A DAC turns the numbers back into a voltage if an analogue output is needed.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2011–12 · Sec B · Q6(a) · 16⅔ marks</div>
+  <div class="exam-q"><p>Show that the average output voltage of a bridge rectifier is \(V_O = \frac2\pi V_s - 2V_{D0}\) (\(V_s\) = peak). If the input is a 12 V (rms) sinusoid and the load is 100 Ω, calculate (i) the average output voltage, (ii) the peak diode current, (iii) the PIV. \(V_{D0}\) = 0.7 V.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>Derivation: section 2 (average over one half-period, \(v_o = V_s\sin\phi - 2V_{D0}\), neglecting the dead zone). Then (i) 9.40 V, (ii) 155.7 mA, (iii) 16.27 V, as in 2021–22.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2011–12 · Sec B · Q5(c) · 15⅔ marks</div>
+  <div class="exam-q"><p>A circuit for charging a 10 V battery (Figure 7, R = 100 Ω): \(v_s\) is a sinusoid of 20 V peak. Find the fraction of each cycle during which the (ideal) diode conducts, the peak diode current and the maximum reverse-bias voltage across the diode.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>\(\sin\theta_1 = 10/20\): \(\theta_1 = 30^\circ\), conducts 120°, fraction 1/3. Peak \(= (20 - 10)/100 = 100\) mA. PIV \(= 20 + 10 = 30\) V.</p>
+  </div></details>
+</div>
+
+<h3>Class example</h3>
+<div class="exam">
+  <div class="exam-src">Sadat L6 · slide 14 #4 (notes p.20; Ikra p.18)</div>
+  <div class="exam-q"><p>\(v_s\) is a sinusoid with 48 V peak-to-peak, in series with 100 Ω, a diode (0.7 V) and a 12 V battery. Find the fraction of the cycle the diode conducts.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>\(V_m = 24\) V; conducts for \(v_s &gt; 12.7\) V: \(\theta_1 = \sin^{-1}(12.7/24) = 31.95^\circ\), \(\theta_2 = 148.05^\circ\). Fraction \(= 116.1/360 = 0.3225\) (32.25 %). Peak current \(= (24 - 12.7)/100 = 113\) mA; PIV \(= 24 + 12 = 36\) V. (Ikra's notes write 0.326: an arithmetic slip, and her shortcut formula is missing the factor 2 in \(180^\circ - 2\theta_1\).)</p>
+  </div></details>
+</div>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+
+<div class="key"><p><strong>Summary:</strong> \(V_s = \sqrt2V_{rms}\)/turns ratio. Peak output \(V_s - V_D\) (HW, CT) or \(V_s - 2V_D\) (bridge). \(V_{avg} = \frac2\pi V_s - V_0\) for full-wave (\(\frac{V_s}{\pi} - \frac{V_D}{2}\) HW). Conduction fraction \((180^\circ - 2\theta)/360^\circ\), \(\theta = \sin^{-1}(\text{threshold}/V_s)\), independent of R. PIV: \(V_s\), \(2V_s - V_D\), \(V_s - V_D\). Battery charger: threshold \(V_B + V_D\), peak \((V_m - V_B - V_D)/R\), PIV \(V_m + V_B\).</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/eee.js"></script>
+<script>
+// plot(o): axes + curves for waveforms and transfer characteristics.
+// o = {w, h, x:[x0,x1], y:[y0,y1], xl, yl, xt:[[v,'label']], yt:[[v,'label']], c:[{f | pts, cls}], g:[{x} | {y}], m:[[x, y, 'text', anchor, cls]], al}
+function plot(o) {
+  const W = o.w || 440, H = o.h || 200, L = 46, R = 30, T = 16, B = 24, s = [];
+  const X = v => L + (v - o.x[0]) / (o.x[1] - o.x[0]) * (W - L - R), Y = v => T + (o.y[1] - v) / (o.y[1] - o.y[0]) * (H - T - B);
+  const n = v => v.toFixed(1), cl = (v, a, b) => Math.min(Math.max(v, a), b);
+  const ax = X(cl(0, o.x[0], o.x[1])), ay = Y(cl(0, o.y[0], o.y[1]));
+  for (const g of o.g || []) s.push(g.x !== undefined ? `<line x1="${n(X(g.x))}" y1="${T}" x2="${n(X(g.x))}" y2="${H - B}" class="s-fg dash" opacity=".45"/>` : `<line x1="${L}" y1="${n(Y(g.y))}" x2="${W - R}" y2="${n(Y(g.y))}" class="s-fg dash" opacity=".45"/>`);
+  s.push(`<line x1="${L}" y1="${n(ay)}" x2="${W - R + 8}" y2="${n(ay)}" class="s-fg"/><line x1="${n(ax)}" y1="${H - B + 4}" x2="${n(ax)}" y2="${T - 8}" class="s-fg"/>`);
+  s.push(`<text x="${W - R + 10}" y="${n(ay + 4)}" class="lbl">${o.xl || ''}</text><text x="${n(ax + 5)}" y="${T - 4}" class="lbl">${o.yl || ''}</text>`);
+  for (const [v, t] of o.xt || []) s.push(`<line x1="${n(X(v))}" y1="${n(ay - 3)}" x2="${n(X(v))}" y2="${n(ay + 3)}" class="s-fg"/><text x="${n(X(v))}" y="${n(ay + 15)}" text-anchor="middle" class="lbl">${t}</text>`);
+  for (const [v, t] of o.yt || []) s.push(`<line x1="${n(ax - 3)}" y1="${n(Y(v))}" x2="${n(ax + 3)}" y2="${n(Y(v))}" class="s-fg"/><text x="${n(ax - 6)}" y="${n(Y(v) + 4)}" text-anchor="end" class="lbl">${t}</text>`);
+  for (const c of o.c || []) {
+    const pts = c.pts || Array.from({ length: 401 }, (_, k) => { const x = o.x[0] + (o.x[1] - o.x[0]) * k / 400; return [x, c.f(x)]; });
+    s.push(`<polyline points="${pts.map(([x, y]) => n(X(x)) + ',' + n(Y(cl(y, o.y[0], o.y[1])))).join(' ')}" class="${c.cls || 's-acc'}"/>`);
+  }
+  for (const [x, y, t, a, c] of o.m || []) s.push(`<text x="${n(X(x))}" y="${n(Y(y))}" text-anchor="${a || 'start'}" class="lbl ${c || ''}">${t}</text>`);
+  return `<svg viewBox="0 0 ${W} ${H}" width="${W}" style="max-width:100%;height:auto;display:block;margin:0 auto" role="img" aria-label="${o.al || 'Plot'}">${s.join('')}</svg>`;
+}
+
+const hwFig = (src = 'vₛ', R = 'R') => sch([
+  ['AC', [40, 60], [40, 160], src, 1], ['W', [40, 60], [90, 60]], ['D', [90, 60], [150, 60], 'D'], ['W', [150, 60], [220, 60]],
+  ['R', [220, 60], [220, 160], R], ['W', [40, 160], [220, 160]], ['gnd', [130, 160]], ['open', [220, 60], ''], ['t', [230, 50], 'vₒ', 'start'],
+], { w: 280, h: 190 });
+const ctFig = sch([
+  ['AC', [40, 60], [40, 140], 'vₛ', 1], ['AC', [40, 140], [40, 220], 'vₛ', 1], ['W', [40, 140], [80, 140]], ['dot', [40, 140]], ['gnd', [80, 140]],
+  ['W', [40, 60], [100, 60]], ['D', [100, 60], [160, 60], 'D1'], ['W', [40, 220], [100, 220]], ['D', [100, 220], [160, 220], 'D2', -1],
+  ['W', [160, 60], [280, 60]], ['W', [160, 220], [220, 220], [220, 60]], ['dot', [220, 60]], ['R', [280, 60], [280, 160], 'R'], ['gnd', [280, 160]],
+  ['open', [280, 60], ''], ['t', [290, 50], 'vₒ', 'start'],
+], { w: 340, h: 250 });
+const brFig = (src = 'vₛ', R = 'R', o = {}) => sch([
+  ['D', [60, 120], [60, 40], ''], ['D', [60, 200], [60, 120], ''], ['D', [180, 120], [180, 40], ''], ['D', [180, 200], [180, 120], ''],
+  ['W', [60, 120], [90, 120]], ['AC', [90, 120], [150, 120], src, 1, o], ['W', [150, 120], [180, 120]],
+  ['W', [60, 40], [270, 40]], ['W', [60, 200], [270, 200]], ['dot', [180, 40]], ['dot', [180, 200]],
+  ['R', [270, 40], [270, 200], R], ['gnd', [120, 200]], ['open', [270, 40], ''], ['t', [280, 30], 'vₒ', 'start'],
+], { w: 330, h: 230 });
+const chFig = (src = 'vₛ', R = 'R', VB = 'V_B') => sch([
+  ['AC', [40, 60], [40, 160], src, 1], ['W', [40, 60], [80, 60]], ['R', [80, 60], [160, 60], R], ['D', [160, 60], [220, 60], 'D'],
+  ['W', [220, 60], [260, 60]], ['V', [260, 60], [260, 160], VB], ['W', [40, 160], [260, 160]], ['gnd', [150, 160]],
+], { w: 320, h: 190 });
+$('#fig-hw').innerHTML = hwFig();
+$('#fig-ct').innerHTML = ctFig;
+$('#fig-br').innerHTML = brFig();
+$('#fig-q2122').innerHTML = brFig('12 V rms', '100 Ω', { amp: 16.97, f: 60 });
+$('#fig-ch').innerHTML = chFig();
+$('#fig-rb').innerHTML = sch([
+  ['AC', [40, 60], [40, 200], 'vᵢ', 1], ['W', [40, 60], [120, 60]], ['W', [40, 200], [120, 200]], ['dot', [90, 60]], ['dot', [90, 200]],
+  ['D', [90, 130], [90, 60], 'D1'], ['D', [90, 130], [90, 200], 'D2'], ['dot', [90, 130]], ['W', [90, 130], [70, 130]], ['gnd', [70, 130]],
+  ['R', [120, 60], [210, 60], 'R₁ 20 kΩ'], ['R', [120, 200], [210, 200], 'R₂ 20 kΩ', -1], ['W', [210, 60], [250, 60], [250, 200], [210, 200]],
+  ['W', [90, 130], [130, 130]], ['R', [130, 130], [210, 130], 'Rₗ 10 kΩ'], ['W', [210, 130], [250, 130]], ['dot', [250, 130]],
+  ['t', [218, 150], '+', 'middle'], ['t', [124, 150], '−', 'middle'], ['t', [170, 156], 'vₒ', 'middle'],
+], { w: 290, h: 230 });
+
+const Vs0 = 12 * Math.SQRT2, V0 = 1.4, th0 = Math.asin(V0 / Vs0);
+$('#fig-wave').innerHTML = plot({ w: 500, h: 220, x: [0, 2], y: [-18, 18], xl: 't/T', yl: 'v (V)', xt: [[0.5, 'T/2'], [1, 'T'], [1.5, '3T/2'], [2, '2T']], yt: [[15.57, '15.57'], [-16.97, '−16.97']],
+  g: [{ y: 15.57 }], c: [{ f: t => Vs0 * Math.sin(2 * Math.PI * t), cls: 's-fg dash' }, { f: t => Math.max(Math.abs(Vs0 * Math.sin(2 * Math.PI * t)) - V0, 0), cls: 's-acc' }],
+  m: [[0.27, 16.5, 'vₒ', 'start', 'acc'], [0.78, -15, 'vₛ', 'start']], al: 'Bridge rectifier waveforms' });
+$('#fig-vtc').innerHTML = '<div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center">' +
+  plot({ w: 260, h: 200, x: [-4, 4], y: [-1, 4], xl: 'vₛ', yl: 'vₒ', xt: [[0.7, 'V_D']], c: [{ f: v => Math.max(v - 0.7, 0) }], al: 'Half-wave transfer characteristic' }) +
+  plot({ w: 260, h: 200, x: [-4, 4], y: [-1, 4], xl: 'vₛ', yl: 'vₒ', xt: [[-1.4, '−V₀'], [1.4, 'V₀']], c: [{ f: v => Math.max(Math.abs(v) - 1.4, 0) }], al: 'Full-wave transfer characteristic' }) + '</div>';
+$('#fig-chw').innerHTML = plot({ w: 500, h: 220, x: [0, 20], y: [-11, 11], xl: 't (ms)', yl: 'v (V), i (×100 mA)', xt: [[1.667, '1.67'], [8.333, '8.33'], [10, '10'], [20, '20']], yt: [[5, '5'], [10, '10']],
+  g: [{ y: 5 }], c: [{ f: t => 10 * Math.sin(2 * Math.PI * t / 20), cls: 's-fg dash' }, { f: t => Math.max(10 * Math.sin(2 * Math.PI * t / 20) - 5, 0) * 0.1 * 10, cls: 's-acc' }],
+  m: [[5, 6.2, 'i_D peak 50 mA (scaled ×100 Ω)', 'middle', 'acc'], [13, -9, 'vₛ', 'start'], [19.5, 5.6, 'V_B', 'end']], al: 'Battery charger current' });
+
+// exact average and rms of a rectified sine with drop V0 (fw: true = full-wave)
+function avgRms(Vs, V0, fw) {
+  const th = Math.asin(Math.min(V0 / Vs, 1)), w = Math.PI - 2 * th;
+  const avg = (2 * Vs * Math.cos(th) - V0 * w) / (fw ? Math.PI : 2 * Math.PI);
+  const ms = (Vs * Vs * (w / 2 + Math.sin(2 * th) / 2) - 4 * Vs * V0 * Math.cos(th) + V0 * V0 * w) / Math.PI;
+  return { th, avg, rms: Math.sqrt(fw ? ms : ms / 2) };
+}
+
+worked('#wk-br', {
+  given: 'Bridge, 1 kΩ load, 120 V rms 60 Hz through 10:1, V_D = 0.7 V, no capacitor.',
+  fig: brFig('12 V rms', '1 kΩ', { amp: 16.97, f: 60 }),
+  steps: [
+    { t: '\\(V_s = (120/10)\\sqrt2 = 16.97\\) V', a: { l: 'V_s', v: 16.97, u: 'V', tol: 0.002 } },
+    { t: '\\(V_{o,p} = 16.97 - 1.4 = 15.57\\) V', a: { l: 'V_{o,p}', v: 15.57, u: 'V', tol: 0.002 } },
+    { t: '\\(\\theta = \\sin^{-1}(1.4/16.97) = 4.73^\\circ\\); fraction \\(= (180 - 9.46)/360 = 47.4\\%\\)', a: { l: '\\text{fraction}', v: 47.37, u: '%', tol: 0.003 } },
+    { t: '\\(V_{avg} \\approx \\frac2\\pi(16.97) - 1.4 = 9.40\\) V (exact 9.44 V)', a: { l: 'V_{avg}', v: 9.40, u: 'V', tol: 0.006 } },
+    { t: '\\(I_{avg} = 9.40/1\\text{ kΩ} = 9.40\\) mA', a: { l: 'I_{avg}', v: 9.40e-3, u: 'mA', tol: 0.006 } },
+  ] });
+
+worked('#wk-ch', {
+  given: 'v_s: 48 V p-p sine; 100 Ω; diode with 0.7 V drop; 12 V battery (+ toward the diode cathode).',
+  fig: chFig('vₛ 24 V', '100 Ω', '12 V'),
+  steps: [
+    'Threshold: \\(V_B + V_D = 12.7\\) V; \\(V_m = 48/2 = 24\\) V.',
+    { t: '\\(\\theta_1 = \\sin^{-1}(12.7/24) = 31.95^\\circ\\), \\(\\theta_2 = 148.05^\\circ\\)', a: { l: '\\theta_1', v: 31.95, u: '°', tol: 0.002 } },
+    { t: 'Fraction \\(= (148.05 - 31.95)/360 = 0.3225\\) (32.25 %)', a: { l: '\\text{fraction}', v: 32.25, u: '%', tol: 0.003 } },
+    { t: '\\(I_p = (24 - 12.7)/100 = 113\\) mA; PIV \\(= 24 + 12 = 36\\) V', a: { l: 'I_p', v: 0.113, u: 'mA' } },
+  ] });
+
+drill('#dr-rect', { id: 'd07-rect-noc', title: 'Rectifier without capacitor: peak, fraction, average, PIV', gen(r) {
+  const top = r.pick(['HW', 'CT', 'bridge', 'bridge']), VD = r.pick([0.6, 0.7, 0.8]), R = r.pick([50, 100, 220, 470, 1000]);
+  let Vs, src;
+  if (r() < 0.5) { const Vr = r.pick([6, 9, 12, 15, 18, 24]); Vs = Math.SQRT2 * Vr; src = `${Vr} V rms${top === 'CT' ? ' on each half of the secondary' : ''}`; }
+  else { const n = r.pick([5, 8, 10, 12]); Vs = Math.SQRT2 * 120 / n; src = `a 120 V rms line through a ${n}:1 transformer${top === 'CT' ? ' (each half of the centre-tapped secondary)' : ''}`; }
+  const V0 = top === 'bridge' ? 2 * VD : VD, fw = top !== 'HW', a = avgRms(Vs, V0, fw), Vop = Vs - V0;
+  const frac = (Math.PI - 2 * a.th) / (2 * Math.PI) * 100, Vapp = fw ? 2 * Vs / Math.PI - V0 : Vs / Math.PI - VD / 2, PIV = top === 'HW' ? Vs : top === 'CT' ? 2 * Vs - VD : Vs - VD;
+  const name = { HW: 'half-wave', CT: 'centre-tapped full-wave', bridge: 'bridge' }[top];
+  return {
+    given: `A ${name} rectifier (no capacitor) with R = ${R} Ω is driven by ${src}. Each diode drops ${VD} V. Find the peak output, the fraction of the cycle each diode conducts, the average output (exact, with the dead zone), the peak diode current and the PIV.`,
+    ask: [{ l: 'V_{o,p}', v: Vop, u: 'V', tol: 0.005 }, { l: '\\text{fraction}', v: frac, u: '%', tol: 0.005 }, { l: 'V_{avg}', v: a.avg, u: 'V', tol: 0.01 }, { l: 'I_{D,p}', v: Vop / R, u: 'mA' }, { l: '\\text{PIV}', v: PIV, u: 'V', tol: 0.005 }],
+    steps: [
+      `\\(V_s = ${num(Vs)}\\) V; drop in the path \\(V_0 = ${num(V0)}\\) V`,
+      { t: `\\(V_{o,p} = ${num(Vs)} - ${num(V0)} = ${num(Vop)}\\) V`, a: { l: 'V_{o,p}', v: Vop, u: 'V', tol: 0.005 } },
+      { t: `\\(\\theta = \\sin^{-1}(${num(V0)}/${num(Vs)}) = ${num(a.th * 180 / Math.PI)}^\\circ\\); fraction \\(= (180 - 2\\theta)/360 = ${num(frac)}\\%\\)`, a: { l: '\\text{fraction}', v: frac, u: '%', tol: 0.005 } },
+      { t: `Exact: \\(V_{avg} = \\dfrac{2(${num(Vs)})\\cos\\theta - ${num(V0)}(\\pi - 2\\theta)}{${fw ? '\\pi' : '2\\pi'}} = ${num(a.avg)}\\) V (Sedra approximation ${num(Vapp)} V)`, a: { l: 'V_{avg}', v: a.avg, u: 'V', tol: 0.01 } },
+      { t: `\\(I_{D,p} = ${num(Vop)}/${R} = ${si(Vop / R, 'A')}\\)`, a: { l: 'I_{D,p}', v: Vop / R, u: 'mA' } },
+      { t: `PIV (${name}) \\(= ${top === 'HW' ? 'V_s' : top === 'CT' ? '2V_s - V_D' : 'V_s - V_D'} = ${num(PIV)}\\) V`, a: { l: '\\text{PIV}', v: PIV, u: 'V', tol: 0.005 } },
+    ] };
+} });
+
+drill('#dr-rms', { id: 'd07-avg-rms', title: 'Average and rms of a rectified sine', gen(r) {
+  const fw = r() < 0.5, Vs = r.pick([5, 10, 12, 15, 20, 24, 50]), V0 = r.pick([0, 0, 0.7, 1.4]);
+  if (V0 > Vs / 4) return null;
+  const a = avgRms(Vs, V0, fw);
+  return {
+    given: `A ${fw ? 'full-wave' : 'half-wave'} rectifier output: \\(v_o = ${fw ? '|v_s|' : 'v_s'} - ${V0}\\) V whenever this is positive, else 0, with \\(v_s = ${Vs}\\sin\\omega t\\) V${V0 ? '' : ' (ideal diodes)'}. Find \\(V_{avg}\\) and \\(V_{rms}\\).`,
+    ask: [{ l: 'V_{avg}', v: a.avg, u: 'V', tol: 0.01 }, { l: 'V_{rms}', v: a.rms, u: 'V', tol: 0.01 }],
+    steps: V0 ? [
+      `\\(\\theta = \\sin^{-1}(${V0}/${Vs}) = ${num(a.th, 4)}\\) rad`,
+      { t: `\\(V_{avg} = \\dfrac{2(${Vs})\\cos\\theta - ${V0}(\\pi - 2\\theta)}{${fw ? '\\pi' : '2\\pi'}} = ${num(a.avg)}\\) V`, a: { l: 'V_{avg}', v: a.avg, u: 'V', tol: 0.01 } },
+      { t: `\\(V_{rms}^2 = \\frac{1}{${fw ? '' : '2'}\\pi}[V_s^2(\\frac{\\pi-2\\theta}{2} + \\frac{\\sin2\\theta}{2}) - 4V_sV_0\\cos\\theta + V_0^2(\\pi - 2\\theta)]\\) → \\(V_{rms} = ${num(a.rms)}\\) V`, a: { l: 'V_{rms}', v: a.rms, u: 'V', tol: 0.01 } },
+    ] : [
+      { t: `Ideal: \\(V_{avg} = ${fw ? '2V_s/\\pi' : 'V_s/\\pi'} = ${num(a.avg)}\\) V`, a: { l: 'V_{avg}', v: a.avg, u: 'V', tol: 0.01 } },
+      { t: `\\(V_{rms} = ${fw ? 'V_s/\\sqrt2' : 'V_s/2'} = ${num(a.rms)}\\) V`, a: { l: 'V_{rms}', v: a.rms, u: 'V', tol: 0.01 } },
+    ] };
+} });
+
+drill('#dr-rb', { id: 'd07-two-resistor', title: 'Two-diode two-resistor full-wave rectifier', gen(r) {
+  const R = r.pick([5, 10, 20, 47]), RL = r.pick([5, 10, 20]), Vm = r.pick([5, 10, 12, 20]);
+  const p = R * RL / (R + RL), k = p / (R + p), Vop = k * Vm, Iav = 2 * Vop / Math.PI / RL / 1000;
+  return {
+    given: `In the circuit of Figure 6, \\(R_1 = R_2\\) = ${R} kΩ, \\(R_L\\) = ${RL} kΩ, ideal diodes, \\(v_i = ${Vm}\\sin\\omega t\\) V. Find the peak output, the PIV and the average load current.`,
+    ask: [{ l: 'V_{o,p}', v: Vop, u: 'V' }, { l: '\\text{PIV}', v: Vm, u: 'V' }, { l: 'I_{L,avg}', v: Iav, u: 'mA' }],
+    steps: [
+      { t: `One diode on: \\(R_2\\parallel R_L = ${num(p)}\\) kΩ, gain \\(k = ${num(p)}/(${R} + ${num(p)}) = ${num(k)}\\), \\(V_{o,p} = ${num(Vop)}\\) V`, a: { l: 'V_{o,p}', v: Vop, u: 'V' } },
+      { t: `The off diode sees the whole input: PIV \\(= ${Vm}\\) V`, a: { l: '\\text{PIV}', v: Vm, u: 'V' } },
+      { t: `\\(I_{L,avg} = \\dfrac{2V_{o,p}/\\pi}{R_L} = ${num(2 * Vop / Math.PI)}/${RL} = ${si(Iav, 'A')}\\)`, a: { l: 'I_{L,avg}', v: Iav, u: 'mA' } },
+    ] };
+} });
+
+drill('#dr-ch', { id: 'd11-charger', title: 'Battery charger: fraction, peak current, PIV', gen(r) {
+  const Vm = r.pick([10, 12, 15, 20, 24, 30]), VB = r.pick([3, 5, 6, 9, 10, 12]), R = r.pick([10, 22, 47, 100, 220]), VD = r.pick([0, 0.7]);
+  if (VB / Vm < 0.2 || VB / Vm > 0.8 || VB + VD > 0.95 * Vm) return null;
+  const th = Math.asin((VB + VD) / Vm), frac = (Math.PI - 2 * th) / (2 * Math.PI) * 100, Ip = (Vm - VB - VD) / R;
+  const Iav = (2 * Vm * Math.cos(th) - (VB + VD) * (Math.PI - 2 * th)) / (2 * Math.PI * R);
+  return {
+    given: `A ${VB} V battery is charged from \\(v_s = ${Vm}\\sin\\omega t\\) V through R = ${R} Ω and a diode (${VD ? '0.7 V drop' : 'ideal'}). Find the fraction of the cycle the diode conducts, the peak current, the maximum reverse voltage and the average charging current.`,
+    fig: chFig(`vₛ ${Vm} V`, R + ' Ω', VB + ' V'),
+    ask: [{ l: '\\text{fraction}', v: frac, u: '%', tol: 0.005 }, { l: 'I_p', v: Ip, u: 'mA' }, { l: '\\text{PIV}', v: Vm + VB, u: 'V' }, { l: 'I_{avg}', v: Iav, u: 'mA' }],
+    steps: [
+      { t: `Conducts while \\(v_s &gt; ${VB + VD}\\) V: \\(\\theta_1 = \\sin^{-1}(${VB + VD}/${Vm}) = ${num(th * 180 / Math.PI)}^\\circ\\); fraction \\(= (180 - 2\\theta_1)/360 = ${num(frac)}\\%\\)`, a: { l: '\\text{fraction}', v: frac, u: '%', tol: 0.005 } },
+      { t: `\\(I_p = (${Vm} - ${VB + VD})/${R} = ${si(Ip, 'A')}\\)`, a: { l: 'I_p', v: Ip, u: 'mA' } },
+      { t: `PIV at the negative peak \\(= ${Vm} + ${VB} = ${Vm + VB}\\) V`, a: { l: '\\text{PIV}', v: Vm + VB, u: 'V' } },
+      { t: `\\(I_{avg} = \\dfrac{2(${Vm})\\cos\\theta_1 - ${VB + VD}(\\pi - 2\\theta_1)}{2\\pi(${R})} = ${si(Iav, 'A')}\\)`, a: { l: 'I_{avg}', v: Iav, u: 'mA' } },
+    ] };
+} });
+
+flashcards('#cards', [
+  { f: 'Bridge peak output', b: 'V_s − 2V_D' },
+  { f: 'Bridge V_avg', b: '(2/π)V_s − 2V_D (exact: integrate from θ to π − θ)' },
+  { f: 'PIV: HW / CT / bridge', b: 'V_s / 2V_s − V_D / V_s − V_D' },
+  { f: 'Conduction fraction', b: '(180° − 2θ)/360°, θ = sin⁻¹(threshold/V_s); independent of R' },
+  { f: 'V_rms ideal', b: 'HW V_s/2; FW V_s/√2' },
+  { f: 'Battery charger PIV', b: 'V_m + V_B' },
+  { f: 'CT vs bridge', b: 'CT: 2 diodes, one drop, needs centre tap, PIV 2V_s; bridge: 4 diodes, two drops, PIV ≈ V_s' },
+]);
+quiz('#quiz', [
+  { q: '12 V rms, bridge, 0.7 V diodes, 100 Ω. Average output ≈', opts: ['9.91 V', '9.40 V', '10.80 V', '7.64 V'], a: 1, why: '(2/π)16.97 − 1.4 = 9.40 V.' },
+  { q: 'PIV of a centre-tapped rectifier with V_s = 10 V per half, V_D = 0.7 V:', opts: ['9.3 V', '10 V', '19.3 V', '20.7 V'], a: 2, why: '2V_s − V_D.' },
+  { q: 'Doubling R in a battery charger changes the conduction fraction by', opts: ['halving it', 'doubling it', 'nothing', '√2'], a: 2, why: 'The fraction depends only on the voltages.' },
+  { q: 'V_m = 20 V, V_B = 10 V, ideal diode. The diode conducts', opts: ['1/2 of the cycle', '1/3', '1/6', '2/3'], a: 1, why: 'θ₁ = 30°, conducts 120°.' },
+  { q: 'Output frequency of a bridge rectifier on 50 Hz:', opts: ['25 Hz', '50 Hz', '100 Hz', '200 Hz'], a: 2, why: 'Two humps per input cycle.' },
+]);
+</script>
+</body>
+</html>

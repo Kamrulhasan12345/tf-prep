@@ -1,0 +1,338 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Current Mirrors, Pairs and Complementary Stages · EEE 263 Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">MOSFET · Chapter 5 · Sedra §5.3, §8.2 (mirror) · Sadat L22–L23, notes p.94–98 · types M-04, M-07</div>
+<h1>Current Mirrors, Differential-Pair Sharing and Complementary Stages</h1>
+<p class="lede">Transistors that share a gate voltage or a source node are a recurring DC question: current mirror and pair sharing (M-04: 2024–25 for 17 marks, 2018–19 for 20, 2016–17 for 26) and the NMOS/PMOS pair with a load resistor (M-07: 2022–23 for 20 marks, 2015–16 for 15, 2014–15 for 20). One idea solves all of them: <b>devices with equal \(V_{GS}\) carry currents in the ratio of their \(W/L\)</b>. Work in mA, V, kΩ, mA/V², Sedra's \(i_D = \tfrac12k_nV_{OV}^2\), with the region check written at the end.</p>
+
+<h2>1. The current mirror</h2>
+<p>M1 has its gate tied to its drain, so \(V_{GD} = 0\) and it is saturated (Sadat L23: "G and D shorted ∴ saturation"). Its current is forced by the reference branch and it sets \(V_{GS}\). M2 shares the gate and the source, so it has the <b>same \(V_{GS}\)</b>; as long as M2 is saturated, its current is the reference current scaled by the geometry:</p>
+<div class="formula">\[ I_{REF} = \frac{V_{DD} - V_{GS}}{R},\quad V_{GS} = V_t + \sqrt{\frac{2I_{REF}}{k_1}} \]\[ I_O = I_{REF}\,\frac{(W/L)_2}{(W/L)_1}\cdot\frac{1 + \lambda V_{DS2}}{1 + \lambda V_{DS1}} \quad(\text{pure ratio when } \lambda = 0) \]</div>
+<p>Saturation of M2 needs \(V_{D2} \ge V_{GS} - V_t = V_{OV}\). Seen from its drain, the mirror output has resistance \(r_{o2} = V_A/I_O\): a good current source. The \(\lambda\) ratio above is the small error between the two drain voltages.</p>
+<figure><div id="fig-mir"></div><figcaption><b>Figure 1.</b> NMOS mirror. M1 diode-connected, M2 the output device with load \(R_D\). Gates and sources are common.</figcaption></figure>
+<div class="method"><h4>Method · mirror with resistors</h4><ol>
+<li>Reference branch: M1 is saturated. \(V_{DD} = I_{REF}R + V_t + V_{OV}\) with \(I_{REF} = \tfrac12k_1V_{OV}^2\). Positive root of the quadratic; reject \(V_{GS} &lt; V_t\). (If \(I_{REF}\) is given: \(V_{OV} = \sqrt{2I_{REF}/k_1}\), then solve for \(R\) directly.)</li>
+<li>\(I_O = I_{REF}\cdot m\), \(m = (W/L)_2/(W/L)_1\) (equal \(L\): width ratio).</li>
+<li>Output node: \(V_{D2} = V_{DD} - I_OR_D\) (or the voltage across a diode-connected load).</li>
+<li><b>Check</b> \(V_{D2} \ge V_{OV}\). If not, M2 is in triode: \(\tfrac{k_2}{2}x^2 - (k_2V_{OV} + 1/R_D)x + V_{DD}/R_D = 0\), small root \(x &lt; V_{OV}\), and \(I_O\) is no longer \(mI_{REF}\).</li>
+</ol></div>
+<h3>Worked example: 2018–19 Sec A Q4(b)</h3>
+<div id="wk-mir"></div>
+<div id="dr-mir"></div>
+<p><b>Mirror with a diode-connected load (2016–17 Q7(a)).</b> If the load on each branch is itself a diode-connected NMOS from \(V_{DD}\) (Q2 above Q1, Q4 above Q3), the two stacks have equal \(V_{GS}\) in every device: \(V_{GS1} = X\) and \(V_{GS2} = V_{DD} - X\) with the same current and \(k\) give \(X = V_{DD}/2\). Making the output pair \(m\) times wider multiplies the current by \(m\) but leaves the node voltage at \(V_{DD}/2\), because the widths of Q3 and Q4 scale together.</p>
+
+<h2>2. Differential pair: how the tail current splits</h2>
+<p>Two transistors with <b>joined sources and equal gate voltages</b> have the same \(V_{GS}\), hence the same \(V_{OV}\), whatever their sizes, so \(I_1/I_2 = (W/L)_1/(W/L)_2 = m\). The tail source fixes \(I_1 + I_2 = I_{tail}\):</p>
+<div class="formula">\[ I_1 = I_{tail}\frac{m}{1+m},\quad I_2 = \frac{I_{tail}}{1+m},\quad V_{OV} = \sqrt{\frac{2I_2}{k_2}} \]\[ V_S = V_G - V_t - V_{OV},\quad V_{Di} = V_{DD} - I_iR_{Di} \]</div>
+<figure><div id="fig-diff"></div><figcaption><b>Figure 2.</b> Mismatched NMOS pair, both gates grounded, tail current source (2024–25 Q3(b); the negative supply is not drawn in the paper, 5 V is used for the simulator).</figcaption></figure>
+<div class="method"><h4>Method · pair with equal gate voltages</h4><ol>
+<li>Same \(V_G\) and \(V_S\) ⇒ same \(V_{GS}\) ⇒ \(I_1:I_2 = (W/L)_1:(W/L)_2\).</li>
+<li>Split \(I_{tail}\): \(I_2 = I_{tail}/(1+m)\).</li>
+<li>\(V_{OV}\) from either device (they are equal); \(V_S = V_G - V_t - V_{OV}\) (a negative number for a grounded gate).</li>
+<li>\(V_{D1}\), \(V_{D2}\) from the drain resistors. <b>Check</b> \(V_D \ge V_G - V_t\) for each. A drain may sit below 0 V and still be saturated; compare with \(V_G - V_t\), not with 0.</li>
+</ol></div>
+<h3>Worked example: 2024–25 Sec A Q3(b)</h3>
+<div id="wk-diff"></div>
+<div id="dr-diff"></div>
+
+<h2>3. Complementary NMOS/PMOS pair with a load (type M-07)</h2>
+<p>One NMOS and one PMOS share the gate input; the supplies are ±V, and a resistor goes from the output to ground. The question: \(i_{DN}\), \(i_{DP}\) and \(v_o\) for given \(v_I\), with matched \(k_n = k_p\) and \(V_{tn} = -V_{tp}\). There are two topologies; identify which first.</p>
+<figure class="wide"><div id="fig-comp"></div><div id="fig-inv"></div><figcaption><b>Figure 3.</b> Left: complementary <b>source follower</b> (sources meet at \(v_O\), drains on the rails; 2022–23 Q2(a), 2014–15 Q4(a)). Right: complementary <b>inverter</b> driving \(R\) (drains meet at \(v_O\), sources on the rails; 2015–16 Q3(a), Sadat L22 p.94–97).</figcaption></figure>
+<div class="method"><h4>Method · follower (sources joined)</h4><ol>
+<li>Which device can be on? NMOS needs \(v_I - v_O > V_t\); PMOS needs \(v_O - v_I > |V_{tp}|\). At \(v_O = 0\): if \(|v_I| \le V_t\) both are off and \(i_{DN} = i_{DP} = 0\), \(v_o = 0\) (the <b>dead zone</b> of a class-B follower).</li>
+<li>For \(v_I > V_t\) only the NMOS conducts: \(v_o = IR\) with \(I = \tfrac12k(v_I - v_o - V_t)^2\). With \(u = v_I - V_t\): \(v_o^2 - (2u + \tfrac{2}{kR})v_o + u^2 = 0\); take the <b>smaller root</b> (the larger one has \(v_{GS} = v_I - v_o &lt; V_t\): reject).</li>
+<li>\(i_{DN} = v_o/R\), \(i_{DP} = 0\). Check \(V_{DS} = V - v_o \ge V_{OV} = u - v_o\) ✓ (always true for \(v_I \le V\)).</li>
+<li>For \(v_I &lt; -V_t\) the PMOS conducts: mirror image, \(v_o\) negative, \(i_{DP} = |v_o|/R\).</li>
+</ol></div>
+<div class="method"><h4>Method · inverter (drains joined) at \(v_I = \pm V\)</h4><ol>
+<li>At \(v_I = -V\): NMOS off (\(V_{GS} = 0\)); PMOS has \(V_{SG} = 2V\), \(|V_{OV}| = 2V - |V_t|\), large.</li>
+<li>Try saturation: \(\tfrac12k(2V - V_t)^2\) is many mA, which would put \(v_o\) above \(+V\): impossible ∴ <b>PMOS in triode</b>. With \(x = V_{SD}\): \(\tfrac k2x^2 - (kV_{OV} + \tfrac1R)x + \tfrac VR = 0\), small root with \(x &lt; V_{OV}\).</li>
+<li>\(v_o = V - x\), \(i_{DP} = v_o/R\), \(i_{DN} = 0\). Mirror image for \(v_I = +V\) (\(v_o = -(V - x)\), \(i_{DN} = |v_o|/R\)).</li>
+<li>\(v_I = 0\): both on, matched ⇒ \(v_o = 0\), each device \(\tfrac12k(V - V_t)^2\), both saturated if \(V \ge V_{OV}\).</li>
+</ol></div>
+<div id="wk-comp"></div>
+<div id="dr-comp"></div>
+<h3>An unmatched inverter at \(v_I\) = 0 (Sadat L22, notes p.96–97)</h3>
+<p>Inverter between ±2.5 V, 1 kΩ to ground, \(k_p\) = 2, \(k_n\) = 1 mA/V², \(V_{tn} = -V_{tp} = 1\) V, \(v_I = 0\). Both on, \(V_{OV} = 1.5\) V each. Assume both saturated: \(I_{DP}\) = 2.25 mA, \(I_{DN}\) = 1.125 mA, \(v_o = (2.25 - 1.125)(1) = 1.125\) V, so \(V_{SD,p} = 1.375 &lt; 1.5\): PMOS not saturated. Take PMOS triode, NMOS saturated (\(I_{DN}\) = 1.125 mA since \(V_{DS,n} = v_o + 2.5 \ge 1.5\)): \(I_{DP} = 2[1.5x - \tfrac12x^2]\) with \(x = V_{SD}\) and \(v_o = I_{DP} - 1.125 = 2.5 - x\), so \(x^2 - 4x + 3.625 = 0\), \(x\) = 1.388 or 2.612 V. Reject 2.612 V (&gt; 1.5, not triode). <b>\(V_{SD}\) = 1.388 V, \(I_{DP}\) = 2.237 mA, \(v_o\) = 1.112 V</b>, and \(1.388 &lt; 1.5\) confirms the triode assumption. "Both can't be in triode" (Sadat's margin note): try the cases in order and check each.</p>
+
+<div class="trap"><h4>Traps (where marks go)</h4><ul>
+<li>Not writing the saturation check for a mirror output: the paper marks \(V_{D2} \ge V_{OV}\) separately (2018–19: 6 V ≥ 2 V).</li>
+<li>Declaring Q1 triode because \(V_{D1}\) is negative in the diff pair. Compare \(V_D\) with \(V_G - V_t = -1\) V, not with zero.</li>
+<li>Forgetting that a larger \(R_D\) pushes the mirror output out of saturation, after which the ratio no longer holds.</li>
+<li>Follower at \(v_I = 0\): the answer is zero current, not 1.125 mA (that is the inverter at \(v_I = 0\)).</li>
+<li>Assuming saturation for the conducting inverter device (gives an impossible 8 mA).</li>
+<li>Taking the larger quadratic root in the follower (\(v_o\) = 2.157 V gives \(V_{GS} &lt; V_t\)).</li>
+<li>PMOS signs: \(V_{SG}\), \(V_{SD}\), \(|V_{tp}|\); current out of the drain into the load.</li>
+</ul></div>
+
+<h2>Exam questions</h2>
+
+<div class="exam">
+  <div class="exam-src">2024–25 · Sec A · Q3(b) · 17 marks &nbsp;|&nbsp; = Sedra mismatched pair, qbank S5-Q9</div>
+  <div class="exam-q"><p>In the circuit, \((W/L)_1 = 2(W/L)_2 = 20\). Both NMOS have \(V_t\) = 1 V and \(\mu_nC_{ox}\) = 100 µA/V². Find the node voltages \(V_1\), \(V_2\), \(V_3\). (Both gates at 0 V; \(R_{D1} = R_{D2}\) = 40 kΩ from +5 V to the drains \(V_1\), \(V_2\); sources joined at \(V_3\); a 200 µA current source from \(V_3\) to the negative supply.)</p><div id="fig-q2425"></div></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>The gates and sources are common, so \(V_{GS1} = V_{GS2}\); equal \(V_{OV}\) means \(I_1/I_2 = (W/L)_1/(W/L)_2 = 2\). \(I_1 + I_2\) = 200 µA ⇒ \(I_1\) = 133.3 µA, \(I_2\) = 66.7 µA.</p>
+    <p>\(k_2 = 0.1\times10 = 1\) mA/V² (\(k_1\) = 2). Assume saturation: \(V_{OV} = \sqrt{2(0.0667)/1} = 0.365\) V (check with Q1: \(\sqrt{2(0.1333)/2}\) = 0.365 ✓).</p>
+    <p>\(V_{GS} = 1.365\) V, so <b>\(V_3 = 0 - 1.365 = -1.365\) V</b>.</p>
+    <p><b>\(V_1 = 5 - 0.1333\times40 = -0.333\) V</b>, <b>\(V_2 = 5 - 0.0667\times40 = 2.333\) V</b>.</p>
+    <p>Check (saturation, \(V_D \ge V_G - V_t = -1\) V): \(V_1 = -0.333 \ge -1\) ✓ (\(V_{DS1} = 1.032 \ge 0.365\)), \(V_2 = 2.333 \ge -1\) ✓. ∴ both saturated; Q1 is saturated although its drain is below ground.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2022–23 · Sec A · Q2(a) · 20 marks · compulsory &nbsp;|&nbsp; = 2014–15 Sec A Q4(a) (\(v_I\) = ±2.5 V) · Sadat L22 notes p.94</div>
+  <div class="exam-q"><p>The NMOS and PMOS in the circuit are matched with \(k_n = k_p\) = 1 mA/V² and \(V_{tn} = -V_{tp}\) = 1 V. Assuming λ = 0 for both, find the drain currents \(i_{DN}\), \(i_{DP}\) and the output voltage \(v_O\) for \(v_I\) = 0 and \(v_I\) = +2.5 V. (Complementary source follower: QN drain at +2.5 V, QP drain at −2.5 V, sources joined at \(v_O\), 10 kΩ from \(v_O\) to ground.)</p><div id="fig-q2223"></div></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><b>\(v_I\) = 0.</b> Try \(v_O\) = 0: \(V_{GSN} = 0 &lt; V_t\) and \(V_{SGP} = 0 &lt; |V_{tp}|\): both off, no current, so \(v_O = 0\) is consistent. <b>\(i_{DN} = i_{DP} = 0\), \(v_O = 0\).</b></p>
+    <p><b>\(v_I\) = +2.5 V.</b> QP has \(V_{SG} = v_O - 2.5 &lt; 0\) for any \(v_O \le 2.5\): off. QN on. Assume saturation: \(i_{DN} = \tfrac12(1)(2.5 - v_O - 1)^2 = v_O/10\) ⇒ \((1.5 - v_O)^2 = 0.2v_O\) ⇒ \(v_O^2 - 3.2v_O + 2.25 = 0\) ⇒ \(v_O\) = 1.043 V or 2.157 V.</p>
+    <p>Reject 2.157 V: \(V_{GS} = 2.5 - 2.157 = 0.343 &lt; V_t\), no channel. <b>\(v_O\) = 1.043 V, \(i_{DN}\) = 0.1043 mA, \(i_{DP}\) = 0.</b></p>
+    <p>Check: \(V_{GS} = 1.457\) V, \(V_{OV} = 0.457\) V, \(V_{DS} = 2.5 - 1.043 = 1.457 \ge 0.457\) ∴ saturated ✓.</p>
+    <p>(2014–15 also asks \(v_I\) = −2.5 V: mirror image, QP on: <b>\(v_O\) = −1.043 V, \(i_{DP}\) = 0.104 mA, \(i_{DN}\) = 0.</b>)</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2018–19 · Sec A · Q4(b) · 20 marks &nbsp;|&nbsp; Sedra Exercise D5.10 pattern</div>
+  <div class="exam-q"><p>Find \(R\) so that \(I_{D1}\) = 0.4 mA. Also find \(V_{D1}\), \(V_{D2}\) and \(I_{D2}\). Q1 and Q2 are identical: \(V_t\) = 2 V, \(\mu_nC_{ox}\) = 20 µA/V², \(L\) = 10 µm, \(W\) = 100 µm. (R from +10 V to the drain/gate of Q1; Q2 shares Q1's gate, with 10 kΩ from +10 V to its drain; both sources grounded.)</p><div id="fig-q1819"></div></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>\(k_n = 0.02\times10 = 0.2\) mA/V². Q1 is diode-connected (\(V_{GD} = 0\)): saturated. \(0.4 = \tfrac12(0.2)V_{OV}^2\) ⇒ \(V_{OV}\) = 2 V (reject −2 V: \(V_{GS} &lt; V_t\)), \(V_{GS} = 4\) V.</p>
+    <p><b>\(V_{D1} = V_{GS} = 4\) V, \(R = (10 - 4)/0.4 = 15\) kΩ.</b></p>
+    <p>Q2 has the same \(V_{GS}\) and the same \(W/L\), so (if saturated) <b>\(I_{D2}\) = 0.4 mA</b>, <b>\(V_{D2} = 10 - 0.4\times10 = 6\) V</b>. Check: \(V_{D2} = 6 \ge V_{OV} = 2\) ✓ saturated, so the mirror holds.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2016–17 · Sec B · Q7(a) · 26 marks</div>
+  <div class="exam-q"><p>For all the MOSFETs \(|V_t|\) = 1 V, \(\mu_nC_{ox}\) = 50 µA/V², \(L\) = 1 µm, \(W\) = 10 µm. Find \(V\) and \(I\). If Q3 and Q4 are made to have \(W\) = 100 µm, find \(V\) and \(I\) in that case. (All NMOS. Q2: drain and gate at +5 V, source X. Q1: drain and gate at X, source ground. Q4: drain and gate at +5 V, source at \(V\). Q3: gate at X, drain at \(V\), source ground.)</p><div id="fig-q1617"></div><p><i>The figure is redrawn from the senior solution's netlist; check the node names against the paper.</i></p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>\(k = 0.05\times10 = 0.5\) mA/V² for \(W\) = 10 µm.</p>
+    <p><b>Reference stack Q2–Q1.</b> Both diode-connected (saturated), same current, same \(k\): same \(V_{GS}\). \(V_{GS1} = X\), \(V_{GS2} = 5 - X\) ⇒ \(X\) = 2.5 V. \(I = \tfrac12(0.5)(2.5 - 1)^2 = 0.5625\) mA.</p>
+    <p><b>Case 1</b> (all \(W\) = 10 µm): Q3 has \(V_{GS3} = X\) = 2.5 V like Q1, so \(I_3 = 0.5625\) mA. Q4 is identical to Q2, with the same current, so \(V_{GS4} = 2.5\) V and \(V = 5 - 2.5\) = <b>2.5 V</b>, <b>\(I\) = 0.5625 mA</b>. Check Q3: \(V_{DS3} = 2.5 \ge V_{OV} = 1.5\) ✓.</p>
+    <p><b>Case 2</b> (Q3, Q4 \(W\) = 100 µm, \(k\) = 5 mA/V²): Q3 still has \(V_{GS3}\) = 2.5 V, so \(I_3 = \tfrac12(5)(1.5)^2 = 5.625\) mA (10 times larger). Q4, also 10 times wider and carrying the same current, has the same \(V_{GS4}\) as before: \(\tfrac12(5)(V_{GS4} - 1)^2 = 5.625\) ⇒ \(V_{GS4} = 2.5\) V, so <b>\(V\) = 2.5 V</b> and <b>\(I\) = 5.625 mA</b> (the Q3–Q4 branch; the Q1–Q2 branch is unchanged at 0.5625 mA). Check: \(V_{DS3} = 2.5 \ge 1.5\) ✓.</p>
+    <p>The output current scales by 10 but \(V\) does not, because the load device scaled with the output device.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2015–16 · Sec A · Q3(a) · 15 marks</div>
+  <div class="exam-q"><p>The CMOS inverter circuit has \(k_n'(W_n/L_n) = k_p'(W_p/L_p)\) = 1 mA/V² and \(V_{tn} = -V_{tp}\) = 1 V. Find (i) \(i_{DN}\), (ii) \(i_{DP}\), (iii) \(v_O\) for \(v_{in}\) = −2.5 V. (Supplies ±2.5 V; 10 kΩ load from \(v_O\) to ground.)</p><div id="fig-q1516"></div></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>\(v_{in} = -2.5\) V: QN has \(V_{GS} = -2.5 - (-2.5) = 0 &lt; V_t\): <b>off, \(i_{DN} = 0\)</b>. QP has \(V_{SG} = 2.5 - (-2.5) = 5\) V, \(|V_{OV}| = 4\) V.</p>
+    <p>Assume saturation: \(i_{DP} = \tfrac12(1)(4)^2 = 8\) mA, which would need \(v_O = 80\) V &gt; the 2.5 V supply: impossible ∴ QP is in <b>triode</b>.</p>
+    <p>\(x = V_{SD}\), \(v_O = 2.5 - x\): \(4x - \tfrac12x^2 = (2.5 - x)/10\) ⇒ \(5x^2 - 41x + 2.5 = 0\) ⇒ \(x\) = 0.0614 V or 8.14 V. Reject 8.14 V (&gt; \(|V_{OV}|\) = 4 V and &gt; 2.5 V).</p>
+    <p><b>\(v_O = 2.5 - 0.0614 = 2.439\) V, \(i_{DP} = 2.439/10 = 0.244\) mA, \(i_{DN}\) = 0.</b> Check \(V_{SD} = 0.061 &lt; 4\) ✓ triode.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2014–15 · Sec A · Q4(a) · 20 marks</div>
+  <div class="exam-q"><p>The NMOS and PMOS in the circuit (the complementary follower of Figure 3, left) have \(k_n'(W_n/L_n) = k_p'(W_p/L_p)\) = 1 mA/V² and \(V_{tn} = -V_{tp}\) = 1 V, λ = 0. Find \(i_{DN}\), \(i_{DP}\), \(v_O\) for \(v_I\) = +2.5 V and −2.5 V.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><b>\(v_I\) = +2.5 V:</b> QP off; QN: \((1.5 - v_O)^2 = 0.2v_O\) ⇒ \(v_O^2 - 3.2v_O + 2.25 = 0\) ⇒ 1.043 V (reject 2.157 V: \(V_{GS} &lt; V_t\)). <b>\(v_O\) = 1.043 V, \(i_{DN}\) = 0.104 mA, \(i_{DP}\) = 0.</b> Saturated: \(V_{DS}\) = 1.457 ≥ \(V_{OV}\) = 0.457.</p>
+    <p><b>\(v_I\) = −2.5 V:</b> the mirror image. QN is off (\(V_{GS} = -2.5 - v_O &lt; 0\)); QP on with \(V_{SG} = v_O + 2.5\): \(\tfrac12(v_O + 2.5 - 1)^2 = -v_O/10\). With \(y = -v_O\): \((1.5 - y)^2 = 0.2y\) ⇒ \(y\) = 1.043 V. <b>\(v_O\) = −1.043 V, \(i_{DP}\) = 0.104 mA, \(i_{DN}\) = 0.</b></p>
+  </div></details>
+</div>
+
+<h3>Highlighted textbook problem and class-note extras</h3>
+
+<div class="exam">
+  <div class="exam-src">Sedra 7e Exercise D5.10 · highlighted by the teacher</div>
+  <div class="exam-q"><p>A diode-connected NMOS is fed from 1.8 V through \(R\); \(V_D\) = 0.7 V; \(V_t\) = 0.5 V, \(k_n\) = 0.4 mA/V² per unit \(W/L\), \(W/L\) = 0.72/0.18 (= 4). Find \(R\). A second, identical transistor Q2 is added as a mirror with \(R_2\) in its drain to 1.8 V: find \(R_2\) so that Q2 is at the edge of saturation.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>\(k_n = 0.4\times4 = 1.6\) mA/V². \(V_{OV} = 0.7 - 0.5 = 0.2\) V, \(I = \tfrac12(1.6)(0.04) = 0.032\) mA. <b>\(R = (1.8 - 0.7)/0.032 = 34.4\) kΩ.</b></p>
+    <p>Q2 is identical with the same \(V_{GS}\): \(I_2 = 0.032\) mA. Edge of saturation: \(V_{D2} = V_{OV} = 0.2\) V ⇒ <b>\(R_2 = (1.8 - 0.2)/0.032 = 50\) kΩ</b>. A larger \(R_2\) would put Q2 in triode and the mirror would no longer copy the current.</p>
+  </div></details>
+</div>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+
+<div class="key"><p><strong>Summary:</strong> equal \(V_{GS}\) ⇒ currents in the ratio of \(W/L\). Mirror: diode-connected M1 sets \(V_{GS}\) (\(I_{REF} = (V_{DD} - V_{GS})/R\)); \(I_O = I_{REF}\,(W/L)_2/(W/L)_1\) while \(V_{D2} \ge V_{OV}\); output resistance \(r_o\). Pair with equal gates: \(I_1:I_2 = (W/L)_1:(W/L)_2\), \(I_1 + I_2 = I_{tail}\), \(V_S = V_G - V_t - V_{OV}\); a drain below 0 V can still be saturated. Complementary follower: dead zone \(|v_I| \le V_t\), else \(v_o^2 - (2u + 2/kR)v_o + u^2 = 0\) (smaller root, \(u = |v_I| - V_t\)); inverter with a load: the conducting device is in triode, small root of \(\tfrac k2x^2 - (kV_{OV} + 1/R)x + V/R = 0\). Answers to remember: 133.3/66.7 µA and −0.333/2.333/−1.365 V; 1.043 V and 0.1043 mA; 2.439 V and 0.244 mA.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/eee.js"></script>
+<script>
+const mA = 1e-3;
+// PMOS drawn with its source on top: move the helper's arrow to the upper lead.
+const schP = (items, o) => items.reduce((s, it) => {
+  if (it[0] !== 'pmos') return s;
+  const [gx, gy] = it[1], f = it[2] && it[2].flip ? -1 : 1;
+  return s.replace(`<line x1="${gx + 40 * f}" y1="${gy + 10}" x2="${gx + 25 * f}" y2="${gy + 10}" class="arr"/>`, `<line x1="${gx + 40 * f}" y1="${gy - 10}" x2="${gx + 25 * f}" y2="${gy - 10}" class="arr"/>`);
+}, sch(items, o));
+const kO = (vt, k) => ({ vt, k: k * 1e-3 });
+
+// NMOS mirror: Q1 diode-connected (gate at 200,160 flipped), Q2 output with load RD
+const mirFig = o => sch([
+  ['rail', [160, 20], o.vdd], ['R', [160, 20], [160, 90], 'R ' + o.r], ['W', [160, 90], [160, 120]], ['dot', [160, 100]],
+  ['nmos', [200, 160], { flip: true, ...kO(o.vt, o.k1) }], ['W', [160, 100], [220, 100], [220, 160]], ['dot', [220, 160]], ['W', [200, 160], [240, 160]],
+  ['nmos', [240, 160], kO(o.vt, o.k2)], ['rail', [280, 20], o.vdd], ['R', [280, 20], [280, 90], 'RD ' + o.rd], ['W', [280, 90], [280, 120]],
+  ['W', [160, 200], [160, 250], [280, 250], [280, 200]], ['dot', [160, 250]], ['gnd', [220, 250]],
+  ['t', [168, 112], 'D1', 'start'], ['t', [288, 108], 'D2', 'start'], ['t', [150, 140], 'M1', 'end'], ['t', [300, 158], 'M2', 'start'],
+], { w: 360, h: 290 });
+$('#fig-mir').innerHTML = mirFig({ vdd: '+10 V', r: '15 kΩ', rd: '10 kΩ', vt: 2, k1: 0.2, k2: 0.2 });
+$('#fig-q1819').innerHTML = mirFig({ vdd: '+10 V', r: 'R', rd: '10 kΩ', vt: 2, k1: 0.2, k2: 0.2 });
+
+// mismatched pair, gates grounded, tail current source
+const diffFig = o => sch([
+  ['rail', [160, 20], '+5 V'], ['R', [160, 20], [160, 90], 'RD1 ' + o.rd], ['W', [160, 90], [160, 120]], ['t', [168, 112], 'V₁', 'start'],
+  ['rail', [280, 20], '+5 V'], ['R', [280, 20], [280, 90], 'RD2 ' + o.rd], ['W', [280, 90], [280, 120]], ['t', [288, 112], 'V₂', 'start'],
+  ['nmos', [200, 160], { flip: true, ...kO(1, o.k1) }], ['nmos', [240, 160], kO(1, o.k2)], ['W', [200, 160], [240, 160]], ['gnd', [220, 160]], ['dot', [220, 160]],
+  ['W', [160, 200], [160, 240], [280, 240], [280, 200]], ['dot', [220, 240]], ['I', [220, 240], [220, 300], 'I ' + o.i], ['rail', [220, 300], '−5 V', false],
+  ['t', [150, 222], 'V₃', 'end'], ['t', [128, 160], 'Q1 (2×)', 'end'], ['t', [300, 160], 'Q2', 'start'],
+], { w: 360, h: 340 });
+$('#fig-diff').innerHTML = diffFig({ rd: '40 kΩ', i: '200 µA', k1: 2, k2: 1 });
+$('#fig-q2425').innerHTML = diffFig({ rd: '40 kΩ', i: '200 µA', k1: 2, k2: 1 });
+
+// complementary pair. topo 'f' = follower (sources joined), 'i' = inverter (drains joined)
+function compFig(topo, V, R) {
+  const f = topo === 'f', rail = '+' + V + ' V', neg = '−' + V + ' V';
+  const top = f ? ['nmos', [160, 100], kO(1, 1)] : ['pmos', [160, 100], kO(1, 1)];
+  const bot = f ? ['pmos', [160, 220], kO(1, 1)] : ['nmos', [160, 220], kO(1, 1)];
+  return schP([
+    ['rail', [200, 20], rail], ['W', [200, 20], [200, 60]], top, bot, ['rail', [200, 300], neg, false], ['W', [200, 260], [200, 300]],
+    ['W', [200, 140], [200, 180]], ['W', [200, 160], [290, 160]], ['dot', [200, 160]], ['R', [290, 160], [290, 240], 'R ' + R], ['gnd', [290, 240]], ['dot', [290, 160]], ['open', [290, 160], 'v_O'],
+    ['W', [160, 100], [120, 100], [120, 220], [160, 220]], ['dot', [120, 160]], ['W', [120, 160], [80, 160]], ['open', [80, 160], ''], ['t', [74, 150], 'v_I', 'end'],
+  ], { w: 360, h: 330 });
+}
+$('#fig-comp').innerHTML = compFig('f', 2.5, '10 kΩ');
+$('#fig-inv').innerHTML = compFig('i', 2.5, '10 kΩ');
+$('#fig-q2223').innerHTML = compFig('f', 2.5, '10 kΩ');
+$('#fig-q1516').innerHTML = compFig('i', 2.5, '10 kΩ');
+
+$('#fig-q1617').innerHTML = sch([
+  ['rail', [60, 20], '+5 V'], ['W', [60, 20], [60, 60]], ['nmos', [20, 100], kO(1, 0.5)], ['W', [20, 100], [-10, 100], [-10, 60], [60, 60]], ['dot', [60, 60]],
+  ['nmos', [20, 200], kO(1, 0.5)], ['W', [20, 200], [-10, 200], [-10, 160], [60, 160]], ['dot', [60, 160]], ['W', [60, 140], [60, 160]], ['gnd', [60, 240]], ['t', [68, 152], 'X', 'start'],
+  ['rail', [240, 20], '+5 V'], ['W', [240, 20], [240, 60]], ['nmos', [200, 100], kO(1, 0.5)], ['W', [200, 100], [170, 100], [170, 60], [240, 60]], ['dot', [240, 60]],
+  ['nmos', [200, 200], kO(1, 0.5)], ['W', [60, 160], [90, 160], [90, 200], [200, 200]], ['gnd', [240, 240]], ['W', [240, 140], [240, 160]], ['t', [248, 152], 'V', 'start'],
+], { w: 340, h: 280, sim: false });
+
+worked('#wk-mir', {
+  given: 'Q1, Q2 identical, \\(V_t\\) = 2 V, \\(\\mu_nC_{ox}\\) = 20 µA/V², \\(W/L\\) = 100/10, \\(\\lambda\\) = 0. \\(V_{DD}\\) = 10 V; Q1 diode-connected via \\(R\\); Q2 has 10 kΩ to \\(V_{DD}\\). Want \\(I_{D1}\\) = 0.4 mA.',
+  steps: [
+    { t: '\\(k_n = 0.02\\times10 = 0.2\\) mA/V². Q1 saturated: \\(0.4 = 0.1V_{OV}^2\\) ⇒ \\(V_{OV} = 2\\) V (reject −2 V), \\(V_{GS} = 4\\) V.', a: { l: 'V_{GS}', v: 4, u: 'V' } },
+    { t: '\\(V_{D1} = V_{GS} = 4\\) V, \\(R = (10 - 4)/0.4 = 15\\) kΩ', a: { l: 'R', v: 15e3, u: 'kΩ' } },
+    { t: 'Same \\(V_{GS}\\), same \\(W/L\\): \\(I_{D2} = 0.4\\) mA (if saturated). \\(V_{D2} = 10 - 0.4\\times10 = 6\\) V', a: { l: 'V_{D2}', v: 6, u: 'V' } },
+    'Check: \\(V_{D2} = 6 \\ge V_{OV} = 2\\) ∴ Q2 saturated, the mirror assumption holds.',
+  ] });
+
+worked('#wk-diff', {
+  given: '\\((W/L)_1 = 2(W/L)_2 = 20\\), \\(\\mu_nC_{ox}\\) = 100 µA/V², \\(V_t\\) = 1 V, gates at 0 V, \\(R_D\\) = 40 kΩ, \\(I_{tail}\\) = 200 µA, \\(V_{DD}\\) = 5 V.',
+  steps: [
+    { t: 'Equal \\(V_{GS}\\) ⇒ \\(I_1 = 2I_2\\); \\(I_1 + I_2 = 0.2\\) mA ⇒ \\(I_2 = 66.7\\) µA, \\(I_1 = 133.3\\) µA.', a: { l: 'I_2', v: 66.667e-6, u: 'µA' } },
+    { t: '\\(k_2 = 0.1\\times10 = 1\\) mA/V²; \\(V_{OV} = \\sqrt{2\\times0.0667/1} = 0.365\\) V.', a: { l: 'V_{OV}', v: 0.36515, u: 'V' } },
+    { t: '\\(V_3 = V_G - V_t - V_{OV} = 0 - 1 - 0.365 = -1.365\\) V', a: { l: 'V_3', v: -1.36515, u: 'V' } },
+    { t: '\\(V_1 = 5 - 0.1333\\times40 = -0.333\\) V, \\(V_2 = 5 - 0.0667\\times40 = 2.333\\) V', a: { l: 'V_1', v: -0.33333, u: 'V' } },
+    'Check: \\(V_1 = -0.333 \\ge V_G - V_t = -1\\) V ∴ Q1 saturated (drain below ground, still fine).',
+  ] });
+
+worked('#wk-comp', {
+  given: 'Follower of Figure 3: ±2.5 V, 10 kΩ, matched \\(k\\) = 1 mA/V², \\(V_t\\) = 1 V, \\(v_I\\) = +2.5 V.',
+  steps: [
+    '\\(v_I - v_O > 0\\): NMOS on; PMOS has \\(V_{SG} = v_O - v_I &lt; 0\\): off. \\(u = 2.5 - 1 = 1.5\\) V.',
+    { t: '\\(\\tfrac12(u - v_O)^2 = v_O/10\\) ⇒ \\(v_O^2 - (3 + 0.2)v_O + 2.25 = 0\\) ⇒ \\(v_O = \\dfrac{3.2 - \\sqrt{10.24 - 9}}{2} = 1.043\\) V (reject 2.157 V: \\(V_{GS} &lt; V_t\\)).', a: { l: 'v_O', v: 1.04322, u: 'V' } },
+    { t: '\\(i_{DN} = 1.043/10 = 0.1043\\) mA, \\(i_{DP} = 0\\)', a: { l: 'i_{DN}', v: 0.104322e-3, u: 'mA' } },
+    'Check: \\(V_{DS} = 1.457 \\ge V_{OV} = 0.457\\) ∴ saturated.',
+  ] });
+
+drill('#dr-mir', { id: 'm04-mirror', title: 'Current mirror: R, output current and the saturation check', gen(r) {
+  const Vt = r.pick([0.5, 0.7, 1, 2]), kp = r.pick([20, 50, 100, 120]), WL = r.pick([5, 10, 20, 50]), m = r.pick([0.5, 1, 2, 3, 4]), VDD = r.pick([5, 10, 15]), Iref = r.step(0.1, 1, 0.1);
+  const k1 = kp * WL / 1000, k2 = k1 * m, Vov = Math.sqrt(2 * Iref / k1), VGS = Vt + Vov; if (VGS > VDD - 1 || Vov > 2.5) return null;
+  const R = (VDD - VGS) / Iref, Io = m * Iref, RDsat = (VDD - Vov) / Io;
+  const tri = r() < 0.3, RD = tri ? +(RDsat * r.pick([1.3, 1.6, 2])).toFixed(1) : +(RDsat * r.pick([0.3, 0.5, 0.7])).toFixed(1); if (RD < 0.3) return null;
+  let I2 = Io, VD2 = VDD - Io * RD, xb = 0;
+  if (VD2 < Vov) { const a = k2 / 2, b = -(k2 * Vov + 1 / RD), c = VDD / RD, d = Math.sqrt(b * b - 4 * a * c); VD2 = (-b - d) / (2 * a); xb = (-b + d) / (2 * a); I2 = (VDD - VD2) / RD; if (!(VD2 > 0 && VD2 < Vov)) return null; }
+  const triode = VDD - Io * RD < Vov;
+  return {
+    given: `Mirror: M1 diode-connected, fed from \\(V_{DD}\\) = ${VDD} V through \\(R\\); M2 shares its gate, \\(R_D\\) = ${RD} kΩ from \\(V_{DD}\\) to its drain. \\(V_t\\) = ${Vt} V, \\(k_n'\\) = ${kp} µA/V², \\((W/L)_1\\) = ${WL}, \\((W/L)_2\\) = ${WL * m}, λ = 0. Choose \\(R\\) for \\(I_{REF}\\) = ${num(Iref)} mA. Find \\(R\\), \\(I_{D2}\\) and \\(V_{D2}\\).`,
+    fig: mirFig({ vdd: '+' + VDD + ' V', r: 'R', rd: RD + ' kΩ', vt: Vt, k1, k2 }),
+    ask: [{ l: 'R', v: R * 1e3, u: 'kΩ' }, { l: 'I_{D2}', v: I2 * mA, u: 'mA' }, { l: 'V_{D2}', v: VD2, u: 'V' }],
+    steps: [
+      { t: `\\(k_1 = ${kp}\\times10^{-3}\\times${WL} = ${num(k1)}\\) mA/V², \\(V_{OV} = \\sqrt{2\\times${num(Iref)}/${num(k1)}} = ${num(Vov)}\\) V, \\(V_{GS} = ${num(VGS)}\\) V`, a: { l: 'V_{GS}', v: VGS, u: 'V' } },
+      { t: `\\(R = (${VDD} - ${num(VGS)})/${num(Iref)} = ${num(R)}\\) kΩ`, a: { l: 'R', v: R * 1e3, u: 'kΩ' } },
+      `Mirror ratio ${m}: \\(I_O = ${m}\\times${num(Iref)} = ${num(Io)}\\) mA (if M2 is saturated); \\(V_{D2} = ${VDD} - ${num(Io)}\\times${RD} = ${num(VDD - Io * RD)}\\) V.`,
+      ...(triode ? [`Check: \\(${num(VDD - Io * RD)}\\text{ V} &lt; V_{OV} = ${num(Vov)}\\) V ∴ M2 is <b>not saturated</b>: triode, the ratio fails.`,
+        { t: `\\(\\tfrac{${num(k2)}}{2}x^2 - (${num(k2 * Vov + 1 / RD)})x + ${num(VDD / RD)} = 0\\) ⇒ \\(x = V_{D2} = ${num(VD2)}\\) V (reject ${num(xb)} V &gt; \\(V_{OV}\\)); \\(I_{D2} = (${VDD} - ${num(VD2)})/${RD} = ${num(I2)}\\) mA`, a: { l: 'V_{D2}', v: VD2, u: 'V' } }]
+        : [{ t: `Check: \\(V_{D2} = ${num(VD2)} \\ge V_{OV} = ${num(Vov)}\\) ∴ M2 saturated, \\(I_{D2} = ${num(I2)}\\) mA.`, a: { l: 'V_{D2}', v: VD2, u: 'V' } }]),
+    ] };
+} });
+
+drill('#dr-diff', { id: 'm04-diffpair', title: 'Differential pair with unequal W/L: split the tail current', gen(r) {
+  const It = r.step(0.1, 2, 0.1), m = r.pick([2, 3, 4, 0.5]), Rd = r.pick([2, 5, 10, 20, 40]), VDD = r.pick([5, 10, 15]), Vt = r.pick([0.5, 0.7, 1]), kp = r.pick([50, 100, 120]), WL2 = r.pick([5, 10, 20]);
+  const k2 = kp * WL2 / 1000, I2 = It / (1 + m), I1 = It * m / (1 + m), Vov = Math.sqrt(2 * I2 / k2), V3 = -Vt - Vov, V1 = VDD - I1 * Rd, V2 = VDD - I2 * Rd;
+  if (V1 < -Vt + 0.2 || V2 < -Vt + 0.2 || Vov > 1.5) return null;
+  return {
+    given: `Two NMOS with joined sources and both gates at 0 V; \\((W/L)_1 = ${m}\\,(W/L)_2\\), \\((W/L)_2\\) = ${WL2}; \\(V_t\\) = ${Vt} V, \\(\\mu_nC_{ox}\\) = ${kp} µA/V², λ = 0. \\(R_{D1} = R_{D2}\\) = ${Rd} kΩ to \\(V_{DD}\\) = ${VDD} V; tail current ${num(It)} mA. Find \\(I_1\\), \\(V_3\\) (the common source), \\(V_1\\), \\(V_2\\).`,
+    fig: diffFig({ rd: Rd + ' kΩ', i: num(It * 1000) + ' µA', k1: k2 * m, k2 }),
+    ask: [{ l: 'I_1', v: I1 * mA, u: 'mA' }, { l: 'V_3', v: V3, u: 'V' }, { l: 'V_1', v: V1, u: 'V' }, { l: 'V_2', v: V2, u: 'V' }],
+    steps: [
+      'Same gate, same source ⇒ same \\(V_{GS}\\) ⇒ \\(I_1/I_2 = (W/L)_1/(W/L)_2\\) = ' + m + '.',
+      { t: `\\(I_2 = ${num(It)}/(1 + ${m}) = ${num(I2)}\\) mA, \\(I_1 = ${num(I1)}\\) mA`, a: { l: 'I_1', v: I1 * mA, u: 'mA' } },
+      `\\(k_2 = ${kp}\\times10^{-3}\\times${WL2} = ${num(k2)}\\) mA/V²; \\(V_{OV} = \\sqrt{2\\times${num(I2)}/${num(k2)}} = ${num(Vov)}\\) V.`,
+      { t: `\\(V_3 = 0 - ${Vt} - ${num(Vov)} = ${num(V3)}\\) V`, a: { l: 'V_3', v: V3, u: 'V' } },
+      { t: `\\(V_1 = ${VDD} - ${num(I1)}\\times${Rd} = ${num(V1)}\\) V, \\(V_2 = ${VDD} - ${num(I2)}\\times${Rd} = ${num(V2)}\\) V`, a: { l: 'V_1', v: V1, u: 'V' } },
+      `Check: both drains ≥ \\(V_G - V_t = ${-Vt}\\) V ∴ saturated.`,
+    ] };
+} });
+
+drill('#dr-comp', { id: 'm07-complementary', title: 'NMOS/PMOS pair with load: follower or inverter', gen(r) {
+  const V = r.pick([2.5, 3, 5]), k = r.pick([0.5, 1, 2]), Vt = r.pick([0.5, 0.7, 1]), R = r.pick([1, 2, 5, 10, 20]), inv = r() < 0.4;
+  if (inv) {
+    const s = r.pick([-1, 1]), Vov = 2 * V - Vt, a = k / 2, b = -(k * Vov + 1 / R), c = V / R, d = Math.sqrt(b * b - 4 * a * c), x = (-b - d) / (2 * a), xb = (-b + d) / (2 * a);
+    if (!(x > 0 && x < Vov)) return null;
+    const mag = V - x, vo = -s * mag, I = mag / R, on = s > 0 ? 'NMOS' : 'PMOS';
+    return {
+      given: `CMOS inverter between ±${V} V (QP source at +${V} V, QN source at −${V} V, drains joined at \\(v_O\\)); load \\(R\\) = ${R} kΩ from \\(v_O\\) to ground. \\(k_n = k_p\\) = ${k} mA/V², \\(V_{tn} = -V_{tp}\\) = ${Vt} V, λ = 0. For \\(v_I\\) = ${s > 0 ? '+' : '−'}${V} V find \\(i_{DN}\\), \\(i_{DP}\\), \\(v_O\\).`,
+      fig: compFig('i', V, R + ' kΩ'),
+      ask: [{ l: 'i_{DN}', v: (s > 0 ? I : 0) * mA, u: 'mA' }, { l: 'i_{DP}', v: (s > 0 ? 0 : I) * mA, u: 'mA' }, { l: 'v_O', v: vo, u: 'V' }],
+      steps: [
+        `\\(v_I = ${s > 0 ? '+' : '−'}${V}\\) V: the ${s > 0 ? 'PMOS' : 'NMOS'} has \\(|V_{GS}| = 0\\): off. The ${on} has \\(|V_{GS}| = ${2 * V}\\) V, \\(V_{OV} = ${num(Vov)}\\) V.`,
+        `Saturation would give \\(\\tfrac12(${k})(${num(Vov)})^2 = ${num(k * Vov * Vov / 2)}\\) mA through ${R} kΩ = ${num(k * Vov * Vov / 2 * R)} V &gt; ${V} V: impossible ∴ <b>triode</b>.`,
+        { t: `\\(x = V_{DS}\\): \\(\\tfrac{${k}}{2}x^2 - (${num(k * Vov + 1 / R)})x + ${num(V / R)} = 0\\) ⇒ \\(x = ${num(x)}\\) V (reject ${num(xb)} V &gt; \\(V_{OV}\\))`, a: { l: 'x', v: x, u: 'V' } },
+        { t: `\\(|v_O| = ${V} - ${num(x)} = ${num(mag)}\\) V, so \\(v_O = ${num(vo)}\\) V; \\(i_{D${s > 0 ? 'N' : 'P'}} = ${num(mag)}/${R} = ${num(I)}\\) mA`, a: { l: 'v_O', v: vo, u: 'V' } },
+      ] };
+  }
+  const vI = r.step(-V, V, 0.5), s = Math.sign(vI), u = Math.abs(vI) - Vt;
+  let vo = 0, I = 0, xb = 0;
+  if (u > 0) { const b = 2 * u + 2 / (k * R), d = Math.sqrt(b * b - 4 * u * u); const y = (b - d) / 2; xb = (b + d) / 2; vo = s * y; I = y / R; }
+  return {
+    given: `Complementary source follower: QN drain at +${V} V, QP drain at −${V} V, sources joined at \\(v_O\\), \\(R\\) = ${R} kΩ from \\(v_O\\) to ground. \\(k_n = k_p\\) = ${k} mA/V², \\(V_{tn} = -V_{tp}\\) = ${Vt} V, λ = 0. For \\(v_I\\) = ${vI} V find \\(i_{DN}\\), \\(i_{DP}\\), \\(v_O\\).`,
+    fig: compFig('f', V, R + ' kΩ'),
+    ask: [{ l: 'i_{DN}', v: (s > 0 ? I : 0) * mA, u: 'mA' }, { l: 'i_{DP}', v: (s < 0 ? I : 0) * mA, u: 'mA' }, { l: 'v_O', v: vo, u: 'V' }],
+    steps: u <= 0 ? [{ t: `Try \\(v_O\\) = 0: \\(|V_{GS}| = ${Math.abs(vI)}\\) V ≤ \\(V_t\\) = ${Vt} V for both devices: both off, \\(i_{DN} = i_{DP} = 0\\), \\(v_O = 0\\) (dead zone).`, a: { l: 'v_O', v: 0, u: 'V' } }] : [
+      `${s > 0 ? 'NMOS' : 'PMOS'} conducts (\\(|v_I| = ${Math.abs(vI)} &gt; V_t\\)); the other is off. \\(u = ${Math.abs(vI)} - ${Vt} = ${num(u)}\\) V; work with \\(y = |v_O|\\).`,
+      `\\(\\tfrac12(${k})(u - y)^2 = y/${R}\\) ⇒ \\(y^2 - ${num(2 * u + 2 / (k * R))}y + ${num(u * u)} = 0\\).`,
+      { t: `\\(y = ${num(Math.abs(vo))}\\) V (reject ${num(xb)} V: \\(V_{GS} &lt; V_t\\)); \\(v_O = ${num(vo)}\\) V`, a: { l: 'v_O', v: vo, u: 'V' } },
+      { t: `\\(i_{D${s > 0 ? 'N' : 'P'}} = ${num(Math.abs(vo))}/${R} = ${num(I)}\\) mA, the other current is 0. Check \\(V_{DS} = ${num(V - Math.abs(vo))} \\ge V_{OV} = ${num(u - Math.abs(vo))}\\) ✓`, a: { l: 'i_D', v: I * mA, u: 'mA' } }],
+  };
+} });
+
+flashcards('#cards', [
+  { f: 'Equal V_GS, different W/L', b: 'Currents in the ratio of W/L (both saturated).' },
+  { f: 'Mirror reference branch', b: 'I_REF = (V_DD − V_GS)/R; M1 is saturated because V_GD = 0.' },
+  { f: 'Mirror output condition', b: 'V_D2 ≥ V_OV: otherwise M2 is in triode and I_O ≠ m·I_REF.' },
+  { f: 'Mirror output resistance', b: 'r_o2 = V_A/I_O.' },
+  { f: 'Pair, equal V_G', b: 'I1/I2 = (W/L)1/(W/L)2, I1 + I2 = I_tail; V_S = V_G − V_t − V_OV.' },
+  { f: 'Drain below 0 V, saturated?', b: 'Compare V_D with V_G − V_t, not with 0.' },
+  { f: 'Complementary follower, v_I = 0', b: 'Both off (dead zone): i = 0, v_o = 0.' },
+  { f: 'Inverter, conducting device', b: 'Large V_OV: assume triode, small root of (k/2)x² − (kV_OV + 1/R)x + V/R = 0.' },
+]);
+quiz('#quiz', [
+  { q: 'Mirror: M1 has W/L = 10, M2 has W/L = 30, I_REF = 0.2 mA, M2 saturated. I_O =', opts: ['0.067 mA', '0.2 mA', '0.6 mA', '6 mA'], a: 2, why: 'I_O = I_REF × 30/10 = 0.6 mA.' },
+  { q: 'Mirror with V_OV = 0.5 V, V_DD = 5 V, I_O = 1 mA. The largest R_D that keeps M2 saturated is', opts: ['4.5 kΩ', '5 kΩ', '0.5 kΩ', '10 kΩ'], a: 0, why: 'V_D2 ≥ 0.5 V: R_D ≤ (5 − 0.5)/1 = 4.5 kΩ.' },
+  { q: 'A pair with equal gate voltages and W/L ratio 3:1 shares a 4 mA tail current. The larger device carries', opts: ['3 mA', '2 mA', '1 mA', '4 mA'], a: 0, why: 'I1 = 4×3/(1+3) = 3 mA.' },
+  { q: 'Complementary follower, V_t = 1 V, v_I = 0.6 V. v_o =', opts: ['0 V', '0.6 V', '−0.4 V', '1.6 V'], a: 0, why: '|v_I| ≤ V_t: both devices off, so no current and v_o = 0.' },
+  { q: 'Inverter with k = 1, V_t = 1, ±2.5 V, 10 kΩ, v_I = −2.5 V. Why is the PMOS taken in triode?', opts: ['saturation gives 8 mA, impossible through 10 kΩ from 2.5 V', 'V_SG < |V_tp|', 'the NMOS carries the current', 'λ = 0'], a: 0, why: '½·1·4² = 8 mA would need v_o = 80 V.' },
+  { q: 'In the follower at v_I = 2.5 V the quadratic roots are 1.043 V and 2.157 V. The correct one is', opts: ['1.043 V: the other gives V_GS < V_t', '2.157 V: larger is saturated', 'either', 'neither'], a: 0, why: 'V_GS = 2.5 − 2.157 = 0.343 V < V_t = 1 V: no channel.' },
+]);
+</script>
+</body>
+</html>

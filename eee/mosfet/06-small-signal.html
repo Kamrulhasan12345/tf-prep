@@ -1,0 +1,358 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Small-Signal Model and Biasing · EEE 263 Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">MOSFET · Chapter 6 · Sedra §7.1–7.4 · Khairul s.25–40 · Sadat L23, notes p.99–100 · theory types M-T4, M-T5</div>
+<h1>Small-Signal Model and Biasing</h1>
+<p class="lede">Every MOSFET amplifier question (chapters 7 and 8: a CS amplifier has been asked in every paper from 2019–20 to 2024–25) uses three things from this chapter: \(g_m\), \(r_o\) and the small-signal model. The theory itself is also examined on its own: the small-signal condition and \(g_m\) derivation (2023–24, 8 marks), why a source resistor stabilises the bias (2024–25, 12 marks; also 2017–18 and 2012–13), the VTC (2017–18, 2012–13) and how \(g_m\) depends on W/L and \(V_{OV}\) (2014–15). Each derivation below is written the way a full-marks script writes it.</p>
+
+<p>Units throughout: mA, kΩ, V, mA/V (so mA × kΩ = V and mA/V × kΩ = V/V). Sedra's law in saturation: \(i_D = \tfrac12 k_n (v_{GS}-V_t)^2\), \(k_n = k_n'(W/L) = \mu_nC_{ox}(W/L)\). If a question writes a capital \(K_n\) (Neamen), the ½ is already inside: \(i_D = K_n(v_{GS}-V_t)^2\). Say which you used.</p>
+
+<h2>1. The basic CS amplifier and its VTC</h2>
+<p>Put a resistor \(R_D\) from \(V_{DD}\) to the drain, ground the source and drive the gate with \(v_{GS}\). The output is the drain voltage, \(v_O = v_{DS} = V_{DD} - i_DR_D\). Sweeping \(v_{GS}\) gives the voltage transfer characteristic (VTC):</p>
+<figure class="wide"><div class="figrow" style="display:flex;flex-wrap:wrap;gap:16px;justify-content:center;align-items:center"><div id="fig-cs0"></div><div id="fig-vtc"></div></div><figcaption><b>Figure 1.</b> The basic CS amplifier and its VTC (drawn for \(V_{DD}\) = 1.8 V, \(k_n\) = 4 mA/V², \(V_t\) = 0.4 V, \(R_D\) = 17.5 kΩ). Cut-off up to A, saturation from A to B (steep, used for amplification), triode beyond B. Q is a bias point in the middle of the steep segment; the slope there is the gain.</figcaption></figure>
+<dl class="def">
+  <dt>Cut-off (\(v_{GS} &lt; V_t\))</dt><dd>\(i_D = 0\), so \(v_O = V_{DD}\). Point A is at \(v_{GS} = V_t\).</dd>
+  <dt>Saturation (A to B)</dt><dd>\(v_O = V_{DD} - \tfrac12k_nR_D(v_{GS}-V_t)^2\): a falling parabola, steep and nearly straight around Q. This is the amplifying region.</dd>
+  <dt>Point B (edge of saturation)</dt><dd>\(v_{DS} = v_{GS} - V_t = V_{OV}\). Substituting: \(\tfrac12k_nR_DV_{OV}^2 + V_{OV} - V_{DD} = 0\), so \(V_{OV}\big|_B = \dfrac{\sqrt{1+2k_nR_DV_{DD}}-1}{k_nR_D}\) and \(V_{DS}\big|_B = V_{OV}\big|_B\).</dd>
+  <dt>Triode (beyond B)</dt><dd>\(v_O\) small, slope small: the transistor acts as a switch (on), not an amplifier.</dd>
+</dl>
+<p><b>Gain at the bias point</b> (Khairul s.28). Differentiate the saturation segment at \(v_{GS} = V_{GS}\):</p>
+<div class="formula">\[ A_v = \frac{dv_O}{dv_{GS}}\Big|_{Q} = -k_n(V_{GS}-V_t)R_D = -k_nV_{OV}R_D = -\frac{I_DR_D}{V_{OV}/2} = -\frac{V_{DD}-V_{DS}}{V_{OV}/2} \]</div>
+<p>The gain is negative (180° phase shift: an inverting amplifier) and grows with \(R_D\), \(k_n\) and \(V_{OV}\). The largest gain is at B: \(|A_{v,\max}| = \dfrac{V_{DD}-V_{OV}|_B}{V_{OV}|_B/2}\), but a Q right at B leaves no room for the negative output swing.</p>
+<p><b>Choosing Q</b> (asked in 2012–13). Raising the bias \(V_{GS}\) raises \(I_D\), \(g_m\) and the gain, but moves Q towards B: less room for the output to swing down before the transistor enters triode, and more power drawn. Lowering it gives room downwards but the output can swing up only to \(V_{DD}\), and the gain falls. The best Q leaves roughly equal room both ways.</p>
+
+<div class="method"><h4>Method · VTC numbers for the basic CS stage</h4><ol>
+<li>Point A: \(v_{GS} = V_t\), \(v_O = V_{DD}\).</li>
+<li>Point B: \(V_{OV}|_B = \dfrac{\sqrt{1+2k_nR_DV_{DD}}-1}{k_nR_D}\); \(V_{GS}|_B = V_t + V_{OV}|_B\); \(V_{DS}|_B = V_{OV}|_B\).</li>
+<li>Bias at a given \(V_{DS}\): \(I_D = (V_{DD}-V_{DS})/R_D\), \(V_{OV} = \sqrt{2I_D/k_n}\), \(V_{GS} = V_t + V_{OV}\).</li>
+<li>Gain: \(A_v = -(V_{DD}-V_{DS})/(V_{OV}/2)\). Check \(V_{DS} &gt; V_{OV}\) (saturated).</li>
+</ol></div>
+<h3>Worked example: Sedra's VTC example (the senior analysis file calls it Ex 5.8)</h3>
+<div id="wk-vtc"></div>
+<div id="dr-vtc"></div>
+
+<h2>2. The small-signal condition and g<sub>m</sub> (derivation)</h2>
+<p>This is the 2023–24 question word for word: <i>derive the condition of small-signal operation for a simple CS nMOS amplifier and find \(g_m\) from it.</i> Write it like this (Khairul s.30–31, Sadat notes p.99):</p>
+<div class="worked" style="padding:1em 1.2em">
+<p><b>DC bias.</b> With \(v_{gs} = 0\): \(I_D = \tfrac12k_n(V_{GS}-V_t)^2 = \tfrac12k_nV_{OV}^2\), \(V_{DS} = V_{DD} - I_DR_D\), and for saturation \(V_{DS} &gt; V_{OV}\).</p>
+<p><b>Add the signal.</b> \(v_{GS} = V_{GS} + v_{gs}\). Then</p>
+\[ i_D = \tfrac12k_n(V_{GS}+v_{gs}-V_t)^2 = \underbrace{\tfrac12k_n(V_{GS}-V_t)^2}_{I_D\ (\text{DC})} + \underbrace{k_n(V_{GS}-V_t)\,v_{gs}}_{\text{linear in } v_{gs}} + \underbrace{\tfrac12k_nv_{gs}^2}_{\text{distortion}} \]
+<p><b>Small-signal condition.</b> The square term adds harmonics (distortion). It is negligible when it is much smaller than the linear term:</p>
+\[ \tfrac12k_nv_{gs}^2 \ll k_n(V_{GS}-V_t)\,v_{gs} \;\Longrightarrow\; v_{gs} \ll 2(V_{GS}-V_t) = 2V_{OV} \]
+<p>In numbers the papers use \(|v_{gs}| \le 0.1\,V_{OV}\) (Sedra also quotes 10 % of \(2V_{OV}\), i.e. \(0.2V_{OV}\)). Use whatever the question states.</p>
+<p><b>Transconductance.</b> Under that condition \(i_D \simeq I_D + i_d\) with \(i_d = k_n(V_{GS}-V_t)\,v_{gs}\), so</p>
+\[ g_m \equiv \frac{i_d}{v_{gs}} = \frac{\partial i_D}{\partial v_{GS}}\Big|_{v_{GS}=V_{GS}} = k_n(V_{GS}-V_t) = k_nV_{OV} \]
+<p><b>Other forms.</b> Eliminating \(V_{OV}\) or \(k_n\) with \(I_D = \tfrac12k_nV_{OV}^2\): \(g_m = \sqrt{2k_n'(W/L)I_D} = \dfrac{2I_D}{V_{OV}}\). Graphically, \(g_m\) is the slope of the \(i_D\)–\(v_{GS}\) parabola at Q; the tangent cuts the \(v_{OV}\) axis at \(V_{OV}/2\), which is why \(g_m = I_D/(V_{OV}/2)\).</p>
+<p><b>Output.</b> \(v_{DS} = V_{DD} - R_D(I_D + i_d) = V_{DS} - R_Di_d\), so \(v_{ds} = -g_mR_Dv_{gs}\) and \(A_v = v_{ds}/v_{gs} = -g_mR_D\).</p>
+</div>
+<div class="formula">\[ g_m = k_n'\tfrac{W}{L}V_{OV} = \sqrt{2k_n'\tfrac{W}{L}I_D} = \frac{2I_D}{V_{OV}}, \qquad r_o = \frac{V_A}{I_D} = \frac{1}{\lambda I_D} \]</div>
+<p><b>How \(g_m\) depends on the design</b> (2014–15). Read each form with the other variable held fixed:</p>
+<div class="tbl"><table>
+<tr><th>Held fixed</th><th>Form to use</th><th>Result</th></tr>
+<tr><td>\(V_{OV}\)</td><td>\(g_m = k_n'(W/L)V_{OV}\)</td><td>\(g_m \propto W/L\): doubling W/L doubles \(g_m\) (and \(I_D\)).</td></tr>
+<tr><td>\(I_D\)</td><td>\(g_m = \sqrt{2k_n'(W/L)I_D}\)</td><td>\(g_m \propto \sqrt{W/L}\); for a given device \(g_m \propto \sqrt{I_D}\).</td></tr>
+<tr><td>\(I_D\)</td><td>\(g_m = 2I_D/V_{OV}\)</td><td>\(g_m \propto 1/V_{OV}\): a lower overdrive gives more \(g_m\) per mA (but needs a wider device).</td></tr>
+<tr><td>W/L</td><td>\(g_m = k_n'(W/L)V_{OV}\)</td><td>\(g_m \propto V_{OV}\) (current grows as \(V_{OV}^2\)).</td></tr>
+</table></div>
+<p>Trade-offs: a larger W/L costs area and capacitance; a larger \(V_{OV}\) costs power and output swing (the drain cannot fall below \(V_{GS}-V_t\)). Compared with a BJT (\(g_m = I_C/V_T\), \(V_T\) = 25 mV), a MOSFET at the same current has \(g_m = I_D/(V_{OV}/2)\) with \(V_{OV}/2\) typically 0.1–0.25 V, so its \(g_m\) is several times lower.</p>
+<p><b>Output resistance.</b> With channel-length modulation \(i_D = \tfrac12k_nV_{OV}^2(1+\lambda v_{DS})\), and \(r_o = (\partial i_D/\partial v_{DS})^{-1} \approx V_A/I_D\), \(V_A = 1/\lambda\). If no \(V_A\) or λ is given, \(r_o = \infty\). Bias calculations ignore λ (unless told otherwise); \(r_o\) is used only in the AC model.</p>
+<div class="method"><h4>Method · which g<sub>m</sub> form</h4><ol>
+<li>Given \(I_D\) and \(V_{OV}\): \(g_m = 2I_D/V_{OV}\) (no \(k_n\) needed).</li>
+<li>Given \(k_n'\), W/L and \(I_D\): \(g_m = \sqrt{2k_n'(W/L)I_D}\); \(V_{OV} = 2I_D/g_m\).</li>
+<li>Given \(V_{GS}\) (or after a DC solve): \(g_m = k_n(V_{GS}-V_t)\).</li>
+<li>\(r_o = V_A/I_D\) with \(I_D\) in mA gives kΩ.</li>
+</ol></div>
+<div id="dr-gm"></div>
+
+<h2>3. Small-signal models: hybrid-π and T</h2>
+<p>For signals, the saturated MOSFET is a voltage-controlled current source \(g_mv_{gs}\) from drain to source, with \(r_o\) in parallel. The gate draws no current, so G is an open circuit (Sadat notes p.100: by analogy with the BJT, \(r_\pi = \beta/g_m\) with \(\beta = I_D/I_G \to \infty\), so \(r_\pi = \infty\)). The same model serves NMOS and PMOS.</p>
+<figure class="wide"><div style="display:flex;flex-wrap:wrap;gap:24px;justify-content:center"><div><div class="figlabel">(a) hybrid-π</div><div id="fig-pi"></div></div><div><div class="figlabel">(b) T model</div><div id="fig-t"></div></div></div><figcaption><b>Figure 2.</b> (a) Hybrid-π: G open, \(g_mv_{gs}\) from D to S, \(r_o\) across D–S. (b) T model: the source \(g_mv_{gs}\) flows from D into an internal node X; G connects to X but \(i_g = 0\); \(1/g_m\) from X to S. The current in \(1/g_m\) is \(v_{gs}/(1/g_m) = g_mv_{gs}\), so (a) and (b) are the same two-port. (BJT analogy: \(r_e = \alpha/g_m\) with \(\alpha = 1\).)</figcaption></figure>
+<p><b>Which one?</b> Use hybrid-π when the source is at signal ground (CS with bypassed \(R_S\)). Use the T model whenever there is a resistance in the source lead (CS with \(R_s\), CG, CD): the resistance simply adds in series with \(1/g_m\), and the gain is "total resistance in the drain over total resistance in the source" (Khairul s.44).</p>
+<p><b>Five steps for any amplifier</b> (Sadat notes p.101): (1) DC analysis (capacitors open) → \(I_D\), \(V_{OV}\), saturation check; (2) turn DC sources off (\(V_{DD}\) → ground, DC current sources → open); (3) short the coupling and bypass capacitors; (4) replace the transistor by its model with \(g_m\), \(r_o\); (5) AC analysis: \(R_{in}\), \(R_o\), \(A_v\), \(G_v\).</p>
+<p><b>Signal swing on the drain.</b> With a signal of peak \(\hat v_{gs}\), \(v_{DS} = V_{DS} \pm |A_v|\hat v_{gs}\). Two limits: \(v_{DS,\max} \le V_{DD}\), and to stay in saturation \(v_{DS,\min} \ge v_{GS,\max} - V_t\) (Khairul s.32).</p>
+
+<h2>4. Biasing and stability with R<sub>S</sub> (type M-T5)</h2>
+<p><b>Why bias?</b> The small-signal parameters \(g_m\) and \(r_o\), the gain and the allowed swing all depend on the DC operating point Q. Biasing sets a Q that is (i) in saturation, (ii) roughly in the middle of the swing range, and (iii) <b>predictable</b>: the same \(I_D\) whatever the particular transistor's \(V_t\) and \(k_n\), which vary widely between units and with temperature.</p>
+<figure class="wide"><div style="display:flex;flex-wrap:wrap;gap:16px;justify-content:center;align-items:center"><div id="fig-bias"></div><div id="fig-stab"></div></div><figcaption><b>Figure 3.</b> Left: classical bias (gate divider, \(R_D\), \(R_S\) bypassed by \(C_S\) for AC). Right: two devices (\(V_t\) = 1 V and 1.5 V, \(k_n\) = 1 mA/V²). A fixed \(V_{GS}\) = 2 V (vertical line) gives 0.5 mA or 0.125 mA. The bias line \(i_D = (V_G - v_{GS})/R_S\) with \(V_G\) = 7 V, \(R_S\) = 10 kΩ gives 0.5 mA or 0.455 mA (Khairul s.36–37, s.40).</figcaption></figure>
+<p><b>Fixed \(V_{GS}\) is bad</b> (source grounded, gate on a divider). \(I_D = \tfrac12k_n(V_{GS}-V_t)^2\) depends on \((V_{GS}-V_t)^2\), and \(V_{GS}-V_t\) is small, so a few hundred mV of \(V_t\) spread changes \(I_D\) by a large factor.</p>
+<p><b>Fixed \(V_G\) plus a source resistor.</b> KVL round the gate–source loop (no gate current):</p>
+<div class="formula">\[ V_G = V_{GS} + I_DR_S \qquad\Longrightarrow\qquad i_D = \frac{V_G - v_{GS}}{R_S}\ \ \text{(bias line, slope } -1/R_S) \]</div>
+<p><b>How \(R_S\) fights the variation (negative feedback).</b> Suppose \(I_D\) tends to rise (lower \(V_t\), higher \(k_n\), or temperature). Then \(V_S = I_DR_S\) rises; since \(V_G\) is fixed by the divider, \(V_{GS} = V_G - I_DR_S\) falls, which pulls \(I_D\) back down. A higher \(V_t\) or lower \(k_n\) works the other way: \(I_D\) tends to fall, \(V_S\) falls, \(V_{GS}\) rises and restores most of the current. Small-signal form: a change \(\Delta I_D^{(0)}\) that would occur at fixed \(V_{GS}\) is reduced to about \(\Delta I_D^{(0)}/(1+g_mR_S)\).</p>
+<p><b>Graphically</b> (2012–13): plot the two \(i_D\)–\(v_{GS}\) parabolas. A vertical line (fixed \(V_{GS}\)) cuts them far apart. The bias line from \(v_{GS} = V_G\) with slope \(-1/R_S\) cuts them close together. The larger \(R_S\) (flatter line) or the larger \(V_G\) relative to \(V_{GS}\), the closer: if \(I_DR_S \gg V_{GS}\), then \(I_D \approx (V_G - V_{GS})/R_S \approx V_G/R_S\), set by resistors only. The cost: \(R_S\) uses up supply voltage (less swing), and it would also cut the AC gain, so it is bypassed with a large \(C_S\) (or partly bypassed, chapter 7).</p>
+<p><b>Other bias schemes</b> (Khairul s.38–39): two supplies with \(R_G\) to ground and \(R_S\) to \(-V_{SS}\) (same feedback idea, \(V_G = 0\)); drain-to-gate feedback \(R_G\) (no gate current, so \(V_{GS} = V_{DS} = V_{DD} - I_DR_D\): \(R_D\) now does the feedback, and the transistor is always saturated; chapter 8); a constant-current source (current mirror) in the source, the best for ICs.</p>
+<div class="method"><h4>Method · classical bias design (V<sub>DD</sub>/3 rule) and sensitivity</h4><ol>
+<li>Drop \(V_{DD}/3\) each across \(R_D\), the transistor and \(R_S\): \(V_D = \tfrac23V_{DD}\), \(V_S = \tfrac13V_{DD}\).</li>
+<li>\(R_D = (V_{DD}-V_D)/I_D\), \(R_S = V_S/I_D\).</li>
+<li>\(V_{OV} = \sqrt{2I_D/k_n}\), \(V_{GS} = V_t + V_{OV}\), \(V_G = V_S + V_{GS}\); pick \(R_{G1}:R_{G2} = (V_{DD}-V_G):V_G\) in MΩ.</li>
+<li>Another device (\(V_t'\)): solve \(V_G = V_{GS} + R_S\cdot\tfrac12k_n(V_{GS}-V_t')^2\). Shortcut: \(V_{OV}' = \dfrac{\sqrt{1+2k_nR_S(V_G-V_t')}-1}{k_nR_S}\), \(I_D' = \tfrac12k_nV_{OV}'^2\).</li>
+<li>% change \(= (I_D'-I_D)/I_D\times100\). Compare with fixed \(V_{GS}\): \(I_D'' = \tfrac12k_n(V_{GS}-V_t')^2\).</li>
+</ol></div>
+<h3>Worked example: Khairul s.40 (Sedra classical bias example)</h3>
+<div id="wk-bias"></div>
+<p><b>Second example (Sadat L20, notes p.90).</b> \(V_{DD}\) = 10 V, 10 MΩ/10 MΩ divider (\(V_G\) = 5 V), \(R_D = R_S\) = 6 kΩ, \(V_t\) = 1 V, \(k_n\) = 1 mA/V². His solution: \(I_D = \tfrac12(4-6I_D)^2\) gives 0.5 mA or 0.889 mA; reject 0.889 mA because it gives \(V_{OV} = -1.33\) V (the transistor would be off) and \(V_{DS} &lt; 0\); keep \(I_D\) = 0.5 mA, \(V_S\) = 3 V, \(V_D\) = 7 V, \(V_{DS} = 4\text{ V} &gt; V_{OV} = 1\text{ V}\), saturated. (He insists: write the reason a root is rejected.) Stability check: with \(V_t\) = 1.5 V the same circuit gives 0.429 mA (−14 %); a grounded source at a fixed \(V_{GS}\) = 2 V would give 0.125 mA (−75 %).</p>
+<div id="dr-stab"></div>
+
+<div class="trap"><h4>Traps (where marks go)</h4><ul>
+<li>Writing the small-signal condition as \(v_{gs} \ll V_{OV}\): it is \(v_{gs} \ll 2V_{OV}\), from comparing the square term with the linear term. Show that comparison.</li>
+<li>Mixing conventions: \(g_m = k_nV_{OV}\) goes with \(i_D = \tfrac12k_nV_{OV}^2\). With Neamen's \(K_n\), \(g_m = 2K_nV_{OV}\).</li>
+<li>"\(g_m \propto W/L\)" without saying what is held fixed. At fixed \(I_D\) it is \(\sqrt{W/L}\).</li>
+<li>Using λ in the DC bias when the question says "ignore the Early effect for bias", or forgetting \(r_o\) in the AC model when \(V_A\) is given.</li>
+<li>Bias-stability answers with no mechanism. Write the chain: \(I_D\uparrow \Rightarrow V_S\uparrow \Rightarrow V_{GS}\downarrow \Rightarrow I_D\downarrow\), and draw the two parabolas with both lines.</li>
+<li>Keeping the quadratic root with \(V_{GS} &lt; V_t\). Say why it is rejected.</li>
+</ul></div>
+
+<h2>Exam questions</h2>
+
+<div class="exam">
+  <div class="exam-src">2024–25 · Sec A · Q4(b) · 12 marks &nbsp;|&nbsp; same idea as 2017–18 Sec A Q2(b) and 2012–13 Sec B Q6(b)</div>
+  <div class="exam-q"><p>Explain why adding a source resistor \(R_S\) to a CS MOSFET amplifier improves its bias stability compared with grounding the source. Detail how \(R_S\) compensates for manufacturing variations in \(V_t\) and \(k_n\).</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><b>Grounded source.</b> \(V_{GS}\) is fixed by the divider, and \(I_D = \tfrac12k_n(V_{GS}-V_t)^2\). \(V_{GS}-V_t\) is small (≈ 0.2–1 V), so a spread of a few hundred mV in \(V_t\), or a ±20 % spread in \(k_n\) (from \(\mu_n\), \(C_{ox}\), W/L), changes \(I_D\) a lot, and with it \(g_m\), the gain and the swing. Example: \(k_n\) = 1 mA/V², \(V_{GS}\) = 2 V: \(V_t\) = 1 V gives 0.5 mA, \(V_t\) = 1.5 V gives 0.125 mA (−75 %).</p>
+    <p><b>With \(R_S\).</b> The gate voltage \(V_G\) is fixed by the divider (no gate current), and KVL gives \(V_G = V_{GS} + I_DR_S\). Now \(V_{GS}\) is not fixed: it adjusts with \(I_D\). This is negative feedback:</p>
+    <p>\(I_D\uparrow \Rightarrow V_S = I_DR_S\uparrow \Rightarrow V_{GS} = V_G - I_DR_S\downarrow \Rightarrow I_D\downarrow\).</p>
+    <p><b>Compensating \(V_t\) and \(k_n\).</b> A unit with higher \(V_t\) or lower \(k_n\) tends to carry less current; then \(V_S\) falls, \(V_{GS}\) rises automatically and restores most of the current. A unit with lower \(V_t\) or higher \(k_n\) tends to carry more; \(V_S\) rises and \(V_{GS}\) falls. For small changes the variation is divided by \(1 + g_mR_S\). In the limit \(I_DR_S \gg V_{GS}\), \(I_D \approx (V_G - V_{GS})/R_S\), almost independent of the device.</p>
+    <p><b>Graph.</b> Draw the two \(i_D\)–\(v_{GS}\) parabolas (Figure 3). A vertical line at fixed \(V_{GS}\) cuts them at very different currents; the bias line \(i_D = (V_G - v_{GS})/R_S\) cuts them at nearly equal currents. Example with \(V_G\) = 7 V, \(R_S\) = 10 kΩ: 0.5 mA vs 0.455 mA (−9 %).</p>
+    <p><b>Costs.</b> \(R_S\) takes supply voltage (less swing) and would reduce the AC gain by \(1+g_mR_S\); a bypass capacitor across \(R_S\) restores the gain while keeping the DC feedback.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2023–24 · Sec B · Q8(c) · 8 marks</div>
+  <div class="exam-q"><p>Derive the condition of small-signal operation considering a simple CS nMOS amplifier circuit. Find the expression of MOSFET transconductance \(g_m\) from there as well.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>Draw the circuit of Figure 1 (left) with \(v_{GS} = V_{GS} + v_{gs}\) at the gate. DC: \(I_D = \tfrac12k_nV_{OV}^2\), \(V_{DS} = V_{DD} - I_DR_D &gt; V_{OV}\).</p>
+    <p>Total current: \(i_D = \tfrac12k_n(V_{OV} + v_{gs})^2 = \tfrac12k_nV_{OV}^2 + k_nV_{OV}v_{gs} + \tfrac12k_nv_{gs}^2\).</p>
+    <p>The last term is nonlinear (distortion). Neglect it relative to the linear term: \(\tfrac12k_nv_{gs}^2 \ll k_nV_{OV}v_{gs} \Rightarrow \boxed{v_{gs} \ll 2V_{OV} = 2(V_{GS}-V_t)}\).</p>
+    <p>Then \(i_D \approx I_D + i_d\), \(i_d = k_nV_{OV}v_{gs}\), so \(\boxed{g_m = \dfrac{i_d}{v_{gs}} = k_n(V_{GS}-V_t) = k_nV_{OV} = \sqrt{2k_nI_D} = \dfrac{2I_D}{V_{OV}}}\), the slope of the \(i_D\)–\(v_{GS}\) curve at Q. Also \(v_{ds} = -g_mR_Dv_{gs}\), \(A_v = -g_mR_D\).</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2017–18 · Sec A · Q2(b) · 11⅔ marks</div>
+  <div class="exam-q"><p>What is the reason for biasing a MOSFET? Write a short note on the biasing technique of a discrete MOSFET using a fixed voltage at the gate and a resistance in the source, \(R_S\).</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><b>Reason.</b> To amplify, the MOSFET must sit in saturation at a DC point Q chosen so that (i) \(g_m\) (hence gain) has the wanted value, (ii) the drain can swing both ways without entering triode or cut-off, and (iii) Q does not move when \(V_t\), \(k_n\) or temperature change from unit to unit.</p>
+    <p><b>Circuit</b> (Figure 3, left): \(R_{G1}\), \(R_{G2}\) divider from \(V_{DD}\) to the gate, \(R_D\) in the drain, \(R_S\) from source to ground, bypassed by \(C_S\). Large \(R_G\) (MΩ) keeps the input resistance high.</p>
+    <p><b>Equations.</b> \(V_G = V_{DD}\dfrac{R_{G2}}{R_{G1}+R_{G2}}\) (no gate current); \(V_G = V_{GS} + I_DR_S\); \(I_D = \tfrac12k_n(V_{GS}-V_t)^2\). Solve the quadratic, reject the root with \(V_{GS} &lt; V_t\), check \(V_{DS} &gt; V_{OV}\).</p>
+    <p><b>Why it is stable.</b> \(R_S\) gives negative feedback: \(I_D\uparrow \Rightarrow V_S\uparrow \Rightarrow V_{GS}\downarrow \Rightarrow I_D\downarrow\). If \(I_DR_S \gg V_{GS}\), \(I_D \approx (V_G - V_{GS})/R_S\), nearly independent of \(V_t\) and \(k_n\). Graphically the bias line of slope \(-1/R_S\) cuts the parabolas of different devices at nearly the same current (Figure 3, right).</p>
+    <p><b>Design rule.</b> One third of \(V_{DD}\) across each of \(R_D\), \(V_{DS}\) and \(R_S\). Example (\(V_{DD}\) = 15 V, \(I_D\) = 0.5 mA, \(V_t\) = 1 V, \(k_n\) = 1 mA/V²): \(R_D = R_S\) = 10 kΩ, \(V_G\) = 7 V (8 MΩ/7 MΩ); a unit with \(V_t\) = 1.5 V gives 0.455 mA, only −9 %.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2017–18 · Sec A · Q2(c) · 15 marks</div>
+  <div class="exam-q"><p>Briefly explain the operation of a MOSFET as a small-signal amplifier and also deduce its VTC from the \(I_D\)–\(V_{DS}\) graph.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><b>Load line.</b> For the CS stage, \(v_{DS} = V_{DD} - i_DR_D\), i.e. \(i_D = (V_{DD}-v_{DS})/R_D\): a straight line on the \(i_D\)–\(v_{DS}\) characteristics from \((0, V_{DD}/R_D)\) to \((V_{DD}, 0)\).</p>
+    <p><b>VTC point by point.</b> For each value of \(v_{GS}\), the operating point is where the load line crosses that \(v_{GS}\) curve; read off \(v_{DS} = v_O\). Below \(V_t\) there is no curve (i = 0): \(v_O = V_{DD}\) (cut-off). As \(v_{GS}\) rises, the intersection slides up the load line through the saturation region (flat parts of the curves), so \(v_O\) falls fast: \(v_O = V_{DD} - \tfrac12k_nR_D(v_{GS}-V_t)^2\). Once the intersection passes the \(v_{DS} = v_{GS}-V_t\) parabola (point B) it is in triode, and \(v_O\) changes only slowly. Plotting \(v_O\) against \(v_{GS}\) gives Figure 1 (right).</p>
+    <p><b>Amplifier operation.</b> Bias at Q in the middle of the saturation segment with \(V_{GS}\). Superimpose \(v_{gs}\): the operating point moves up and down the load line around Q, \(i_d = g_mv_{gs}\), and \(v_{ds} = -g_mR_Dv_{gs}\). The gain is the VTC slope at Q, \(A_v = -k_nV_{OV}R_D = -(V_{DD}-V_{DS})/(V_{OV}/2)\), inverting. For linearity keep \(v_{gs} \ll 2V_{OV}\) and keep \(v_{DS} \ge v_{GS}-V_t\) at the negative output peak.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2014–15 · Sec A · Q4(c) · 10⅔ marks</div>
+  <div class="exam-q"><p>How can the MOSFET transconductance \(g_m\) be varied with the design parameters W/L ratio and overdrive voltage \(V_{OV}\)? Explain.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>Start from \(g_m = \partial i_D/\partial v_{GS} = k_n'(W/L)V_{OV}\) and \(I_D = \tfrac12k_n'(W/L)V_{OV}^2\), which give the three equivalent forms \(g_m = k_n'(W/L)V_{OV} = \sqrt{2k_n'(W/L)I_D} = 2I_D/V_{OV}\).</p>
+    <ul>
+      <li>At fixed \(V_{OV}\): \(g_m \propto W/L\) (the current also scales with W/L).</li>
+      <li>At fixed \(I_D\): \(g_m \propto \sqrt{W/L}\); e.g. 4× the width gives 2× \(g_m\), with \(V_{OV}\) halved.</li>
+      <li>At fixed W/L: \(g_m \propto V_{OV}\), but \(I_D \propto V_{OV}^2\), so power grows faster than \(g_m\).</li>
+      <li>At fixed \(I_D\): \(g_m = 2I_D/V_{OV}\) rises as \(V_{OV}\) is lowered (done by widening the device).</li>
+    </ul>
+    <p>So for high \(g_m\) at a given current: low \(V_{OV}\) and large W/L. Costs: area and capacitance (bandwidth) for W/L; for small \(V_{OV}\) the small-signal range \(v_{gs} \ll 2V_{OV}\) shrinks. For a given device, \(g_m \propto \sqrt{I_D}\) (unlike the BJT's \(g_m \propto I_C\)).</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2012–13 · Sec B · Q6(b) · 20 marks</div>
+  <div class="exam-q"><p>Explain graphically the benefit of using a resistance at the MOSFET source terminal. How does it fight the problem of unpredictable variation in process parameters such as \(V_t\), \(C_{ox}\), \(\mu_n\)?</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>\(C_{ox}\), \(\mu_n\) and W/L set \(k_n = \mu_nC_{ox}(W/L)\); \(V_t\) shifts the parabola sideways. Two "identical" transistors can therefore have different \(i_D\)–\(v_{GS}\) curves (Device 1 and Device 2 in Figure 3).</p>
+    <p><b>Without \(R_S\)</b>: the bias is a vertical line \(v_{GS} = V_{GS}\). It cuts the two curves at \(I_{D1}\) and \(I_{D2}\), very different because \(I_D \propto (V_{GS}-V_t)^2\) and the curves are steep.</p>
+    <p><b>With \(R_S\)</b>: \(V_G = v_{GS} + i_DR_S\), the line \(i_D = (V_G - v_{GS})/R_S\) through \((V_G, 0)\) with slope \(-1/R_S\). It cuts the curves at \(I_{D1}\) and \(I_{D2}\) that are close. A larger \(R_S\) makes the line flatter and the currents closer.</p>
+    <p><b>Mechanism</b> (negative feedback): if the device conducts more, \(V_S\) rises, \(V_{GS}\) falls and the current is pulled back; if less, \(V_{GS}\) rises. Numbers (\(k_n\) = 1 mA/V², \(V_t\) = 1 → 1.5 V): fixed \(V_{GS}\) = 2 V gives 0.5 → 0.125 mA; \(V_G\) = 7 V with \(R_S\) = 10 kΩ gives 0.5 → 0.455 mA.</p>
+    <p><b>Price:</b> \(R_S\) uses supply headroom and needs a bypass capacitor so the AC gain is not reduced.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2012–13 · Sec B · Q7(a) · 19⅔ marks</div>
+  <div class="exam-q"><p>Draw the voltage transfer characteristic of a MOSFET (amplifier). In which part of this graph is a MOSFET used as an amplifier and why? What are the benefits and drawbacks of increasing the bias voltage?</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><b>VTC</b> (Figure 1, right) of the CS stage: \(v_O = V_{DD}\) for \(v_{GS} &lt; V_t\) (cut-off, up to A); \(v_O = V_{DD} - \tfrac12k_nR_D(v_{GS}-V_t)^2\) from A to B (saturation); beyond B, where \(v_O = v_{GS}-V_t\), the device is in triode and \(v_O\) flattens towards a small value. Mark \(V_{OV}|_B = (\sqrt{1+2k_nR_DV_{DD}}-1)/(k_nR_D)\).</p>
+    <p><b>Where to amplify:</b> the saturation segment A–B. It is steep (large slope = gain \(A_v = -k_nV_{OV}R_D\)) and, over a small range around Q, almost straight, so a small \(v_{gs}\) gives a large, nearly undistorted \(v_{ds}\). In cut-off the slope is zero; in triode it is small and the device behaves as a resistor (switch).</p>
+    <p><b>Raising the bias \(V_{GS}\):</b> benefits: larger \(I_D\), larger \(g_m\) and gain \(|A_v| = (V_{DD}-V_{DS})/(V_{OV}/2)\) (up to the maximum at B). Drawbacks: Q moves towards B, so the negative output swing before triode shrinks (the output clips); more DC power; at fixed \(V_{OV}\) small-signal range also matters. Too low a bias leaves little gain and limited positive swing (output clips at \(V_{DD}\)). The best Q is near the middle of A–B, allowing roughly equal swing both ways.</p>
+  </div></details>
+</div>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+
+<div class="key"><p><strong>Summary:</strong> expand \(i_D\) about Q: the linear term gives \(g_m = k_nV_{OV} = \sqrt{2k_nI_D} = 2I_D/V_{OV}\); the square term is negligible when \(v_{gs} \ll 2V_{OV}\) (use 0.1\(V_{OV}\) in numbers). \(r_o = V_A/I_D\). The saturated MOSFET is \(g_mv_{gs}\) from D to S with \(r_o\) across it and an open gate (hybrid-π), or the T model with \(1/g_m\) in the source lead when there is a source resistance. The basic CS gain is \(-g_mR_D = -(V_{DD}-V_{DS})/(V_{OV}/2)\), the VTC slope at Q. Bias with a fixed \(V_G\) and a source resistor: \(V_G = V_{GS} + I_DR_S\) is negative feedback that keeps \(I_D\) nearly constant when \(V_t\) or \(k_n\) change.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/eee.js"></script>
+<script>
+// small x–y plot in schematic style; curves: [{pts:[[x,y]...], cls}], marks: [[x,y,label,anchor]]
+function plot({ w = 400, h = 250, xr, yr, xl, yl, curves = [], marks = [], lines = [] }) {
+  const L = 44, B = h - 30, T = 14, Rt = w - 14;
+  const X = x => L + (x - xr[0]) / (xr[1] - xr[0]) * (Rt - L), Y = y => B - (y - yr[0]) / (yr[1] - yr[0]) * (B - T);
+  const o = [`<line x1="${L}" y1="${B}" x2="${Rt}" y2="${B}" class="arr"/>`, `<line x1="${L}" y1="${B}" x2="${L}" y2="${T}" class="arr"/>`,
+    `<text x="${Rt}" y="${B + 20}" text-anchor="end" class="sl">${xl}</text>`, `<text x="${L + 6}" y="${T + 4}" class="sl">${yl}</text>`];
+  for (const l of lines) o.push(`<line x1="${X(l[0])}" y1="${Y(l[1])}" x2="${X(l[2])}" y2="${Y(l[3])}" style="stroke-dasharray:4 3" class="${l[4] || ''}"/>`);
+  for (const c of curves) o.push(`<polyline points="${c.pts.map(([x, y]) => X(x).toFixed(1) + ',' + Y(y).toFixed(1)).join(' ')}" class="nf ${c.cls || ''}"/>`);
+  for (const [x, y, s, a, dy = -6] of marks) { o.push(`<circle cx="${X(x)}" cy="${Y(y)}" r="3" class="fill"/>`); if (s) o.push(`<text x="${X(x) + (a === 'end' ? -6 : 6)}" y="${Y(y) + dy}" text-anchor="${a || 'start'}" class="sl">${s}</text>`); }
+  return `<svg class="sch" viewBox="0 0 ${w} ${h}" width="${w}" role="img" aria-label="Graph">${o.join('')}</svg>`;
+}
+const rng01 = (a, b, n) => Array.from({ length: n + 1 }, (_, i) => a + (b - a) * i / n);
+
+// basic CS stage
+$('#fig-cs0').innerHTML = sch([
+  ['rail', [160, 20], '+V_DD'], ['R', [160, 20], [160, 100], 'R_D'], ['dot', [160, 100]], ['W', [160, 100], [160, 110]],
+  ['nmos', [120, 150]], ['W', [160, 190], [160, 220]], ['gnd', [160, 220]],
+  ['W', [120, 150], [60, 150]], ['V', [60, 150], [60, 220], 'v_GS', -1], ['gnd', [60, 220]],
+  ['W', [160, 100], [220, 100]], ['open', [220, 100], 'v_O = v_DS'],
+], { w: 300, h: 240, sim: false });
+{ // VTC of the example
+  const VDD = 1.8, kn = 4, RD = 17.5, Vt = 0.4, f = v => { if (v < Vt) return VDD; const ov = v - Vt, s = VDD - 0.5 * kn * RD * ov * ov; if (s >= ov) return s; const a = 1 + kn * RD * ov; return (a - Math.sqrt(a * a - 2 * kn * RD * VDD)) / (kn * RD); };
+  const pts = rng01(0, 1.1, 180).map(v => [v, f(v)]);
+  $('#fig-vtc').innerHTML = plot({ xr: [0, 1.1], yr: [0, 2], xl: 'v_GS (V)', yl: 'v_O (V)', curves: [{ pts, cls: 'hi' }],
+    marks: [[0.4, 1.8, 'A', 'start'], [0.6129, 0.2129, 'B', 'start'], [0.5512, 1.0, 'Q', 'start']], lines: [[0, 1.8, 1.1, 1.8], [0.5512, 0, 0.5512, 1.0]] });
+}
+// hybrid-pi and T models
+$('#fig-pi').innerHTML = sch([
+  ['open', [40, 50], ''], ['t', [40, 36], 'G'], ['t', [40, 80], '+'], ['t', [46, 112], 'v_gs', 'start'], ['t', [40, 150], '−'],
+  ['W', [40, 160], [260, 160]], ['open', [40, 160], ''], ['I', [160, 60], [160, 160], 'gₘv_gs'], ['W', [160, 60], [260, 60]],
+  ['R', [260, 60], [260, 160], 'r_o'], ['W', [260, 60], [260, 30]], ['open', [260, 30], 'D'], ['dot', [260, 60]], ['dot', [160, 160]], ['dot', [260, 160]],
+  ['W', [160, 160], [160, 190]], ['open', [160, 190], 'S'],
+], { w: 310, h: 210, sim: false });
+$('#fig-t').innerHTML = sch([
+  ['open', [40, 120], ''], ['t', [32, 125], 'G', 'end'], ['W', [40, 120], [160, 120]], ['t', [100, 110], 'i_g = 0'], ['dot', [160, 120]], ['t', [150, 136], 'X', 'end'],
+  ['I', [160, 40], [160, 120], 'gₘv_gs'], ['R', [160, 120], [160, 200], '1/gₘ'], ['W', [160, 40], [260, 40]], ['R', [260, 40], [260, 200], 'r_o'],
+  ['W', [260, 200], [160, 200]], ['dot', [160, 40]], ['dot', [160, 200]], ['W', [160, 40], [160, 20]], ['open', [160, 20], 'D'], ['W', [160, 200], [160, 225]], ['open', [160, 225], 'S'],
+], { w: 300, h: 240, sim: false });
+// classical bias circuit
+$('#fig-bias').innerHTML = sch([
+  ['rail', [80, 20], '+V_DD'], ['rail', [200, 20], '+V_DD'], ['R', [80, 20], [80, 150], 'R_G1', -1], ['R', [80, 150], [80, 270], 'R_G2', -1], ['gnd', [80, 270]],
+  ['dot', [80, 150]], ['W', [80, 150], [160, 150]], ['R', [200, 20], [200, 110], 'R_D'], ['nmos', [160, 150]],
+  ['R', [200, 190], [200, 270], 'R_S'], ['W', [200, 190], [260, 190]], ['C', [260, 190], [260, 270], 'C_S'], ['W', [200, 270], [260, 270]], ['dot', [200, 190]], ['gnd', [230, 270]],
+], { w: 300, h: 290, sim: false });
+{ const p1 = rng01(1, 2.5, 60).map(v => [v, 0.5 * (v - 1) ** 2]), p2 = rng01(1.5, 3.0, 60).map(v => [v, 0.5 * (v - 1.5) ** 2]);
+  $('#fig-stab').innerHTML = plot({ xr: [0, 7.4], yr: [0, 1.2], xl: 'v_GS (V)', yl: 'i_D (mA)', curves: [{ pts: p1, cls: 'hi' }, { pts: p2 }, { pts: [[2.0, 0.5], [7, 0]] }],
+    lines: [[2, 0, 2, 1.15]], marks: [[2, 0.5, '0.5', 'end'], [2, 0.125, '0.125', 'end'], [2.4536, 0.4546, '0.455', 'start'], [7, 0, 'V_G = 7', 'end', 18]] }); }
+
+worked('#wk-vtc', {
+  given: 'CS stage: \\(V_{DD}\\) = 1.8 V, \\(R_D\\) = 17.5 kΩ, \\(k_n\\) = 4 mA/V², \\(V_t\\) = 0.4 V. (a) Find point B. (b) Bias at \\(V_{DS}\\) = 1 V: find \\(V_{GS}\\), \\(I_D\\) and the gain. (c) The largest possible gain.',
+  steps: [
+    '\\(k_nR_D = 4\\times17.5 = 70\\) V⁻¹ (mA/V² × kΩ).',
+    { t: '\\(V_{OV}|_B = \\dfrac{\\sqrt{1+2\\times70\\times1.8}-1}{70} = \\dfrac{\\sqrt{253}-1}{70} = 0.213\\) V, so B is at \\(V_{GS}\\) = 0.613 V, \\(V_{DS}\\) = 0.213 V', a: { l: 'V_{OV}|_B', v: 0.2129, u: 'V' } },
+    { t: '\\(I_D = (1.8-1)/17.5 = 0.0457\\) mA', a: { l: 'I_D', v: 4.571e-5, u: 'µA' } },
+    { t: '\\(V_{OV} = \\sqrt{2\\times0.0457/4} = 0.151\\) V, \\(V_{GS} = 0.551\\) V', a: { l: 'V_{GS}', v: 0.5512, u: 'V' } },
+    { t: '\\(A_v = -\\dfrac{1.8-1}{0.151/2} = -10.6\\) V/V (check: \\(-k_nV_{OV}R_D = -70\\times0.151 = -10.6\\))', a: { l: 'A_v', v: -10.58, u: 'V/V' } },
+    { t: '\\(|A_{v,\\max}| = \\dfrac{1.8-0.213}{0.213/2} = 14.9\\) V/V (at B, no room for negative swing)', a: { l: '|A_{v,max}|', v: 14.91, u: 'V/V' } },
+  ] });
+
+drill('#dr-vtc', { id: 'mt4-vtc-gain', title: 'Basic CS stage: point B, bias and gain from the VTC', gen(r) {
+  const VDD = r.pick([1.8, 2.5, 3.3, 5, 10]), kn = r.pick([0.5, 1, 2, 4]), Vt = r.pick([0.4, 0.5, 0.7, 1]), RD = r.E(2, 30);
+  if (Vt > VDD / 3) return null;
+  const k = kn * RD, VovB = (Math.sqrt(1 + 2 * k * VDD) - 1) / k;
+  const VDS = +(VDD * r.pick([0.4, 0.5, 0.6])).toFixed(2), I = (VDD - VDS) / RD, Vov = Math.sqrt(2 * I / kn);
+  if (VDS < Vov + 0.05 || Vov < 0.05) return null;
+  const Av = -(VDD - VDS) / (Vov / 2);
+  return {
+    given: `A CS stage has \\(V_{DD}\\) = ${VDD} V, \\(R_D\\) = ${RD} kΩ and a MOSFET with \\(k_n\\) = ${kn} mA/V², \\(V_t\\) = ${Vt} V. Find (a) \\(V_{OV}\\) at the edge of saturation (point B); (b) the \\(V_{GS}\\) that biases the output at \\(V_{DS}\\) = ${VDS} V; (c) the small-signal gain there.`,
+    ask: [{ l: 'V_{OV}|_B', v: VovB, u: 'V' }, { l: 'V_{GS}', v: Vt + Vov, u: 'V' }, { l: 'A_v', v: Av, u: 'V/V' }],
+    steps: [
+      { t: `\\(k_nR_D = ${kn}\\times${RD} = ${num(k)}\\); \\(V_{OV}|_B = \\dfrac{\\sqrt{1+2\\times${num(k)}\\times${VDD}}-1}{${num(k)}} = ${num(VovB)}\\) V`, a: { l: 'V_{OV}|_B', v: VovB, u: 'V' } },
+      { t: `\\(I_D = (${VDD}-${VDS})/${RD} = ${num(I)}\\) mA, \\(V_{OV} = \\sqrt{2\\times${num(I)}/${kn}} = ${num(Vov)}\\) V, \\(V_{GS} = ${Vt} + ${num(Vov)} = ${num(Vt + Vov)}\\) V`, a: { l: 'V_{GS}', v: Vt + Vov, u: 'V' } },
+      `Saturation check: \\(V_{DS} = ${VDS} &gt; V_{OV} = ${num(Vov, 3)}\\) ✓`,
+      { t: `\\(A_v = -\\dfrac{V_{DD}-V_{DS}}{V_{OV}/2} = -\\dfrac{${num(VDD - VDS)}}{${num(Vov / 2)}} = ${num(Av)}\\) V/V`, a: { l: 'A_v', v: Av, u: 'V/V' } },
+    ] };
+} });
+
+drill('#dr-gm', { id: 'mt4-gm-forms', title: 'Transconductance, overdrive and output resistance from the given data', gen(r) {
+  const path = r.pick(['kWL', 'IV', 'VGS']), VA = r.pick([10, 20, 50, 100]);
+  let I, Vov, gm, kn, given, steps;
+  if (path === 'kWL') {
+    const kp = r.pick([100, 200, 400]), WL = r.pick([5, 10, 20, 40, 50]); I = r.pick([0.05, 0.1, 0.2, 0.25, 0.5, 1]); kn = kp * WL / 1000;
+    gm = Math.sqrt(2 * kn * I); Vov = 2 * I / gm;
+    given = `A MOSFET has \\(\\mu_nC_{ox}\\) = ${kp} µA/V², W/L = ${WL}, \\(V_A\\) = ${VA} V and is biased at \\(I_D\\) = ${I} mA. Find \\(g_m\\), \\(V_{OV}\\) and \\(r_o\\).`;
+    steps = [{ t: `\\(k_n = ${kp}\\times10^{-3}\\times${WL} = ${num(kn)}\\) mA/V²; \\(g_m = \\sqrt{2\\times${num(kn)}\\times${I}} = ${num(gm)}\\) mA/V`, a: { l: 'g_m', v: gm * 1e-3, u: 'mA/V', mul: 1e-3 } },
+      { t: `\\(V_{OV} = 2I_D/g_m = 2\\times${I}/${num(gm)} = ${num(Vov)}\\) V`, a: { l: 'V_{OV}', v: Vov, u: 'V' } }];
+  } else if (path === 'IV') {
+    I = r.pick([0.1, 0.2, 0.25, 0.5, 1, 2]); Vov = r.pick([0.15, 0.2, 0.25, 0.3, 0.4, 0.5]); gm = 2 * I / Vov; kn = 2 * I / Vov ** 2;
+    given = `A MOSFET is biased at \\(I_D\\) = ${I} mA with \\(V_{OV}\\) = ${Vov} V; \\(V_A\\) = ${VA} V. Find \\(g_m\\), \\(k_n\\) and \\(r_o\\).`;
+    steps = [{ t: `\\(g_m = 2I_D/V_{OV} = 2\\times${I}/${Vov} = ${num(gm)}\\) mA/V`, a: { l: 'g_m', v: gm * 1e-3, u: 'mA/V', mul: 1e-3 } },
+      { t: `\\(k_n = 2I_D/V_{OV}^2 = 2\\times${I}/${Vov}^2 = ${num(kn)}\\) mA/V²`, a: { l: 'k_n', v: kn * 1e-3, u: 'mA/V²', mul: 1e-3 } }];
+  } else {
+    kn = r.pick([0.5, 1, 2, 4]); const Vt = r.pick([0.5, 0.7, 1]); Vov = r.pick([0.2, 0.3, 0.5, 0.8, 1]); I = 0.5 * kn * Vov ** 2; gm = kn * Vov;
+    given = `A MOSFET with \\(k_n\\) = ${kn} mA/V², \\(V_t\\) = ${Vt} V, \\(V_A\\) = ${VA} V is biased at \\(V_{GS}\\) = ${num(Vt + Vov)} V in saturation. Find \\(g_m\\), \\(I_D\\) and \\(r_o\\).`;
+    steps = [{ t: `\\(V_{OV} = ${num(Vt + Vov)} - ${Vt} = ${Vov}\\) V, \\(g_m = k_nV_{OV} = ${kn}\\times${Vov} = ${num(gm)}\\) mA/V`, a: { l: 'g_m', v: gm * 1e-3, u: 'mA/V', mul: 1e-3 } },
+      { t: `\\(I_D = \\tfrac12k_nV_{OV}^2 = 0.5\\times${kn}\\times${Vov}^2 = ${num(I)}\\) mA`, a: { l: 'I_D', v: I * 1e-3, u: 'mA' } }];
+  }
+  const ro = VA / I;
+  steps.push({ t: `\\(r_o = V_A/I_D = ${VA}/${I < 0.01 ? num(I) : num(I)} = ${num(ro)}\\) kΩ`, a: { l: 'r_o', v: ro * 1e3, u: 'kΩ' } });
+  const second = path === 'kWL' ? { l: 'V_{OV}', v: Vov, u: 'V' } : path === 'IV' ? { l: 'k_n', v: kn * 1e-3, u: 'mA/V²', mul: 1e-3 } : { l: 'I_D', v: I * 1e-3, u: 'mA' };
+  return { given, ask: [{ l: 'g_m', v: gm * 1e-3, u: 'mA/V', mul: 1e-3 }, second, { l: 'r_o', v: ro * 1e3, u: 'kΩ' }], steps };
+} });
+
+worked('#wk-bias', {
+  given: 'Design the classical bias circuit (Figure 3, left) for \\(I_D\\) = 0.5 mA with \\(V_{DD}\\) = 15 V, \\(V_t\\) = 1 V, \\(k_n\\) = 1 mA/V², λ = 0. Then find the % change in \\(I_D\\) if the MOSFET is replaced by one with \\(V_t\\) = 1.5 V.',
+  steps: [
+    'Rule of thumb: 5 V each across \\(R_D\\), \\(V_{DS}\\), \\(R_S\\): \\(V_D\\) = 10 V, \\(V_S\\) = 5 V.',
+    { t: '\\(R_D = (15-10)/0.5 = 10\\) kΩ, \\(R_S = 5/0.5 = 10\\) kΩ', a: { l: 'R_S', v: 10e3, u: 'kΩ' } },
+    { t: '\\(V_{OV} = \\sqrt{2\\times0.5/1} = 1\\) V, \\(V_{GS} = 2\\) V, \\(V_G = 5 + 2 = 7\\) V → \\(R_{G1}\\) = 8 MΩ, \\(R_{G2}\\) = 7 MΩ', a: { l: 'V_G', v: 7, u: 'V' } },
+    { t: 'New device: \\(7 = V_{GS} + 10\\times0.5(V_{GS}-1.5)^2 \\Rightarrow 5V_{GS}^2 - 14V_{GS} + 4.25 = 0 \\Rightarrow V_{GS} = 2.454\\) V (the other root, 0.35 V, is below \\(V_t\\): reject)', a: { l: 'V_{GS}', v: 2.4536, u: 'V' } },
+    { t: '\\(I_D = 0.5(2.454-1.5)^2 = 0.455\\) mA', a: { l: 'I_D', v: 0.4546e-3, u: 'mA' } },
+    { t: 'Change \\(= (0.455-0.5)/0.5 = -9.1\\) % (fixed \\(V_{GS}\\) = 2 V would give 0.125 mA, −75 %)', a: { l: '\\Delta I_D/I_D', v: -9.07, u: '%', tol: 0.03 } },
+  ] });
+
+drill('#dr-stab', { id: 'mt5-rs-stability', title: 'Bias design with a source resistor, then a different threshold', gen(r) {
+  const VDD = r.pick([9, 12, 15, 18]), I = r.pick([0.25, 0.5, 1, 2]), kn = r.pick([0.5, 1, 2, 4]), Vt = r.pick([0.8, 1, 1.2]), dV = r.pick([0.3, 0.5, -0.2, -0.3]);
+  const RS = VDD / 3 / I, Vov = Math.sqrt(2 * I / kn), VG = VDD / 3 + Vt + Vov; if (VG > VDD * 0.8) return null;
+  const Vt2 = Vt + dV, kR = kn * RS, Vov2 = (Math.sqrt(1 + 2 * kR * (VG - Vt2)) - 1) / kR, I2 = 0.5 * kn * Vov2 ** 2, pct = (I2 - I) / I * 100;
+  const Vf = Vt + Vov - Vt2, If = Vf > 0 ? 0.5 * kn * Vf ** 2 : 0, pctf = (If - I) / I * 100;
+  return {
+    given: `Design the classical bias circuit (\\(V_{DD}/3\\) across each of \\(R_D\\), \\(V_{DS}\\), \\(R_S\\)) for \\(I_D\\) = ${I} mA with \\(V_{DD}\\) = ${VDD} V and a MOSFET with \\(k_n\\) = ${kn} mA/V², \\(V_t\\) = ${Vt} V (λ = 0). Find \\(R_S\\) and \\(V_G\\). Then the MOSFET is replaced by one with \\(V_t\\) = ${num(Vt2)} V: find the new \\(I_D\\) and its % change.`,
+    ask: [{ l: 'R_S', v: RS * 1e3, u: 'kΩ' }, { l: 'V_G', v: VG, u: 'V' }, { l: "I_D'", v: I2 * 1e-3, u: 'mA' }, { l: '\\Delta I_D/I_D', v: pct, u: '%', tol: 0.04 }],
+    steps: [
+      { t: `\\(V_S = ${VDD}/3 = ${num(VDD / 3)}\\) V, \\(R_S = R_D = ${num(VDD / 3)}/${I} = ${num(RS)}\\) kΩ`, a: { l: 'R_S', v: RS * 1e3, u: 'kΩ' } },
+      { t: `\\(V_{OV} = \\sqrt{2\\times${I}/${kn}} = ${num(Vov)}\\) V, \\(V_G = V_S + V_t + V_{OV} = ${num(VDD / 3)} + ${Vt} + ${num(Vov)} = ${num(VG)}\\) V`, a: { l: 'V_G', v: VG, u: 'V' } },
+      { t: `New device: \\(V_G = V_{GS} + R_S\\cdot\\tfrac12k_n(V_{GS}-V_t')^2\\). With \\(k_nR_S = ${num(kR)}\\): \\(V_{OV}' = \\dfrac{\\sqrt{1+2\\times${num(kR)}\\times(${num(VG)}-${num(Vt2)})}-1}{${num(kR)}} = ${num(Vov2)}\\) V (the other root has \\(V_{GS} &lt; V_t'\\): reject)`, a: { l: "V_{OV}'", v: Vov2, u: 'V' } },
+      { t: `\\(I_D' = \\tfrac12\\times${kn}\\times${num(Vov2)}^2 = ${num(I2)}\\) mA`, a: { l: "I_D'", v: I2 * 1e-3, u: 'mA' } },
+      { t: `Change \\(= (${num(I2)}-${I})/${I}\\times100 = ${num(pct, 3)}\\) %`, a: { l: '\\Delta I_D/I_D', v: pct, u: '%', tol: 0.04 } },
+      `Compare: with the source grounded at a fixed \\(V_{GS} = ${num(Vt + Vov)}\\) V the new current would be ${num(If, 3)} mA (${num(pctf, 3)} %). That is the benefit of \\(R_S\\).`,
+    ] };
+} });
+
+flashcards('#cards', [
+  { f: 'Small-signal condition', b: 'v_gs ≪ 2V_OV (square term ≪ linear term); in numbers v_gs ≤ 0.1·V_OV.' },
+  { f: 'g_m, three forms', b: 'k_n·V_OV = √(2k_n·I_D) = 2I_D/V_OV' },
+  { f: 'r_o', b: 'V_A/I_D = 1/(λI_D); ∞ if no V_A given.' },
+  { f: 'Basic CS gain', b: '−g_m·R_D = −(V_DD − V_DS)/(V_OV/2): the VTC slope at Q.' },
+  { f: 'Point B of the VTC', b: 'V_DS = V_OV; V_OV|B = (√(1 + 2k_nR_DV_DD) − 1)/(k_nR_D).' },
+  { f: 'Hybrid-π vs T', b: 'π: source grounded for AC. T: resistance in the source lead (adds to 1/g_m).' },
+  { f: 'R_S bias stability', b: 'V_G = V_GS + I_D·R_S: I_D↑ ⇒ V_S↑ ⇒ V_GS↓ ⇒ I_D↓. Variation ÷ (1 + g_mR_S).' },
+  { f: 'V_DD/3 rule', b: 'Equal drops across R_D, V_DS and R_S.' },
+]);
+quiz('#quiz', [
+  { q: 'I_D = 0.5 mA, V_OV = 0.25 V. g_m =', opts: ['2 mA/V', '4 mA/V', '0.125 mA/V', '1 mA/V'], a: 1, why: '2 × 0.5 / 0.25 = 4 mA/V.' },
+  { q: 'At fixed I_D, the width W is made 4 times larger. g_m becomes', opts: ['4×', '2×', 'unchanged', '½×'], a: 1, why: 'g_m = √(2k′(W/L)I_D) ∝ √(W/L).' },
+  { q: 'The small-signal approximation needs', opts: ['v_gs ≪ V_t', 'v_gs ≪ 2V_OV', 'v_gs ≪ V_DD', 'v_ds ≪ V_OV'], a: 1, why: '½k_n·v_gs² ≪ k_n·V_OV·v_gs.' },
+  { q: 'V_A = 50 V, I_D = 0.25 mA. r_o =', opts: ['12.5 kΩ', '200 kΩ', '50 kΩ', '20 kΩ'], a: 1, why: '50/0.25 = 200 kΩ.' },
+  { q: 'A replacement MOSFET has a higher V_t. In a circuit with fixed V_G and R_S, V_GS', opts: ['falls', 'rises, so I_D falls only a little', 'stays the same', 'goes negative'], a: 1, why: 'I_D tends to fall, so V_S = I_D·R_S falls and V_GS = V_G − V_S rises.' },
+  { q: 'In which region of the VTC is the MOSFET used as an amplifier?', opts: ['Cut-off', 'Triode', 'Saturation (between A and B)', 'Breakdown'], a: 2, why: 'Steep, nearly linear segment: large slope = gain.' },
+]);
+</script>
+</body>
+</html>

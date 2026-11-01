@@ -1,0 +1,305 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Zener Diodes and Regulators · EEE 263 Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Diodes · Chapter 7 · Sedra §4.4 · Sadat L7, notes p.21–25 · Khairul s.26–30 · types D-09, D-10</div>
+<h1>Zener Diodes and Shunt Regulators</h1>
+<p class="lede">A Zener question appeared in 2014–15 to 2017–18, 2020–21, 2022–23, 2023–24 and 2024–25: almost every year, usually 10 to 20 marks, and mostly Sedra's own example with the numbers changed. There are only three kinds: the Zener model, analysing a regulator (line and load regulation, minimum load), and designing or finding ranges. Each has a five-step recipe.</p>
+
+<h2>1. What a Zener does</h2>
+<p>A Zener is a diode built to be used in <b>reverse breakdown</b>. Once the reverse voltage reaches about \(V_Z\), the current can rise a lot while the voltage barely changes: the diode behaves like a battery of value \(V_Z\). In a circuit the <b>cathode faces the positive side</b> (current flows cathode → anode inside the Zener).</p>
+<dl class="def">
+  <dt>\(V_Z\), \(I_{ZT}\)</dt><dd>Nominal Zener voltage, specified at a test current \(I_{ZT}\).</dd>
+  <dt>\(r_z\)</dt><dd>Incremental (dynamic) resistance in breakdown, a few ohms to tens of ohms. Smaller is a better regulator.</dd>
+  <dt>\(I_{ZK}\)</dt><dd>Knee current: below it the Zener leaves breakdown and stops regulating. Keep \(I_Z \ge I_{ZK}\).</dd>
+  <dt>\(I_{ZM}\), \(P_{ZM}\)</dt><dd>Maximum current and power: \(P_{ZM} = V_Z I_{ZM}\). Keep \(I_Z \le I_{ZM}\).</dd>
+</dl>
+
+<h2>2. The Zener model (type D-09, part 1)</h2>
+<p>In breakdown, replace the Zener by a battery \(V_{Z0}\) in series with \(r_z\). \(V_{Z0}\) is where the straight-line approximation meets the voltage axis:</p>
+<div class="formula">\[ V_Z = V_{Z0} + r_z I_Z, \qquad V_{Z0} = V_{ZT} - r_z I_{ZT} \]</div>
+<div class="method"><h4>Method · Zener at another current</h4><ol>
+<li>\(V_{Z0} = V_{ZT} - r_z I_{ZT}\) (use the test point given).</li>
+<li>\(V_Z = V_{Z0} + r_z I_Z\) at each new current.</li>
+<li>Comment (asked in 2023–24): at lower current the dissipation is smaller but the operating point nears the knee, where \(r_z\) grows and regulation worsens; at higher current \(r_z\) is small and steady but \(P = V_Z I_Z\) heats the diode and \(V_Z\) drifts with temperature.</li>
+</ol></div>
+<div id="dr-model"></div>
+
+<h2>3. Shunt regulator analysis (type D-09)</h2>
+<p>The standard regulator: supply \(V^+\) → resistor \(R\) → output node, Zener from the output to ground, load \(R_L\) across the Zener.</p>
+<figure><div id="fig-reg"></div><figcaption><b>Figure 1.</b> Zener shunt regulator. \(R\) drops the difference between supply and output; the Zener absorbs whatever current the load does not take.</figcaption></figure>
+<div class="method"><h4>Method · regulator analysis (5 steps)</h4><ol>
+<li><b>Model:</b> \(V_{Z0} = V_{ZT} - r_zI_{ZT}\).</li>
+<li><b>ON check first</b> (whenever a load is present): remove the Zener, \(V_{TH} = V^+\dfrac{R_L}{R+R_L}\). If \(V_{TH} &lt; V_{Z0}\) the Zener is off and \(V_o = V_{TH}\). Stop.</li>
+<li><b>No load:</b> \(I_Z = \dfrac{V^+ - V_{Z0}}{R + r_z}\), \(V_o = V_{Z0} + r_zI_Z\).</li>
+<li><b>Line regulation:</b> \(\dfrac{\Delta V_o}{\Delta V^+} = \dfrac{r_z}{R + r_z}\) (a divider of \(r_z\) and \(R\)).</li>
+<li><b>Load regulation:</b> \(\Delta V_o = -\Delta I_L\,(r_z\parallel R)\) with \(I_L \approx V_o/R_L\). Exact: node equation \(V_o = \dfrac{V^+/R + V_{Z0}/r_z}{1/R + 1/r_z + 1/R_L}\).</li>
+<li><b>Minimum \(R_L\)</b> (still in breakdown): set \(I_Z = I_{ZK}\) at the <b>lowest</b> supply: \(V_o = V_{Z0} + r_zI_{ZK}\), \(I_R = (V^+_{min} - V_o)/R\), \(I_L = I_R - I_{ZK}\), \(R_{L,min} = V_o/I_L\).</li>
+</ol></div>
+
+<h3>Worked example: 2024–25 Sec B Q8(a), the Sedra regulator</h3>
+<div id="wk-reg"></div>
+<div id="dr-reg"></div>
+
+<h3>Ideal Zener with a divider (2015–16)</h3>
+<p>With an ideal Zener (\(r_z = 0\)) the ON check is the whole question: find the Thevenin voltage the Zener sees. If it exceeds \(V_Z\), the Zener clamps the node at \(V_Z\) and takes the surplus current; otherwise it is open.</p>
+<div id="dr-div"></div>
+
+<h2>4. Ranges and design (type D-10)</h2>
+<div class="method"><h4>Method · load range with fixed supply (ideal Zener)</h4><ol>
+<li>While regulating, \(V_o = V_Z\), so \(I_R = (V_i - V_Z)/R\) is <b>constant</b>.</li>
+<li>Heaviest load takes everything except \(I_{ZK}\): \(I_{L,max} = I_R - I_{ZK}\), so \(R_{L,min} = V_Z/I_{L,max}\). Cross-check: \(V_iR_L/(R+R_L) \ge V_Z\).</li>
+<li>Lightest load leaves the Zener with its maximum: \(I_{L,min} = I_R - I_{ZM}\), so \(R_{L,max} = V_Z/I_{L,min}\) (if \(I_{L,min} \le 0\), any load up to open circuit is fine).</li>
+<li>\(P_{ZM} = V_ZI_{ZM}\).</li>
+</ol></div>
+<div class="method"><h4>Method · choose R for a supply range and a load range</h4><ol>
+<li><b>Regulation worst case</b> = lowest supply with the heaviest load: \(R = \dfrac{V_{S,min} - V_Z}{I_{L,max} + I_{Z,min}}\).</li>
+<li><b>Dissipation worst case</b> = highest supply with the lightest load: \(I_{Z,max} = \dfrac{V_{S,max} - V_Z}{R} - I_{L,min}\), \(P_Z = V_ZI_{Z,max}\).</li>
+<li>State your \(I_{Z,min}\). If none is given, either \(I_{Z,min} = 0\) (simplest) or Neamen's rule \(I_{Z,min} = 0.1\,I_{Z,max}\), which gives \(I_{Z,max} = \dfrac{I_{L,max}(V_{S,max}-V_Z) - I_{L,min}(V_{S,min}-V_Z)}{V_{S,min} - 0.9V_Z - 0.1V_{S,max}}\).</li>
+</ol></div>
+<div id="dr-range"></div>
+<div id="dr-design"></div>
+
+<h3>Zener + BJT shunt regulator (2014–15)</h3>
+<p>The Zener sits between the output and the base of an npn whose collector is the output and emitter is ground. The transistor multiplies the Zener current by β, so the Zener carries only a tiny current:</p>
+<div class="formula">\[ V_L = V_Z + V_{BE},\quad I_S = \frac{V_{in} - V_L}{R_S},\quad I_L = \frac{V_L}{R_L},\quad I_Z = I_B = \frac{I_S - I_L}{\beta + 1} \]</div>
+<div id="dr-bjt"></div>
+
+<div class="trap"><h4>Traps (where marks go)</h4><ul>
+<li>Using \(V_{ZT}\) (6.8 V) instead of \(V_{Z0}\) (6.7 V) in the KVL.</li>
+<li>Skipping the ON check: with a heavy load the Zener can be off, and then \(V_o\) is just the divider voltage (2024–25: \(R_L\) = 0.5 kΩ gives 5 V).</li>
+<li>Minimum load at the nominal supply instead of the lowest supply (2024–25 gives ±1 V: use 9 V).</li>
+<li>Mixing the two design worst cases: R from (lowest supply, heaviest load); Zener power from (highest supply, lightest load).</li>
+<li>Drawing the Zener the wrong way round: cathode to the positive node.</li>
+</ul></div>
+
+<h2>Exam questions</h2>
+
+<div class="exam">
+  <div class="exam-src">2024–25 · Sec B · Q8(a) · 20 marks &nbsp;|&nbsp; also 2020–21 Sec B Q6(b) (parts i, iv, 23⅓ marks) · Sedra Example 4.x</div>
+  <div class="exam-q"><p>A 6.8 V Zener diode has its nominal voltage at a test current of 5 mA; there \(r_z\) = 20 Ω, and the knee current is 0.2 mA. The cathode is connected to \(V^+\) = 10 V (±1 V) through a 0.5 kΩ resistor; the anode is grounded. (i) Find \(V_o\) with no load at the nominal supply. (ii) Find the change in \(V_o\) for a ±1 V change in supply. (iii) Find the change in \(V_o\) when \(R_L\) = 2 kΩ is connected. What happens with \(R_L\) = 0.5 kΩ? (iv) Find the minimum \(R_L\) for which the Zener stays in breakdown.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><b>Model:</b> \(V_{Z0} = 6.8 - 0.005\times20 = 6.7\) V.</p>
+    <p><b>(i)</b> \(I_Z = \dfrac{10 - 6.7}{0.5 + 0.02}\) mA \(= 6.35\) mA; \(V_o = 6.7 + 0.02\times6.35 = 6.83\) V.</p>
+    <p><b>(ii)</b> \(\Delta V_o = \pm1\times\dfrac{20}{500+20} = \pm38.5\) mV (line regulation 38.5 mV/V).</p>
+    <p><b>(iii)</b> ON check: \(V_{TH} = 10\times\frac{2}{2.5} = 8\) V \(&gt; 6.7\) V, so the Zener stays on. \(I_L \approx 6.8/2 = 3.4\) mA, \(\Delta V_o = -3.4\text{ mA}\times(20\parallel500) = -3.4\times19.2\text{ mV} = -65\) mV. (Exact node equation: \(V_o = 6.762\) V, \(\Delta V_o = -64.9\) mV.)</p>
+    <p>With \(R_L\) = 0.5 kΩ: \(V_{TH} = 10\times\frac{0.5}{1} = 5\) V \(&lt; V_{Z0}\), so the Zener is <b>off</b> and \(V_o = 5\) V: the circuit no longer regulates.</p>
+    <p><b>(iv)</b> Worst case is the lowest supply, 9 V, with \(I_Z = I_{ZK}\): \(V_o = 6.7 + 0.2\times0.02 = 6.704\) V; \(I_R = (9 - 6.704)/0.5 = 4.59\) mA; \(I_L = 4.59 - 0.2 = 4.39\) mA; \(R_{L,min} = 6.704/4.39 = 1.53\) kΩ. (2020–21 gives a fixed 10 V supply: then \(I_R = 6.59\) mA, \(I_L = 6.39\) mA, \(R_{L,min} = 1.05\) kΩ.)</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2023–24 · Sec A · Q2(b) · 10 marks &nbsp;|&nbsp; also CT-1 (batch 23)</div>
+  <div class="exam-q"><p>A 9.1 V Zener diode exhibits its nominal voltage at a test current of 28 mA. At this current the incremental resistance is 5 Ω. (i) Find \(V_{Z0}\) of the Zener model. (ii) Find the Zener voltage at 10 mA and at 100 mA. (iii) Comment on running the Zener at currents other than the nominal value.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><b>(i)</b> \(V_{Z0} = 9.1 - 0.028\times5 = 8.96\) V.</p>
+    <p><b>(ii)</b> \(V_Z(10\text{ mA}) = 8.96 + 0.010\times5 = 9.01\) V; \(V_Z(100\text{ mA}) = 8.96 + 0.100\times5 = 9.46\) V.</p>
+    <p><b>(iii)</b> At 10 mA the dissipation is lower (91 mW) but the point is closer to the knee, where \(r_z\) rises and regulation is poorer. At 100 mA the voltage is 0.36 V above nominal, the dissipation is 0.95 W (heating, so \(V_Z\) drifts with its temperature coefficient), though \(r_z\) is small and steady. Nominal current is the designed compromise.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2022–23 · Sec A · Q3(a) · 18 marks &nbsp;|&nbsp; Boylestad example</div>
+  <div class="exam-q"><p>For the Zener regulator with \(V_i\) = 50 V, \(R\) = 1 kΩ, \(V_Z\) = 10 V and \(I_{ZM}\) = 32 mA, find the range of \(R_L\) and \(I_L\) that keeps \(V_{RL}\) = 10 V. Also find the maximum wattage rating of the diode.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>Ideal Zener, \(I_{ZK} \approx 0\). While regulating, \(I_R = (50 - 10)/1 = 40\) mA (constant).</p>
+    <p><b>Smallest \(R_L\)</b> (Zener just in breakdown, \(I_Z \approx 0\)): \(I_{L,max} = 40\) mA, \(R_{L,min} = 10/40 = 0.25\) kΩ. Check with the divider: \(50R_L/(1 + R_L) = 10 \Rightarrow R_L = 0.25\) kΩ ✓.</p>
+    <p><b>Largest \(R_L\)</b> (Zener at \(I_{ZM}\)): \(I_{L,min} = 40 - 32 = 8\) mA, \(R_{L,max} = 10/8 = 1.25\) kΩ.</p>
+    <p><b>Ranges:</b> 250 Ω ≤ \(R_L\) ≤ 1.25 kΩ; 8 mA ≤ \(I_L\) ≤ 40 mA. <b>Rating:</b> \(P_{ZM} = 10\times32\text{ mA} = 320\) mW.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2017–18 · Sec A · Q4(c) · 18 marks &nbsp;|&nbsp; Neamen example</div>
+  <div class="exam-q"><p>A Zener regulator powers a car radio at \(V_L\) = 9 V from a battery that varies between 11 and 13.6 V. The radio current varies from 0 (off) to 100 mA (full volume). Find the current-limiting resistor \(R_i\) and the maximum Zener power dissipation.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>State the assumption. <b>Textbook rule</b> \(I_{Z,min} = 0.1I_{Z,max}\):</p>
+    <p>\(I_{Z,max} = \dfrac{100(13.6 - 9) - 0\,(11 - 9)}{11 - 0.9\times9 - 0.1\times13.6} = \dfrac{460}{1.54} = 298.7\) mA.</p>
+    <p>\(R_i = \dfrac{11 - 9}{100 + 29.87}\) kΩ \(= 15.4\) Ω; \(P_{Z,max} = 9\times0.2987 = 2.69\) W.</p>
+    <p><b>Simpler assumption</b> \(I_{Z,min} = 0\): \(R_i = (11 - 9)/0.1 = 20\) Ω; \(I_{Z,max} = (13.6 - 9)/20 = 230\) mA; \(P_Z = 2.07\) W. Accept either if the assumption is written; the first keeps a regulation margin at the worst case.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2015–16 · Sec A · Q1(c) · 15 marks</div>
+  <div class="exam-q"><p>A 10 V source feeds node a through \(R_1\) = 2 kΩ; a 5 V Zener (cathode at a) and \(R_2\) = 3 kΩ both go from a to ground. Find \(V_a\) and \(I_Z\). Then swap \(R_1\) and \(R_2\) and repeat.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><b>Original:</b> without the Zener, \(V_{TH} = 10\times3/5 = 6\) V \(&gt; 5\) V, so the Zener breaks down: \(V_a = 5\) V. \(I_{R1} = (10-5)/2 = 2.5\) mA, \(I_{R2} = 5/3 = 1.667\) mA, \(I_Z = 2.5 - 1.667 = 0.833\) mA.</p>
+    <p><b>Swapped</b> (\(R_1\) = 3 kΩ, \(R_2\) = 2 kΩ): \(V_{TH} = 10\times2/5 = 4\) V \(&lt; 5\) V, so the Zener is off: \(V_a = 4\) V, \(I_Z = 0\).</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2014–15 · Sec A · Q2(b) · 16 marks &nbsp;|&nbsp; Boylestad transistor shunt regulator</div>
+  <div class="exam-q"><p>A 30 V supply feeds the output node L through \(R_S\) = 1.5 kΩ. A 9.3 V Zener has its cathode at L and its anode at the base of an npn transistor (β = 100, \(V_{BE}\) = 0.7 V) whose collector is at L and emitter at ground. \(R_L\) = 1 kΩ from L to ground. Find the regulated load voltage and the Zener current.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>\(V_L = V_Z + V_{BE} = 9.3 + 0.7 = 10\) V. \(I_S = (30 - 10)/1.5 = 13.33\) mA; \(I_L = 10/1 = 10\) mA.</p>
+    <p>The remaining 3.33 mA splits into the collector and the Zener (= base) current: \(I_C + I_Z = 3.33\) mA with \(I_C = \beta I_Z\), so \(I_Z = 3.333/101 = 33.0\) µA and \(I_C = 3.30\) mA.</p>
+  </div></details>
+</div>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+
+<div class="key"><p><strong>Summary:</strong> model the Zener as \(V_{Z0} = V_{ZT} - r_zI_{ZT}\) plus \(r_z\). For a regulator: ON check first (divider voltage vs \(V_{Z0}\)); line regulation \(r_z/(R + r_z)\); load regulation \(-\Delta I_L(r_z\parallel R)\); minimum load at the lowest supply with \(I_Z = I_{ZK}\). For design: R from (lowest supply, heaviest load), Zener power from (highest supply, lightest load), and always state \(I_{Z,min}\).</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/eee.js"></script>
+<script>
+// shunt regulator schematic; o = {V, R, RL (number or null), zl}
+const zreg = (V, R, RL, zl = 'Z') => sch([
+  ['V', [40, 50], [40, 150], V], ['W', [40, 50], [40, 30], [80, 30]], ['R', [80, 30], [180, 30], 'R ' + R], ['W', [180, 30], [220, 30]],
+  ['dot', [220, 30]], ['Z', [220, 150], [220, 30], zl], ['W', [220, 150], [220, 170], [40, 170], [40, 150]], ['gnd', [130, 170]],
+  ...(RL ? [['W', [220, 30], [310, 30]], ['R', [310, 30], [310, 170], 'Rₗ ' + RL], ['W', [310, 170], [220, 170]], ['dot', [220, 170]]] : [['W', [220, 30], [270, 30]]]),
+  ['open', [RL ? 310 : 270, 30], ''], ['t', [RL ? 318 : 278, 20], 'vₒ', 'start'],
+], { w: RL ? 380 : 330, h: 200 });
+$('#fig-reg').innerHTML = zreg('V⁺', '', ' ');
+
+drill('#dr-model', { id: 'd09-model', title: 'Zener model: V_Z0 and V_Z at other currents', gen(r) {
+  const VZT = r.pick([4.7, 5.1, 5.6, 6.2, 6.8, 7.5, 8.2, 9.1, 10, 12]), IZT = r.pick([5, 10, 20, 28, 40]) * 1e-3, rz = r.pick([2, 5, 7, 10, 15, 20, 30]);
+  const I2 = r.pick([1, 2, 5, 10, 15, 50, 80, 100]) * 1e-3; if (Math.abs(I2 - IZT) < 1e-6) return null;
+  const VZ0 = VZT - rz * IZT, V2 = VZ0 + rz * I2;
+  return {
+    given: `A ${VZT} V Zener has its nominal voltage at a test current of ${si(IZT, 'A')}, where its incremental resistance is ${rz} Ω. Find \\(V_{Z0}\\) and the Zener voltage at ${si(I2, 'A')}.`,
+    ask: [{ l: 'V_{Z0}', v: VZ0, u: 'V', tol: 0.001 }, { l: 'V_Z', v: V2, u: 'V', tol: 0.001 }],
+    steps: [
+      { t: `\\(V_{Z0} = V_{ZT} - r_zI_{ZT} = ${VZT} - ${rz}\\times${num(IZT)} = ${num(VZ0, 5)}\\) V`, a: { l: 'V_{Z0}', v: VZ0, u: 'V', tol: 0.001 } },
+      { t: `\\(V_Z = V_{Z0} + r_zI_Z = ${num(VZ0, 5)} + ${rz}\\times${num(I2)} = ${num(V2, 5)}\\) V`, a: { l: 'V_Z', v: V2, u: 'V', tol: 0.001 } },
+    ],
+    note: 'Tolerance here is 0.1%: these answers differ from V_ZT only in the second decimal.' };
+} });
+
+worked('#wk-reg', {
+  given: '6.8 V Zener, nominal at 5 mA, r_z = 20 Ω, I_ZK = 0.2 mA; V⁺ = 10 V ± 1 V through R = 0.5 kΩ. Work in mA, kΩ, V.',
+  fig: zreg('10 V', '0.5 kΩ', null, '6.8 V'),
+  steps: [
+    { t: '\\(V_{Z0} = 6.8 - 0.005\\times20 = 6.7\\) V', a: { l: 'V_{Z0}', v: 6.7, u: 'V', tol: 0.001 } },
+    { t: 'No load: \\(I_Z = (10 - 6.7)/(0.5 + 0.02) = 6.35\\) mA', a: { l: 'I_Z', v: 6.346e-3, u: 'mA' } },
+    { t: '\\(V_o = 6.7 + 0.02\\times6.35 = 6.827\\) V', a: { l: 'V_o', v: 6.827, u: 'V', tol: 0.001 } },
+    { t: 'Line regulation: \\(\\Delta V_o = \\pm1\\times20/520 = \\pm38.5\\) mV', a: { l: '|\\Delta V_o|', v: 0.0385, u: 'mV' } },
+    'Load 2 kΩ: ON check \\(V_{TH} = 10\\times2/2.5 = 8\\text{ V} &gt; 6.7\\text{ V}\\), Zener on.',
+    { t: '\\(\\Delta V_o \\approx -\\frac{6.8}{2}\\text{ mA}\\times(20\\parallel500) = -3.4\\times19.2 = -65\\) mV', a: { l: '\\Delta V_o', v: -0.065, u: 'mV' } },
+    'Load 0.5 kΩ: \\(V_{TH} = 5\\text{ V} &lt; 6.7\\text{ V}\\): Zener off, \\(V_o = 5\\) V.',
+    { t: 'Min load at \\(V^+ = 9\\) V, \\(I_Z = 0.2\\) mA: \\(V_o = 6.704\\), \\(I_R = 2.296/0.5 = 4.59\\) mA, \\(I_L = 4.39\\) mA, \\(R_{L,min} = 6.704/4.39 = 1.53\\) kΩ', a: { l: 'R_{L,min}', v: 1526, u: 'kΩ' } },
+  ] });
+
+drill('#dr-reg', { id: 'd09-regulator', title: 'Zener shunt regulator: V_o, line and load regulation, R_L,min', gen(r) {
+  const VZT = r.pick([4.7, 5.1, 5.6, 6.2, 6.8, 7.5, 8.2, 9.1, 10, 12]), IZT = r.pick([5, 10, 20]), rz = r.pick([5, 10, 20, 30]) / 1000; // mA, kΩ
+  const IZK = r.pick([0.1, 0.2, 0.5, 1]), R = r.pick([0.22, 0.33, 0.47, 0.5, 0.68, 1]), V = +(VZT + r.pick([2, 3, 4, 5, 6])).toFixed(2), dV = r.pick([0.5, 1, 2]);
+  const VZ0 = VZT - rz * IZT, IZ = (V - VZ0) / (R + rz), Vo = VZ0 + rz * IZ;
+  if (IZ < 3 * IZK) return null;
+  const line = dV * rz / (R + rz);
+  const Vlo = V - dV, VoK = VZ0 + rz * IZK, IL = (Vlo - VoK) / R - IZK; if (IL <= 0) return null;
+  const RLmin = VoK / IL;
+  const RL = r() < 0.35 ? r.pick([0.22, 0.33, 0.47, 0.5, 0.68, 1, 1.5, 2.2, 4.7, 10].filter(x => x < RLmin * 0.9 && V * x / (R + x) < VZ0)) : r.pick([1, 2, 2.2, 4.7, 5, 10].filter(x => x > RLmin * 1.1));
+  if (!RL) return null;
+  const VTH = V * RL / (R + RL), on = VTH >= VZ0;
+  const VoL = on ? (V / R + VZ0 / rz) / (1 / R + 1 / rz + 1 / RL) : VTH;
+  return {
+    given: `A ${VZT} V Zener (nominal at ${IZT} mA, \\(r_z\\) = ${rz * 1000} Ω, \\(I_{ZK}\\) = ${IZK} mA) is fed from \\(V^+\\) = ${V} V ± ${dV} V through R = ${si(R * 1e3, 'Ω')}. Find (a) \\(V_o\\) at no load and nominal supply; (b) \\(|\\Delta V_o|\\) for the ±${dV} V supply change; (c) \\(V_o\\) at nominal supply when \\(R_L\\) = ${si(RL * 1e3, 'Ω')} is connected (use the exact node equation, or the divider if the Zener is off); (d) the minimum \\(R_L\\) that keeps the Zener in breakdown over the whole supply range.`,
+    fig: zreg(V + ' V', si(R * 1e3, 'Ω'), si(RL * 1e3, 'Ω'), VZT + ' V'),
+    ask: [{ l: 'V_o', v: Vo, u: 'V', tol: 0.001 }, { l: '|\\Delta V_o|', v: line, u: 'mV' }, { l: 'V_{o,L}', v: VoL, u: 'V', tol: 0.002 }, { l: 'R_{L,min}', v: RLmin * 1e3, u: 'kΩ' }],
+    steps: [
+      { t: `\\(V_{Z0} = ${VZT} - ${num(rz)}\\times${IZT} = ${num(VZ0, 5)}\\) V (mA × kΩ = V)`, a: { l: 'V_{Z0}', v: VZ0, u: 'V', tol: 0.001 } },
+      { t: `(a) \\(I_Z = \\dfrac{${V} - ${num(VZ0, 5)}}{${R} + ${num(rz)}} = ${num(IZ)}\\) mA, \\(V_o = ${num(VZ0, 5)} + ${num(rz)}\\times${num(IZ)} = ${num(Vo, 5)}\\) V`, a: { l: 'V_o', v: Vo, u: 'V', tol: 0.001 } },
+      { t: `(b) \\(|\\Delta V_o| = ${dV}\\times\\dfrac{${num(rz)}}{${R} + ${num(rz)}} = ${num(line * 1000)}\\) mV`, a: { l: '|\\Delta V_o|', v: line, u: 'mV' } },
+      `(c) ON check: \\(V_{TH} = ${V}\\times\\dfrac{${RL}}{${R} + ${RL}} = ${num(VTH)}\\) V ${on ? `\\(\\ge V_{Z0}\\): Zener on.` : `\\(&lt; V_{Z0}\\): <b>Zener off</b>, so \\(V_o = V_{TH}\\).`}`,
+      { t: on ? `\\(V_o = \\dfrac{${V}/${R} + ${num(VZ0, 5)}/${num(rz)}}{1/${R} + 1/${num(rz)} + 1/${RL}} = ${num(VoL, 5)}\\) V (a drop of ${num((Vo - VoL) * 1000)} mV)` : `\\(V_o = ${num(VoL, 4)}\\) V: the load is too heavy, no regulation.`, a: { l: 'V_{o,L}', v: VoL, u: 'V', tol: 0.002 } },
+      { t: `(d) Lowest supply ${num(Vlo)} V, \\(I_Z = I_{ZK}\\): \\(V_o = ${num(VoK, 5)}\\) V, \\(I_R = (${num(Vlo)} - ${num(VoK, 5)})/${R} = ${num(IL + IZK)}\\) mA, \\(I_L = ${num(IL)}\\) mA, \\(R_{L,min} = ${num(VoK, 5)}/${num(IL)} = ${num(RLmin)}\\) kΩ`, a: { l: 'R_{L,min}', v: RLmin * 1e3, u: 'kΩ' } },
+    ] };
+} });
+
+drill('#dr-div', { id: 'd09-divider', title: 'Ideal Zener on a divider: on or off?', gen(r) {
+  const V = r.pick([10, 12, 15, 20]), R1 = r.pick([1, 2, 2.2, 3, 3.3, 4.7]), R2 = r.pick([1, 2, 2.2, 3, 3.3, 4.7, 6.8]), VZ = r.pick([3.3, 4.7, 5, 5.6, 6.2, 8.2]);
+  const VTH = V * R2 / (R1 + R2); if (Math.abs(VTH - VZ) < 0.3) return null;
+  const on = VTH > VZ, Va = on ? VZ : VTH, IZ = on ? (V - VZ) / R1 - VZ / R2 : 0;
+  return {
+    given: `${V} V feeds node a through \\(R_1\\) = ${R1} kΩ. An ideal ${VZ} V Zener (cathode at a) and \\(R_2\\) = ${R2} kΩ go from a to ground. Find \\(V_a\\) and \\(I_Z\\).`,
+    fig: sch([['V', [40, 50], [40, 150], V + ' V'], ['W', [40, 50], [40, 30], [70, 30]], ['R', [70, 30], [170, 30], 'R₁ ' + R1 + 'k'], ['W', [170, 30], [300, 30]], ['dot', [210, 30]], ['Z', [210, 150], [210, 30], VZ + ' V'], ['R', [300, 30], [300, 150], 'R₂ ' + R2 + 'k'], ['W', [300, 150], [40, 150]], ['dot', [210, 150]], ['gnd', [120, 150]], ['t', [216, 22], 'a', 'start']], { w: 360, h: 180 }),
+    ask: [{ l: 'V_a', v: Va, u: 'V' }, { l: 'I_Z', v: IZ, u: 'mA', tol: 0.02 }],
+    steps: [
+      `Remove the Zener: \\(V_{TH} = ${V}\\times\\dfrac{${R2}}{${R1} + ${R2}} = ${num(VTH)}\\) V.`,
+      on ? `\\(V_{TH} &gt; V_Z\\): the Zener breaks down and holds \\(V_a = ${VZ}\\) V.` : `\\(V_{TH} &lt; V_Z\\): the Zener stays off (open), so \\(V_a = V_{TH} = ${num(VTH)}\\) V and \\(I_Z = 0\\).`,
+      ...(on ? [{ t: `\\(I_{R1} = (${V} - ${VZ})/${R1} = ${num((V - VZ) / R1)}\\) mA, \\(I_{R2} = ${VZ}/${R2} = ${num(VZ / R2)}\\) mA, \\(I_Z = ${num(IZ)}\\) mA`, a: { l: 'I_Z', v: IZ, u: 'mA' } }] : []),
+    ] };
+} });
+
+drill('#dr-range', { id: 'd10-range', title: 'Load range for a fixed supply', gen(r) {
+  const Vi = r.pick([20, 24, 30, 40, 50]), R = r.pick([0.5, 1, 1.5, 2]), VZ = r.pick([5.1, 6.8, 9.1, 10, 12]), IZM = r.pick([20, 25, 32, 40, 50]);
+  const IR = (Vi - VZ) / R; if (IR <= IZM + 1 || IR > 120) return null;
+  const ILmin = IR - IZM, RLmin = VZ / IR, RLmax = VZ / ILmin;
+  return {
+    given: `\\(V_i\\) = ${Vi} V, R = ${si(R * 1e3, 'Ω')}, ideal ${VZ} V Zener with \\(I_{ZM}\\) = ${IZM} mA (take \\(I_{ZK}\\) ≈ 0). Find the range of \\(R_L\\) that keeps \\(V_L = V_Z\\), and \\(P_{ZM}\\).`,
+    fig: zreg(Vi + ' V', si(R * 1e3, 'Ω'), ' ', VZ + ' V'),
+    ask: [{ l: 'R_{L,min}', v: RLmin * 1e3, u: 'kΩ' }, { l: 'R_{L,max}', v: RLmax * 1e3, u: 'kΩ' }, { l: 'P_{ZM}', v: VZ * IZM / 1000, u: 'mW' }],
+    steps: [
+      { t: `While regulating, \\(I_R = (${Vi} - ${VZ})/${R} = ${num(IR)}\\) mA, constant.`, a: { l: 'I_R', v: IR / 1000, u: 'mA' } },
+      { t: `Heaviest load: \\(I_{L,max} = I_R = ${num(IR)}\\) mA, \\(R_{L,min} = ${VZ}/${num(IR)} = ${num(RLmin)}\\) kΩ`, a: { l: 'R_{L,min}', v: RLmin * 1e3, u: 'kΩ' } },
+      { t: `Lightest load: \\(I_{L,min} = ${num(IR)} - ${IZM} = ${num(ILmin)}\\) mA, \\(R_{L,max} = ${VZ}/${num(ILmin)} = ${num(RLmax)}\\) kΩ`, a: { l: 'R_{L,max}', v: RLmax * 1e3, u: 'kΩ' } },
+      { t: `\\(P_{ZM} = ${VZ}\\times${IZM} = ${num(VZ * IZM)}\\) mW`, a: { l: 'P_{ZM}', v: VZ * IZM / 1000, u: 'mW' } },
+    ] };
+} });
+
+drill('#dr-design', { id: 'd10-design', title: 'Choose R for supply and load ranges', gen(r) {
+  const VZ = r.pick([5, 6, 9, 12]), Vmin = VZ + r.pick([1.5, 2, 3]), Vmax = Vmin + r.pick([1, 2, 2.6, 4]), ILmax = r.pick([50, 100, 200]), ILmin = r.pick([0, 0, 10]);
+  const rule = r() < 0.5 ? 0 : 0.1;
+  let IZmax, Ri;
+  if (rule) { IZmax = (ILmax * (Vmax - VZ) - ILmin * (Vmin - VZ)) / (Vmin - 0.9 * VZ - 0.1 * Vmax); if (IZmax <= 0) return null; Ri = (Vmin - VZ) / (ILmax + 0.1 * IZmax); }
+  else { Ri = (Vmin - VZ) / ILmax; IZmax = (Vmax - VZ) / Ri - ILmin; }
+  const P = VZ * IZmax / 1000;
+  return {
+    given: `A ${VZ} V Zener regulator runs from a supply that varies from ${Vmin} V to ${num(Vmax)} V. The load current varies from ${ILmin} to ${ILmax} mA. Take \\(I_{Z,min}\\) = ${rule ? '0.1 \\(I_{Z,max}\\)' : '0'}. Find the series resistor and the maximum Zener power.`,
+    ask: [{ l: 'R_i', v: Ri * 1000, u: 'Ω' }, { l: 'P_{Z,max}', v: P, u: 'W' }],
+    steps: rule ? [
+      { t: `\\(I_{Z,max} = \\dfrac{${ILmax}(${num(Vmax)} - ${VZ}) - ${ILmin}(${Vmin} - ${VZ})}{${Vmin} - 0.9\\times${VZ} - 0.1\\times${num(Vmax)}} = ${num(IZmax)}\\) mA`, a: { l: 'I_{Z,max}', v: IZmax / 1000, u: 'mA' } },
+      { t: `\\(R_i = \\dfrac{${Vmin} - ${VZ}}{${ILmax} + ${num(0.1 * IZmax)}} = ${num(Ri)}\\) kΩ \\(= ${num(Ri * 1000)}\\) Ω`, a: { l: 'R_i', v: Ri * 1000, u: 'Ω' } },
+      { t: `\\(P_{Z,max} = ${VZ}\\times${num(IZmax)}\\text{ mA} = ${num(P)}\\) W`, a: { l: 'P_{Z,max}', v: P, u: 'W' } },
+    ] : [
+      { t: `Regulation worst case (lowest supply, heaviest load): \\(R_i = (${Vmin} - ${VZ})/(${ILmax} + 0) = ${num(Ri * 1000)}\\) Ω`, a: { l: 'R_i', v: Ri * 1000, u: 'Ω' } },
+      { t: `Dissipation worst case (highest supply, lightest load): \\(I_{Z,max} = (${num(Vmax)} - ${VZ})/${num(Ri)} - ${ILmin} = ${num(IZmax)}\\) mA`, a: { l: 'I_{Z,max}', v: IZmax / 1000, u: 'mA' } },
+      { t: `\\(P_{Z,max} = ${VZ}\\times${num(IZmax)}\\text{ mA} = ${num(P)}\\) W`, a: { l: 'P_{Z,max}', v: P, u: 'W' } },
+    ] };
+} });
+
+drill('#dr-bjt', { id: 'd10-bjt-shunt', title: 'Zener + BJT shunt regulator', gen(r) {
+  const Vin = r.pick([20, 24, 30]), RS = r.pick([1, 1.5, 2.2]), VZ = r.pick([5.6, 6.8, 8.2, 9.3]), RL = r.pick([1, 2.2, 4.7]), b = r.pick([50, 100, 150]);
+  const VL = VZ + 0.7, IS = (Vin - VL) / RS, IL = VL / RL; if (IS <= IL) return null;
+  const IZ = (IS - IL) / (b + 1);
+  return {
+    given: `\\(V_{in}\\) = ${Vin} V, \\(R_S\\) = ${RS} kΩ, ${VZ} V Zener from the output to the base of an npn (β = ${b}, \\(V_{BE}\\) = 0.7 V; collector at the output, emitter grounded), \\(R_L\\) = ${RL} kΩ. Find \\(V_L\\), \\(I_C\\) and \\(I_Z\\).`,
+    ask: [{ l: 'V_L', v: VL, u: 'V' }, { l: 'I_C', v: b * IZ / 1000, u: 'mA' }, { l: 'I_Z', v: IZ / 1000, u: 'µA' }],
+    steps: [
+      `\\(V_L = V_Z + V_{BE} = ${num(VL)}\\) V`,
+      `\\(I_S = (${Vin} - ${num(VL)})/${RS} = ${num(IS)}\\) mA, \\(I_L = ${num(VL)}/${RL} = ${num(IL)}\\) mA`,
+      { t: `\\(I_C + I_Z = ${num(IS - IL)}\\) mA with \\(I_C = \\beta I_Z\\): \\(I_Z = ${num(IS - IL)}/${b + 1} = ${num(IZ * 1000)}\\) µA, \\(I_C = ${num(b * IZ)}\\) mA`, a: { l: 'I_Z', v: IZ / 1000, u: 'µA' } },
+    ] };
+} });
+
+flashcards('#cards', [
+  { f: 'V_Z0', b: 'V_ZT − r_z·I_ZT: the battery in the Zener model.' },
+  { f: 'Line regulation', b: 'ΔV_o/ΔV⁺ = r_z/(R + r_z)' },
+  { f: 'Load regulation', b: 'ΔV_o = −ΔI_L·(r_z ∥ R)' },
+  { f: 'ON check', b: 'Remove the Zener; if the divider voltage < V_Z0 it is off and V_o = divider voltage.' },
+  { f: 'R_L,min', b: 'Lowest supply, I_Z = I_ZK, then R_L = V_o/(I_R − I_ZK).' },
+  { f: 'Design: R from…', b: 'Lowest supply + heaviest load.' },
+  { f: 'Design: P_Z from…', b: 'Highest supply + lightest load.' },
+  { f: 'Zener + BJT shunt: V_L', b: 'V_Z + V_BE; I_Z = (I_S − I_L)/(β+1)' },
+]);
+quiz('#quiz', [
+  { q: 'A 5.1 V Zener is nominal at 20 mA with r_z = 10 Ω. V_Z0 =', opts: ['5.1 V', '4.9 V', '5.3 V', '4.1 V'], a: 1, why: '5.1 − 0.02 × 10 = 4.9 V.' },
+  { q: 'R = 1 kΩ, r_z = 10 Ω. Line regulation is about', opts: ['10 mV/V', '1 mV/V', '99 mV/V', '0.1 mV/V'], a: 0, why: '10/1010 ≈ 9.9 mV/V.' },
+  { q: 'With a load connected, the divider voltage seen by the Zener is below V_Z0. Then', opts: ['V_o = V_Z0', 'V_o = V_ZT', 'the Zener is off and V_o is the divider voltage', 'I_Z = I_ZK'], a: 2, why: 'Breakdown needs at least V_Z0 across it.' },
+  { q: 'Which pair sets the maximum Zener dissipation?', opts: ['Lowest supply, heaviest load', 'Highest supply, lightest load', 'Lowest supply, lightest load', 'Highest supply, heaviest load'], a: 1, why: 'Most current through R and least taken by the load.' },
+  { q: 'In a shunt regulator the Zener cathode connects to', opts: ['ground', 'the positive output node', 'the supply directly', 'either way'], a: 1, why: 'It must be reverse biased.' },
+]);
+</script>
+</body>
+</html>

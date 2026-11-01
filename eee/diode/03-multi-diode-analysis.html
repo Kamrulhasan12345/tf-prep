@@ -1,0 +1,370 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Circuits with Several Diodes · EEE 263 Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Diodes · Chapter 3 · Sedra §4.1–4.3 (Example 4.2, P4.9) · Sadat L5–L6, notes p.13–20 · Khairul s.22–25 · types D-04, D-05</div>
+<h1>Circuits with Several Diodes</h1>
+<p class="lede">State guessing appeared in 2011–12, 2014–15 and 2022–23 (10⅔ to 16 marks), diode logic in 2016–17, and this batch's own CT-1 Q2 was "find the range of R<sub>x</sub> for which only one diode is on". Sadat sir wrote "v. v. important: find range of R<sub>x</sub> for which only one diode will be on" next to Sedra P4.9, and 2022–23 asked exactly that. One method does all of it: the case method. Assume a state for every diode, solve a linear circuit, check, and write down why each rejected case fails.</p>
+
+<h2>1. The case method</h2>
+<p>With n diodes there are \(2^n\) on/off combinations. Exactly one is consistent (for normal circuits). You do not have to try all of them: rule out the impossible ones by a one-line argument first.</p>
+<div class="method"><h4>Method · case method (Sadat L5)</h4><ol>
+<li><b>List the cases</b> and strike the impossible ones with a reason: "both off: no current, so node X sits at +10 V and D2 is forward biased ✗"; "D1 alone: current would enter X from both sides with no way out ✗".</li>
+<li><b>Pick a likely case</b> (diodes pointing from a high rail toward a low rail are usually on).</li>
+<li><b>Replace</b> on diodes by a short (ideal) or a 0.7 V battery (CVD) or battery + \(r_D\) (PWL); off diodes by an open.</li>
+<li><b>Solve</b> the node voltages and branch currents (KCL / KVL; work in V, mA, kΩ).</li>
+<li><b>Check</b>: each on diode carries current from anode to cathode (\(I &gt; 0\)); each off diode has \(V_{AK} &lt; V_{D0}\) (\(\le 0\) for ideal). With CVD check on-diodes by current only.</li>
+<li>If any check fails, change that diode's state and repeat. <b>Write the failed case in the answer</b>: it earns method marks and is the "justify" the question asks for.</li>
+</ol></div>
+<h3>Worked example: Sadat L5, notes p.15 (Sedra Fig. 4.6(a) with a 0.7 V drop)</h3>
+<div id="wk-46"></div>
+<p>Change the 5 kΩ to 10 kΩ and the same "both on" case gives \(I_1 = 0.93 - 1 = -0.07\) mA ✗; then D1 off, D2 on: \(I = (10 - 0.7 + 10)/20 = 0.965\) mA, \(V_o = -10 + 10\times0.965 = -0.35\) V, and D1 sees only 0.35 V &lt; 0.7 V ✓ (Sadat L5, notes p.16).</p>
+<div id="dr-states"></div>
+
+<h2>2. Range of a resistor for which a given set of diodes conducts</h2>
+<p>The "v. v. important" type. The question fixes the states ("D1 off and D2 on", "only one diode on") and asks for the resistor values that make that state consistent.</p>
+<div class="method"><h4>Method · range of R</h4><ol>
+<li>Decide which state is meant. If the question says "only one diode", argue which one (the others are impossible alone).</li>
+<li>Solve that state with R kept as a symbol: currents and node voltages as functions of R.</li>
+<li>Write the checks as inequalities: on diodes \(I(R) &gt; 0\); off diodes \(V_{AK}(R) &lt; V_{D0}\).</li>
+<li>Solve each inequality for R (multiply out; R is positive). Intersect them.</li>
+<li>Cross-check: at the boundary the off diode is exactly at its threshold with zero current, so the neighbouring state (both on) gives the same boundary from the other side.</li>
+</ol></div>
+<h3>Worked example: Sadat L6, notes p.17–19 (CVD, then PWL)</h3>
+<div id="wk-l6"></div>
+<div id="dr-range"></div>
+
+<h2>3. Diode logic gates (type D-05) and selectors</h2>
+<figure><div id="fig-gates"></div><figcaption><b>Figure 1.</b> OR gate (left): anodes at the inputs, R to ground: the highest input wins, \(v_Y = \max(v) - V_{D0}\). AND gate (right): cathodes at the inputs, R to +5 V: the lowest input wins, \(v_Y = \min(v) + V_{D0}\).</figcaption></figure>
+<div class="method"><h4>Method · diode gates</h4><ol>
+<li><b>OR / max selector:</b> only the diode from the highest input conducts (if two inputs tie, both share). \(v_Y = v_{max} - V_{D0}\) (ideal: \(v_{max}\)); every other diode is reverse biased by \(v_Y - v_k\). If all inputs are below \(V_{D0}\), all are off and \(v_Y\) = 0.</li>
+<li><b>AND / min selector:</b> the diode to the lowest input conducts: \(v_Y = v_{min} + V_{D0}\); if \(v_{min} + V_{D0} \ge 5\) V every diode is off and \(v_Y\) = 5 V.</li>
+<li>Check with the case method if the cut-in voltages differ: with \(V_\gamma\) = 1.2, 0.1, 0.7 V on the 3, 2, 1 V inputs, the 2 V diode wins (\(v_o = 1.9\) V; the 3 V diode sees 1.1 V &lt; 1.2 V) (Sadat L5, notes p.13).</li>
+<li>Cascaded gates: work stage by stage from the inputs; every conducting diode shifts the level by 0.7 V, so a logic 1 degrades through the chain.</li>
+</ol></div>
+<div id="dr-gate"></div>
+
+<div class="trap"><h4>Traps (where marks go)</h4><ul>
+<li>Checking only the currents of on diodes and never the reverse voltage of off diodes (or the reverse).</li>
+<li>Ideal diodes: on means 0 V, not 0.7 V.</li>
+<li>Not stating which cases are impossible and why: in "justify" questions this is the marks.</li>
+<li>Range questions: forgetting that R is in the denominator; flipping the inequality when multiplying by a negative bracket. Multiply out with positive quantities only.</li>
+<li>Direction of the asked current: I is defined by the arrow in the figure; a negative value means the diode is off, not "current the other way".</li>
+<li>A figure with a diode drawn backwards changes the logic function (2016–17): say which orientation you used.</li>
+</ul></div>
+
+<h2>Exam questions</h2>
+
+<div class="exam">
+  <div class="exam-src">2022–23 · Sec A · Q2(b) · 15 marks</div>
+  <div class="exam-q"><p>Determine the range of values of resistor R such that D1 does not conduct and D2 conducts. Assume ideal diodes.</p><div id="fig-2223"></div></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><b>State:</b> D1 off (open), D2 on (short). Then one loop: +5 V → 5 kΩ → X → D2 → R → −5 V.</p>
+    <p>\(I = \dfrac{5 - (-5)}{5 + R} = \dfrac{10}{5 + R}\) mA (R in kΩ), \(V_X = 5 - 5I = 5 - \dfrac{50}{5 + R} = \dfrac{5R - 25}{5 + R}\) V.</p>
+    <p><b>D2 on</b> needs \(I &gt; 0\): true for every R ≥ 0.</p>
+    <p><b>D1 off</b> needs \(V_{AK} = V_X - 0 \le 0\): \(5R - 25 \le 0\) → \(R \le 5\) kΩ.</p>
+    <p><b>Cross-check</b> with both on: \(V_X\) = 0, \(I_{5k} = 1\) mA, \(I_R = 5/R\); \(I_{D1} = 1 - 5/R &gt; 0\) needs \(R &gt; 5\) kΩ, the complementary range ✓.</p>
+    <p><b>Answer:</b> 0 ≤ R ≤ 5 kΩ.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2016–17 · Sec B · Q8(b) · 10 marks</div>
+  <div class="exam-q"><p>Determine the Boolean expression for \(V_o\) in terms of the four input voltages (logic 0 = 0 V, logic 1 = +5 V). All resistors 1 kΩ.</p><div id="fig-1617"></div>
+  <p class="lbl">Netlist as read from the hand-drawn figure: 1 kΩ from +5 V to A, diodes A → V1 and A → V2; 1 kΩ from +5 V to B, diode B → A and diode B → +5 V; 1 kΩ from +5 V to C, diodes C → V3 and C → V4; diodes B → E and C → E with 1 kΩ from E to ground; diode E → \(V_o\), diode ground → \(V_o\), 1 kΩ from \(V_o\) to ground. (A senior copy draws the B–A diode the other way; with that orientation the output is never low, so this reading is the intended one.)</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><b>Stage 1 (A, C):</b> AND gates. A is low (0.7 V) if V1 or V2 is 0; A is high only when V1 = V2 = 1. Same for C with V3, V4.</p>
+    <p><b>Stage 2 (B):</b> the B → A diode makes B follow A one drop higher: when A = 0.7 V, B = 1.4 V; when A is high the B → A diode is off and B is pulled up by its resistor (the B → +5 V diode only stops B rising above 5.7 V). So B = A (level shifted): B carries V1·V2.</p>
+    <p><b>Stage 3 (E):</b> diodes from B and C into E with a pull-down: an OR gate, E = B + C.</p>
+    <p><b>Stage 4 (\(V_o\)):</b> diodes from E and from ground into \(V_o\), pull-down: \(V_o\) = max(E, 0) − 0.7, which passes E's logic level and keeps \(V_o\) ≥ 0.</p>
+    <p><b>Result:</b> \(V_o = V_1V_2 + V_3V_4\) (AND–OR).</p>
+    <p>Levels with 0.7 V diodes (checked by solving all 16 input cases): logic 0 gives \(V_o\) = 0 V (A = 0.7, B = 1.4, E = 0.7). One AND high gives E = 1.67 V, \(V_o\) = 0.97 V; both high give E = 2.33 V, \(V_o\) = 1.63 V. With ideal diodes: 0 V, 1.67 V, 2.5 V. The "1" level is far below 5 V: the drawback of cascading diode logic.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2014–15 · Sec A · Q1(a) · 10⅔ marks</div>
+  <div class="exam-q"><p>Find the values of I and V. Use the 0.7 V drop diode model.</p><div id="fig-1415"></div></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><b>Impossible cases:</b> both off: no current, V = −10 V, so D2 (anode at 0 V) would be forward biased by 10 V ✗. D1 off, D2 on: V = −0.7 V, a = +10 V, so D1 sees 10.7 V forward ✗.</p>
+    <p><b>Try D1 on, D2 off:</b> \(I = \dfrac{10 - 0.7 + 10}{5 + 3} = 2.41\) mA, \(V = -10 + 3\times2.41 = -2.76\) V. D2 then has \(V_{AK} = 0 - (-2.76) = 2.76\) V &gt; 0.7 V: it would conduct ✗.</p>
+    <p><b>Both on:</b> V = −0.7 V, so node a = V + 0.7 = 0 V. \(I_{D1} = (10 - 0)/5 = 2\) mA; \(I = (-0.7 + 10)/3 = 3.1\) mA; \(I_{D2} = I - I_{D1} = 1.1\) mA &gt; 0 ✓ (both currents positive).</p>
+    <p><b>Answer:</b> I = 3.1 mA, V = −0.7 V.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2011–12 · Sec B · Q5(a) · 16 marks &nbsp;|&nbsp; = Sedra Example 4.2(b) and Exercise 4.4(e); circuit (ii) also CT1(B) 2018</div>
+  <div class="exam-q"><p>Assuming the diodes to be ideal, find I and V in circuits (i) and (ii). In (i), I is the current in D1 (from ground into node x).</p><div id="fig-1112"></div></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><b>(i) Both on:</b> x = 0, V = 0. \(I_{D2} = (10 - 0)/5 = 2\) mA, current in 10 kΩ \(= (0 + 10)/10 = 1\) mA, so \(I = 1 - 2 = -1\) mA ✗.</p>
+    <p><b>D1 off, D2 on:</b> \(I_{D2} = \dfrac{10 + 10}{5 + 10} = 1.333\) mA; \(V = V_x = -10 + 10\times1.333 = 3.33\) V. D1 has \(V_{AK} = 0 - 3.33 &lt; 0\) ✓. <b>I = 0, V = 3.33 V.</b></p>
+    <p><b>(ii)</b> OR (max) selector: only the +3 V diode conducts. V = 3 V, I = 3/1 = 3 mA. The +2 V and +1 V diodes are reverse biased by 1 V and 2 V ✓.</p>
+  </div></details>
+</div>
+
+<h3>Class tests and assignment</h3>
+<div class="exam">
+  <div class="exam-src">CT-1, this batch (Jan 2026), Sec A · Q2 · 10 marks (teacher's variant of Sedra P4.9)</div>
+  <div class="exam-q"><p>The diodes have \(V_D\) = 0.7 V (CVD). Find the range of \(R_x\) for which only one diode turns on. Which diode is it? Justify.</p><div id="fig-ct"></div></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><b>D1 alone is impossible:</b> current would flow into X from +5 V (through D1) and from +10 V (through 9.5 kΩ), with D2 off there is no path out of X ✗.</p>
+    <p><b>Both off is impossible:</b> no current, \(V_X\) = 10 V, which forward-biases D2 (10 V &gt; 3 + 0.7) ✗.</p>
+    <p><b>So the single diode must be D2.</b> \(I = \dfrac{10 - 0.7 - 3}{9.5 + R_x} = \dfrac{6.3}{9.5 + R_x}\) mA; \(V_X = 10 - 9.5I\).</p>
+    <p>D1 stays off if \(V_{AK} = 5 - V_X &lt; 0.7\), i.e. \(V_X &gt; 4.3\) V: \(9.5\times\dfrac{6.3}{9.5 + R_x} &lt; 5.7\) → \(59.85 &lt; 54.15 + 5.7R_x\) → <b>\(R_x &gt; 1\) kΩ</b>.</p>
+    <p><b>Cross-check (both on):</b> \(V_X\) = 4.3 V, \(I_{9.5k} = 5.7/9.5 = 0.6\) mA, \(I_{Rx} = (4.3 - 0.7 - 3)/R_x = 0.6/R_x\); \(I_{D1} = 0.6/R_x - 0.6 &gt; 0\) needs \(R_x &lt; 1\) kΩ, the complement ✓.</p>
+    <p><b>Answer:</b> only D2 conducts, for \(R_x &gt; 1\) kΩ.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">Assignment · Q1</div>
+  <div class="exam-q"><p>Each diode has \(V_D\) = 0.7 V. Find the diode currents, \(V_A\) and \(V_B\).</p><div id="fig-asg"></div></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><b>Guess:</b> D1 on (it points from +5 V toward −10 V), D3 on (from ground toward −5 V), D2 off. Check that guess.</p>
+    <p>Left branch: \(I_{D1} = \dfrac{5 - 0.7 + 10}{5 + 5} = 1.43\) mA; \(V_A = 5 - 5\times1.43 = -2.15\) V.</p>
+    <p>Right branch: D3 on gives \(V_B = -0.7\) V; \(I_{D3} = (-0.7 + 5)/5 = 0.86\) mA.</p>
+    <p>D2: \(V_{AK} = V_A - V_B = -2.15 + 0.7 = -1.45\) V &lt; 0.7 V, off ✓, \(I_{D2}\) = 0. Both on-currents positive ✓.</p>
+    <p>(Had you guessed D2 on, it would need \(V_A = V_B + 0.7\); the left branch cannot supply it: the other 7 combinations all fail a check.)</p>
+  </div></details>
+</div>
+
+<h3>Highlighted textbook problems</h3>
+<div class="exam">
+  <div class="exam-src">Sedra 7e P4.9 · highlighted by the teacher: "v. v. important · practice with PL model · find range of R<sub>x</sub> for which only one diode will be on"</div>
+  <div class="exam-q"><p>Ideal diodes; find I (the current in D1) and V. (a) 12 kΩ from +3 V to A, D1 from A to ground, D2 from A to V, 6 kΩ from V to −3 V. (b) The same with 6 kΩ on top and 12 kΩ below. Teacher's extension: replace the top resistor by \(R_x\) and find the range of \(R_x\) for which only one diode is on, with ideal, CVD and PL (0.7 V, 10 Ω) diodes.</p><div id="fig-p49"></div></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><b>(a)</b> Both on: \(V_A = 0\), \(I_{12k} = 3/12 = 0.25\) mA, \(I_{6k} = 3/6 = 0.5\) mA, \(I_{D1} = 0.25 - 0.5 &lt; 0\) ✗. D1 off, D2 on: \(I = 6/18 = 0.333\) mA, \(V_A = V = 3 - 12\times0.333 = -1\) V; D1 reverse biased ✓. <b>I = 0, V = −1 V.</b></p>
+    <p><b>(b)</b> Both on: \(I_{6k} = 0.5\) mA, \(I_{12k} = 0.25\) mA, \(I_{D1} = 0.25\) mA &gt; 0 ✓. <b>I = 0.25 mA, V = 0.</b></p>
+    <p><b>Range (the single diode must be D2: D1 alone leaves the 6 kΩ branch dead but then V = −3 V and D2 is forward biased).</b> D2 on: \(I = \dfrac{3 - V_{D0} + 3}{R_x + 6 + r_D}\); D1 off needs \(V_A = 3 - R_xI &lt; V_{D0}\).</p>
+    <p>Ideal: \(3(R_x + 6) &lt; 6R_x\) → <b>\(R_x &gt; 6\) kΩ</b>. CVD: \(2.3(R_x + 6) &lt; 5.3R_x\) → <b>\(R_x &gt; 4.6\) kΩ</b>. PL (\(r_D\) = 0.01 kΩ): \(2.3(R_x + 6.01) &lt; 5.3R_x\) → <b>\(R_x &gt; 4.608\) kΩ</b>. (Only the conducting diode's \(r_D\) enters, because the off diode carries no current.)</p>
+  </div></details>
+</div>
+<p>Also highlighted: P4.2 (four single-diode circuits; answers (a) −3 V, 0.6 mA (b) 0, +3 V (c) +3 V, 0.6 mA (d) 0, −3 V) and P4.3 (OR/AND pairs; (a) D2 on, 2 V, 2.5 mA (b) D1 on, 1 V, 1 mA). Work them from the book's figures.</p>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+
+<div class="key"><p><strong>Summary:</strong> list the cases, strike the impossible ones with a reason, solve the likely one, check every diode (on: \(I &gt; 0\); off: \(V_{AK} &lt; V_{D0}\)), and write down every rejected case. For "range of R" keep R as a symbol in the fixed state and turn the checks into inequalities; the boundary is where the off diode reaches its threshold with zero current. OR gate = max − 0.7, AND gate = min + 0.7.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/eee.js"></script>
+<script>
+// ---------- diode state solver (modified nodal analysis) ----------
+// nodes: unknown node names; fixed: {name: V}; res: [[a, b, R_kΩ]]; dio: [[anode, cathode, label]].
+// Returns every on/off state with its node voltages, on-diode currents (mA) and off-diode V_AK.
+function dsolve(nodes, fixed, res, dio, Vd) {
+  const out = [], n = nodes.length;
+  for (let s = (1 << dio.length) - 1; s >= 0; s--) {
+    const st = dio.map((_, k) => (s >> (dio.length - 1 - k)) & 1), on = dio.filter((_, k) => st[k]), N = n + on.length;
+    const A = Array.from({ length: N }, () => new Array(N + 1).fill(0)), ix = Object.fromEntries(nodes.map((k, i) => [k, i]));
+    for (const [a, b, R] of res) for (const [x, y] of [[a, b], [b, a]]) if (x in ix) {
+      A[ix[x]][ix[x]] += 1 / R; if (y in ix) A[ix[x]][ix[y]] -= 1 / R; else A[ix[x]][N] += fixed[y] / R;
+    }
+    on.forEach(([a, c], k) => {
+      const j = n + k;
+      if (a in ix) A[ix[a]][j] += 1; if (c in ix) A[ix[c]][j] -= 1;
+      A[j][N] = Vd; if (a in ix) A[j][ix[a]] += 1; else A[j][N] -= fixed[a]; if (c in ix) A[j][ix[c]] -= 1; else A[j][N] += fixed[c];
+    });
+    let ok = true;
+    for (let i = 0; i < N && ok; i++) {
+      let p = i; for (let r = i + 1; r < N; r++) if (Math.abs(A[r][i]) > Math.abs(A[p][i])) p = r;
+      if (Math.abs(A[p][i]) < 1e-12) { ok = false; break; }
+      [A[i], A[p]] = [A[p], A[i]];
+      for (let r = 0; r < N; r++) if (r !== i) { const f = A[r][i] / A[i][i]; for (let c = i; c <= N; c++) A[r][c] -= f * A[i][c]; }
+    }
+    if (!ok) continue;
+    const V = { ...fixed }; nodes.forEach((k, i) => V[k] = A[i][N] / A[i][i]);
+    const I = {}; on.forEach((d, k) => I[d[2]] = A[n + k][N] / A[n + k][n + k]);
+    const viol = [];
+    dio.forEach((d, k) => {
+      if (st[k]) { if (I[d[2]] < -1e-9) viol.push(`\\(I_{${d[2]}} = ${num(I[d[2]], 3)}\\) mA &lt; 0`); }
+      else { const vak = V[d[0]] - V[d[1]]; if (vak > Vd + 1e-9) viol.push(`\\(V_{AK,${d[2]}} = ${num(vak, 3)}\\) V &gt; ${Vd} V, so ${d[2]} would conduct`); }
+    });
+    out.push({ st, V, I, viol });
+  }
+  return out;
+}
+const fx = v => (v >= 0 ? '+' : '−') + Math.abs(v) + ' V';
+
+// figure: Sedra Fig 4.6 / 2014–15 shape. Top resistor from +Vt to node P, D_top P→Q, bottom resistor Q→−Vb, D_g ground→Q.
+const fig46 = (Vt, Rt, Rb, Vb, dt = 'D2', dg = 'D1', P = 'V', Q = '', Il = 'I') => sch([
+  ['rail', [60, 20], fx(Vt)], ['R', [60, 20], [60, 90], Rt], ['dot', [60, 90]], ['t', [50, 94], P, 'end'], ['D', [60, 90], [60, 160], dt],
+  ['dot', [60, 160]], ['t', [50, 164], Q, 'end'], ['R', [60, 160], [60, 240], Rb], ['rail', [60, 240], fx(-Vb), false],
+  ['W', [60, 160], [100, 160]], ['D', [160, 160], [100, 160], dg, -1], ['W', [160, 160], [160, 180]], ['gnd', [160, 180]], ['t', [130, 186], Il],
+], { w: 200, h: 270 });
+// figure: 2022–23 / P4.9 shape. +Vt – Rt – X; D1 X→ground; D2 X→Y; Rb Y→−Vb
+const figA = (Vt, Rt, Rb, Vb) => sch([
+  ['rail', [60, 20], fx(Vt)], ['R', [60, 20], [60, 100], Rt], ['dot', [60, 100]], ['t', [50, 104], 'X', 'end'], ['D', [60, 100], [60, 170], 'D1'], ['gnd', [60, 170]],
+  ['W', [60, 100], [100, 100]], ['D', [100, 100], [170, 100], 'D2'], ['W', [170, 100], [210, 100]], ['t', [190, 92], 'Y'], ['R', [210, 100], [210, 180], Rb], ['rail', [210, 180], fx(-Vb), false],
+], { w: 260, h: 210 });
+
+worked('#wk-46', {
+  given: '+10 V — 10 kΩ — node V; D2 from V to node B; D1 from ground to B; 5 kΩ from B to −10 V. CVD 0.7 V. Find \\(V_o = V_B\\) and the diode currents.',
+  fig: fig46(10, '10 kΩ', '5 kΩ', 10, 'D2', 'D1', 'V', 'B'),
+  steps: [
+    'Case both off: no current, B = −10 V, so D1 (anode at 0 V) is forward biased ✗.',
+    'Case D1 on, D2 off: B = −0.7 V but V = +10 V, so D2 sees 10.7 V forward ✗.',
+    'Case both on: B = −0.7 V, V = B + 0.7 = 0 V.',
+    { t: '\\(I_{D2} = (10 - 0)/10 = 1\\) mA', a: { l: 'I_{D2}', v: 1e-3, u: 'mA' } },
+    { t: 'Current in 5 kΩ \\(= (-0.7 + 10)/5 = 1.86\\) mA', a: { l: 'I_{5k}', v: 1.86e-3, u: 'mA' } },
+    { t: '\\(I_{D1} = 1.86 - 1 = 0.86\\) mA &gt; 0 ✓. Both currents positive, so no need to test D1 off, D2 on. \\(V_o = -0.7\\) V.', a: { l: 'I_{D1}', v: 0.86e-3, u: 'mA' } },
+  ] });
+
+drill('#dr-states', { id: 'd04-two-diode-states', title: 'Two diodes: guess, solve, verify', gen(r) {
+  const V1 = r.pick([5, 10, 15]), V2 = r.pick([5, 10, 15]), Ra = r.pick([1, 2, 3, 5, 10]), Rb = r.pick([1, 2, 3, 5, 10]), Vd = r.pick([0, 0.7, 0.7]);
+  const sols = dsolve(['P', 'Q'], { T: V1, B: -V2, G: 0 }, [['T', 'P', Ra], ['Q', 'B', Rb]], [['P', 'Q', 'D2'], ['G', 'Q', 'D1']], Vd);
+  const good = sols.filter(s => !s.viol.length); if (good.length !== 1) return null;
+  const g = good[0]; if (g.st[0] && g.st[1] && r() < 0.4) return null; // make the first guess fail more often
+  const ID1 = g.st[1] ? g.I.D1 : 0, VP = g.V.P, VQ = g.V.Q;
+  const name = s => `D2 ${s.st[0] ? 'on' : 'off'}, D1 ${s.st[1] ? 'on' : 'off'}`;
+  const steps = [];
+  for (const s of sols) {
+    steps.push(s.viol.length ? `Assume ${name(s)}: \\(V_P = ${num(s.V.P, 3)}\\), \\(V_Q = ${num(s.V.Q, 3)}\\) V; ${s.viol.join('; ')} ✗` : { t: `Assume ${name(s)}: \\(V_P = ${num(VP, 4)}\\) V, \\(V_Q = ${num(VQ, 4)}\\) V; ${s.st[0] ? `\\(I_{D2} = ${num(s.I.D2, 4)}\\) mA` : `\\(V_{AK,D2} = ${num(s.V.P - s.V.Q, 3)}\\) V`}, ${s.st[1] ? `\\(I_{D1} = ${num(s.I.D1, 4)}\\) mA` : `\\(V_{AK,D1} = ${num(-s.V.Q, 3)}\\) V`}: every check passes ✓`, a: { l: 'V_Q', v: VQ, u: 'V', tol: 0.02 } });
+    if (!s.viol.length) break;
+  }
+  return {
+    given: `+${V1} V — ${Ra} kΩ — node P; D2 from P (anode) to node Q; D1 from ground (anode) to Q; ${Rb} kΩ from Q to −${V2} V. ${Vd ? 'CVD diodes, 0.7 V.' : 'Ideal diodes.'} Find \\(V_P\\), \\(V_Q\\) and the current in D1 (ground → Q; enter 0 if off).`,
+    fig: fig46(V1, Ra + ' kΩ', Rb + ' kΩ', V2, 'D2', 'D1', 'P', 'Q', ''),
+    ask: [{ l: 'V_P', v: VP, u: 'V', tol: 0.02 }, { l: 'V_Q', v: VQ, u: 'V', tol: 0.02 }, { l: 'I_{D1}', v: ID1 / 1000, u: 'mA' }],
+    steps,
+    note: 'Order tried: both on, D2 on alone, D1 on alone, both off. In an exam, strike the obviously impossible ones with one line each.' };
+} });
+
+worked('#wk-l6', {
+  given: '9 V source; from its + terminal two branches to node A: (1) D1 and D2 in series, (2) D3 in series with \\(R_x\\). A — 2 kΩ — ground. (i) CVD 0.7 V: range of \\(R_x\\) for all diodes on, and for D3 alone. (ii) PWL 0.7 V, \\(R_{on}\\) = 10 Ω: the same.',
+  fig: sch([['V', [40, 60], [40, 200], '9 V'], ['W', [40, 60], [40, 30], [100, 30]], ['dot', [80, 30]], ['D', [100, 30], [160, 30], 'D1'], ['W', [160, 30], [180, 30]], ['D', [180, 30], [240, 30], 'D2'], ['W', [240, 30], [280, 30], [280, 90]],
+    ['W', [80, 30], [80, 90], [100, 90]], ['D', [100, 90], [160, 90], 'D3', -1], ['W', [160, 90], [180, 90]], ['R', [180, 90], [240, 90], 'Rₓ', -1], ['W', [240, 90], [280, 90]], ['dot', [280, 90]], ['t', [290, 94], 'A', 'start'],
+    ['R', [280, 90], [280, 200], '2 kΩ'], ['W', [280, 200], [40, 200]], ['gnd', [160, 200]]], { w: 330, h: 230, sim: false }),
+  steps: [
+    'Impossible cases: all off (no current, A = 0 V, every diode forward ✗); D1, D2 on with D3 off (A = 9 − 1.4 = 7.6 V, D3 then sees 9 − 7.6 = 1.4 V ✗). Only two cases remain, so their R ranges are complementary.',
+    { t: '(i) All on: A = 9 − 1.4 = 7.6 V; \\(I_{2k} = 7.6/2 = 3.8\\) mA; \\(I_3 = (8.3 - 7.6)/R_x = 0.7/R_x\\)', a: { l: 'I_{2k}', v: 3.8e-3, u: 'mA' } },
+    { t: '\\(I_1 = 3.8 - 0.7/R_x &gt; 0\\) → \\(R_x &gt; 0.7/3.8 = 0.18421\\) kΩ: all on for \\(R_x &gt; 184.21\\) Ω; D3 alone for \\(R_x \\le 184.21\\) Ω', a: { l: 'R_x', v: 184.21, u: 'Ω' } },
+    'Check from the D3-alone side: \\(I_3 = 8.3/(R_x + 2)\\); D1, D2 off needs \\(9 - 2I_3 &lt; 1.4\\) → \\(R_x &lt; 2\\times8.3/7.6 - 2 = 0.18421\\) kΩ ✓.',
+    { t: '(ii) PWL, D3 alone: \\(I_3 = 8.3/(R_x + 0.01 + 2)\\); D1, D2 off (no current, so no drop in their 20 Ω) needs \\(9 - 2I_3 &lt; 1.4\\) → \\(R_x &lt; 16.6/7.6 - 2.01 = 0.17421\\) kΩ', a: { l: 'R_x', v: 174.21, u: 'Ω' } },
+    'So D3 alone for \\(R_x &lt; 174.21\\) Ω, all on for \\(R_x &gt; 174.21\\) Ω. (The notes write 174.42 Ω: an arithmetic slip.)',
+  ] });
+
+drill('#dr-range', { id: 'd04-r-range', title: 'Range of R for a given diode state', gen(r) {
+  const tpl = r.pick(['A', 'A', 'B', 'C']), Vd = tpl === 'C' ? 0.7 : r.pick([0, 0.7, 0.7]);
+  if (tpl === 'A') { // +V1 – Rt – X; D1 X→gnd; D2 X→Y; Rb Y→ −V2. State: D1 off, D2 on.
+    const V1 = r.pick([3, 5, 10]), V2 = r.pick([3, 5, 10]), top = r() < 0.5, Rk = r.pick([2, 5, 6, 10, 12]);
+    if (V1 <= Vd + 0.5) return null;
+    const bound = top ? Rk * (V1 - Vd) / V2 : Rk * V2 / (V1 - Vd), dir = top ? '&gt;' : '&lt;';
+    return {
+      given: `+${V1} V — ${top ? '\\(R_x\\)' : Rk + ' kΩ'} — node X; D1 from X to ground; D2 from X to Y; ${top ? Rk + ' kΩ' : '\\(R_x\\)'} from Y to −${V2} V. ${Vd ? 'CVD 0.7 V.' : 'Ideal diodes.'} Find the boundary value of \\(R_x\\) for D1 off and D2 on (the answer is \\(R_x\\) ${dir} boundary).`,
+      fig: figA(V1, top ? 'Rₓ' : Rk + ' kΩ', top ? Rk + ' kΩ' : 'Rₓ', V2),
+      ask: [{ l: 'R_{x,boundary}', v: bound * 1000, u: 'kΩ' }],
+      steps: [
+        `State D1 off, D2 on: one loop. \\(I = \\dfrac{${V1} - ${Vd} + ${V2}}{${top ? 'R_x + ' + Rk : Rk + ' + R_x'}}\\)`,
+        `\\(V_X = ${V1} - ${top ? 'R_x' : Rk}\\,I\\). D2 on: \\(I &gt; 0\\), always true.`,
+        `D1 off: \\(V_X &lt; ${Vd}\\) → \\((${V1} - ${Vd})(${top ? 'R_x + ' + Rk : Rk + ' + R_x'}) &lt; ${top ? 'R_x' : Rk}(${num(V1 + V2 - Vd)})\\)`,
+        { t: top ? `→ \\(${num(V1 - Vd)}\\times${Rk} &lt; ${V2}R_x\\) → \\(R_x &gt; ${num(bound)}\\) kΩ` : `→ \\(${num(V1 - Vd)}R_x &lt; ${Rk}\\times${V2}\\) → \\(R_x &lt; ${num(bound)}\\) kΩ`, a: { l: 'R_x', v: bound * 1000, u: 'kΩ' } },
+      ] };
+  }
+  if (tpl === 'B') { // CT-1 shape: +V1 – R1 – X; D1 +V2→X; D2 X→Y; Rx Y→+V3. Only D2 on.
+    const V1 = r.pick([10, 12, 15]), V2 = r.pick([4, 5, 6]), V3 = r.pick([0, 1, 2, 3]), R1 = r.pick([2.2, 4.7, 9.5, 10]);
+    const numr = V2 - 2 * Vd - V3, den = V1 - V2 + Vd; if (numr < 0.2 || V1 <= V3 + Vd + 1) return null;
+    const bound = R1 * numr / den;
+    return {
+      given: `+${V1} V — ${R1} kΩ — node X; D1 from +${V2} V (anode) to X; D2 from X to Y; \\(R_x\\) from Y to +${V3} V. ${Vd ? 'CVD 0.7 V.' : 'Ideal diodes.'} Find the range of \\(R_x\\) for which only one diode is on (enter the boundary value).`,
+      fig: sch([['rail', [60, 20], '+' + V1 + ' V'], ['R', [60, 20], [60, 100], R1 + ' kΩ'], ['dot', [60, 100]], ['t', [50, 104], 'X', 'end'], ['rail', [160, 20], '+' + V2 + ' V'], ['D', [160, 20], [160, 100], 'D1'], ['W', [160, 100], [60, 100]],
+        ['D', [60, 100], [60, 170], 'D2'], ['R', [60, 170], [60, 250], 'Rₓ'], ['rail', [60, 250], '+' + V3 + ' V', false]], { w: 220, h: 280 }),
+      ask: [{ l: 'R_{x,boundary}', v: bound * 1000, u: 'kΩ' }],
+      steps: [
+        `D1 alone ✗: current would enter X from both +${V2} V and +${V1} V with no way out. Both off ✗: X = ${V1} V forward-biases D2. So the single diode is D2.`,
+        `D2 alone: \\(I = \\dfrac{${V1} - ${Vd} - ${V3}}{${R1} + R_x}\\), \\(V_X = ${V1} - ${R1}I\\).`,
+        `D1 off: \\(${V2} - V_X &lt; ${Vd}\\) → \\(${R1}I &lt; ${num(den)}\\) → \\(${R1}\\times${num(V1 - Vd - V3)} &lt; ${num(den)}(${R1} + R_x)\\)`,
+        { t: `\\(R_x &gt; \\dfrac{${num(R1 * (V1 - Vd - V3))} - ${num(den * R1)}}{${num(den)}} = ${num(bound)}\\) kΩ: only D2 on for \\(R_x &gt; ${num(bound)}\\) kΩ`, a: { l: 'R_x', v: bound * 1000, u: 'kΩ' } },
+      ] };
+  }
+  // tpl C: Sadat L6 parallel branches, CVD or PWL
+  const Vs = r.pick([6, 9, 10, 12]), R = r.pick([1, 2, 4.7]), rD = r.pick([0, 0, 0.01, 0.02]);
+  const bound = Vd * R / (Vs - 2 * Vd) - rD;
+  return {
+    given: `${Vs} V source; two branches from its + terminal to node A: D1 and D2 in series, and D3 in series with \\(R_x\\). A — ${R} kΩ — ground. ${rD ? `PWL diodes, 0.7 V and ${rD * 1000} Ω each.` : 'CVD 0.7 V.'} Find the boundary \\(R_x\\): all diodes on above it, only D3 on below it.`,
+    ask: [{ l: 'R_{x,boundary}', v: bound * 1000, u: 'Ω' }],
+    steps: [
+      'At the boundary D1, D2 are just at threshold with zero current, so A = Vs − 1.4 V and D3 carries all the current.',
+      `\\(V_A = ${Vs} - 1.4 = ${num(Vs - 1.4)}\\) V, \\(I_3 = ${num(Vs - 1.4)}/${R} = ${num((Vs - 1.4) / R)}\\) mA`,
+      { t: `\\(R_x + r_D = \\dfrac{${Vs} - 0.7 - ${num(Vs - 1.4)}}{${num((Vs - 1.4) / R)}} = ${num(Vd * R / (Vs - 1.4))}\\) kΩ → \\(R_x = ${num(bound * 1000)}\\) Ω`, a: { l: 'R_x', v: bound * 1000, u: 'Ω' } },
+      `All on for \\(R_x &gt; ${num(bound * 1000)}\\) Ω; D3 alone for \\(R_x &lt; ${num(bound * 1000)}\\) Ω.`,
+    ] };
+} });
+
+// gates figure
+$('#fig-gates').innerHTML = sch([
+  ['open', [20, 30]], ['t', [14, 34], 'v_A', 'end'], ['D', [20, 30], [90, 30]], ['open', [20, 80]], ['t', [14, 84], 'v_B', 'end'], ['D', [20, 80], [90, 80]],
+  ['W', [90, 30], [110, 30], [110, 80], [90, 80]], ['dot', [110, 80]], ['W', [110, 80], [150, 80]], ['R', [150, 80], [150, 160], 'R'], ['gnd', [150, 160]], ['t', [160, 74], 'v_Y', 'start'],
+  ['rail', [330, 20], '+5 V'], ['R', [330, 20], [330, 80], 'R'], ['dot', [330, 80]], ['t', [340, 74], 'v_Y', 'start'], ['W', [330, 80], [330, 100], [300, 100]],
+  ['D', [300, 100], [240, 100]], ['open', [230, 100]], ['W', [240, 100], [230, 100]], ['t', [224, 104], 'v_A', 'end'], ['W', [300, 100], [300, 140]], ['D', [300, 140], [240, 140]], ['W', [240, 140], [230, 140]], ['open', [230, 140]], ['t', [224, 144], 'v_B', 'end'],
+], { w: 380, h: 180, sim: false });
+
+drill('#dr-gate', { id: 'd05-gate-output', title: 'Diode OR and AND gates: output and current', gen(r) {
+  const type = r.pick(['OR', 'AND']), k = r.pick([2, 3]), Vd = r.pick([0, 0.7, 0.7, 0.6]), R = r.pick([1, 2, 4.7, 10]);
+  const v = Array.from({ length: k }, () => r.pick([0, 0, 1, 2, 3, 4, 5, 5]));
+  let Vo, I, why;
+  if (type === 'OR') { const m = Math.max(...v); Vo = Math.max(0, m - Vd); I = Vo / R; why = m > Vd ? `the diode from the highest input (${m} V) conducts: \\(v_Y = ${m} - ${Vd} = ${num(Vo)}\\) V; the others are reverse biased by \\(v_Y - v_k\\).` : `every input is below ${Vd} V: all diodes off, \\(v_Y\\) = 0.`; }
+  else { const m = Math.min(...v); Vo = Math.min(5, m + Vd); I = (5 - Vo) / R; why = m + Vd < 5 ? `the diode to the lowest input (${m} V) conducts: \\(v_Y = ${m} + ${Vd} = ${num(Vo)}\\) V; the others have \\(v_Y - v_k &lt; ${Vd}\\).` : `even the lowest input plus ${Vd} V reaches 5 V: all diodes off, \\(v_Y\\) = 5 V.`; }
+  return {
+    given: `A diode ${type} gate: ${type === 'OR' ? 'anodes at the inputs, cathodes joined at \\(v_Y\\), R = ' + R + ' kΩ to ground' : 'cathodes at the inputs, anodes joined at \\(v_Y\\), R = ' + R + ' kΩ to +5 V'}. ${Vd ? `CVD, ${Vd} V.` : 'Ideal diodes.'} Inputs: ${v.map((x, i) => `\\(v_${'ABC'[i]}\\) = ${x} V`).join(', ')}. Find \\(v_Y\\) and the current in R.`,
+    ask: [{ l: 'v_Y', v: Vo, u: 'V', tol: 0.01 }, { l: 'I_R', v: I / 1000, u: 'mA' }],
+    steps: [
+      { t: `${type === 'OR' ? 'OR (max selector)' : 'AND (min selector)'}: ${why}`, a: { l: 'v_Y', v: Vo, u: 'V', tol: 0.01 } },
+      { t: `\\(I_R = ${type === 'OR' ? `${num(Vo)}/${R}` : `(5 - ${num(Vo)})/${R}`} = ${num(I)}\\) mA`, a: { l: 'I_R', v: I / 1000, u: 'mA' } },
+    ] };
+} });
+
+// exam figures
+$('#fig-2223').innerHTML = figA(5, '5 kΩ', 'R', 5);
+$('#fig-p49').innerHTML = figA(3, '12 kΩ (or Rₓ)', '6 kΩ', 3);
+$('#fig-1415').innerHTML = fig46(10, '5 kΩ', '3 kΩ', 10, 'D1', 'D2', 'a', 'V', '');
+$('#fig-1112').innerHTML = '<div class="figlabel">(i)</div>' + fig46(10, '5 kΩ', '10 kΩ', 10, 'D2', 'D1', 'V', 'x', 'I') +
+  '<div class="figlabel">(ii)</div>' + sch([['rail', [40, 20], '+3 V'], ['D', [40, 20], [40, 90]], ['rail', [110, 20], '+2 V'], ['D', [110, 20], [110, 90]], ['rail', [180, 20], '+1 V'], ['D', [180, 20], [180, 90]],
+    ['W', [40, 90], [250, 90]], ['dot', [110, 90]], ['dot', [180, 90]], ['dot', [250, 90]], ['t', [256, 84], 'V', 'start'], ['R', [250, 90], [250, 170], '1 kΩ'], ['gnd', [250, 170]], ['t', [236, 134], 'I ↓', 'end']], { w: 300, h: 200 });
+$('#fig-ct').innerHTML = sch([['rail', [60, 20], '+10 V'], ['R', [60, 20], [60, 100], '9.5 kΩ'], ['dot', [60, 100]], ['t', [50, 104], 'X', 'end'], ['rail', [160, 20], '+5 V'], ['D', [160, 20], [160, 100], 'D1'], ['W', [160, 100], [60, 100]],
+  ['D', [60, 100], [60, 170], 'D2'], ['R', [60, 170], [60, 250], 'Rₓ'], ['rail', [60, 250], '+3 V', false]], { w: 220, h: 280 });
+$('#fig-asg').innerHTML = sch([['rail', [60, 20], '+5 V'], ['R', [60, 20], [60, 90], '5 kΩ'], ['dot', [60, 90]], ['t', [50, 94], 'A', 'end'], ['D', [60, 90], [60, 160], 'D1'], ['R', [60, 160], [60, 240], '5 kΩ'], ['rail', [60, 240], '−10 V', false],
+  ['W', [60, 90], [100, 90]], ['D', [100, 90], [170, 90], 'D2'], ['W', [170, 90], [210, 90]], ['dot', [210, 90]], ['t', [210, 80], 'B'], ['R', [210, 90], [210, 170], '5 kΩ'], ['rail', [210, 170], '−5 V', false],
+  ['W', [210, 90], [240, 90]], ['D', [300, 90], [240, 90], 'D3'], ['W', [300, 90], [300, 110]], ['gnd', [300, 110]]], { w: 340, h: 270 });
+$('#fig-1617').innerHTML = sch([
+  ['rail', [120, 20], '+5 V'], ['R', [120, 20], [120, 80], '1k'], ['dot', [120, 80]], ['t', [124, 96], 'A', 'start'],
+  ['D', [120, 80], [60, 80]], ['W', [60, 80], [40, 80]], ['open', [40, 80]], ['t', [32, 84], 'V₁', 'end'],
+  ['W', [120, 80], [120, 110]], ['D', [120, 110], [60, 110]], ['W', [60, 110], [40, 110]], ['open', [40, 110]], ['t', [32, 114], 'V₂', 'end'],
+  ['rail', [200, 20], '+5 V'], ['R', [200, 20], [200, 80], '1k'], ['dot', [200, 80]], ['t', [206, 98], 'B', 'start'], ['D', [200, 80], [140, 80]], ['W', [140, 80], [120, 80]],
+  ['W', [200, 80], [250, 80]], ['D', [250, 80], [250, 20]], ['rail', [250, 20], '+5 V'],
+  ['W', [200, 80], [200, 130]], ['D', [200, 130], [200, 190]], ['W', [200, 190], [320, 190]], ['dot', [260, 190]], ['t', [266, 206], 'E', 'start'], ['R', [260, 190], [260, 260], '1k'], ['gnd', [260, 260]],
+  ['rail', [320, 20], '+5 V'], ['R', [320, 20], [320, 80], '1k'], ['dot', [320, 80]], ['t', [310, 98], 'C', 'end'], ['D', [320, 80], [380, 80]], ['W', [380, 80], [400, 80]], ['open', [400, 80]], ['t', [408, 84], 'V₃', 'start'],
+  ['W', [320, 80], [320, 110]], ['dot', [320, 110]], ['D', [320, 110], [380, 110]], ['W', [380, 110], [400, 110]], ['open', [400, 110]], ['t', [408, 114], 'V₄', 'start'],
+  ['W', [320, 110], [320, 130]], ['D', [320, 130], [320, 190]], ['dot', [320, 190]],
+  ['W', [320, 190], [360, 190]], ['D', [360, 190], [420, 190]], ['W', [420, 190], [500, 190]], ['dot', [440, 190]], ['R', [440, 190], [440, 260], '1k'], ['dot', [500, 190]],
+  ['D', [500, 260], [500, 190]], ['W', [440, 260], [500, 260]], ['gnd', [470, 260]], ['W', [500, 190], [530, 190]], ['open', [530, 190]], ['t', [530, 180], 'Vₒ'],
+], { w: 560, h: 290, sim: false });
+
+flashcards('#cards', [
+  { f: 'Case method', b: 'Assume states → replace → solve → check every diode → flip and repeat; write rejected cases.' },
+  { f: 'Checks', b: 'On: I > 0 anode→cathode. Off: V_AK < V_D0 (≤ 0 ideal).' },
+  { f: 'Range of R', b: 'Fix the state, keep R symbolic, turn the checks into inequalities, intersect.' },
+  { f: 'Boundary of a range', b: 'The off diode is exactly at threshold with zero current.' },
+  { f: 'OR gate output', b: 'max(v) − V_D0 (or 0 if every input is below V_D0).' },
+  { f: 'AND gate output', b: 'min(v) + V_D0 (or the pull-up voltage if that is higher).' },
+  { f: 'CT-1 Q2 answer', b: 'Only D2 on, for R_x > 1 kΩ.' },
+]);
+quiz('#quiz', [
+  { q: 'Ideal diodes; 2022–23 circuit (+5 V, 5 kΩ, D1 to ground, D2 and R to −5 V). D1 off, D2 on for', opts: ['R ≥ 5 kΩ', 'R ≤ 5 kΩ', 'R ≤ 2.5 kΩ', 'all R'], a: 1, why: 'V_X = (5R − 25)/(5 + R) ≤ 0.' },
+  { q: 'An OR gate with 0.7 V diodes has inputs 3 V, 2 V, 1 V. v_Y =', opts: ['3 V', '2.3 V', '0.3 V', '1.3 V'], a: 1, why: 'Highest input minus one drop.' },
+  { q: 'An AND gate (pull-up to 5 V, 0.7 V diodes) has inputs 5, 5, 0 V. v_Y =', opts: ['5 V', '0 V', '0.7 V', '4.3 V'], a: 2, why: 'The diode to 0 V conducts: 0 + 0.7.' },
+  { q: 'With the CVD model, an assumed-on diode is verified by', opts: ['its voltage', 'its current direction', 'both', 'the other diode'], a: 1, why: 'The 0.7 V was imposed by the assumption.' },
+  { q: 'In the "both on" case the current in D1 comes out −1 mA. Then', opts: ['D1 conducts 1 mA backwards', 'D1 is off; re-solve', 'D2 is off', 'the answer is −1 mA'], a: 1, why: 'A diode cannot carry reverse current: flip its state.' },
+]);
+</script>
+</body>
+</html>

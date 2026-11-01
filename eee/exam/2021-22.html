@@ -1,0 +1,447 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Term Final 2021–22 · EEE 263 Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Exam · Term final 2021–22 · held 28/03/2023</div>
+<h1>Term Final 2021–22</h1>
+<p class="lede">Old format: 280 marks, 3 hours, two sections of four questions each; answer any three per section, 46⅔ marks per question. No compulsory questions and no CO tags. "The figures in the margin indicate full marks. All the symbols have their usual meanings. Assume reasonable values for missing data. Use separate scripts for each section." Section A is mostly op-amp applications, oscillators and the 555, plus data converters, PLL and logic families (no longer examined). Section B is diodes, BJT DC, BJT and MOSFET amplifiers, plus memory and a counter (no longer examined).</p>
+
+<h2>What this paper tests</h2>
+<ul>
+<li><b>Q1</b>: op-amp circuit for \(\sin^2(50t)\); RC phase-shift oscillator derivation.</li>
+<li><b>Q2</b>: op-amp one-shot; 555 monostable resistor; 555 astable design (10 ms, 75 %).</li>
+<li><b>Q3</b>: R-2R DAC; PLL block diagram; 6-bit ADC (all no longer examined).</li>
+<li><b>Q4</b>: op-amp sawtooth generator; CMOS vs TTL (theory, no longer examined).</li>
+<li><b>Q5</b>: two identical diodes (exponential model, find R); diode limiter design (±2.1 V); bridge rectifier numbers.</li>
+<li><b>Q6</b>: Early effect; BJT bias design (±1.5 V); BJT DC with saturation check.</li>
+<li><b>Q7</b>: CE amplifier with R<sub>e</sub> derivation (T model); CS amplifier numerics.</li>
+<li><b>Q8</b>: DRAM, flash, MOD-3 counter (all no longer examined).</li>
+</ul>
+<div class="method"><h4>How to use this page</h4><p>Sit it as a mock: 3 hours, any three questions from each section (about 30 min per 46⅔-mark question). Write full answers on paper, then open each "Answer key". If a part went wrong, follow its "Full method" link and do that chapter's drill. Conventions in the keys: V<sub>BE</sub> = V<sub>D</sub> = 0.7 V, V<sub>T</sub> = 25 mV, V<sub>CE,sat</sub> = 0.2 V, units mA, kΩ, V, mA/V. Parts tagged "no longer examined" are given with a short key only.</p></div>
+
+<h2>Section A</h2>
+<p class="recog">Instruction (quoted from the paper): "There are FOUR questions in this section. Answer any THREE questions."</p>
+
+<h3>Question 1</h3>
+<div class="exam">
+  <div class="exam-src">2021–22 · Sec A · Q1(a) · 20 marks</div>
+  <div class="exam-q"><p>Suppose you have two supply voltage sources, \(v_1 = \sin(100t)\) V and \(v_2 = 1\) V. Design a circuit using op-amps that will produce an output voltage \(v_o = (\sin 50t)^2\) V. Also show that this circuit produces this output.</p></div>
+  <details><summary>Answer key</summary><div class="exam-a">
+    <p><b>Identity.</b> \(\sin^2(50t) = \tfrac12 - \tfrac12\cos(100t)\). We have \(v_2 = 1\) (the DC part) and need \(\cos 100t\), which is the derivative of \(v_1\): \(\dfrac{dv_1}{dt} = 100\cos 100t\).</p>
+    <p><b>Stage 1, differentiator</b> (ideal op-amp, \(C = 1\ \mu\)F, \(R = 10\) kΩ, \(RC = 10\) ms): \(v_A = -RC\dfrac{dv_1}{dt} = -0.01\times 100\cos 100t = -\cos 100t\).</p>
+    <p><b>Stage 2, averager:</b> \(v_A\) and \(v_2\) each through 10 kΩ to the + input of a voltage follower. Equal resistors, so \(v_+ = \dfrac{v_A + v_2}{2}\) (superposition, no current into the op-amp), and \(v_o = v_+\).</p>
+    <figure><div id="f-a1a"></div><figcaption>Differentiator (A1) then non-inverting averager (A2, voltage follower). In practice add a small resistor in series with C for stability.</figcaption></figure>
+    <p><b>Show:</b> \(v_o = \dfrac{-\cos 100t + 1}{2} = \dfrac{1 - \cos 100t}{2} = \sin^2(50t)\) ✓. Check at \(t = 0\): \(v_1\) is 0, \(dv_1/dt = 100\), \(v_A = -1\), \(v_o = 0\) ✓.</p>
+    <div class="trap"><h4>Common mark-loser</h4><p>An integrator route ("integrate \(\sin 100t\) to get \(\cos\)") gives \(\tfrac12(\cos 100t - 1)\) from an uncharged capacitor, so the output is off by 0.5 V DC. Use the differentiator, which has no constant of integration.</p></div>
+    <p class="recog">Full method: <a href="../opamp/04-expression-synthesis.html">Building a given expression</a></p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2021–22 · Sec A · Q1(b) · 26⅔ marks</div>
+  <div class="exam-q"><p>For an R-C phase shift oscillator, derive the expression of oscillation frequency. Also derive the conditions for Barkhausen criteria to be satisfied. You may assume that in the feedback part of the oscillator all the resistors are of the same value and all the capacitors are of the same value.</p></div>
+  <details><summary>Answer key</summary><div class="exam-a">
+    <p><b>Circuit:</b> an inverting amplifier (gain \(A = -R_f/R\), the last ladder resistor R is its input resistor) whose output feeds a three-section ladder: C in series, R to ground, three times. The ladder gives 180° of phase shift, the inverting amplifier the other 180°.</p>
+    <p><b>Loop equations</b> (loop currents \(I_1, I_2, I_3\); \(V_o\) is the amplifier output, \(V_f = I_3R\) is fed back):</p>
+    \[ V_o = I_1\!\left(R + \tfrac1{sC}\right) - I_2R \]
+    \[ 0 = -I_1R + I_2\!\left(2R + \tfrac1{sC}\right) - I_3R \]
+    \[ 0 = -I_2R + I_3\!\left(2R + \tfrac1{sC}\right) \]
+    <p>Solving: \(\beta(s) = \dfrac{V_f}{V_o} = \dfrac{1}{1 + \dfrac{6}{sRC} + \dfrac{5}{(sRC)^2} + \dfrac{1}{(sRC)^3}}\). Put \(s = j\omega\) and \(x = 1/(\omega RC)\): \(\dfrac1\beta = (1 - 5x^2) + j\,(x^3 - 6x)\).</p>
+    <ul>
+      <li><b>Phase condition</b> (the ladder must give 180°, so \(1/\beta\) is real): imaginary part \(= 0\) ⇒ \(x^2 = 6\) ⇒ \(\omega_0 = \dfrac{1}{\sqrt6\,RC}\), \(f_0 = \dfrac{1}{2\pi\sqrt6\,RC}\).</li>
+      <li><b>Magnitude condition:</b> at \(x^2 = 6\): \(1/\beta = 1 - 30 = -29\), so \(\beta = -1/29\). Barkhausen: \(A\beta = 1\) ⇒ \(A = -29\), i.e. \(R_f/R \ge 29\) (slightly above 29 to start, a limiter then sets the amplitude).</li>
+    </ul>
+    <p>(If the ladder is made of series R and shunt C instead, \(\omega_0 = \sqrt6/RC\) and the required gain is again 29.)</p>
+    <p class="recog">Full method: <a href="../osc/03-rc-phase-shift.html">RC phase-shift oscillator</a></p>
+  </div></details>
+</div>
+
+<h3>Question 2</h3>
+<div class="exam">
+  <div class="exam-src">2021–22 · Sec A · Q2(a) · 26⅔ marks</div>
+  <div class="exam-q"><p>Draw a one-shot multivibrator circuit using op amp. Explain the operation of the circuit.</p></div>
+  <details><summary>Answer key</summary><div class="exam-a">
+    <p><b>Circuit:</b> a comparator with positive feedback divider \(R_1, R_2\) (\(\beta = R_1/(R_1+R_2)\), from \(v_O\) to the + input) and an \(R\)–\(C\) network from \(v_O\) to the − input. Diode D₁ across C clamps \(v_-\) at about +0.7 V. A trigger (a small C<sub>t</sub>, R<sub>t</sub> differentiator and diode D₂) injects a negative pulse at the + input.</p>
+    <figure><div id="f-a2a"></div><figcaption>Op-amp monostable. Trigger: a negative pulse through C<sub>t</sub>–D₂ into the + node (not drawn).</figcaption></figure>
+    <ul>
+      <li><b>Stable state:</b> \(v_O = +L\). D₁ conducts, so \(v_- = V_D = 0.7\) V; \(v_+ = \beta L > 0.7\) V, so the state is held.</li>
+      <li><b>Trigger:</b> a negative pulse pulls \(v_+\) below 0.7 V. The output flips to \(-L\), and \(v_+ = -\beta L\). D₁ turns off.</li>
+      <li><b>Quasi-stable state:</b> C discharges from +0.7 V toward \(-L\) through R: \(v_-(t) = -L + (L + 0.7)e^{-t/RC}\). The output returns to +L when \(v_-\) reaches \(-\beta L\).</li>
+      <li><b>Pulse width:</b> \(T = RC\ln\dfrac{L + V_D}{L(1-\beta)} \approx RC\ln\dfrac{1}{1-\beta}\). With \(\beta = 0.5\): \(T \approx 0.69\,RC\) (0.75 RC with L = 13 V and V<sub>D</sub> = 0.7 V).</li>
+      <li><b>Recovery:</b> after the output returns, C recharges to 0.7 V through R and D₁; do not re-trigger until it has.</li>
+    </ul>
+    <p class="recog">Full method: <a href="../osc/06-astable-and-generators.html">Astable, monostable, square–triangle generators</a></p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2021–22 · Sec A · Q2(b)(i) · 10 marks</div>
+  <div class="exam-q"><p>To get an output pulse of 10 ms width when trigger is applied, an external resistor and a 1 µF capacitor are connected with a 555 timer. What should be the value of the resistor?</p></div>
+  <details><summary>Answer key</summary><div class="exam-a">
+    <p>Monostable: \(T = RC\ln 3 = 1.1\,RC\). \(R = \dfrac{T}{1.1C} = \dfrac{10\text{ ms}}{1.1\times1\,\mu\text{F}} = \mathbf{9.09}\) kΩ (9.10 kΩ with ln 3 exactly). Connection: R from V<sub>CC</sub> to pins 6 and 7, C from there to ground, trigger at pin 2 (negative-going, below V<sub>CC</sub>/3).</p>
+    <p class="recog">Full method: <a href="../osc/07-555-timer.html">The 555 timer</a></p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2021–22 · Sec A · Q2(b)(ii) · 10 marks</div>
+  <div class="exam-q"><p>Design an astable multivibrator using 555 timer which has 10 ms period and 75% duty cycle.</p></div>
+  <details><summary>Answer key</summary><div class="exam-a">
+    <p>Astable: C charges through R<sub>A</sub> + R<sub>B</sub> and discharges through R<sub>B</sub> between V<sub>CC</sub>/3 and 2V<sub>CC</sub>/3. \(t_H = 0.693(R_A+R_B)C = 7.5\) ms, \(t_L = 0.693R_BC = 2.5\) ms ⇒ \(R_A = 2R_B\).</p>
+    <p>Choose C = 1 µF: \(R_B = \dfrac{2.5\text{ ms}}{0.693\times1\,\mu\text{F}} = \mathbf{3.61}\) kΩ, \(R_A = \mathbf{7.21}\) kΩ. Check: \(D = (R_A+R_B)/(R_A+2R_B) = 0.75\), \(T = 0.693(R_A+2R_B)C = 10\) ms ✓. Connections: R<sub>A</sub> from V<sub>CC</sub> to pin 7, R<sub>B</sub> from pin 7 to pins 6 and 2, C to ground, pin 5 through 0.01 µF to ground. (The same question appears in 2022–23 Q7(b).)</p>
+    <p class="recog">Full method: <a href="../osc/07-555-timer.html">The 555 timer</a></p>
+  </div></details>
+</div>
+
+<h3>Question 3</h3>
+<div class="exam">
+  <div class="exam-src">2021–22 · Sec A · Q3(a) · 17 marks · <span class="pb pb-0">no longer examined</span></div>
+  <div class="exam-q"><p>What are DAC circuits? How does an R-2R ladder DAC circuit operate? Explain using circuit diagram and mathematical analysis.</p></div>
+  <details><summary>Answer key</summary><div class="exam-a">
+    <p>A DAC converts an n-bit binary word \(b_{n-1}\dots b_0\) into an analog voltage proportional to its value. R-2R ladder: each bit switches a 2R leg between \(V_{ref}\) (bit = 1) and ground (bit = 0); R's join the leg nodes, and the LSB end is terminated with 2R to ground.</p>
+    <ul>
+      <li>At every node the resistance looking toward the LSB end (leg 2R in parallel with the rest) is 2R, so each node splits into two equal halves: Thevenin resistance seen from any node toward the end is R.</li>
+      <li>Superposition: a single bit \(b_k\) at \(V_{ref}\) with the rest grounded contributes \(V_{ref}/2\) at its own node, halved at each step toward the output node: \(V_{ref}\,2^{k-n}\) at the output (MSB: \(V_{ref}/2\), next: \(V_{ref}/4\), ...).</li>
+      <li>\(v_A = V_{ref}\left(\dfrac{b_{n-1}}2 + \dfrac{b_{n-2}}4 + \dots + \dfrac{b_0}{2^n}\right)\), with Thevenin resistance R. 4-bit example: \(V_{ref}(8b_3 + 4b_2 + 2b_1 + b_0)/16\); word 1010 gives \(0.625V_{ref}\).</li>
+      <li>A voltage follower (or a non-inverting amplifier of gain \(1 + R_f/R_i\)) buffers the high-impedance node; an inverted ladder into an inverting summer with feedback R gives \(v_o = -V_{ref}\sum b_k2^{k-n}\).</li>
+    </ul>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2021–22 · Sec A · Q3(b) · 17 marks · <span class="pb pb-0">no longer examined</span></div>
+  <div class="exam-q"><p>Draw a simplified block diagram of PLL and briefly explain its operation.</p></div>
+  <details><summary>Answer key</summary><div class="exam-a">
+    <p>Blocks in a loop: <b>phase detector</b> (multiplier or XOR) compares the input \(f_i\) with the VCO output \(f_o\) and produces an error voltage; a <b>low-pass loop filter</b> removes the sum-frequency term and keeps the DC error \(v_e\); an optional <b>amplifier</b>; a <b>VCO</b> whose frequency is \(f_o = f_{free} + K_Vv_c\) closes the loop.</p>
+    <ul>
+      <li>Free-running: \(v_c = 0\), VCO at \(f_{free}\). When \(f_i\) comes within the capture range, the error beat note passes the filter, pulls the VCO toward \(f_i\) and the loop <b>locks</b>: \(f_o = f_i\) with a constant phase difference.</li>
+      <li>Once locked, the loop tracks \(f_i\) over the wider lock range. Uses: FM demodulation (\(v_c\) is the output), frequency synthesis (divider in the loop), clock recovery.</li>
+    </ul>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2021–22 · Sec A · Q3(c) · 12⅔ marks · <span class="pb pb-0">no longer examined</span></div>
+  <div class="exam-q"><p>A 6-bit A/D converter has reference voltage \(V_{REF}\) = 8 V and reference count \(n_{REF} = 2^6\). Values of some consecutive analog sampled voltages \(|V_A|\) are: 0 V, 3 V, 5.5 V, 7.125 V. If these voltages are given as inputs to the converter, find the corresponding digital outputs.</p></div>
+  <details><summary>Answer key</summary><div class="exam-a">
+    <p>Count \(N = \dfrac{V_A}{V_{REF}}\,n_{REF} = \dfrac{V_A}{8}\times64 = 8V_A\) (1 LSB = 0.125 V).</p>
+    <ul><li>0 V → 0 → <b>000000</b></li><li>3 V → 24 → <b>011000</b></li><li>5.5 V → 44 → <b>101100</b></li><li>7.125 V → 57 → <b>111001</b></li></ul>
+  </div></details>
+</div>
+
+<h3>Question 4</h3>
+<div class="exam">
+  <div class="exam-src">2021–22 · Sec A · Q4(a) · 23 marks</div>
+  <div class="exam-q"><p>Draw a sawtooth wave generator circuit using op amp. Explain the operation of the circuit.</p></div>
+  <details><summary>Answer key</summary><div class="exam-a">
+    <p><b>Circuit:</b> the square–triangle generator (non-inverting Schmitt trigger A1 plus inverting integrator A2) with the integrator's input resistor split into two parallel paths: D₁ in series with R<sub>a</sub> (conducts when \(v_{sq} = +L\)) and D₂ in series with R<sub>b</sub> (conducts when \(v_{sq} = -L\)).</p>
+    <figure><div id="f-a4a"></div><figcaption>Sawtooth generator: unequal charge and discharge resistors (R<sub>b</sub> ≪ R<sub>a</sub>).</figcaption></figure>
+    <ul>
+      <li><b>Thresholds</b> (A1 flips when its + input crosses 0): \(V_{TH} = +L\dfrac{R_2}{R_3}\), \(V_{TL} = -L\dfrac{R_2}{R_3}\); peak-to-peak \(2LR_2/R_3\).</li>
+      <li><b>Slow ramp down</b> while \(v_{sq} = +L\): slope \(-L/(R_aC)\), so \(T_1 = 2\dfrac{R_2}{R_3}R_aC\).</li>
+      <li><b>Fast ramp up</b> while \(v_{sq} = -L\): slope \(+L/(R_bC)\), so \(T_2 = 2\dfrac{R_2}{R_3}R_bC\).</li>
+      <li>\(f = \dfrac{1}{T_1 + T_2} = \dfrac{R_3}{2R_2C(R_a + R_b)}\). Example: \(R_2/R_3 = \tfrac12\), \(R_a = 100\) kΩ, \(R_b = 10\) kΩ, C = 0.1 µF: \(T_1 = 10\) ms, \(T_2 = 1\) ms, f = 90.9 Hz. (Ideal diodes; \(L \gg 0.7\) V.)</li>
+    </ul>
+    <p class="recog">Full method: <a href="../osc/06-astable-and-generators.html">Astable, monostable, square–triangle generators</a></p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2021–22 · Sec A · Q4(b) · 23⅔ marks · <span class="pb pb-0">no longer examined</span></div>
+  <div class="exam-q"><p>Discuss basic operational characteristics and parameters of CMOS and TTL logic families.</p></div>
+  <details><summary>Answer key</summary><div class="exam-a">
+    <ul>
+      <li><b>Parameters:</b> noise margins \(NM_H = V_{OH,min} - V_{IH,min}\), \(NM_L = V_{IL,max} - V_{OL,max}\); propagation delay \(t_p\); fan-out; power dissipation; supply voltage; speed–power product.</li>
+      <li><b>TTL</b> (BJT, multi-emitter input stage, totem-pole output): \(V_{CC}\) = 5 V; \(V_{OH} \approx 3.4\) V, \(V_{OL} \approx 0.2\) V, \(V_{IH} = 2\) V, \(V_{IL} = 0.8\) V (noise margins ≈ 0.4 V). Static power is drawn in both states; \(t_p\) ≈ 10 ns (standard); fan-out about 10.</li>
+      <li><b>CMOS</b> (complementary MOSFETs): rails \(V_{OH} = V_{DD}\), \(V_{OL} = 0\); \(V_{IL} \approx V_{DD}/2\), noise margins ≈ 0.45 \(V_{DD}\); essentially zero static power (only dynamic \(CV_{DD}^2f\)); very high input resistance, so large fan-out; wide supply range; slower than TTL at the same node, but the lower power allows high integration.</li>
+    </ul>
+  </div></details>
+</div>
+
+<h2>Section B</h2>
+<p class="recog">Instruction (quoted from the paper): "There are FOUR questions in this section. Answer any THREE questions."</p>
+
+<h3>Question 5</h3>
+<div class="exam">
+  <div class="exam-src">2021–22 · Sec B · Q5(a) · 16⅔ marks</div>
+  <div class="exam-q"><p>For the circuit shown in Fig. for Q. No. 5(a), both diodes are identical. Find the value of R for which V = 50 mV.</p>
+    <figure><div id="f-b5a"></div><figcaption>Fig. for Q. 5(a): 10 mA source into node a; D₂ from a to ground; D₁ from a to node V; R from V to ground. Identical diodes, n = 1, V<sub>T</sub> = 25 mV assumed.</figcaption></figure></div>
+  <details><summary>Answer key</summary><div class="exam-a">
+    <p>Both diodes hang from node a, so \(V_{D2} = V_{D1} + V\). Same \(I_S\): \(\dfrac{I_{D2}}{I_{D1}} = e^{V/V_T} = e^{0.05/0.025} = e^2 = 7.389\).</p>
+    <p>KCL at a: \(I_{D1} + I_{D2} = 10\) mA ⇒ \(I_{D1} = \dfrac{10}{1 + 7.389} = 1.192\) mA (\(I_{D2} = 8.808\) mA).</p>
+    <p>\(I_{D1}\) flows through R only: \(R = \dfrac{V}{I_{D1}} = \dfrac{0.05}{1.192\text{ mA}} = \mathbf{41.9\ \Omega}\).</p>
+    <div class="trap"><h4>Common mark-loser</h4><p>Putting R in series with the wrong diode (D₂, the larger current) gives 5.7 Ω. R carries \(I_{D1}\), the smaller current. Also, V<sub>T</sub> = 25.85 mV changes the answer by a visible amount because it sits in an exponent; state the value you use.</p></div>
+    <p class="recog">Full method: <a href="../diode/04-exponential-model.html">The exponential model and diode strings</a></p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2021–22 · Sec B · Q5(b) · 15 marks</div>
+  <div class="exam-q"><p>Design a limiter circuit using only diodes and 10 kΩ resistors to provide an output signal limited to the range ±2.1 V. Assume that each diode has a 0.7 V drop when conducting.</p></div>
+  <details><summary>Answer key</summary><div class="exam-a">
+    <p>One conducting diode holds 0.7 V, so each limit needs \(2.1/0.7 = 3\) diodes in series. Positive limit: a string of 3 diodes from \(v_o\) to ground (anodes toward \(v_o\)). Negative limit: a second string of 3, reversed (antiparallel). The 10 kΩ goes in series with the input.</p>
+    <figure><div id="f-b5b"></div><figcaption>Limiter: output limited to ±2.1 V.</figcaption></figure>
+    <p><b>Operation:</b> for \(|v_i| \le 2.1\) V no string conducts, so \(v_o = v_i\) (no load: no drop in the 10 kΩ). For \(v_i > 2.1\) V the upper string conducts and \(v_o = +2.1\) V; for \(v_i < -2.1\) V, \(v_o = -2.1\) V. The source current when limiting is \((|v_i| - 2.1)/10\) kΩ, which the resistor keeps small (e.g. 0.79 mA at \(|v_i| = 10\) V). Transfer characteristic: slope 1 for \(|v_i| \le 2.1\) V, flat at ±2.1 V beyond.</p>
+    <p class="recog">Full method: <a href="../diode/10-clippers.html">Clippers and transfer characteristics</a></p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2021–22 · Sec B · Q5(c) · 15 marks</div>
+  <div class="exam-q"><p>Suppose for the bridge rectifier circuit shown in Fig. for Q. No. 5(c), \(v_s\) is a 12 V (rms) sinusoid, \(V_D\) = 0.7 V, and R = 100 Ω. Find the average of the output voltage \(v_o\), the peak diode current, and the PIV.</p>
+    <figure><div id="f-b5c"></div><figcaption>Fig. for Q. 5(c): bridge with D₁ (t→p), D₃ (b→p), D₄ (n→t), D₂ (n→b); R between p and n (grounded). v<sub>s</sub> is the transformer secondary.</figcaption></figure></div>
+  <details><summary>Answer key</summary><div class="exam-a">
+    <p>\(V_s = 12\sqrt2 = 16.97\) V (peak). Two diodes conduct in series: \(v_{o,peak} = 16.97 - 1.4 = 15.57\) V.</p>
+    <ul>
+      <li><b>Average output:</b> \(V_o \approx \dfrac{2V_s}{\pi} - 2V_D = 10.80 - 1.4 = \mathbf{9.40}\) V (exact integral with the dead zone: 9.44 V).</li>
+      <li><b>Peak diode current:</b> \(i_{D,peak} = 15.57/100 = \mathbf{155.7}\) mA.</li>
+      <li><b>PIV</b> (bridge): \(V_s - V_D = 16.97 - 0.7 = \mathbf{16.27}\) V.</li>
+    </ul>
+    <div class="trap"><h4>Common mark-loser</h4><p>\(V_o = 2V_{o,peak}/\pi = 9.91\) V ignores the dead zone and overstates the average. Use \(2V_s/\pi - 2V_D\).</p></div>
+    <p class="recog">Full method: <a href="../diode/08-rectifiers.html">Rectifiers and battery chargers</a></p>
+  </div></details>
+</div>
+
+<h3>Question 6</h3>
+<div class="exam">
+  <div class="exam-src">2021–22 · Sec B · Q6(a) · 10⅔ marks</div>
+  <div class="exam-q"><p>What is Early-effect in a BJT? Draw the I-V curve of a practical BJT showing the Early effect.</p></div>
+  <details><summary>Answer key</summary><div class="exam-a">
+    <ul>
+      <li><b>Definition:</b> in the active region a larger \(v_{CE}\) widens the reverse-biased collector–base depletion region, narrowing the neutral base. The base transport factor and the collector current rise slightly, so \(i_C\) is not flat versus \(v_{CE}\).</li>
+      <li>\(i_C = I_Se^{v_{BE}/V_T}\left(1 + \dfrac{v_{CE}}{V_A}\right)\), \(V_A\) = Early voltage (50–100 V). Output resistance \(r_o = \dfrac{V_A + V_{CE}}{I_C} \approx \dfrac{V_A}{I_C}\).</li>
+      <li><b>Curve:</b> in each curve \(i_C\) slopes up in the active region; extended backward the straight lines all meet the \(v_{CE}\) axis at \(-V_A\).</li>
+    </ul>
+    <figure><div id="p-b6a"></div><figcaption>i<sub>C</sub>–v<sub>CE</sub> curves for three values of v<sub>BE</sub>; dashed lines extend to −V<sub>A</sub>.</figcaption></figure>
+    <p class="recog">Full method: <a href="../bjt/02-iv-and-early-effect.html">I–V characteristics and the Early effect</a></p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2021–22 · Sec B · Q6(b) · 20 marks</div>
+  <div class="exam-q"><p>Design the circuit shown in Fig. for Q. No. 6(b) to establish \(I_C\) = 0.2 mA and \(V_C\) = 0.5 V. The transistor exhibits \(V_{BE}\) of 0.8 V at \(i_C\) = 1 mA, and β = 100.</p>
+    <figure><div id="f-b6b"></div><figcaption>Fig. for Q. 6(b): base grounded, R<sub>C</sub> to +1.5 V, R<sub>E</sub> to −1.5 V.</figcaption></figure></div>
+  <details><summary>Answer key</summary><div class="exam-a">
+    <p><b>V<sub>BE</sub> at 0.2 mA:</b> \(V_{BE} = 0.8 + V_T\ln(0.2/1) = 0.8 - 0.025(1.609) = 0.760\) V (not 0.7 V).</p>
+    <p>\(V_B = 0\) (grounded), so \(V_E = -0.760\) V. \(I_E = I_C\dfrac{\beta+1}{\beta} = 0.2\times1.01 = 0.202\) mA.</p>
+    <p>\(R_E = \dfrac{V_E - (-1.5)}{I_E} = \dfrac{0.740}{0.202} = \mathbf{3.66}\) kΩ. \(R_C = \dfrac{1.5 - 0.5}{0.2} = \mathbf{5.0}\) kΩ.</p>
+    <p>Check: \(V_{CE} = 0.5 - (-0.760) = 1.26\) V ≥ 0.3 V, active ✓ (\(V_{CB} = 0.5\) V, reverse biased).</p>
+    <p class="recog">Full method: <a href="../bjt/04-bias-circuits.html">Bias circuits, stability and bias design</a></p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2021–22 · Sec B · Q6(c) · 16 marks</div>
+  <div class="exam-q"><p>For the circuit shown in Fig. for Q. No. 6(c), find \(V_B\), \(V_E\), and \(V_C\) for \(R_B\) = 10 kΩ. Let β = 100.</p>
+    <figure><div id="f-b6c"></div><figcaption>Fig. for Q. 6(c): R<sub>B</sub> = 10 kΩ from +5 V to the base; R<sub>C</sub> = 1 kΩ to +5 V; R<sub>E</sub> = 1 kΩ to ground. V<sub>BE</sub> = 0.7 V assumed.</figcaption></figure></div>
+  <details><summary>Answer key</summary><div class="exam-a">
+    <p><b>Assume active:</b> \(I_B = \dfrac{5 - 0.7}{10 + 101(1)} = 38.7\) µA, \(I_C = 3.87\) mA. Then \(V_C = 5 - 3.87 = 1.13\) V, but \(V_E = 101(0.0387) = 3.91\) V: \(V_C < V_E\), impossible. <b>Not active, so saturated.</b></p>
+    <p><b>Saturation</b> (\(V_{BE} = 0.7\) V, \(V_{CE} = 0.2\) V): with \(V_E = x\): \(V_B = x + 0.7\), \(V_C = x + 0.2\). KCL at the emitter: \(I_E = x/1 = I_B + I_C = \dfrac{5 - (x + 0.7)}{10} + \dfrac{5 - (x + 0.2)}{1}\) ⇒ \(5.23 = 2.1x\) ⇒ \(x = 2.49\) V.</p>
+    <p><b>\(V_E = 2.49\) V, \(V_B = 3.19\) V, \(V_C = 2.69\) V.</b> \(I_B = 0.181\) mA, \(I_C = 2.31\) mA; forced β = 12.8 < 100 ✓ (saturation confirmed).</p>
+    <p class="recog">Full method: <a href="../bjt/03-dc-analysis.html">DC analysis: active, saturation, cutoff</a></p>
+  </div></details>
+</div>
+
+<h3>Question 7</h3>
+<div class="exam">
+  <div class="exam-src">2021–22 · Sec B · Q7(a) · 26⅔ marks</div>
+  <div class="exam-q"><p>Derive the expression of \(R_i\), \(R_o\), \(A_v\), and \(G_v\) for a common emitter amplifier with emitter resistance (\(R_e\)) using the T model.</p></div>
+  <details><summary>Answer key</summary><div class="exam-a">
+    <p>Circuit: signal \(v_{sig}\) with \(R_{sig}\) into the base; \(R_e\) unbypassed in the emitter; \(R_C\) in the collector and load \(R_L\) coupled to it. \(r_o\) is neglected. T model: base current \(i_b\), emitter current \(i_e = (\beta+1)i_b\), \(r_e\) in series with the emitter, dependent current \(\alpha i_e\) at the collector.</p>
+    <ul>
+      <li><b>Input resistance.</b> \(v_b = i_e(r_e + R_e)\) and \(i_b = i_e/(\beta+1)\), so \(R_i = \dfrac{v_b}{i_b} = (\beta+1)(r_e + R_e)\) (with a bias resistor \(R_B\): \(R_B\parallel R_i\)).</li>
+      <li><b>Voltage gain.</b> \(i_e = \dfrac{v_b}{r_e + R_e}\), \(v_o = -\alpha i_e(R_C\parallel R_L)\), so \(A_v = \dfrac{v_o}{v_b} = -\dfrac{\alpha(R_C\parallel R_L)}{r_e + R_e}\). Open circuit: \(A_{vo} = -\dfrac{\alpha R_C}{r_e + R_e}\). For \(R_e \gg r_e\), \(A_v \approx -\dfrac{R_C\parallel R_L}{R_e}\), nearly independent of \(\beta\).</li>
+      <li><b>Output resistance.</b> With \(v_{sig} = 0\) the dependent source is dead (\(i_e = 0\)): \(R_o = R_C\) (\(R_C\parallel r_o\) if kept; with \(R_e\) the transistor's own \(r_o\) rises to \(r_o[1 + g_mR_e r_\pi/(r_\pi + R_e + R_{sig})]\)).</li>
+      <li><b>Overall gain.</b> \(G_v = \dfrac{R_i}{R_i + R_{sig}}A_v = -\dfrac{\beta(R_C\parallel R_L)}{R_{sig} + (\beta+1)(r_e + R_e)}\).</li>
+      <li>Effect of \(R_e\): \(R_i\) goes up by about \((1 + R_e/r_e)\), gain falls by the same factor (gain–bandwidth, linearity and stability traded for gain).</li>
+    </ul>
+    <p class="recog">Full method: <a href="../bjt/09-ce-with-re.html">CE amplifier with emitter resistance</a></p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2021–22 · Sec B · Q7(b) · 20 marks</div>
+  <div class="exam-q"><p>A CS amplifier utilizes a MOSFET biased at \(I_D\) = 0.25 mA with \(V_{ov}\) = 0.25 V and \(R_D\) = 20 kΩ. The amplifier is fed with a signal source having \(R_{sig}\) = 100 kΩ, and a 20 kΩ load is connected to the output. Find \(R_{in}\), \(A_{vo}\), \(R_o\), \(A_v\), and \(G_v\).</p></div>
+  <details><summary>Answer key</summary><div class="exam-a">
+    <p>\(g_m = \dfrac{2I_D}{V_{ov}} = \dfrac{2(0.25)}{0.25} = 2\) mA/V. No \(V_A\) is given, so \(r_o = \infty\).</p>
+    <ul>
+      <li>\(R_{in} = \infty\) (gate, no DC path assumed in the amplifier itself).</li>
+      <li>\(A_{vo} = -g_mR_D = -2\times20 = \mathbf{-40}\) V/V.</li>
+      <li>\(R_o = R_D = \mathbf{20}\) kΩ.</li>
+      <li>\(A_v = -g_m(R_D\parallel R_L) = -2\times10 = \mathbf{-20}\) V/V.</li>
+      <li>\(G_v = \dfrac{R_{in}}{R_{in} + R_{sig}}A_v = \mathbf{-20}\) V/V (no loss in \(R_{sig}\) since \(R_{in} = \infty\)).</li>
+    </ul>
+    <p class="recog">Full method: <a href="../mosfet/07-cs-amplifier.html">Common-source amplifier</a></p>
+  </div></details>
+</div>
+
+<h3>Question 8</h3>
+<div class="exam">
+  <div class="exam-src">2021–22 · Sec B · Q8(a) · 16⅔ marks · <span class="pb pb-0">no longer examined</span></div>
+  <div class="exam-q"><p>Explain the read and write operation in a DRAM cell.</p></div>
+  <details><summary>Answer key</summary><div class="exam-a">
+    <p>1T1C cell: one access NMOS (gate on the word line WL, drain/source between the bit line BL and the storage capacitor \(C_S\)).</p>
+    <ul>
+      <li><b>Write:</b> WL high turns the transistor on; BL is driven to \(V_{DD}\) (write 1) or 0 (write 0) and \(C_S\) charges or discharges through it. WL goes low, trapping the charge.</li>
+      <li><b>Read:</b> BL is precharged to \(V_{DD}/2\); WL high shares charge between \(C_S\) and the bit-line capacitance \(C_B\): \(\Delta V = \pm\dfrac{V_{DD}}{2}\dfrac{C_S}{C_S + C_B}\) (tens of mV). A sense amplifier amplifies it. The read is destructive, so the sensed value is written back (restore).</li>
+      <li>Charge leaks away, so every cell is refreshed every few ms.</li>
+    </ul>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2021–22 · Sec B · Q8(b) · 15 marks · <span class="pb pb-0">no longer examined</span></div>
+  <div class="exam-q"><p>Explain briefly the programming and erase operation in a Flash Memory.</p></div>
+  <details><summary>Answer key</summary><div class="exam-a">
+    <p>A flash cell is a MOSFET with a floating gate between the control gate and the channel; stored electrons shift \(V_t\) (low \(V_t\) = 1, high \(V_t\) = 0).</p>
+    <ul>
+      <li><b>Program</b> (NOR flash): high gate voltage (about 12 V) and a high drain voltage; hot electrons are injected from the channel onto the floating gate, raising \(V_t\).</li>
+      <li><b>Erase:</b> electrons are removed by Fowler–Nordheim tunnelling to the source (or the substrate) with a high voltage of opposite polarity, lowering \(V_t\). It is done in blocks.</li>
+      <li><b>Read:</b> apply a gate voltage between the two \(V_t\) values and sense whether the cell conducts.</li>
+    </ul>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2021–22 · Sec B · Q8(c) · 15 marks · <span class="pb pb-0">no longer examined</span></div>
+  <div class="exam-q"><p>Design a MOD-3 counter using JK flip-flops and verify the design showing truth-table.</p></div>
+  <details><summary>Answer key</summary><div class="exam-a">
+    <p>Two flip-flops, states \(Q_1Q_0\): 00 → 01 → 10 → 00 (11 unused).</p>
+    <table class="tbl"><thead><tr><th>Q₁Q₀</th><th>next</th><th>J₁ K₁</th><th>J₀ K₀</th></tr></thead><tbody>
+    <tr><td>00</td><td>01</td><td>0 ×</td><td>1 ×</td></tr>
+    <tr><td>01</td><td>10</td><td>1 ×</td><td>× 1</td></tr>
+    <tr><td>10</td><td>00</td><td>× 1</td><td>0 ×</td></tr>
+    <tr><td>11</td><td>(→ 00)</td><td>× 1</td><td>× 1</td></tr>
+    </tbody></table>
+    <p>From the K-maps: \(J_0 = \overline{Q_1}\), \(K_0 = 1\), \(J_1 = Q_0\), \(K_1 = 1\). Verification: start 00: \(J_0 = 1, K_0 = 1\) → \(Q_0\) sets; \(J_1 = 0\) → 01. From 01: \(J_0 = 1\) but \(K_0 = 1\) toggles \(Q_0\) to 0; \(J_1 = 1\) sets \(Q_1\) → 10. From 10: \(J_0 = 0\), \(K_0 = 1\) → \(Q_0 = 0\); \(K_1 = 1\) resets \(Q_1\) → 00. The unused state 11 goes to 00 (\(J_0 = 0, K_0 = 1\), \(J_1 = K_1 = 1\)), so it is self-starting.</p>
+  </div></details>
+</div>
+
+<h2>Topic table</h2>
+<table class="tbl"><thead><tr><th>Part</th><th>Marks</th><th>Type</th><th>Chapter</th></tr></thead><tbody>
+<tr><td>Q1(a)</td><td>20</td><td>O-05 build an expression (sin²)</td><td><a href="../opamp/04-expression-synthesis.html">Building a given expression</a></td></tr>
+<tr><td>Q1(b)</td><td>26⅔</td><td>S-02 RC phase-shift derivation</td><td><a href="../osc/03-rc-phase-shift.html">RC phase-shift oscillator</a></td></tr>
+<tr><td>Q2(a)</td><td>26⅔</td><td>S-05 op-amp monostable</td><td><a href="../osc/06-astable-and-generators.html">Astable, monostable, square–triangle generators</a></td></tr>
+<tr><td>Q2(b)(i)</td><td>10</td><td>S-07 555 monostable</td><td><a href="../osc/07-555-timer.html">The 555 timer</a></td></tr>
+<tr><td>Q2(b)(ii)</td><td>10</td><td>S-06 555 astable design</td><td><a href="../osc/07-555-timer.html">The 555 timer</a></td></tr>
+<tr><td>Q3(a)</td><td>17</td><td>R-2R DAC (no longer examined)</td><td>—</td></tr>
+<tr><td>Q3(b)</td><td>17</td><td>PLL (no longer examined)</td><td>—</td></tr>
+<tr><td>Q3(c)</td><td>12⅔</td><td>ADC output (no longer examined)</td><td>—</td></tr>
+<tr><td>Q4(a)</td><td>23</td><td>S-08 sawtooth generator</td><td><a href="../osc/06-astable-and-generators.html">Astable, monostable, square–triangle generators</a></td></tr>
+<tr><td>Q4(b)</td><td>23⅔</td><td>CMOS vs TTL (no longer examined)</td><td>—</td></tr>
+<tr><td>Q5(a)</td><td>16⅔</td><td>D-01 two-diode ratio</td><td><a href="../diode/04-exponential-model.html">The exponential model and diode strings</a></td></tr>
+<tr><td>Q5(b)</td><td>15</td><td>D-14 limiter design</td><td><a href="../diode/10-clippers.html">Clippers and transfer characteristics</a></td></tr>
+<tr><td>Q5(c)</td><td>15</td><td>D-07 bridge rectifier</td><td><a href="../diode/08-rectifiers.html">Rectifiers and battery chargers</a></td></tr>
+<tr><td>Q6(a)</td><td>10⅔</td><td>B-12 Early effect (theory)</td><td><a href="../bjt/02-iv-and-early-effect.html">I–V characteristics and the Early effect</a></td></tr>
+<tr><td>Q6(b)</td><td>20</td><td>B-04 bias design</td><td><a href="../bjt/04-bias-circuits.html">Bias circuits, stability and bias design</a></td></tr>
+<tr><td>Q6(c)</td><td>16</td><td>B-01 DC with saturation</td><td><a href="../bjt/03-dc-analysis.html">DC analysis: active, saturation, cutoff</a></td></tr>
+<tr><td>Q7(a)</td><td>26⅔</td><td>B-08 CE with R<sub>e</sub> derivation</td><td><a href="../bjt/09-ce-with-re.html">CE amplifier with emitter resistance</a></td></tr>
+<tr><td>Q7(b)</td><td>20</td><td>M-10 CS amplifier numbers</td><td><a href="../mosfet/07-cs-amplifier.html">Common-source amplifier</a></td></tr>
+<tr><td>Q8(a)</td><td>16⅔</td><td>DRAM (no longer examined)</td><td>—</td></tr>
+<tr><td>Q8(b)</td><td>15</td><td>Flash (no longer examined)</td><td>—</td></tr>
+<tr><td>Q8(c)</td><td>15</td><td>MOD-3 counter (no longer examined)</td><td>—</td></tr>
+</tbody></table>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/eee.js"></script>
+<script>
+// Q1(a) key
+$('#f-a1a').innerHTML = sch([
+  ['AC', [30, 100], [30, 180], 'v₁', 1, { amp: 1, f: 15.9 }], ['gnd', [30, 180]], ['W', [30, 100], [50, 100]],
+  ['C', [50, 100], [110, 100], 'C 1 µF'], ['W', [110, 100], [160, 100]], ['dot', [130, 100]],
+  ['W', [130, 100], [130, 40]], ['R', [130, 40], [230, 40], 'R 10 kΩ'], ['W', [230, 40], [260, 40], [260, 116]], ['W', [240, 116], [260, 116]],
+  ['opamp', [160, 116]], ['W', [160, 132], [160, 140]], ['gnd', [160, 140]], ['dot', [260, 116]],
+  ['W', [260, 116], [290, 116]], ['R', [290, 116], [350, 116], '10 kΩ'], ['W', [350, 116], [420, 116]], ['dot', [380, 116]],
+  ['R', [380, 116], [380, 180], '10 kΩ'], ['V', [380, 180], [380, 250], 'v₂ 1 V'], ['gnd', [380, 250]],
+  ['opamp', [420, 100]], ['W', [500, 100], [520, 100]], ['dot', [510, 100]], ['W', [510, 100], [510, 50], [400, 50], [400, 84], [420, 84]],
+  ['open', [540, 100], 'vₒ'], ['t', [270, 106], 'vA', 'start'],
+], { w: 590, h: 270 });
+
+// Q2(a) key monostable
+$('#f-a2a').innerHTML = sch([
+  ['opamp', [200, 116]], ['W', [280, 116], [330, 116]], ['dot', [300, 116]], ['open', [330, 116], 'vₒ'],
+  ['W', [300, 116], [300, 40]], ['R', [300, 40], [220, 40], 'R'], ['W', [220, 40], [160, 40], [160, 100], [200, 100]], ['dot', [160, 100]],
+  ['W', [160, 100], [90, 100]], ['dot', [90, 100]], ['C', [90, 100], [90, 170], 'C'], ['gnd', [90, 170]],
+  ['W', [90, 100], [40, 100]], ['D', [40, 100], [40, 170], 'D₁'], ['gnd', [40, 170]],
+  ['W', [200, 132], [170, 132]], ['dot', [170, 132]], ['R', [170, 132], [170, 200], 'R₁'], ['gnd', [170, 200]],
+  ['W', [300, 116], [300, 230]], ['R', [300, 230], [230, 230], 'R₂'], ['W', [230, 230], [130, 230], [130, 132], [170, 132]],
+], { w: 380, h: 260, sim: false });
+
+// Q4(a) key sawtooth
+$('#f-a4a').innerHTML = sch([
+  ['opamp', [100, 116], { plusTop: true }], ['W', [80, 100], [100, 100]], ['W', [100, 132], [100, 140]], ['gnd', [100, 140]],
+  ['W', [180, 116], [200, 116]], ['W', [200, 50], [200, 170]], ['dot', [200, 116]],
+  ['R', [80, 50], [200, 50], 'R₃'], ['W', [80, 50], [80, 100]], ['dot', [80, 100]],
+  ['W', [200, 90], [220, 90]], ['D', [220, 90], [270, 90], 'D₁'], ['R', [270, 90], [330, 90], 'Rₐ'],
+  ['W', [200, 170], [220, 170]], ['D', [270, 170], [220, 170], 'D₂'], ['R', [330, 170], [270, 170], 'Rb'],
+  ['W', [330, 90], [360, 90], [360, 170], [330, 170]], ['dot', [360, 100]], ['W', [360, 100], [400, 100]],
+  ['opamp', [400, 116]], ['W', [400, 132], [400, 140]], ['gnd', [400, 140]],
+  ['W', [390, 100], [390, 40]], ['C', [390, 40], [500, 40], 'C'], ['W', [500, 40], [500, 116]], ['W', [480, 116], [500, 116]], ['dot', [390, 100]],
+  ['W', [500, 116], [500, 210], [20, 210], [20, 100]], ['R', [20, 100], [80, 100], 'R₂'], ['dot', [500, 116]],
+  ['t', [206, 140], 'vsq', 'start'], ['t', [510, 150], 'vsaw', 'start'], ['t', [140, 160], 'A1'], ['t', [440, 160], 'A2'],
+], { w: 560, h: 230, sim: false });
+
+// Q5(a)
+$('#f-b5a').innerHTML = sch([
+  ['I', [100, 30], [100, 100], '10 mA'], ['W', [100, 30], [30, 30], [30, 190], [220, 190]], ['gnd', [130, 190]],
+  ['dot', [100, 100]], ['t', [88, 96], 'a', 'end'],
+  ['D', [100, 100], [100, 190], 'D₂'], ['D', [100, 100], [220, 100], 'D₁'],
+  ['dot', [220, 100]], ['t', [230, 96], 'V', 'start'], ['R', [220, 100], [220, 190], 'R'],
+], { w: 280, h: 220 });
+
+// Q5(b) key limiter
+$('#f-b5b').innerHTML = sch([
+  ['AC', [30, 80], [30, 160], 'vᵢ', 1, { amp: 5, f: 1000 }], ['W', [30, 80], [60, 80]], ['R', [60, 80], [140, 80], '10 kΩ'], ['W', [140, 80], [300, 80]],
+  ['dot', [200, 80]], ['dot', [260, 80]],
+  ['D', [200, 80], [200, 130], 'D'], ['D', [200, 130], [200, 180], 'D'], ['D', [200, 180], [200, 230], 'D'],
+  ['D', [260, 230], [260, 180], 'D'], ['D', [260, 180], [260, 130], 'D'], ['D', [260, 130], [260, 80], 'D'],
+  ['W', [30, 160], [30, 230], [260, 230]], ['dot', [200, 230]], ['gnd', [120, 230]], ['open', [300, 80], 'vₒ'],
+], { w: 350, h: 260 });
+
+// Q5(c) bridge
+$('#f-b5c').innerHTML = sch([
+  ['D', [120, 100], [120, 40], 'D₁'], ['D', [220, 100], [220, 40], 'D₃'],
+  ['D', [120, 240], [120, 100], 'D₄'], ['D', [220, 240], [220, 100], 'D₂'],
+  ['AC', [120, 100], [220, 100], 'vₛ', 1, { amp: 16.97, f: 50 }], ['dot', [120, 100]], ['dot', [220, 100]],
+  ['t', [108, 118], 't', 'end'], ['t', [232, 118], 'b', 'start'],
+  ['W', [120, 40], [300, 40]], ['dot', [220, 40]], ['t', [150, 30], 'p'],
+  ['W', [120, 240], [300, 240]], ['dot', [220, 240]], ['gnd', [210, 240]], ['t', [150, 256], 'n'],
+  ['R', [300, 40], [300, 240], 'R 100 Ω'], ['t', [312, 60], '+ vₒ', 'start'],
+], { w: 380, h: 270, sim: false });
+
+// Q6(a) Early plot
+(() => {
+  const W = 400, H = 220, x0 = 150, VA = 50, X = v => x0 + v * 2.4, Y = i => 190 - i * 18;
+  let s = `<line x1="20" x2="390" y1="190" y2="190" stroke="currentColor"/><line x1="${x0}" x2="${x0}" y1="10" y2="195" stroke="currentColor"/>`;
+  [3, 2, 1].forEach((I0, k) => {
+    s += `<polyline fill="none" stroke="currentColor" stroke-width="2" points="${X(0)},${Y(0)} ${X(1)},${Y(I0 * 0.8)} ${X(3)},${Y(I0 * 0.97)} ${X(5)},${Y(I0 * (1 + 5 / VA))} ${X(100)},${Y(I0 * (1 + 100 / VA))}"/>`;
+    s += `<line x1="${X(-VA)}" x2="${X(5)}" y1="190" y2="${Y(I0 * (1 + 5 / VA))}" stroke="currentColor" stroke-dasharray="4 3" stroke-opacity=".5"/>`;
+    s += `<text x="392" y="${Y(I0 * (1 + 100 / VA)) - 6}" text-anchor="end" font-size="10" fill="currentColor">vBE${k + 1}</text>`;
+  });
+  s += `<text x="${X(-VA)}" y="206" text-anchor="middle" font-size="10" fill="currentColor">−VA</text><text x="388" y="204" text-anchor="end" font-size="10" fill="currentColor">vCE →</text><text x="${x0 + 4}" y="16" font-size="10" fill="currentColor">iC</text>`;
+  $('#p-b6a').innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="${W}" style="max-width:100%" role="img" aria-label="iC versus vCE showing the Early effect">${s}</svg>`;
+})();
+
+// Q6(b)
+$('#f-b6b').innerHTML = sch([
+  ['rail', [140, 20], '+1.5 V'], ['R', [140, 20], [140, 100], 'RC'], ['npn', [100, 140], { beta: 100 }],
+  ['W', [100, 140], [60, 140]], ['gnd', [60, 140]], ['R', [140, 180], [140, 260], 'RE'], ['rail', [140, 260], '−1.5 V', false],
+  ['dot', [140, 100]], ['t', [150, 96], 'VC = 0.5 V', 'start'],
+], { w: 260, h: 290, sim: false });
+
+// Q6(c)
+$('#f-b6c').innerHTML = sch([
+  ['rail', [110, 20], '+5 V'], ['W', [60, 20], [160, 20]], ['R', [60, 20], [60, 140], 'RB 10 kΩ'], ['W', [60, 140], [120, 140]],
+  ['npn', [120, 140], { beta: 100 }], ['R', [160, 20], [160, 100], 'RC 1 kΩ'], ['R', [160, 180], [160, 260], 'RE 1 kΩ'], ['gnd', [160, 260]],
+  ['t', [100, 134], 'VB', 'end'], ['t', [170, 176], 'VE', 'start'], ['t', [170, 100], 'VC', 'start'],
+], { w: 300, h: 280 });
+</script>
+</body>
+</html>

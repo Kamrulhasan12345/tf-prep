@@ -5,6 +5,7 @@ Term-final study notes, published as a static site on GitHub Pages. No build ste
 | Subject | Folder | Course |
 |---|---|---|
 | Database Management Systems | [`dbms/`](dbms/) | CSE215 |
+| Electronic Circuits | [`eee/`](eee/) | EEE263 |
 
 ## Layout
 

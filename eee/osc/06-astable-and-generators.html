@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Astable, Monostable and Square–Triangle Generators · EEE 263 Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Oscillators · Chapter 6 · Sedra §18.5–18.6 · Khairul (Function Generator) s.2–12 · types S-05, S-08</div>
+<h1>Astable, Monostable and Square–Triangle Generators</h1>
+<p class="lede">A Schmitt trigger plus a timing element makes a waveform generator. Triangle/square generators came every year from 2018–19 to 2022–23 (16 to 27 marks), an op-amp one-shot in 2021–22, and the batch's assignment had an RL-timed astable. Every result here comes from two facts: a capacitor (or inductor) relaxes exponentially, and an integrator turns a constant into a ramp. Schmitt thresholds are in <a href="05-schmitt-trigger.html">Chapter 5</a>; the 555 versions are in <a href="07-555-timer.html">Chapter 7</a>. Not covered in the class notes this term (see <a href="../start/04-exam-strategy.html">exam strategy §9</a>), but examined.</p>
+
+<h2>1. Three kinds of multivibrator</h2>
+<dl class="def">
+  <dt>Bistable</dt><dd>Two stable states; stays in either until triggered. The Schmitt trigger.</dd>
+  <dt>Astable</dt><dd>No stable state (two quasi-stable states): switches back and forth by itself. A square-wave oscillator.</dd>
+  <dt>Monostable (one-shot)</dt><dd>One stable state. A trigger flips it into the quasi-stable state for a fixed time T, then it returns by itself.</dd>
+</dl>
+<p>The one formula every timing derivation uses (Khairul s.8): a capacitor charging through R toward \(V_\infty\) from \(V_{0^+}\):</p>
+<div class="formula">\[ v(t) = V_\infty - (V_\infty - V_{0^+})\,e^{-t/\tau}, \quad \tau = RC \quad\Rightarrow\quad t = \tau\ln\frac{V_\infty - V_{0^+}}{V_\infty - v(t)} \]</div>
+
+<h2>2. The op-amp astable (type S-05)</h2>
+<figure><div id="fig-ast"></div><figcaption><b>Figure 1.</b> Op-amp astable: an inverting Schmitt trigger (R₁, R₂ set \(\beta = R_1/(R_1+R_2)\)) whose output charges C through R. The capacitor voltage \(v_-\) swings between \(\beta L_-\) and \(\beta L_+\).</figcaption></figure>
+<p><b>Derivation (an exam answer).</b> Let the output be \(L_+\). The + input sits at \(\beta L_+\). C charges from \(\beta L_-\) toward \(L_+\); when \(v_-\) reaches \(\beta L_+\) the op-amp flips to \(L_-\). Using the capacitor law with \(V_\infty = L_+\), \(V_{0^+} = \beta L_-\), \(v(T_1) = \beta L_+\):</p>
+<div class="formula">\[ T_1 = \tau\ln\frac{L_+ - \beta L_-}{L_+ - \beta L_+} = \tau\ln\frac{1 - \beta(L_-/L_+)}{1-\beta}, \qquad T_2 = \tau\ln\frac{1 - \beta(L_+/L_-)}{1-\beta} \]</div>
+<p>With symmetric levels \(L_- = -L_+\):</p>
+<div class="formula">\[ T = 2\tau\ln\frac{1+\beta}{1-\beta}, \qquad f = \frac{1}{T} \]</div>
+<p>Handy choices: \(\beta = 0.5\) gives \(T = 2\tau\ln3 = 2.197\,RC\); \(\beta = 0.462\) (\(R_2/R_1 = 1.164\)) gives \(T \approx 2RC\).</p>
+<div class="method"><h4>Method · astable analysis or design</h4><ol>
+<li>\(\beta = R_1/(R_1 + R_2)\) from the divider on the + input.</li>
+<li>Symmetric levels: \(T = 2RC\ln\frac{1+\beta}{1-\beta}\). Unequal levels: compute \(T_1\) and \(T_2\) separately.</li>
+<li>Design: choose β (say 0.5), choose C (so that R lands between about 1 kΩ and 1 MΩ), then \(R = T / \left(2C\ln\frac{1+\beta}{1-\beta}\right)\).</li>
+</ol></div>
+<div id="wk-ast"></div>
+<div id="dr-ast"></div>
+<div id="dr-astd"></div>
+
+<h3>The RL-timed astable (assignment Q9)</h3>
+<p>Replace R–C by L–R: the inductor sits between the output and the − input and a resistor goes from the − input to ground. The resistor voltage (proportional to the inductor current) is the continuous quantity, and it relaxes with \(\tau = L/R\). The period has the same form, \(T = 2\tau\ln\frac{1+\beta}{1-\beta}\).</p>
+<div class="q"><h4>Assignment Q9: L = 10 mH, R = 200 Ω, divider 35 kΩ (output to +) and 30 kΩ (+ to ground), rails ±13 V</h4>
+<p>\(\beta = 30/65 = 6/13\), so the thresholds are ±6 V. \(\tau = L/R = 10\text{ mH}/200\ \Omega = 50\) µs. The resistor voltage moves exponentially between −6 V and +6 V toward ±13 V: \(T = 2\times50\text{ µs}\times\ln\frac{13+6}{13-6} = 100\ln(19/7)\) µs \(= 99.85\) µs. The output is a ±13 V square wave at about 10.0 kHz.</p></div>
+
+<h2>3. The op-amp monostable (one-shot)</h2>
+<p>Circuit (Khairul s.11–12, Sedra Fig. 18.28): the astable of Figure 1 with a diode \(D_1\) across C (anode at the − input) and a trigger network (\(C_2\), \(R_4\), \(D_2\)) into the + input.</p>
+<ol>
+<li><b>Stable state:</b> \(v_O = L_+\); C would charge toward \(L_+\) but \(D_1\) clamps \(v_-\) at \(V_{D1} \approx 0.7\) V, which is below \(\beta L_+\), so nothing changes.</li>
+<li><b>Trigger:</b> a negative pulse through \(D_2\) pulls \(v_+\) below \(V_{D1}\): the output flips to \(L_-\) and \(v_+ = \beta L_-\).</li>
+<li><b>Timing:</b> C discharges from \(V_{D1}\) toward \(L_-\); when \(v_-\) reaches \(\beta L_-\) the output returns to \(L_+\).</li>
+<li><b>Recovery:</b> C must recharge to \(V_{D1}\) before the next trigger, otherwise the pulse comes out shorter.</li>
+</ol>
+<div class="formula">\[ T = RC\ln\frac{V_{D1} - L_-}{\beta L_- - L_-} = RC\ln\frac{V_{D1} + L}{L(1-\beta)} \;\approx\; RC\ln\frac{1}{1-\beta}\quad(V_{D1} \ll L) \]</div>
+<p>Example: \(\beta = 0.5\), \(L = 13\) V, \(V_{D1} = 0.7\) V gives \(T = RC\ln(13.7/6.5) = 0.746\,RC\) (0.693 RC if the diode drop is ignored; say which you used).</p>
+<div id="dr-mono"></div>
+
+<h2>4. Square–triangle generator (type S-08)</h2>
+<figure><div id="fig-tri"></div><figcaption><b>Figure 2.</b> A non-inverting Schmitt (op-amp 1, R₁ from the triangle output to +, R₂ from the square output to +) drives an inverting integrator (op-amp 2). The integrator output \(v_1\) is the triangle; the Schmitt output \(v_2\) is the square wave.</figcaption></figure>
+<p><b>Derivation (2022–23 compulsory part, 20 marks).</b></p>
+<ol>
+<li>The Schmitt + input: \(v_+ = \dfrac{R_2 v_1 + R_1 v_2}{R_1 + R_2}\). It switches when \(v_+ = 0\), i.e. when \(v_1 = -\dfrac{R_1}{R_2}v_2\). So the thresholds are \(V_{TH} = -L_-\dfrac{R_1}{R_2}\), \(V_{TL} = -L_+\dfrac{R_1}{R_2}\); symmetric: \(\pm L\dfrac{R_1}{R_2}\).</li>
+<li>While \(v_2 = L_+\), the integrator output falls with slope \(-L_+/(RC)\), from \(V_{TH}\) to \(V_{TL}\): \(T_1 = RC\dfrac{V_{TH} - V_{TL}}{L_+}\). While \(v_2 = L_-\) it rises: \(T_2 = RC\dfrac{V_{TH} - V_{TL}}{-L_-}\).</li>
+<li>Symmetric levels: \(V_{pp} = 2L\dfrac{R_1}{R_2}\), \(T_1 = T_2 = 2RC\dfrac{R_1}{R_2}\):</li>
+</ol>
+<div class="formula">\[ T = 4RC\,\frac{R_1}{R_2}, \qquad f = \frac{R_2}{4RCR_1}, \qquad V_{pp,\triangle} = 2L\frac{R_1}{R_2} \]</div>
+<p>Why non-inverting: the integrator already inverts. An inverting Schmitt would make the loop latch instead of oscillate.</p>
+<div class="method"><h4>Method · design for f and V<sub>pp</sub></h4><ol>
+<li>State the saturation level L (13 V is Sedra's usual; 15 V if told the output swings to the rails).</li>
+<li>Amplitude first: \(R_1/R_2 = V_{pp}/(2L)\). Pick \(R_2\) (say 10 kΩ), get \(R_1\).</li>
+<li>Frequency next: \(RC = \dfrac{R_2}{4fR_1}\). Pick C, get R.</li>
+<li>If the bistable is given (thresholds and levels fixed, 2019–20), only RC is free: \(T = RC(V_{TH} - V_{TL})\left(\frac{1}{L_+} + \frac{1}{|L_-|}\right)\).</li>
+</ol></div>
+<div id="wk-tri"></div>
+<div id="dr-tri"></div>
+<div id="dr-trid"></div>
+
+<h3>Sawtooth variant (2021–22)</h3>
+<p>Make the two ramps unequal: feed the integrator through two diode-steered paths, \(D_1\) in series with \(R_a\) (used while \(v_2 = L_+\)) and \(D_2\) reversed in series with \(R_b\) (used while \(v_2 = L_-\)). With ideal diodes and symmetric levels: \(T_{fall} = 2R_aC\dfrac{R_1}{R_2}\), \(T_{rise} = 2R_bC\dfrac{R_1}{R_2}\), \(f = \dfrac{R_2}{2R_1C(R_a + R_b)}\). Choose \(R_b \ll R_a\) for a fast flyback.</p>
+
+<div class="trap"><h4>Traps</h4><ul>
+<li>Triangle generator: the Schmitt must be <b>non-inverting</b>; draw R₁ from the triangle output, not from the square output.</li>
+<li>\(V_{pp} = 2LR_1/R_2\), not \(LR_1/R_2\); and \(T = 4RCR_1/R_2\), not \(2RCR_1/R_2\) (that is half a period).</li>
+<li>Astable: \(T = 2RC\ln\frac{1+\beta}{1-\beta}\) uses the natural log; \(\beta\) is \(R_1/(R_1+R_2)\), not \(R_1/R_2\).</li>
+<li>Monostable: the timing starts at the diode clamp \(V_{D1}\), not at 0 V or \(\beta L_+\).</li>
+<li>Always state the assumed saturation level L; answers with 13 V and 15 V are both accepted if stated.</li>
+</ul></div>
+
+<h2>Exam questions</h2>
+<div class="exam">
+  <div class="exam-src">2022–23 · Sec B · Q5(b) · 20 marks · compulsory</div>
+  <div class="exam-q"><p>Draw and explain the operation of a triangular-wave generator circuit using op-amps and a Schmitt trigger. Derive the frequency of oscillation.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><b>Circuit:</b> Figure 2: op-amp 1 is a non-inverting Schmitt trigger (− input grounded; R₁ from the triangle output \(v_1\) to the + input; R₂ from its own output \(v_2\) to the + input). Op-amp 2 is an inverting integrator (R from \(v_2\) to its − input, C from − input to \(v_1\), + grounded).</p>
+    <p><b>Operation:</b> while \(v_2 = +L\) the integrator ramps \(v_1\) down at \(L/(RC)\) V/s. When \(v_1\) reaches \(-LR_1/R_2\), the Schmitt's + input crosses zero and \(v_2\) flips to \(-L\); \(v_1\) now ramps up until it reaches \(+LR_1/R_2\), and the Schmitt flips back. \(v_1\) is a triangle between \(\pm LR_1/R_2\), \(v_2\) a square wave ±L.</p>
+    <p><b>Thresholds:</b> \(v_+ = \dfrac{R_2v_1 + R_1v_2}{R_1+R_2} = 0 \Rightarrow v_1 = -\dfrac{R_1}{R_2}v_2\), so \(V_{TH,TL} = \pm L\dfrac{R_1}{R_2}\), \(\Delta V = 2L\dfrac{R_1}{R_2}\).</p>
+    <p><b>Frequency:</b> each ramp lasts \(\dfrac{T}{2} = \dfrac{\Delta V}{L/RC} = 2RC\dfrac{R_1}{R_2}\), so \(T = 4RC\dfrac{R_1}{R_2}\) and \(f = \dfrac{R_2}{4RCR_1}\). (For unequal levels: \(T_1 = RC\Delta V/L_+\), \(T_2 = RC\Delta V/|L_-|\).)</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2021–22 · Sec A · Q4(a) · 23 marks</div>
+  <div class="exam-q"><p>Draw a sawtooth-wave generator circuit using op-amps. Explain the operation of the circuit.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>Use the triangle generator of Figure 2 but replace the integrator's input resistor by two parallel diode paths: \(D_1\) + \(R_a\) conducting when \(v_2 = +L\), and \(D_2\) (reversed) + \(R_b\) conducting when \(v_2 = -L\), with \(R_b \ll R_a\).</p>
+    <p>While \(v_2 = +L\), current flows through \(R_a\): the output falls slowly with slope \(L/(R_aC)\) from \(+LR_1/R_2\) to \(-LR_1/R_2\), taking \(T_{fall} = 2R_aC\,R_1/R_2\). The Schmitt then flips; current flows through \(R_b\) and the output rises quickly, \(T_{rise} = 2R_bC\,R_1/R_2\). The result is a sawtooth (slow ramp, fast flyback) of peak-to-peak \(2LR_1/R_2\) and \(f = \dfrac{R_2}{2R_1C(R_a + R_b)}\). (Alternative: an integrator with a switch across C that resets it rapidly.)</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2021–22 · Sec A · Q2(a) · 26⅔ marks</div>
+  <div class="exam-q"><p>Draw a one-shot multivibrator circuit using an op-amp. Explain the operation of the circuit.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><b>Circuit:</b> op-amp with R₂ from output A to the + input C and R₁ from C to ground (\(\beta = R_1/(R_1+R_2)\)); R from A to the − input B; C from B to ground; D₁ from B (anode) to ground; trigger: a negative pulse through C₂ to node E (R₄ to ground), D₂ from C (anode) to E.</p>
+    <p><b>Operation:</b> stable state \(v_A = L_+\), \(v_C = \beta L_+\), \(v_B\) clamped at \(V_{D1}\) by D₁. A negative trigger pulls \(v_C\) below \(v_B\) through D₂, so the output switches to \(L_-\) and \(v_C = \beta L_-\). C now discharges from \(V_{D1}\) toward \(L_-\): \(v_B(t) = L_- - (L_- - V_{D1})e^{-t/RC}\). When \(v_B = \beta L_-\) the comparator flips back to \(L_+\).</p>
+    <p><b>Pulse width:</b> \(T = RC\ln\dfrac{V_{D1} - L_-}{\beta L_- - L_-} \approx RC\ln\dfrac{1}{1-\beta}\). Example β = 0.5, L = 13 V: \(T = 0.746RC\). After the pulse, C must recharge to \(V_{D1}\) (recovery time) before the next trigger.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2020–21 · Sec A · Q4(a) · 26⅔ marks</div>
+  <div class="exam-q"><p>Drawing appropriate circuits, show how you can generate triangular waves using a bistable multivibrator and appropriate op-amp circuits.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>Same answer as 2022–23 Q5(b) above: a non-inverting bistable (R₁ from \(v_1\), R₂ from \(v_2\) to the + input) driving an inverting integrator, with the integrator output fed back to the bistable. Thresholds \(\pm LR_1/R_2\); \(f = R_2/(4RCR_1)\); both a triangle (\(v_1\)) and a square wave (\(v_2\)) are available. Draw both waveforms aligned in time.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2019–20 · Sec B · Q7(b) · 18 marks</div>
+  <div class="exam-q"><p>A bistable multivibrator with a given non-inverting transfer characteristic (levels \(L_+\), \(L_-\); thresholds \(V_{TL} &lt; 0 &lt; V_{TH}\)) is provided. Design a signal generator based on it that produces a square wave \(v_2\) (high for \(T_1\), low for \(T_2\)) and a triangle \(v_1\) between \(V_{TL}\) and \(V_{TH}\). Choose component values for 1 MHz.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>Connect an inverting integrator (R, C) from the bistable output \(v_2\) to \(v_1\), and \(v_1\) back to the bistable input. The bistable is given, so only RC is designed.</p>
+    <p>\(T_1 = RC\dfrac{V_{TH} - V_{TL}}{L_+}\), \(T_2 = RC\dfrac{V_{TH} - V_{TL}}{-L_-}\), so \(T = RC(V_{TH} - V_{TL})\left(\dfrac{1}{L_+} + \dfrac{1}{|L_-|}\right) = 1\) µs.</p>
+    <p>For a symmetric characteristic (\(L_\pm = \pm L\), \(V_{TH,TL} = \pm V_T\)): \(T = 4RC\,V_T/L\). If, for example, \(V_T = L\) (thresholds equal to the levels, \(R_1 = R_2\)), \(RC = 250\) ns: C = 100 pF, R = 2.5 kΩ. Read \(V_T\) and L from the given figure and substitute.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2018–19 · Sec B · Q7(c) · 16 marks</div>
+  <div class="exam-q"><p>Design a circuit using a bistable multivibrator which generates a triangular waveform with oscillation frequency 2 kHz and 10 V peak-to-peak amplitude.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>Use Figure 2. Assume \(L = \pm13\) V.</p>
+    <p><b>Amplitude:</b> \(2L\dfrac{R_1}{R_2} = 10 \Rightarrow \dfrac{R_1}{R_2} = \dfrac{10}{26} = 0.385\). Take \(R_2\) = 26 kΩ, \(R_1\) = 10 kΩ.</p>
+    <p><b>Frequency:</b> \(f = \dfrac{R_2}{4RCR_1} = 2000 \Rightarrow RC = \dfrac{1}{4\times2000\times0.385} = 325\) µs. With C = 10 nF, R = 32.5 kΩ.</p>
+    <p>(With \(L = \pm15\) V: \(R_1/R_2 = 1/3\), \(RC = 375\) µs, R = 37.5 kΩ at 10 nF. Either is right if L is stated.)</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">Class test (2018, 2019 batches) · 20 marks</div>
+  <div class="exam-q"><p>Design an astable multivibrator using op-amps with f = 300 Hz. Choose suitable R and C values.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>Figure 1. Choose \(R_1 = R_2\) (β = 0.5): \(T = 2RC\ln3 = 2.197RC = 1/300\) s, so \(RC = 1.517\) ms. With C = 0.1 µF, R = 15.2 kΩ (use 15 kΩ). (Alternatively \(R_2/R_1 = 1.164\), β = 0.462, gives T ≈ 2RC, RC = 1.667 ms.)</p>
+  </div></details>
+</div>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+
+<div class="key"><p><strong>Summary:</strong> astable \(T = 2RC\ln\frac{1+\beta}{1-\beta}\), β = R₁/(R₁+R₂); one-shot \(T = RC\ln\frac{V_{D1}+L}{L(1-\beta)}\); square–triangle generator = non-inverting Schmitt + inverting integrator, \(V_{pp} = 2LR_1/R_2\), \(f = R_2/(4RCR_1)\): set the ratio from \(V_{pp}\) first, then RC from f. Sawtooth: unequal integrator resistors via steering diodes.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/eee.js"></script>
+<script>
+const astFig = (o = {}) => sch([
+  ['opamp', [200, 120], { vmax: o.L ?? 13 }], ['W', [280, 120], [300, 120], [300, 40], [270, 40]], ['R', [180, 40], [270, 40], o.R || 'R'],
+  ['W', [180, 40], [170, 40], [170, 104], [200, 104]], ['dot', [170, 104]], ['C', [170, 104], [170, 190], o.C || 'C', -1], ['gnd', [170, 190]],
+  ['W', [200, 136], [190, 136], [190, 210]], ['dot', [190, 210]], ['R', [190, 210], [300, 210], o.R2 || 'R₂'], ['W', [300, 210], [300, 120]],
+  ['R', [190, 210], [190, 280], o.R1 || 'R₁'], ['gnd', [190, 280]], ['dot', [300, 120]], ['W', [300, 120], [330, 120]], ['open', [330, 120], 'vₒ'],
+], { w: 380, h: 300 });
+const triFig = (o = {}) => sch([
+  ['opamp', [60, 120], { vmax: o.L ?? 13 }], ['W', [60, 104], [40, 104]], ['gnd', [40, 104]],
+  ['W', [60, 136], [50, 136], [50, 190]], ['dot', [50, 190]], ['R', [50, 190], [160, 190], o.R2 || 'R₂', -1], ['W', [160, 190], [160, 120]],
+  ['W', [140, 120], [180, 120], [180, 104], [190, 104]], ['dot', [160, 120]], ['t', [150, 112], 'v₂', 'middle'],
+  ['R', [190, 104], [250, 104], o.R || 'R'], ['W', [250, 104], [260, 104]], ['dot', [250, 104]],
+  ['W', [250, 104], [250, 50]], ['C', [250, 50], [350, 50], o.C || 'C'], ['W', [350, 50], [360, 50], [360, 120]],
+  ['opamp', [260, 120], { vmax: o.L ?? 13 }], ['W', [260, 136], [245, 136], [245, 150]], ['gnd', [245, 150]],
+  ['W', [340, 120], [390, 120]], ['dot', [360, 120]], ['open', [390, 120], 'v₁ △'],
+  ['W', [50, 190], [50, 250]], ['R', [50, 250], [360, 250], o.R1 || 'R₁', -1], ['W', [360, 250], [360, 120]],
+], { w: 440, h: 270 });
+$('#fig-ast').innerHTML = astFig({ R: 'R 15 kΩ', C: 'C 0.1 µF', R1: 'R₁ 10 kΩ', R2: 'R₂ 10 kΩ' });
+$('#fig-tri').innerHTML = triFig({ R: 'R 32 kΩ', C: 'C 10 nF', R1: 'R₁ 10 kΩ', R2: 'R₂ 26 kΩ' });
+
+worked('#wk-ast', {
+  given: 'Design an op-amp astable for f = 300 Hz (class test). Take R₁ = R₂ and C = 0.1 µF.',
+  steps: [
+    { t: '\\(\\beta = R_1/(R_1+R_2) = 0.5\\)', a: { l: '\\beta', v: 0.5, u: '' } },
+    { t: '\\(T = 2RC\\ln\\frac{1+\\beta}{1-\\beta} = 2RC\\ln 3 = 2.197\\,RC\\)', a: { l: 'T/RC', v: 2.1972, u: '' } },
+    { t: '\\(T = 1/300 = 3.333\\) ms, so \\(RC = 3.333/2.197 = 1.517\\) ms', a: { l: 'RC', v: 1.517e-3, u: 'ms' } },
+    { t: '\\(R = 1.517\\text{ ms}/0.1\\text{ µF} = 15.2\\) kΩ (use 15 kΩ)', a: { l: 'R', v: 15170, u: 'kΩ' } },
+  ] });
+
+drill('#dr-ast', { id: 's05-astable', title: 'Op-amp astable: period and frequency', gen(r) {
+  const L = r.pick([12, 13, 14, 15]), R1 = r.E(1e3, 47e3), R2 = r.E(1e3, 100e3), R = r.E(1e3, 220e3), C = r.pick([1e-9, 2.2e-9, 4.7e-9, 10e-9, 22e-9, 47e-9, 0.1e-6, 0.22e-6, 1e-6]);
+  const b = R1 / (R1 + R2), T = 2 * R * C * Math.log((1 + b) / (1 - b)), f = 1 / T;
+  if (f < 1 || f > 2e5) return null;
+  return {
+    given: `Op-amp astable (Figure 1) with ±${L} V output levels, \\(R_1\\) = ${si(R1, 'Ω')}, \\(R_2\\) = ${si(R2, 'Ω')}, R = ${si(R, 'Ω')}, C = ${si(C, 'F')}. Find β, the period and the frequency.`,
+    fig: astFig({ L, R: 'R ' + si(R, 'Ω'), C: 'C ' + si(C, 'F'), R1: 'R₁ ' + si(R1, 'Ω'), R2: 'R₂ ' + si(R2, 'Ω') }),
+    ask: [{ l: '\\beta', v: b, u: '' }, { l: 'T', v: T, u: 'ms' }, { l: 'f', v: f, u: 'Hz' }],
+    steps: [
+      { t: `\\(\\beta = \\dfrac{${num(R1 / 1e3)}}{${num(R1 / 1e3)} + ${num(R2 / 1e3)}} = ${num(b)}\\)`, a: { l: '\\beta', v: b, u: '' } },
+      { t: `\\(T = 2RC\\ln\\dfrac{1+\\beta}{1-\\beta} = 2\\times${si(R, 'Ω')}\\times${si(C, 'F')}\\times\\ln\\dfrac{${num(1 + b)}}{${num(1 - b)}} = ${si(T, 's')}\\)`, a: { l: 'T', v: T, u: 'ms' } },
+      { t: `\\(f = 1/T = ${si(f, 'Hz')}\\). The levels (±${L} V) do not enter: only their symmetry matters.`, a: { l: 'f', v: f, u: 'Hz' } },
+    ] };
+} });
+
+drill('#dr-astd', { id: 's05-astable-design', title: 'Op-amp astable: choose R for a target frequency', gen(r) {
+  const f = r.pick([50, 100, 200, 300, 500, 1000, 2000, 5000, 10000]), R1 = r.pick([10e3, 22e3, 47e3]), R2 = r.pick([10e3, 22e3, 47e3, 100e3]), C = r.pick([1e-9, 10e-9, 22e-9, 0.1e-6, 0.47e-6, 1e-6]);
+  const b = R1 / (R1 + R2), k = 2 * Math.log((1 + b) / (1 - b)), R = 1 / (f * C * k);
+  if (R < 1e3 || R > 1e6) return null;
+  return {
+    given: `Design an op-amp astable for f = ${si(f, 'Hz')} using \\(R_1\\) = ${si(R1, 'Ω')}, \\(R_2\\) = ${si(R2, 'Ω')} and C = ${si(C, 'F')}. Find the timing resistor R.`,
+    ask: [{ l: 'R', v: R, u: 'kΩ' }],
+    steps: [
+      `\\(\\beta = ${num(R1 / 1e3)}/(${num(R1 / 1e3)} + ${num(R2 / 1e3)}) = ${num(b)}\\), so \\(T = ${num(k)}\\,RC\\).`,
+      { t: `\\(R = \\dfrac{1}{f\\,C\\times${num(k)}} = \\dfrac{1}{${num(f)}\\times${si(C, 'F')}\\times${num(k)}} = ${si(R, 'Ω')}\\)`, a: { l: 'R', v: R, u: 'kΩ' } },
+    ] };
+} });
+
+drill('#dr-mono', { id: 's05-monostable', title: 'Op-amp one-shot: pulse width', gen(r) {
+  const L = r.pick([12, 13, 14]), VD = 0.7, R1 = r.E(1e3, 47e3), R2 = r.E(1e3, 100e3), R = r.E(1e3, 220e3), C = r.pick([10e-9, 47e-9, 0.1e-6, 1e-6]);
+  const b = R1 / (R1 + R2), T = R * C * Math.log((VD + L) / (L * (1 - b))), Ta = R * C * Math.log(1 / (1 - b));
+  return {
+    given: `Op-amp monostable with ±${L} V levels, clamp diode drop 0.7 V, \\(R_1\\) = ${si(R1, 'Ω')} (+ input to ground), \\(R_2\\) = ${si(R2, 'Ω')} (output to + input), timing R = ${si(R, 'Ω')}, C = ${si(C, 'F')}. Find the pulse width T (include the diode drop).`,
+    ask: [{ l: 'T', v: T, u: 'ms' }],
+    steps: [
+      `\\(\\beta = ${num(b)}\\); during the pulse C runs from \\(V_{D1} = 0.7\\) V toward \\(-${L}\\) V and the output flips back at \\(\\beta L_- = ${num(-b * L)}\\) V.`,
+      { t: `\\(T = RC\\ln\\dfrac{V_{D1} + L}{L(1-\\beta)} = ${si(R * C, 's')}\\times\\ln\\dfrac{${num(VD + L)}}{${num(L * (1 - b))}} = ${si(T, 's')}\\)`, a: { l: 'T', v: T, u: 'ms' } },
+      `Ignoring the diode drop would give \\(RC\\ln\\frac{1}{1-\\beta} = ${si(Ta, 's')}\\).`,
+    ] };
+} });
+
+worked('#wk-tri', {
+  given: 'Design a triangle generator (Figure 2) for 2 kHz and 10 V peak-to-peak (2018–19). Assume L = ±13 V, R₂ = 26 kΩ, C = 10 nF.',
+  steps: [
+    { t: '\\(V_{pp} = 2L\\,R_1/R_2 \\Rightarrow R_1/R_2 = 10/26 = 0.385\\)', a: { l: 'R_1/R_2', v: 0.3846, u: '' } },
+    { t: '\\(R_1 = 0.385\\times26 = 10\\) kΩ', a: { l: 'R_1', v: 10e3, u: 'kΩ' } },
+    { t: '\\(f = R_2/(4RCR_1) \\Rightarrow RC = \\dfrac{1}{4\\times2000\\times0.385} = 325\\) µs', a: { l: 'RC', v: 325e-6, u: 'µs' } },
+    { t: '\\(R = 325\\text{ µs}/10\\text{ nF} = 32.5\\) kΩ', a: { l: 'R', v: 32.5e3, u: 'kΩ' } },
+  ] });
+
+drill('#dr-tri', { id: 's08-triangle', title: 'Square–triangle generator: amplitude and frequency', gen(r) {
+  const L = r.pick([10, 12, 13, 15]), R1 = r.E(2.2e3, 47e3), R2 = r.E(4.7e3, 100e3), R = r.E(1e3, 100e3), C = r.pick([1e-9, 2.2e-9, 4.7e-9, 10e-9, 22e-9, 47e-9, 0.1e-6]);
+  if (R1 >= R2) return null;
+  const Vpp = 2 * L * R1 / R2, f = R2 / (4 * R * C * R1);
+  if (f > 2e5 || f < 10) return null;
+  return {
+    given: `In the generator of Figure 2 the op-amps saturate at ±${L} V; \\(R_1\\) = ${si(R1, 'Ω')}, \\(R_2\\) = ${si(R2, 'Ω')}, R = ${si(R, 'Ω')}, C = ${si(C, 'F')}. Find the triangle's peak-to-peak value and the frequency.`,
+    fig: triFig({ L, R: 'R ' + si(R, 'Ω'), C: 'C ' + si(C, 'F'), R1: 'R₁ ' + si(R1, 'Ω'), R2: 'R₂ ' + si(R2, 'Ω') }),
+    ask: [{ l: 'V_{pp}', v: Vpp, u: 'V' }, { l: 'f', v: f, u: 'kHz' }],
+    steps: [
+      { t: `Thresholds \\(\\pm L\\,R_1/R_2 = \\pm${num(L * R1 / R2)}\\) V, so \\(V_{pp} = ${num(Vpp)}\\) V`, a: { l: 'V_{pp}', v: Vpp, u: 'V' } },
+      `Each ramp: slope \\(L/RC = ${num(L / (R * C))}\\) V/s over \\(V_{pp}\\): \\(T/2 = ${si(Vpp * R * C / L, 's')}\\).`,
+      { t: `\\(f = \\dfrac{R_2}{4RCR_1} = \\dfrac{${num(R2 / 1e3)}}{4\\times${si(R, 'Ω')}\\times${si(C, 'F')}\\times${num(R1 / 1e3)}} = ${si(f, 'Hz')}\\)`, a: { l: 'f', v: f, u: 'kHz' } },
+    ] };
+} });
+
+drill('#dr-trid', { id: 's08-triangle-design', title: 'Design a triangle generator for f and Vpp', gen(r) {
+  const L = r.pick([12, 13, 15]), Vpp = r.pick([2, 4, 5, 6, 8, 10, 12]), f = r.pick([100, 500, 1000, 2000, 5000, 10000, 20000]), R2 = 10e3, C = r.pick([1e-9, 4.7e-9, 10e-9, 47e-9, 0.1e-6]);
+  if (Vpp >= 2 * L * 0.95) return null;
+  const k = Vpp / (2 * L), R1 = k * R2, R = 1 / (4 * f * C * k);
+  if (R < 1e3 || R > 1e6) return null;
+  return {
+    given: `Design a square–triangle generator (Figure 2) for a ${Vpp} V peak-to-peak triangle at ${si(f, 'Hz')}. Op-amps saturate at ±${L} V. Use \\(R_2\\) = 10 kΩ and C = ${si(C, 'F')}. Find \\(R_1\\) and R.`,
+    ask: [{ l: 'R_1', v: R1, u: 'kΩ' }, { l: 'R', v: R, u: 'kΩ' }],
+    steps: [
+      { t: `Amplitude first: \\(R_1/R_2 = V_{pp}/(2L) = ${Vpp}/${2 * L} = ${num(k)}\\), so \\(R_1 = ${si(R1, 'Ω')}\\)`, a: { l: 'R_1', v: R1, u: 'kΩ' } },
+      { t: `Then frequency: \\(R = \\dfrac{R_2}{4fCR_1} = \\dfrac{1}{4\\times${num(f)}\\times${si(C, 'F')}\\times${num(k)}} = ${si(R, 'Ω')}\\)`, a: { l: 'R', v: R, u: 'kΩ' } },
+    ] };
+} });
+
+flashcards('#cards', [
+  { f: 'Astable period', b: 'T = 2RC ln((1+β)/(1−β)), β = R₁/(R₁+R₂)' },
+  { f: 'β = 0.5 astable', b: 'T = 2.197 RC' },
+  { f: 'One-shot pulse width', b: 'T = RC ln((V_D1 + L)/(L(1−β))) ≈ RC ln(1/(1−β))' },
+  { f: 'Recovery time', b: 'Time for C to recharge to V_D1 before the next trigger.' },
+  { f: 'Triangle amplitude', b: 'V_pp = 2L·R₁/R₂ (non-inverting Schmitt thresholds ±L R₁/R₂)' },
+  { f: 'Triangle frequency', b: 'f = R₂/(4RCR₁)' },
+  { f: 'Why non-inverting Schmitt?', b: 'The integrator already inverts; the loop needs net positive feedback to switch.' },
+  { f: 'Sawtooth', b: 'Unequal integrator resistors via steering diodes: slow ramp, fast flyback.' },
+]);
+quiz('#quiz', [
+  { q: 'Astable with R₁ = R₂, R = 10 kΩ, C = 0.1 µF. f ≈', opts: ['455 Hz', '1 kHz', '693 Hz', '227 Hz'], a: 0, why: 'T = 2.197 × 1 ms = 2.197 ms, f = 455 Hz.' },
+  { q: 'Triangle generator, L = 12 V, R₁ = 10 kΩ, R₂ = 30 kΩ. V_pp =', opts: ['4 V', '8 V', '24 V', '12 V'], a: 1, why: '2 × 12 × 10/30 = 8 V.' },
+  { q: 'Same generator with R = 10 kΩ, C = 10 nF. f =', opts: ['7.5 kHz', '2.5 kHz', '833 Hz', '25 kHz'], a: 0, why: 'f = 30/(4 × 10k × 10n × 10) = 7.5 kHz.' },
+  { q: 'Doubling C in the triangle generator…', opts: ['halves f, same amplitude', 'halves amplitude', 'doubles f', 'changes nothing'], a: 0, why: 'Amplitude depends only on L·R₁/R₂.' },
+  { q: 'In the op-amp one-shot the capacitor voltage at the start of the pulse is', opts: ['0 V', 'V_D1 ≈ 0.7 V', 'βL₊', 'L₊'], a: 1, why: 'The clamp diode held it there in the stable state.' },
+]);
+</script>
+</body>
+</html>

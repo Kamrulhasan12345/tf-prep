@@ -1,0 +1,431 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Clippers and Limiters · EEE 263 Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Diodes · Chapter 10 · Sedra §4.6.1 · Sadat L9, notes p.31–36, p.82, slides 24–28 · Khairul s.45–59 · types D-13, D-14, D-12</div>
+<h1>Clippers and Transfer Characteristics</h1>
+<p class="lede">A clipper question appeared in 2011–12, 2015–16, 2016–17 (two), 2017–18, 2018–19, 2021–22 and 2022–23 (compulsory Q1(a), 14 marks), 10 to 18 marks each. It was absent in 2023–24 and 2024–25, but Sadat sir taught it in depth (L9) and asked you to practise <b>designing a clipper from a given \(v_o\)–\(v_i\) curve</b> ("no need to memorise generalised formulas"). Everything here is one idea: find where each diode turns on, then solve a divider in each region.</p>
+
+<h2>1. Vocabulary and the two rules</h2>
+<dl class="def">
+  <dt>Limiter / clipper</dt><dd>A circuit whose transfer characteristic is linear (gain \(K\)) between two levels and flat (hard) or less steep (soft) outside: \(v_O = Kv_I\) for \(L_-/K \le v_I \le L_+/K\).</dd>
+  <dt>Shunt (parallel) clipper</dt><dd>Series \(R\) from input to output, diode branches from output to ground. The common exam form.</dd>
+  <dt>Series clipper</dt><dd>Diode in series between input and load; the output follows the input only while the diode conducts (Khairul s.46–49). A half-wave rectifier is a series clipper.</dd>
+  <dt>Hard / soft</dt><dd>Branch without resistor: output held at the threshold (slope 0). Branch with \(R_k\): output keeps rising with slope \(R_k/(R + R_k)\).</dd>
+</dl>
+<div class="method"><h4>Sadat sir's two rules (notes p.34, boxed)</h4><ol>
+<li><b>Diode pointing down from \(v_o\)</b> (anode at \(v_o\)) clips the <b>top</b>: it conducts when \(v_o &gt; V_{ref} + V_\gamma\). <b>Diode pointing up</b> (cathode at \(v_o\)) clips the <b>bottom</b>: conducts when \(v_o &lt; V_{ref} - V_\gamma\).</li>
+<li>\(V_{ref}\) is the battery voltage at the diode's far end, with sign: battery + toward the diode shifts the level up, flipped battery shifts it down. A Zener in breakdown acts as a battery \(V_Z\) (Zener clipper: \(\pm(V_Z + V_\gamma)\)).</li>
+</ol></div>
+<figure><div id="fig-basic"></div><figcaption><b>Figure 1.</b> Basic shunt clippers with \(V_\gamma\) = 0.7 V (Sadat slides 24–25): anode at \(v_o\) clips at +0.7 V; cathode at \(v_o\) clips at −0.7 V; with a 2 V battery (+ up) in series, at 2.7 V; with the battery flipped, at −1.3 V; two branches (2 V and 3 V) clip at +2.7 and −3.7 V.</figcaption></figure>
+
+<h2>2. Analysis: breakpoints and slopes (type D-13)</h2>
+<div class="method"><h4>Method · transfer characteristic</h4><ol>
+<li>For every branch write its threshold in \(v_o\): \(E = V_{ref} + V_\gamma\) (clips top) or \(V_{ref} - V_\gamma\) (clips bottom). Ideal diode: \(V_\gamma = 0\). PWL diode: also an \(r_D\) in the branch.</li>
+<li><b>Middle region</b> (all off): \(v_o = v_i\), or \(v_o = v_i\dfrac{R_L}{R + R_L}\) with a load.</li>
+<li><b>Breakpoint in \(v_i\):</b> where the middle-region \(v_o\) reaches \(E\): \(v_i = E\) (no load) or \(E(R + R_L)/R_L\).</li>
+<li><b>Beyond it:</b> replace the on diode by \(V_\gamma\) (and \(r_D\)); hard clip: \(v_o = E\); soft clip: \(v_o = E + (v_i - E)\dfrac{R_k}{R + R_k}\) (Sadat p.36: \(y = mx + c\)). With a load, use the nodal form \(v_o = \dfrac{v_i/R + E/R_k}{1/R + 1/R_k + 1/R_L}\).</li>
+<li>Check continuity at each breakpoint and that the on diode's current is positive.</li>
+<li><b>Waveform:</b> output peaks from \(v_i = \pm V_m\); times of the breakpoints \(t = \sin^{-1}(v_{i,bp}/V_m)/\omega\) (and \(T/2 - t\), etc.).</li>
+</ol></div>
+<h3>Worked example: 2022–23 Sec A Q1(a)</h3>
+<div id="wk-2223"></div>
+<div id="dr-clip"></div>
+
+<h3>Other forms you must recognise</h3>
+<ul>
+<li><b>Zener clipper</b> (Sadat p.35, Khairul s.55–59): back-to-back Zeners across the output limit at \(+(V_{Z2} + 0.7)\) and \(-(V_{Z1} + 0.7)\). A single Zener: \(+V_Z\) and \(-0.7\) V.</li>
+<li><b>Series clipper</b> (Khairul s.46–49): diode in series, load \(R_L\) (and maybe a battery in series with \(R_L\)). Output = the part of the input that forward-biases the diode, e.g. "series negative clipper with positive bias" passes \(v_i\) above \(+V_b\).</li>
+<li><b>Output across the series resistor</b> (Sadat p.82): it is the complement of the normal clipper: \(v_R = v_i - v_o\), zero in the middle region and sloped outside.</li>
+<li><b>Diode-bridge limiter</b> (2016–17): all four diodes on while the bias current exceeds the load current; the output then follows the input.</li>
+</ul>
+
+<h2>3. The piecewise-linear model (teacher's rewrites of P4.87, P4.91, P4.95)</h2>
+<p>The teacher crossed out the exponential model in the highlighted Sedra limiter problems and asked for PWL or CVD. A PWL diode is a battery \(V_{D0}\) plus \(r_D\). From two points: \(r_D = \Delta V/\Delta I\) (P4.87: conduction starts at 0.5 V, 0.7 V at 1 mA, so \(r_D\) = 200 Ω). In the on region the diode branch has \(R_k = r_D\), so the slope is \(r_D/(R + r_D)\): \(0.2/1.2 = 1/6\) in P4.87 and \(0.1/1.1 = 1/11\) in P4.91.</p>
+<div id="dr-pwl"></div>
+
+<h2>4. Design from a required curve (type D-14)</h2>
+<div class="method"><h4>Method · design a shunt clipper</h4><ol>
+<li>Middle slope 1 → unloaded shunt clipper: series \(R\), branches to ground. (Middle slope 0 → output taken across the series resistor, Sadat p.82.)</li>
+<li>Upper breakpoint \(L_+\): diode with anode toward \(v_o\), battery \(V = L_+ - V_\gamma\) (+ toward the diode). Lower breakpoint \(L_-\): diode with cathode toward \(v_o\), reference \(V = L_- + V_\gamma\) (a negative value means battery + at ground).</li>
+<li>Flat beyond the breakpoint → no resistor in that branch. Slope \(s\) → branch resistor \(R_k = R\dfrac{s}{1 - s}\) (\(s = 1/2\): \(R_k = R\); \(1/3\): \(R/2\)).</li>
+<li>Only diodes allowed (no batteries): use \(n = |L|/V_\gamma\) diodes in series (2.1/0.7 = 3).</li>
+<li>Two corners on one side (soft, then hard): two branches, the hard one with the higher threshold.</li>
+<li>Re-analyse your circuit to check every corner.</li>
+</ol></div>
+<div id="dr-design"></div>
+
+<h2>5. Graphical I–V and waveform construction (type D-12)</h2>
+<p>Old papers (2012–13, 2013–14) give a drawn diode I–V and an input waveform. Read the model off the graph: turn-on voltage \(V_{on}\), slope (\(r_D\) = inverse slope), reverse breakdown at \(-V_{BR}\). In series with \(R\): \(v_R = (v_{in} - V_{on})\frac{R}{R + r_D}\) above \(V_{on}\), \(v_R = (v_{in} + V_{BR})\frac{R}{R + r_{BR}}\) below \(-V_{BR}\), zero between; \(v_D = v_{in} - v_R\). A diode in parallel with an ideal source just has \(v_D = v_{in}\).</p>
+<div id="dr-iv"></div>
+
+<div class="trap"><h4>Traps (where marks go)</h4><ul>
+<li>Drawing a flat clip when the branch has a resistor (the 2022–23 student sketch did this: the output keeps rising with slope 2/3 and 1/2).</li>
+<li>Battery polarity: read the long plate as +. A battery with + at ground gives a negative reference.</li>
+<li>With a load, the breakpoint in \(v_i\) is not the threshold in \(v_o\): \(v_{i,bp} = E(R + R_L)/R_L\).</li>
+<li>Model not stated: say "ideal" or "CVD 0.7 V" and use it consistently; "non-ideal" means CVD.</li>
+<li>Design: forgetting to verify; matching a slope without the branch resistor; wrong sign of the battery for a negative level.</li>
+</ul></div>
+
+<h2>Exam questions</h2>
+
+<div class="exam">
+  <div class="exam-src">2022–23 · Sec A · Q1(a) · 14 marks · compulsory</div>
+  <div class="exam-q"><p>For the circuit, plot \(v_o\) versus time. The input \(v_I\) is a sine wave with 5 V amplitude and 1 kHz frequency. Assume 0.7 V drop across the diodes in forward bias.</p><div id="fig-q2223"></div></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>Thresholds: D1 (anode side toward \(v_o\) through 10 kΩ, cathode to +1 V) conducts when \(v_o &gt; 1.7\) V. D2 (cathode toward \(v_o\) through 5 kΩ, anode at −2 V) conducts when \(v_o &lt; -2.7\) V.</p>
+    <p>\(-2.7 \le v_I \le 1.7\): both off, \(v_o = v_I\).</p>
+    <p>\(v_I &gt; 1.7\): \(v_o = 1.7 + (v_I - 1.7)\frac{10}{15} = \frac23v_I + 0.567\); at \(v_I\) = 5 V, \(v_o\) = 3.9 V.</p>
+    <p>\(v_I &lt; -2.7\): \(v_o = -2.7 + (v_I + 2.7)\frac{5}{10} = 0.5v_I - 1.35\); at −5 V, \(v_o\) = −3.85 V.</p>
+    <p>Times (T = 1 ms): \(v_I = 1.7\) V at 0.055 ms and 0.445 ms; \(v_I = -2.7\) V at 0.591 ms and 0.909 ms. The output is the sine, compressed (not flat) beyond these points:</p>
+    <div id="pl-2223"></div>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2021–22 · Sec B · Q5(b) · 15 marks</div>
+  <div class="exam-q"><p>Design a limiter circuit using only diodes and 10 kΩ resistors to provide an output signal limited to the range ±2.1 V. Assume each diode has a 0.7 V drop when conducting.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>No batteries allowed, so build each level from diode drops: \(n = 2.1/0.7 = 3\) diodes in series. Series 10 kΩ from \(v_i\) to \(v_o\); from \(v_o\) to ground one string of 3 diodes pointing down (clips at +2.1 V) and one string of 3 pointing up (clips at −2.1 V).</p>
+    <div id="fig-q2122"></div>
+    <p>Transfer: \(v_o = v_i\) for \(|v_i| \le 2.1\) V; \(v_o = +2.1\) V for \(v_i \ge 2.1\); \(v_o = -2.1\) V for \(v_i \le -2.1\). When limiting, the source current is \((v_i \mp 2.1)/10\) kΩ. (If you add a 10 kΩ load the middle slope becomes 1/2 and limiting starts at ±4.2 V; the limits stay ±2.1 V.)</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2018–19 · Sec A · Q1(d) · 10 marks</div>
+  <div class="exam-q"><p>For a sinusoidal input, draw the output waveshape for the circuit: series R from \(v_i\) to \(v_o\); a diode with cathode at \(v_o\) and anode at the + terminal of a battery V whose − terminal is grounded. (No values given.)</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>Ideal diode (state it): it conducts when \(v_o &lt; V\), so \(v_o = V\) whenever \(v_i &lt; V\), and \(v_o = v_i\) when \(v_i \ge V\). The output follows the sine above \(+V\) and sits flat at \(+V\) elsewhere (take \(V_m &gt; V\)); the diode is off for \(\sin^{-1}(V/V_m) &lt; \omega t &lt; \pi - \sin^{-1}(V/V_m)\). With CVD the level is \(V - 0.7\).</p>
+    <div id="pl-1819"></div>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2017–18 · Sec A · Q4(b) · 18 marks</div>
+  <div class="exam-q"><p>Design a parallel-based clipper that yields the transfer characteristic shown (\(v_O = -5\) V for \(v_I \le -5\) V; \(v_O = v_I\) for \(-5 \le v_I \le 2.5\) V; slope 1/3 above 2.5 V). Assume 0.7 V cut-in.</p><div id="pl-1718"></div></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>Middle slope 1 → shunt clipper with series R. Upper corner 2.5 V with slope 1/3: branch with diode (anode toward \(v_o\)), battery \(2.5 - 0.7 = 1.8\) V (+ toward the diode) and \(R_1\) with \(\frac{R_1}{R + R_1} = \frac13 \Rightarrow R = 2R_1\): take \(R\) = 20 kΩ, \(R_1\) = 10 kΩ. Lower level −5 V flat: diode with cathode at \(v_o\), anode at \(-5 + 0.7 = -4.3\) V (4.3 V battery, + at ground), no resistor.</p>
+    <div id="fig-q1718"></div>
+    <p>Check: \(v_I \ge 2.5\): \(v_O = 1.8 + 0.7 + (v_I - 2.5)\frac{10}{30} = \frac{v_I}{3} + \frac53\) (2.5 V at 2.5 V ✓, 5 V at 10 V); \(v_I \le -5\): \(v_O = -4.3 - 0.7 = -5\) V ✓.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2016–17 · Sec B · Q5(b) · 13 marks</div>
+  <div class="exam-q"><p>Find and sketch the transfer characteristic of the diode-bridge limiter (CVD 0.7 V): +10 V → 10 kΩ → node T; node B → 10 kΩ → −10 V; D1: T→X, D2: T→O, D3: X→B, D4: O→B (anode→cathode); \(v_i\) at X; load 10 kΩ from O to ground.</p><div id="fig-q1617b"></div></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><b>All on</b> (small \(|v_i|\)): \(V_T = v_i + 0.7\), \(V_O = V_T - 0.7 = v_i\): slope 1. Bias currents \(I_T = (10 - v_i - 0.7)/10\) mA and \(I_B = (v_i - 0.7 + 10)/10\) mA.</p>
+    <p><b>Upper break:</b> as \(v_i\) rises, D2 must carry the load current \(v_o/10\) while \(I_T\) falls; D1 cuts off when \(I_T = I_L\): \((9.3 - v_i)/10 = v_i/10 \Rightarrow v_i = 4.65\) V. Beyond it D1 and D4 are off and the output is set by +10 V, 10 kΩ, D2 and the 10 kΩ load: \(v_o = (10 - 0.7)\frac{10}{20} = 4.65\) V, flat.</p>
+    <p>By symmetry \(v_o = -4.65\) V for \(v_i \le -4.65\) V. VTC: flat −4.65 | slope 1 | flat +4.65 V.</p>
+    <div id="pl-1617b"></div>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2016–17 · Sec B · Q5(c) · 13⅔ marks</div>
+  <div class="exam-q"><p>Plot \(v_o\) versus \(v_i\) and \(i_1\) versus \(v_i\) for \(-10 \le v_i \le 10\) V; ideal diodes, \(V_Z\) = 3 V.</p><div id="fig-q1617c"></div></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><b>\(v_i &lt; 0\):</b> the Zener is forward biased and D conducts, so \(v_o = 0\) (D clamps the output at ground) and \(i_1 = v_i/10\) kΩ (−1 mA at −10 V).</p>
+    <p><b>\(0 \le v_i \le 3\) V:</b> the Zener blocks (below \(V_Z\)): \(i_1 = 0\), \(v_o = 0\).</p>
+    <p><b>\(v_i &gt; 3\) V:</b> Zener in breakdown (a 3 V battery), D off: \(i_1 = (v_i - 3)/20\) kΩ, \(v_o = 10i_1 = 0.5(v_i - 3)\): 3.5 V and 0.35 mA at \(v_i\) = 10 V.</p>
+    <div id="pl-1617c"></div>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2015–16 · Sec A · Q2(a) · 16⅔ marks</div>
+  <div class="exam-q"><p>Neatly draw the output \(v_o\) for \(v_{in} = 10\sin(200\pi t)\) V. The diodes are non-ideal (take 0.7 V).</p><div id="fig-q1516"></div></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>Thresholds: right branch (anode at \(v_o\), +5 V, 20 kΩ) on for \(v_o &gt; 5.7\) V; left branch (cathode at \(v_o\), −5 V, 5 kΩ) on for \(v_o &lt; -5.7\) V.</p>
+    <p>\(v_{in} \ge 5.7\): \(v_o = 5.7 + (v_{in} - 5.7)\frac{20}{30} = \frac23v_{in} + 1.9\), peak 8.57 V. \(|v_{in}| &lt; 5.7\): \(v_o = v_{in}\). \(v_{in} \le -5.7\): \(v_o = -5.7 + (v_{in} + 5.7)\frac{5}{15} = \frac{v_{in}}{3} - 3.8\), trough −7.13 V.</p>
+    <p>T = 10 ms; breakpoints at 0.965, 4.035 ms (positive) and 5.965, 9.035 ms (negative).</p>
+    <div id="pl-1516"></div>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2013–14 · Sec A · Q1(a) 26 marks, Q1(b) 10 marks, Q1(c) 10⅔ marks</div>
+  <div class="exam-q"><p>A diode in series with a 1 Ω resistor; the diode I–V: zero current for −3 V &lt; V &lt; 1 V, a line of slope 1 A/V above 1 V, vertical breakdown at −3 V. The input is a staircase 0, 1, 2, 3, 2, 1, 0, −1, −2, −3, −2, −1, 0 V (the text says "sinusoidal"). (a) Draw \(V_{out}\) across the resistor. (b) What would \(V_{out}\) be if the diode had a constant 0.7 V drop? (c) What if the diode and resistor were in parallel?</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>Model: \(V_{on}\) = 1 V, \(r_D\) = 1 Ω, \(V_{BR}\) = 3 V (vertical).</p>
+    <p><b>(a)</b> \(V_{in} &gt; 1\): \(V_{out} = (V_{in} - 1)\frac{1}{1 + 1}\). Steps: 0, 0, 0.5, 1.0, 0.5, 0, 0 V; negative half all 0 (the −3 V step only reaches the breakdown edge, current ≈ 0).</p>
+    <p><b>(b)</b> \(V_{out} = V_{in} - 0.7\) for \(V_{in} &gt; 0.7\): 0, 0.3, 1.3, 2.3, 1.3, 0.3, 0, and 0 on the negative half (an ideal CVD diode has no breakdown).</p>
+    <p><b>(c)</b> Both are directly across the ideal source: \(V_{out} = V_{in}\) (the diode only draws extra current).</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2012–13 · Sec A · Q4(a) 20 marks, Q4(b) 16 marks, Q4(c) 10⅔ marks</div>
+  <div class="exam-q"><p>An ac source drives a diode and resistor in series. \(V_{ac}\) is a triangle (slope ±1 V/s): 0 → +3 V at 3 s → 0 at 6 s → −3 V at 9 s → 0 at 12 s. \(V_R\) is 0 until 1 s, peaks at 3 s, returns to 0 at 5 s; 0 until 8 s, a negative peak at 9 s, 0 at 10 s. (a) Copy \(V_R\) and draw the diode voltage. (b) Draw the diode I–V to scale. (c) Draw the diode voltage if the diode were in parallel with R.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>Conduction starts at \(V_{ac}\) = +1 V (t = 1 s) and at −2 V (t = 8 s), so the diode turns on at +1 V forward and breaks down at −2 V. With \(V_R\) rising at the same 1 V/s slope, \(r_D \approx 0\): \(V_R\) peaks at +2 V and −1 V. (The printed figure suggests 2.2 V and −1.2 V; read literally that needs a negative-resistance diode, so it is a drawing error. The QBank answer uses those values; do not.)</p>
+    <p><b>(a)</b> \(V_D = V_{ac} - V_R\): rises 0 → 1 V (0–1 s), held at 1 V (1–5 s), follows \(V_{ac}\) from 1 V down to −2 V (5–8 s), held at −2 V (8–10 s), then −2 → 0 V (10–12 s).</p>
+    <div id="pl-1213"></div>
+    <p><b>(b)</b> I–V: zero current between −2 V and +1 V, a vertical line at +1 V (forward) and at −2 V (reverse breakdown). <b>(c)</b> In parallel with an ideal source: \(V_D = V_{ac}\).</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2011–12 · Sec B · Q5(b) · 15 marks</div>
+  <div class="exam-q"><p>Sketch the output waveform and transfer characteristic: series R from \(v_s\) to \(v_o\); an ideal diode with anode at \(v_o\) and cathode at −2 V (2 V battery, + at ground). \(v_s\) is a 5 V peak, 5 kHz sinusoid.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>The diode conducts when \(v_o &gt; -2\) V, so \(v_o = -2\) V for \(v_s \ge -2\) V and \(v_o = v_s\) for \(v_s &lt; -2\) V. Transfer: slope 1 up to (−2, −2), flat at −2 V after.</p>
+    <p>Waveform: flat at −2 V except a dip to −5 V during the negative half, between \(t = (0.5 + \sin^{-1}(0.4)/2\pi)T = 0.113\) ms and 0.187 ms (T = 0.2 ms).</p>
+    <div id="pl-1112"></div>
+  </div></details>
+</div>
+
+<h3>Highlighted textbook problems</h3>
+<div class="exam">
+  <div class="exam-src">Sedra 7e P4.87 · highlighted by the teacher (rewritten: PWL, \(V_{D0}\) = 0.5 V, 0.7 V at 1 mA)</div>
+  <div class="exam-q"><p>1 kΩ from \(v_I\) to \(v_O\). (a) Diode from \(v_O\) (anode) to +3 V. (b) Diode from +3 V (anode) to \(v_O\). Sketch \(v_O\) vs \(v_I\).</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>\(r_D = (0.7 - 0.5)/1\text{ mA} = 200\) Ω. (a) Conducts for \(v_O &gt; 3.5\) V: \(v_O = v_I\) up to 3.5 V, then \(v_O = 3.5 + (v_I - 3.5)\frac{0.2}{1.2} = 3.5 + (v_I - 3.5)/6\). (b) Conducts for \(v_O &lt; 2.5\) V: \(v_O = v_I\) above 2.5 V, \(v_O = 2.5 + (v_I - 2.5)/6\) below.</p>
+  </div></details>
+</div>
+<div class="exam">
+  <div class="exam-src">Sedra 7e P4.91 · highlighted by the teacher (rewritten: PWL, \(V_{D0}\) = 0.7 V, \(R_{on}\) = 100 Ω)</div>
+  <div class="exam-q"><p>1 kΩ from \(v_I\) to \(v_O\), two anti-parallel diodes from \(v_O\) to ground. Plot \(v_O\) vs \(v_I\).</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>\(|v_I| \le 0.7\): \(v_O = v_I\). Beyond: \(v_O = \pm[0.7 + (|v_I| - 0.7)\frac{0.1}{1.1}] = \pm[0.7 + (|v_I| - 0.7)/11]\). A soft limiter with K = 1, \(L_\pm \approx \pm0.7\) V (e.g. 1.5 V at \(v_I\) = 9.5 V).</p>
+  </div></details>
+</div>
+<div class="exam">
+  <div class="exam-src">Sedra 7e P4.95 · highlighted by the teacher (rewritten: CVD 0.7 V, \(v_I\) = 2, 1, 0, −1, −2 V)</div>
+  <div class="exam-q"><p>3 kΩ from \(v_I\) to O. D1 from O (anode) to a, a–1 kΩ–(+1 V). D2 from b (anode) to O, b–1 kΩ–(−2 V), D3 from the −2 V node (anode) to b. Find \(v_O\).</p><div id="fig-p495"></div></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>D1 on for \(v_O &gt; 1.7\): \(v_O = 1.7 + (v_I - 1.7)\frac14\). D2 on for \(v_O &lt; -2.7\): \(v_O = -2.7 + (v_I + 2.7)/4\), until \(V_b = v_O + 0.7\) falls to −2.7 V where D3 turns on (\(v_I\) = −5.5 V) and holds \(v_O\) = −3.4 V.</p>
+    <p>\(v_I\) = 2, 1, 0, −1, −2 V → \(v_O\) = 1.775, 1, 0, −1, −2 V. (At ±10 V: +3.78 V and −3.4 V.)</p>
+  </div></details>
+</div>
+
+<h3>Class design exercises (Sadat slide 28, Khairul s.58, Ikra p.32)</h3>
+<div class="exam">
+  <div class="exam-src">Sadat slide 28 · design practice</div>
+  <div class="exam-q"><p>With resistors, DC sources and (i) ideal (ii) 0.7 V diodes, design: (A) \(v_{out} = v_{in}\) for \(|v_{in}| \le 2\) V, slope 0.5 for \(2 &lt; |v_{in}| &lt; 4\) (reaching ±3 V), flat beyond ±4 V. (B) \(v_{out} = 0\) for \(-2 \le v_{in} \le 6\) V, slope 1/8 below −2 V, slope 1/4 above 6 V.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><b>(A)</b> Series \(R\) = 10 kΩ. Upper soft branch: diode (anode toward \(v_o\)) + battery \(2 - V_\gamma\) + \(R_1 = R\) (slope 1/2). Upper hard branch: diode + battery \(3 - V_\gamma\), no resistor (the soft line reaches 3 V exactly at \(v_{in}\) = 4 V ✓). Mirror both for the negative side. Batteries: ideal 2 V and 3 V; CVD 1.3 V and 2.3 V. Verified: \(v_o\) = 2.5 V at 3 V, 3 V at 4 V and 6 V.</p>
+    <p><b>(B)</b> Middle slope 0, so take the output across a resistor \(R_o\) to ground and put the diode branches in series between \(v_{in}\) and \(v_o\). Upper: diode (anode at \(v_{in}\)) + battery \(6 - V_\gamma\) (opposing) + \(R_1\) with \(R_o/(R_o + R_1) = 1/4\) (\(R_o\) = 10 kΩ, \(R_1\) = 30 kΩ). Lower: reversed diode + battery \(2 - V_\gamma\) + \(R_2\) = 70 kΩ (slope 1/8). Verified (CVD, 5.3 V and 1.3 V): \(v_o\) = 0 at 0 and 6 V, +1 V at 10 V, −1 V at −10 V.</p>
+  </div></details>
+</div>
+<div class="exam">
+  <div class="exam-src">Khairul s.58 · design question &nbsp;|&nbsp; Ikra p.32 (class version)</div>
+  <div class="exam-q"><p>(a) Design a parallel clipper (0.7 V cut-in) with slope 1 for \(-2 \le v_I \le 3\) V, slope 1/2 above 3 V and 1/3 below −2 V. (b) Class version: slope 1 between −3 V and 4 V, slope 2/7 above 4 V, 1/6 below −3 V.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><b>(a)</b> \(R\) = 10 kΩ; upper: diode + 2.3 V + \(R_1\) = 10 kΩ; lower: reversed diode, reference −1.3 V, \(R_2\) = 5 kΩ. Verified: 4 V at \(v_I\) = 5, −3 V at −5.</p>
+    <p><b>(b)</b> Batteries 3.3 V (upper) and −2.3 V (lower). With \(R_s\) = 5 kΩ: \(R_1/(R_1 + 5) = 2/7 \Rightarrow R_1\) = 2 kΩ; \(R_2/(R_2 + 5) = 1/6 \Rightarrow R_2\) = 1 kΩ (the notes write "R1 = 1 kΩ" for the second; it is \(R_2\)).</p>
+  </div></details>
+</div>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+
+<div class="key"><p><strong>Summary:</strong> anode at \(v_o\) clips the top at \(V_{ref} + V_\gamma\); cathode at \(v_o\) clips the bottom at \(V_{ref} - V_\gamma\). Middle region \(v_o = v_i\) (or the load divider). Beyond a breakpoint: flat if the branch has no resistor, slope \(R_k/(R + R_k)\) if it has one (\(r_D\) counts as \(R_k\) for a PWL diode). Design: level → battery \(L \mp V_\gamma\), slope \(s\) → \(R_k = Rs/(1 - s)\), no batteries → \(|L|/V_\gamma\) diodes in series. Always re-check corners.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/eee.js"></script>
+<script>
+// plot(o): axes + curves for waveforms and transfer characteristics.
+// o = {w, h, x:[x0,x1], y:[y0,y1], xl, yl, xt:[[v,'label']], yt:[[v,'label']], c:[{f | pts, cls}], g:[{x} | {y}], m:[[x, y, 'text', anchor, cls]], al}
+function plot(o) {
+  const W = o.w || 440, H = o.h || 200, L = 46, R = 30, T = 16, B = 24, s = [];
+  const X = v => L + (v - o.x[0]) / (o.x[1] - o.x[0]) * (W - L - R), Y = v => T + (o.y[1] - v) / (o.y[1] - o.y[0]) * (H - T - B);
+  const n = v => v.toFixed(1), cl = (v, a, b) => Math.min(Math.max(v, a), b);
+  const ax = X(cl(0, o.x[0], o.x[1])), ay = Y(cl(0, o.y[0], o.y[1]));
+  for (const g of o.g || []) s.push(g.x !== undefined ? `<line x1="${n(X(g.x))}" y1="${T}" x2="${n(X(g.x))}" y2="${H - B}" class="s-fg dash" opacity=".45"/>` : `<line x1="${L}" y1="${n(Y(g.y))}" x2="${W - R}" y2="${n(Y(g.y))}" class="s-fg dash" opacity=".45"/>`);
+  s.push(`<line x1="${L}" y1="${n(ay)}" x2="${W - R + 8}" y2="${n(ay)}" class="s-fg"/><line x1="${n(ax)}" y1="${H - B + 4}" x2="${n(ax)}" y2="${T - 8}" class="s-fg"/>`);
+  s.push(`<text x="${W - R + 10}" y="${n(ay + 4)}" class="lbl">${o.xl || ''}</text><text x="${n(ax + 5)}" y="${T - 4}" class="lbl">${o.yl || ''}</text>`);
+  for (const [v, t] of o.xt || []) s.push(`<line x1="${n(X(v))}" y1="${n(ay - 3)}" x2="${n(X(v))}" y2="${n(ay + 3)}" class="s-fg"/><text x="${n(X(v))}" y="${n(ay + 15)}" text-anchor="middle" class="lbl">${t}</text>`);
+  for (const [v, t] of o.yt || []) s.push(`<line x1="${n(ax - 3)}" y1="${n(Y(v))}" x2="${n(ax + 3)}" y2="${n(Y(v))}" class="s-fg"/><text x="${n(ax - 6)}" y="${n(Y(v) + 4)}" text-anchor="end" class="lbl">${t}</text>`);
+  for (const c of o.c || []) {
+    const pts = c.pts || Array.from({ length: 401 }, (_, k) => { const x = o.x[0] + (o.x[1] - o.x[0]) * k / 400; return [x, c.f(x)]; });
+    s.push(`<polyline points="${pts.map(([x, y]) => n(X(x)) + ',' + n(Y(cl(y, o.y[0], o.y[1])))).join(' ')}" class="${c.cls || 's-acc'}"/>`);
+  }
+  for (const [x, y, t, a, c] of o.m || []) s.push(`<text x="${n(X(x))}" y="${n(Y(y))}" text-anchor="${a || 'start'}" class="lbl ${c || ''}">${t}</text>`);
+  return `<svg viewBox="0 0 ${W} ${H}" width="${W}" style="max-width:100%;height:auto;display:block;margin:0 auto" role="img" aria-label="${o.al || 'Plot'}">${s.join('')}</svg>`;
+}
+
+// shunt clipper schematic. br: [{d: 'top' | 'bot', V (signed ref), Rk (kΩ, 0 = none)}], o: {R, RL, amp, f}
+function clipFig(br, o = {}) {
+  const n = br.length + (o.RL ? 1 : 0), X = 210 + n * 90;
+  const it = [['AC', [40, 60], [40, 220], 'vᵢ', 1, { amp: o.amp || 5, f: o.f || 1000 }], ['W', [40, 60], [70, 60]], ['R', [70, 60], [150, 60], o.R || 'R'],
+    ['W', [150, 60], [X, 60]], ['W', [40, 220], [X - 90, 220]], ['gnd', [100, 220]], ['open', [X, 60], ''], ['t', [X + 8, 50], 'vₒ', 'start']];
+  br.forEach((b, i) => {
+    const x = 210 + i * 90; let y = 60;
+    it.push(['dot', [x, 60]], ['dot', [x, 220]]);
+    if (b.Rk) { it.push(['R', [x, 60], [x, 110], b.Rk + ' kΩ']); y = 110; }
+    it.push(b.d === 'top' ? ['D', [x, y], [x, y + 40], ''] : ['D', [x, y + 40], [x, y], '']); y += 40;
+    if (b.V) it.push(['W', [x, y], [x, 160]], b.V > 0 ? ['V', [x, 160], [x, 210], num(b.V) + ' V'] : ['V', [x, 210], [x, 160], num(-b.V) + ' V'], ['W', [x, 210], [x, 220]]);
+    else it.push(['W', [x, y], [x, 220]]);
+  });
+  if (o.RL) { const x = 210 + br.length * 90; it.push(['dot', [x, 60]], ['R', [x, 60], [x, 220], 'Rₗ ' + o.RL + ' kΩ']); }
+  return sch(it, { w: X + 40, h: 250 });
+}
+$('#fig-basic').innerHTML = '<div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center">' + [
+  [x => Math.min(x, 0.7), '+0.7'], [x => Math.max(x, -0.7), '−0.7'], [x => Math.min(x, 2.7), '+2.7'], [x => Math.min(x, -1.3), '−1.3'], [x => Math.min(Math.max(x, -3.7), 2.7), '+2.7 / −3.7']]
+  .map(([f, t]) => plot({ w: 190, h: 160, x: [-5, 5], y: [-5, 5], xl: 'vᵢ', yl: 'vₒ', c: [{ f }], m: [[0.3, 4.3, t, 'start', 'acc']], al: 'Clipper transfer ' + t })).join('') + '</div>';
+
+const Q2223 = [{ d: 'top', V: 1, Rk: 10 }, { d: 'bot', V: -2, Rk: 5 }];
+const v2223 = v => v > 1.7 ? 1.7 + (v - 1.7) * 2 / 3 : v < -2.7 ? -2.7 + (v + 2.7) / 2 : v;
+$('#fig-q2223').innerHTML = clipFig(Q2223, { R: '5 kΩ', amp: 5, f: 1000 });
+$('#pl-2223').innerHTML = plot({ w: 500, h: 220, x: [0, 1], y: [-5.5, 5.5], xl: 't (ms)', yl: 'v (V)', xt: [[0.055, '.055'], [0.445, '.445'], [0.591, '.591'], [0.909, '.909']], yt: [[3.9, '3.9'], [1.7, '1.7'], [-2.7, '−2.7'], [-3.85, '−3.85']],
+  g: [{ y: 1.7 }, { y: -2.7 }], c: [{ f: t => 5 * Math.sin(2 * Math.PI * t), cls: 's-fg dash' }, { f: t => v2223(5 * Math.sin(2 * Math.PI * t)) }], al: '2022-23 output' });
+worked('#wk-2223', {
+  given: 'v_I = 5 sin(2π·1000t) V, series 5 kΩ; branch 1: 10 kΩ + D1 (toward v_o anode) + 1 V; branch 2: 5 kΩ + D2 (cathode toward v_o) + battery −2 V. CVD 0.7 V.',
+  fig: clipFig(Q2223, { R: '5 kΩ', amp: 5, f: 1000 }),
+  steps: [
+    { t: 'D1 on for \\(v_o &gt; 1 + 0.7 = 1.7\\) V', a: { l: 'E_1', v: 1.7, u: 'V' } },
+    { t: 'D2 on for \\(v_o &lt; -2 - 0.7 = -2.7\\) V', a: { l: 'E_2', v: -2.7, u: 'V' } },
+    'Middle: \\(v_o = v_I\\) (no load), so the breakpoints in \\(v_I\\) are 1.7 V and −2.7 V.',
+    { t: 'Top: \\(v_o = 1.7 + (5 - 1.7)\\frac{10}{10 + 5} = 3.9\\) V at the peak', a: { l: 'v_{o,max}', v: 3.9, u: 'V' } },
+    { t: 'Bottom: \\(v_o = -2.7 + (-5 + 2.7)\\frac{5}{5 + 5} = -3.85\\) V', a: { l: 'v_{o,min}', v: -3.85, u: 'V' } },
+    { t: 'First breakpoint time: \\(t = \\sin^{-1}(1.7/5)/(2\\pi\\cdot1000) = 0.0552\\) ms', a: { l: 't_1', v: 55.2e-6, u: 'µs' } },
+  ] });
+
+$('#fig-q2122').innerHTML = sch([
+  ['AC', [40, 60], [40, 220], 'vᵢ', 1, { amp: 5, f: 1000 }], ['W', [40, 60], [70, 60]], ['R', [70, 60], [150, 60], '10 kΩ'], ['W', [150, 60], [330, 60]], ['dot', [210, 60]], ['dot', [290, 60]],
+  ['D', [210, 60], [210, 110], ''], ['D', [210, 110], [210, 160], ''], ['D', [210, 160], [210, 210], ''], ['W', [210, 210], [210, 220]],
+  ['D', [290, 110], [290, 60], ''], ['D', [290, 160], [290, 110], ''], ['D', [290, 210], [290, 160], ''], ['W', [290, 210], [290, 220]],
+  ['W', [40, 220], [290, 220]], ['dot', [210, 220]], ['gnd', [100, 220]], ['open', [330, 60], ''], ['t', [338, 50], 'vₒ', 'start'],
+], { w: 370, h: 250 });
+$('#pl-1819').innerHTML = plot({ w: 460, h: 190, x: [0, 2], y: [-5.5, 5.5], xl: 't/T', yl: 'v', yt: [[2, 'V']], g: [{ y: 2 }], c: [{ f: t => 5 * Math.sin(2 * Math.PI * t), cls: 's-fg dash' }, { f: t => Math.max(5 * Math.sin(2 * Math.PI * t), 2) }], al: '2018-19 output' });
+$('#pl-1718').innerHTML = plot({ w: 300, h: 220, x: [-10, 10], y: [-6, 6], xl: 'vᵢ', yl: 'vₒ', xt: [[-5, '−5'], [2.5, '2.5']], yt: [[-5, '−5'], [2.5, '2.5'], [5, '5']], c: [{ f: v => v < -5 ? -5 : v > 2.5 ? 2.5 + (v - 2.5) / 3 : v }], al: '2017-18 target' });
+$('#fig-q1718').innerHTML = clipFig([{ d: 'top', V: 1.8, Rk: 10 }, { d: 'bot', V: -4.3, Rk: 0 }], { R: '20 kΩ', amp: 10 });
+$('#fig-q1617b').innerHTML = sch([
+  ['AC', [30, 180], [30, 260], 'vᵢ', 1, { amp: 10, f: 1000 }], ['gnd', [30, 260]], ['W', [30, 180], [90, 180]], ['dot', [90, 180]],
+  ['D', [90, 100], [90, 180], 'D1', -1], ['D', [90, 180], [90, 260], 'D3', -1], ['D', [210, 100], [210, 180], 'D2'], ['D', [210, 180], [210, 260], 'D4'],
+  ['W', [90, 100], [210, 100]], ['W', [90, 260], [210, 260]], ['dot', [150, 100]], ['dot', [150, 260]],
+  ['R', [150, 100], [150, 40], '10 kΩ'], ['rail', [150, 40], '+10 V'], ['R', [150, 260], [150, 320], '10 kΩ'], ['rail', [150, 320], '−10 V', false],
+  ['W', [210, 180], [290, 180]], ['dot', [210, 180]], ['R', [290, 180], [290, 260], '10 kΩ'], ['gnd', [290, 260]], ['t', [298, 172], 'vₒ', 'start'],
+], { w: 340, h: 340 });
+$('#pl-1617b').innerHTML = plot({ w: 300, h: 200, x: [-10, 10], y: [-6, 6], xl: 'vᵢ', yl: 'vₒ', xt: [[-4.65, '−4.65'], [4.65, '4.65']], yt: [[4.65, '4.65'], [-4.65, '−4.65']], c: [{ f: v => Math.max(-4.65, Math.min(4.65, v)) }], al: 'Bridge limiter VTC' });
+$('#fig-q1617c').innerHTML = sch([
+  ['AC', [30, 60], [30, 200], 'vᵢ', 1, { amp: 10, f: 1000 }], ['W', [30, 60], [60, 60]], ['R', [60, 60], [140, 60], 'R₁ 10 kΩ'], ['W', [140, 60], [170, 60]],
+  ['Z', [240, 60], [170, 60], '3 V', { vz: 3 }], ['dot', [240, 60]], ['D', [240, 200], [240, 60], 'D', -1], ['W', [240, 60], [310, 60]], ['R', [310, 60], [310, 200], 'Rₗ 10 kΩ'],
+  ['W', [30, 200], [310, 200]], ['dot', [240, 200]], ['gnd', [120, 200]], ['t', [100, 90], 'i₁ →', 'middle'], ['t', [318, 50], 'vₒ', 'start'],
+], { w: 380, h: 230 });
+$('#pl-1617c').innerHTML = '<div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center">' +
+  plot({ w: 260, h: 200, x: [-10, 10], y: [-1, 4], xl: 'vᵢ', yl: 'vₒ (V)', xt: [[3, '3'], [10, '10']], yt: [[3.5, '3.5']], c: [{ f: v => v > 3 ? (v - 3) / 2 : 0 }], al: 'vo vs vi' }) +
+  plot({ w: 260, h: 200, x: [-10, 10], y: [-1.1, 0.5], xl: 'vᵢ', yl: 'i₁ (mA)', xt: [[3, '3'], [-10, '−10']], yt: [[0.35, '0.35'], [-1, '−1']], c: [{ f: v => v < 0 ? v / 10 : v > 3 ? (v - 3) / 20 : 0 }], al: 'i1 vs vi' }) + '</div>';
+const v1516 = v => v > 5.7 ? 2 * v / 3 + 1.9 : v < -5.7 ? v / 3 - 3.8 : v;
+$('#fig-q1516').innerHTML = clipFig([{ d: 'bot', V: -5, Rk: 5 }, { d: 'top', V: 5, Rk: 20 }], { R: '10 kΩ', amp: 10, f: 100 });
+$('#pl-1516').innerHTML = plot({ w: 500, h: 220, x: [0, 10], y: [-10.5, 10.5], xl: 't (ms)', yl: 'v (V)', xt: [[0.965, '.97'], [4.035, '4.0'], [5.965, '6.0'], [9.035, '9.0']], yt: [[8.57, '8.57'], [5.7, '5.7'], [-5.7, '−5.7'], [-7.13, '−7.13']],
+  g: [{ y: 5.7 }, { y: -5.7 }], c: [{ f: t => 10 * Math.sin(2 * Math.PI * t / 10), cls: 's-fg dash' }, { f: t => v1516(10 * Math.sin(2 * Math.PI * t / 10)) }], al: '2015-16 output' });
+const vac = t => t <= 3 ? t : t <= 9 ? 6 - t : t - 12;
+const vR = t => { const v = vac(t); return v > 1 ? v - 1 : v < -2 ? v + 2 : 0; };
+$('#pl-1213').innerHTML = plot({ w: 500, h: 200, x: [0, 12], y: [-3.3, 3.3], xl: 't (s)', yl: 'V', xt: [[3, '3'], [6, '6'], [9, '9'], [12, '12']], yt: [[1, '1'], [-2, '−2'], [3, '3']],
+  c: [{ f: vac, cls: 's-fg dash' }, { f: vR, cls: 's-fg' }, { f: t => vac(t) - vR(t) }], m: [[3, 2.3, 'V_R', 'middle'], [6.3, 1.5, 'V_D', 'start', 'acc']], al: '2012-13 diode voltage' });
+$('#pl-1112').innerHTML = '<div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center">' +
+  plot({ w: 300, h: 190, x: [0, 0.4], y: [-5.5, 5.5], xl: 't (ms)', yl: 'v', xt: [[0.2, '0.2'], [0.4, '0.4']], yt: [[-2, '−2'], [-5, '−5']], c: [{ f: t => 5 * Math.sin(2 * Math.PI * t / 0.2), cls: 's-fg dash' }, { f: t => Math.min(5 * Math.sin(2 * Math.PI * t / 0.2), -2) }], al: '2011-12 waveform' }) +
+  plot({ w: 220, h: 190, x: [-5, 5], y: [-5.5, 2], xl: 'vₛ', yl: 'vₒ', xt: [[-2, '−2']], yt: [[-2, '−2']], c: [{ f: v => Math.min(v, -2) }], al: '2011-12 VTC' }) + '</div>';
+$('#fig-p495').innerHTML = sch([
+  ['AC', [40, 60], [40, 240], 'vᵢ', 1, { amp: 2, f: 1000 }], ['W', [40, 60], [70, 60]], ['R', [70, 60], [150, 60], '3 kΩ'], ['W', [150, 60], [380, 60]], ['dot', [210, 60]], ['dot', [300, 60]],
+  ['D', [210, 60], [210, 110], 'D1'], ['R', [210, 110], [210, 160], '1 kΩ'], ['V', [210, 160], [210, 210], '1 V'], ['W', [210, 210], [210, 240]],
+  ['D', [300, 110], [300, 60], 'D2', -1], ['R', [300, 110], [300, 160], '1 kΩ', -1], ['V', [300, 210], [300, 160], '2 V', -1], ['W', [300, 210], [300, 240]],
+  ['W', [300, 160], [350, 160]], ['D', [350, 160], [350, 110], 'D3'], ['W', [350, 110], [300, 110]], ['dot', [300, 110]], ['dot', [300, 160]],
+  ['W', [40, 240], [300, 240]], ['dot', [210, 240]], ['gnd', [120, 240]], ['open', [380, 60], ''], ['t', [388, 50], 'O', 'start'],
+], { w: 420, h: 270 });
+
+// shunt clipper value: E = threshold in vo; Rk in kΩ (0 = hard); RL in kΩ or 0 (none)
+function clipVo(vi, R, br, RL) {
+  const lin = RL ? vi * RL / (R + RL) : vi;
+  for (const b of br) {
+    if ((b.d === 'top' && lin > b.E) || (b.d === 'bot' && lin < b.E)) return b.Rk ? (vi / R + b.E / b.Rk) / (1 / R + 1 / b.Rk + (RL ? 1 / RL : 0)) : b.E;
+  }
+  return lin;
+}
+drill('#dr-clip', { id: 'd13-clipper-vtc', title: 'Biased shunt clipper: breakpoints and output peaks', gen(r) {
+  const R = r.pick([1, 5, 10]), Vg = r.pick([0, 0.7, 0.7]), RL = r() < 0.25 ? r.pick([10, 20]) : 0, Vm = r.pick([3, 5, 8, 10, 12]);
+  const nb = r() < 0.35 ? 1 : 2, br = [];
+  const mk = d => { const V = r.pick([0, 1, 2, 3, 4, 5, 6]) * r.pick([1, -1]); return { d, V, Rk: r.pick([0, 0, 5, 10, 20]), E: d === 'top' ? V + Vg : V - Vg }; };
+  if (nb === 1) br.push(mk(r() < 0.5 ? 'top' : 'bot')); else br.push(mk('top'), mk('bot'));
+  if (nb === 2 && br[0].E <= br[1].E + 0.5) return null;
+  const k = RL ? RL / (R + RL) : 1, bps = br.map(b => b.E / k);
+  if (bps.some(v => Math.abs(v) >= Vm * 0.95)) return null;
+  const vmax = clipVo(Vm, R, br, RL), vmin = clipVo(-Vm, R, br, RL), b0 = br[0];
+  const desc = b => `a diode with its ${b.d === 'top' ? 'anode' : 'cathode'} toward \\(v_o\\)${b.Rk ? ` through ${b.Rk} kΩ` : ''}, its other end at ${b.V ? `a battery giving a reference of ${b.V} V` : 'ground (no battery)'}`;
+  const seg = b => b.Rk ? `\\(v_o = \\dfrac{v_i/${R} + (${num(b.E)})/${b.Rk}}{1/${R} + 1/${b.Rk}${RL ? ` + 1/${RL}` : ''}}\\)` : `hard clip: \\(v_o = ${num(b.E)}\\) V`;
+  return {
+    given: `Series ${R} kΩ from \\(v_i\\) to \\(v_o\\)${RL ? `, load ${RL} kΩ from \\(v_o\\) to ground` : ''}. Branch${nb > 1 ? 'es' : ''} from \\(v_o\\) to ground: ${br.map(desc).join('; and ')}. Diodes: ${Vg ? 'CVD 0.7 V' : 'ideal'}. \\(v_i = ${Vm}\\sin\\omega t\\). Find the input voltage at which the ${b0.d === 'top' ? 'upper' : 'lower'} diode turns on, and the output maximum and minimum.`,
+    fig: clipFig(br, { R: R + ' kΩ', RL, amp: Vm }),
+    ask: [{ l: 'v_{i,bp}', v: bps[0], u: 'V' }, { l: 'v_{o,max}', v: vmax, u: 'V' }, { l: 'v_{o,min}', v: vmin, u: 'V' }],
+    steps: [
+      ...br.map(b => `Threshold: ${b.d === 'top' ? 'conducts when \\(v_o &gt; ' + b.V + ' + ' + Vg : 'conducts when \\(v_o &lt; ' + b.V + ' - ' + Vg} = ${num(b.E)}\\) V.`),
+      { t: `Middle region: \\(v_o = ${RL ? `v_i\\frac{${RL}}{${R} + ${RL}}` : 'v_i'}\\), so the ${b0.d === 'top' ? 'upper' : 'lower'} diode turns on at \\(v_i = ${num(b0.E)}${RL ? `\\times\\frac{${R + RL}}{${RL}}` : ''} = ${num(bps[0])}\\) V`, a: { l: 'v_{i,bp}', v: bps[0], u: 'V' } },
+      ...br.map(b => `Beyond the ${b.d === 'top' ? 'upper' : 'lower'} breakpoint: ${seg(b)}.`),
+      { t: `At \\(v_i = +${Vm}\\): \\(v_o = ${num(vmax)}\\) V`, a: { l: 'v_{o,max}', v: vmax, u: 'V' } },
+      { t: `At \\(v_i = -${Vm}\\): \\(v_o = ${num(vmin)}\\) V`, a: { l: 'v_{o,min}', v: vmin, u: 'V' } },
+    ] };
+} });
+
+drill('#dr-pwl', { id: 'd13-pwl-limiter', title: 'Limiter with a piecewise-linear diode', gen(r) {
+  const VD0 = r.pick([0.5, 0.6]), V1 = r.pick([0.7, 0.75, 0.8]), rD = (V1 - VD0) / 1, R = r.pick([1, 2]), Vb = r.pick([0, 1, 2, 3, 4]), top = r() < 0.5;
+  const E = top ? Vb + VD0 : Vb - VD0, vi = top ? E + r.pick([1, 2, 3, 5]) : E - r.pick([1, 2, 3, 5]), s = rD / (R + rD), vo = E + (vi - E) * s;
+  return {
+    given: `R = ${R} kΩ from \\(v_I\\) to \\(v_O\\); a diode ${top ? `from \\(v_O\\) (anode) to +${Vb} V` : `from +${Vb} V (anode) to \\(v_O\\)`}. The diode starts conducting at ${VD0} V and has ${V1} V at 1 mA (PWL model). Find \\(r_D\\), the slope beyond the breakpoint, and \\(v_O\\) at \\(v_I\\) = ${num(vi)} V.`,
+    ask: [{ l: 'r_D', v: rD * 1000, u: 'Ω' }, { l: '\\text{slope}', v: s, u: 'V/V' }, { l: 'v_O', v: vo, u: 'V', tol: 0.01 }],
+    steps: [
+      { t: `\\(r_D = (${V1} - ${VD0})/1\\text{ mA} = ${num(rD * 1000)}\\) Ω`, a: { l: 'r_D', v: rD * 1000, u: 'Ω' } },
+      `Breakpoint: ${top ? `\\(v_O &gt; ${Vb} + ${VD0} = ${num(E)}\\)` : `\\(v_O &lt; ${Vb} - ${VD0} = ${num(E)}\\)`} V; \\(v_I = ${num(vi)}\\) is beyond it.`,
+      { t: `Slope \\(= r_D/(R + r_D) = ${num(rD)}/${num(R + rD)} = ${num(s)}\\)`, a: { l: '\\text{slope}', v: s, u: 'V/V' } },
+      { t: `\\(v_O = ${num(E)} + (${num(vi)} - ${num(E)})\\times${num(s)} = ${num(vo)}\\) V`, a: { l: 'v_O', v: vo, u: 'V', tol: 0.01 } },
+    ] };
+} });
+
+drill('#dr-design', { id: 'd14-clipper-design', title: 'Design a clipper for a given curve', gen(r) {
+  const Rs = r.pick([5, 10, 20]), Vg = r.pick([0, 0.7]), Lp = r.pick([1.5, 2, 2.5, 3, 4, 5]), Lm = r.pick([1, 2, 3, 4, 5]);
+  const fr = [[0, '0'], [1 / 2, '1/2'], [1 / 3, '1/3'], [1 / 4, '1/4'], [2 / 7, '2/7']], [s1, t1] = r.pick(fr), [s2, t2] = r.pick(fr);
+  const V1 = Lp - Vg, V2 = -(Lm - Vg), R1 = Rs * s1 / (1 - s1), R2 = Rs * s2 / (1 - s2);
+  return {
+    given: `Required: \\(v_o = v_i\\) for \\(-${Lm} \\le v_i \\le ${Lp}\\) V, slope ${t1} above ${Lp} V, slope ${t2} below −${Lm} V. Use a series ${Rs} kΩ and ${Vg ? '0.7 V' : 'ideal'} diodes. Give the upper battery, the upper branch resistor, the lower reference (signed) and the lower branch resistor (0 = no resistor).`,
+    fig: plot({ w: 280, h: 200, x: [-10, 10], y: [-8, 8], xl: 'vᵢ', yl: 'vₒ', xt: [[Lp, String(Lp)], [-Lm, '−' + Lm]], c: [{ f: v => v > Lp ? Lp + (v - Lp) * s1 : v < -Lm ? -Lm + (v + Lm) * s2 : v }], al: 'Target curve' }),
+    ask: [{ l: 'V_1', v: V1, u: 'V' }, { l: 'R_1', v: R1 * 1000, u: 'kΩ' }, { l: 'V_{ref,2}', v: V2, u: 'V' }, { l: 'R_2', v: R2 * 1000, u: 'kΩ' }],
+    steps: [
+      { t: `Upper corner ${Lp} V: diode with anode toward \\(v_o\\), battery \\(${Lp} - ${Vg} = ${num(V1)}\\) V (+ toward the diode)`, a: { l: 'V_1', v: V1, u: 'V' } },
+      { t: s1 ? `Slope ${t1}: \\(R_1 = R_s\\frac{s}{1 - s} = ${Rs}\\times${num(s1 / (1 - s1))} = ${num(R1)}\\) kΩ` : 'Flat above: no resistor, \\(R_1 = 0\\)', a: { l: 'R_1', v: R1 * 1000, u: 'kΩ' } },
+      { t: `Lower corner −${Lm} V: diode with cathode toward \\(v_o\\), reference \\(-${Lm} + ${Vg} = ${num(V2)}\\) V`, a: { l: 'V_{ref,2}', v: V2, u: 'V' } },
+      { t: s2 ? `Slope ${t2}: \\(R_2 = ${Rs}\\times${num(s2 / (1 - s2))} = ${num(R2)}\\) kΩ` : 'Flat below: \\(R_2 = 0\\)', a: { l: 'R_2', v: R2 * 1000, u: 'kΩ' } },
+    ] };
+} });
+
+drill('#dr-iv', { id: 'd12-graphical-iv', title: 'Diode from a drawn I–V in series with R', gen(r) {
+  const Von = r.pick([0.5, 0.7, 1]), rD = r.pick([0, 0.5, 1, 2]), VBR = r.pick([2, 3, 4]), R = r.pick([1, 2]), vin = r.pick([-5, -4, -3, -2, 2, 3, 4, 5]);
+  const vR = vin > Von ? (vin - Von) * R / (R + rD) : vin < -VBR ? vin + VBR : 0, vD = vin - vR;
+  return {
+    given: `A diode's drawn I–V: zero current for \\(-${VBR} &lt; v &lt; ${Von}\\) V, a straight line of slope ${rD ? num(1 / rD) + ' A/V' : '∞ (vertical)'} above ${Von} V, vertical breakdown at −${VBR} V. It is in series with R = ${R} Ω across \\(v_{in}\\) = ${vin} V. Find \\(v_R\\) and \\(v_D\\).`,
+    ask: [{ l: 'v_R', v: vR, u: 'V' }, { l: 'v_D', v: vD, u: 'V' }],
+    steps: [
+      `Model: \\(V_{on} = ${Von}\\) V, \\(r_D = ${rD}\\) Ω, \\(V_{BR} = ${VBR}\\) V.`,
+      { t: vin > Von ? `Forward: \\(v_R = (${vin} - ${Von})\\frac{${R}}{${R} + ${rD}} = ${num(vR)}\\) V` : vin < -VBR ? `Breakdown: the diode holds −${VBR} V, \\(v_R = ${vin} + ${VBR} = ${num(vR)}\\) V` : `Between −${VBR} and ${Von} V: no current, \\(v_R = 0\\)`, a: { l: 'v_R', v: vR, u: 'V' } },
+      { t: `\\(v_D = v_{in} - v_R = ${num(vD)}\\) V`, a: { l: 'v_D', v: vD, u: 'V' } },
+    ] };
+} });
+
+flashcards('#cards', [
+  { f: 'Anode at v_o', b: 'clips the top at V_ref + V_γ' },
+  { f: 'Cathode at v_o', b: 'clips the bottom at V_ref − V_γ' },
+  { f: 'Soft clip slope', b: 'R_k/(R + R_k)' },
+  { f: 'Breakpoint with a load', b: 'v_i = E(R + R_L)/R_L' },
+  { f: 'Design: slope s', b: 'R_k = R·s/(1 − s)' },
+  { f: 'Only diodes allowed, level L', b: 'n = L/0.7 diodes in series' },
+  { f: 'Zener clipper', b: '±(V_Z + 0.7) with back-to-back Zeners' },
+]);
+quiz('#quiz', [
+  { q: 'Series R; diode with cathode at v_o, anode at −3 V; CVD. The output is clipped', opts: ['above −2.3 V', 'below −3.7 V', 'below −2.3 V', 'above −3.7 V'], a: 1, why: 'Cathode at v_o clips the bottom at −3 − 0.7.' },
+  { q: 'R = 10 kΩ, branch R_k = 10 kΩ. Slope beyond the breakpoint:', opts: ['1', '1/2', '1/3', '0'], a: 1, why: '10/(10 + 10).' },
+  { q: 'Required slope 1/3 with R = 20 kΩ needs R_k =', opts: ['10 kΩ', '20 kΩ', '40 kΩ', '6.7 kΩ'], a: 0, why: '20 × (1/3)/(2/3) = 10 kΩ.' },
+  { q: 'Limit at ±2.1 V with only diodes (0.7 V): diodes per string', opts: ['2', '3', '4', '1'], a: 1, why: '2.1/0.7 = 3.' },
+  { q: 'PWL diode: 0.5 V start, 0.7 V at 1 mA, R = 1 kΩ. Slope when on:', opts: ['1/5', '1/6', '1/11', '1/2'], a: 1, why: 'r_D = 200 Ω; 0.2/1.2.' },
+]);
+</script>
+</body>
+</html>

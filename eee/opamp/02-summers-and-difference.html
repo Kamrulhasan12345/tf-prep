@@ -1,0 +1,336 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Summers and Difference Amplifiers · EEE 263 Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Op-amps · Chapter 2 · Sedra §2.2.3, §2.4 · Khairul s.11–16 · Sadat L22 notes p.103, L24 notes p.107–110 · types O-04, O-10 (+ O-01 cascades)</div>
+<h1>Summers, the Difference Amplifier and the V-to-I Converter</h1>
+<p class="lede">Linear-combination questions come in three shapes: analyse a cascade of summers (2018–19, 20 marks), design a one-op-amp circuit for \(a v_1 - b v_2\) (2013–14, 2015–16, 2022–23; 14 to 15 marks), and the Howland voltage-to-current converter (2024–25, 18 marks, the newest type). All three are superposition plus the two golden rules from Chapter 1.</p>
+
+<h2>1. Inverting summer</h2>
+<p>Several inputs \(v_k\), each through \(R_k\), into the virtual-ground node; \(R_f\) from that node to the output. Each input current \(v_k/R_k\) is independent of the others (the node is held at 0 V), and their sum flows through \(R_f\):</p>
+<div class="formula">\[ v_o = -\left(\frac{R_f}{R_1}v_1 + \frac{R_f}{R_2}v_2 + \frac{R_f}{R_3}v_3\right) \]</div>
+<figure><div id="fig-sum"></div><figcaption><b>Figure 1.</b> Inverting (weighted) summer. Coefficient of each input = \(-R_f/R_k\).</figcaption></figure>
+<p><b>Both signs with two op-amps</b> (Sedra Fig. 2.10, Khairul s.12, Sadat p.107): stage 1 sums \(v_1, v_2\) with feedback \(R_a\); its output enters stage 2 through \(R_b\) together with \(v_3\) through \(R_3\), feedback \(R_c\):</p>
+<div class="formula">\[ v_o = \frac{R_a}{R_1}\frac{R_c}{R_b}v_1 + \frac{R_a}{R_2}\frac{R_c}{R_b}v_2 - \frac{R_c}{R_3}v_3 \]</div>
+<figure><div id="fig-2stage"></div><figcaption><b>Figure 2.</b> Two-stage weighted summer: positive coefficients for \(v_1, v_2\), negative for \(v_3\).</figcaption></figure>
+<div class="method"><h4>Method · design a two-stage summer for vₒ = p v₁ + q v₂ − r v₃</h4><ol>
+<li>Pick \(R_a = R_b = R_3\) = 10 kΩ (any convenient value).</li>
+<li>Negative term: \(R_c/R_3 = r \Rightarrow R_c = r\,R_3\).</li>
+<li>Positive terms carry the stage-2 gain \(R_c/R_b = r\): \(R_1 = R_a r/p\), \(R_2 = R_a r/q\).</li>
+<li>Check by substituting back; check the largest output against the rails.</li>
+</ol></div>
+<div id="dr-2stage"></div>
+<div id="dr-cascade"></div>
+
+<h2>2. Non-inverting summer and the general formula</h2>
+<p>Inputs through \(R_1, R_2\) into the \(+\) node (nothing else on \(+\)); \(R_3\) from \(-\) to ground, \(R_4\) feedback. Superposition (Sadat p.107–108): with \(V_2\) off, \(v_+ = V_1R_2/(R_1+R_2)\), and so on:</p>
+<div class="formula">\[ v_o = \left(1 + \frac{R_4}{R_3}\right)\frac{R_2V_1 + R_1V_2}{R_1 + R_2} \]</div>
+<p>Each input is weighted by the conductance of its own resistor (a smaller resistor gives a larger weight).</p>
+<p><b>General case</b> (Khairul s.14): inputs on both sides. Let \(R_N\) = parallel of everything at the \(-\) node except \(R_F\), and \(R_P\) = parallel of everything at the \(+\) node (including any resistor to ground):</p>
+<div class="formula">\[ v_O = -\sum_{-\text{ side}} \frac{R_F}{R_k}v_k + \left(1 + \frac{R_F}{R_N}\right)\sum_{+\text{ side}} \frac{R_P}{R_j}v_j \]</div>
+<p>The factor \(1 + R_F/R_N\) (the noise gain) multiplies every \(+\)-side input. Grounded resistors at the \(-\) node raise it; that is the lever for single-op-amp designs below.</p>
+<div id="wk-e29"></div>
+
+<h2>3. Difference amplifier</h2>
+<figure><div id="fig-diff"></div><figcaption><b>Figure 3.</b> Difference amplifier: \(v_2\) into the inverting side, \(v_1\) into the non-inverting side.</figcaption></figure>
+<p><b>Derivation by superposition</b> (Sadat p.103). \(v_1\) off: inverting amplifier, \(v_o' = -\dfrac{R_2}{R_1}v_2\). \(v_2\) off: divider then non-inverting amplifier, \(v_o'' = \dfrac{R_4}{R_3+R_4}\left(1 + \dfrac{R_2}{R_1}\right)v_1\). Add:</p>
+<div class="formula">\[ v_o = \frac{R_4}{R_3+R_4}\left(1 + \frac{R_2}{R_1}\right)v_1 - \frac{R_2}{R_1}v_2 \;\;\xrightarrow{\;R_4/R_3 = R_2/R_1\;}\;\; v_o = \frac{R_2}{R_1}(v_1 - v_2) \]</div>
+<p>With all four equal, \(v_o = v_1 - v_2\): the <b>subtractor</b>. If the ratios are mismatched, a common-mode input \(v_1 = v_2 = v_{cm}\) leaks through: \(A_{cm} = \dfrac{R_4R_1 - R_2R_3}{R_1(R_3+R_4)}\), so CMRR depends on resistor matching. Differential input resistance (with \(R_3 = R_1\)) is only \(2R_1\).</p>
+<p><b>Instrumentation amplifier (idea).</b> Put a non-inverting stage in front of each input (two op-amps sharing a resistor \(2R_1\) between their inverting inputs, feedback \(R_2\) each), then a difference amplifier \(R_3, R_4\). Input resistance is infinite and the gain \(\left(1 + \dfrac{R_2}{R_1}\right)\dfrac{R_4}{R_3}\) is set by one resistor (\(2R_1\)) without disturbing the matching.</p>
+<div id="dr-diff"></div>
+
+<h2>4. One op-amp for v<sub>o</sub> = a v<sub>1</sub> − b v<sub>2</sub> (type O-04)</h2>
+<div class="method"><h4>Method · single op-amp synthesis</h4><ol>
+<li>Negative term to the \(-\) input: \(v_2\) through \(R_1\), feedback \(R_f\) with \(R_f/R_1 = b\) (e.g. \(R_1\) = 10 kΩ, \(R_f = 10b\) kΩ).</li>
+<li>The positive term sees the noise gain \(1 + R_f/R_N\). With only \(R_1\) at the \(-\) node that is \(1 + b\).</li>
+<li><b>\(a &lt; 1 + b\):</b> attenuate \(v_1\) with a divider on \(+\): \(\dfrac{R_4}{R_3+R_4} = \dfrac{a}{1+b}\). (Pure difference \(a = b\): \(R_3 = R_1\), \(R_4 = R_f\).)</li>
+<li><b>\(a = 1 + b\):</b> \(v_1\) straight to \(+\).</li>
+<li><b>\(a &gt; 1 + b\):</b> a divider can only reduce, so instead raise the noise gain: \(v_1\) straight to \(+\) and add \(R_x\) from \(-\) to ground: \(1 + b + R_f/R_x = a \Rightarrow R_x = \dfrac{R_f}{a - 1 - b}\).</li>
+<li>Check: \(v_1 = 1, v_2 = 0\) gives \(a\); \(v_1 = 0, v_2 = 1\) gives \(-b\) (the grounded \(R_x\) does not change the inverting gain).</li>
+</ol></div>
+<h3>Worked example: 2013–14 Sec B Q6(c), z = 5V₁ − 3V₂</h3>
+<div id="wk-53"></div>
+<div id="dr-single"></div>
+
+<h2>5. Howland voltage-to-current converter (type O-10)</h2>
+<p>A difference amplifier whose \(+\) side is loaded: \(R_1\) from \(V_{in}\) to \(v_-\), \(R_2\) from \(v_-\) to \(V_{out}\); \(R_3\) from \(V_{out}\) to node L (= \(v_+\)), \(R_4\) and the load \(R_L\) from L to ground. Positive feedback through \(R_3\) and negative feedback through \(R_2\) balance so that the load current does not depend on \(R_L\).</p>
+<figure><div id="fig-how"></div><figcaption><b>Figure 4.</b> Howland current pump (2024–25 values: \(R_1 = R_2\) = 10 kΩ, \(R_3 = R_4\) = 1 kΩ, \(R_L\) = 100 Ω, ±20 V).</figcaption></figure>
+<p><b>Derivation.</b> Inverting side (no input current): \(V_{out} = v_-\left(1 + \dfrac{R_2}{R_1}\right) - V_{in}\dfrac{R_2}{R_1}\), and \(v_- = v_+ = V_L\). KCL at L: \(\dfrac{V_{out} - V_L}{R_3} = \dfrac{V_L}{R_4} + i_L\). Substitute \(V_{out}\):</p>
+<div class="formula">\[ i_L = -\frac{R_2}{R_1R_3}V_{in} + V_L\left(\frac{R_2}{R_1R_3} - \frac{1}{R_4}\right) \;\;\xrightarrow{\;R_2/R_1 = R_3/R_4\;}\;\; i_L = -\frac{R_2}{R_1R_3}V_{in} \]</div>
+<p>With the bridge balanced the \(V_L\) term vanishes: \(i_L\) is set by \(V_{in}\) alone, whatever \(R_L\) is. <b>Compliance:</b> this holds only while \(|V_{out}| &lt; L\). For \(R_1 = R_2\), \(R_3 = R_4\): \(V_{out} = 2V_L - V_{in} = -V_{in}(1 + 2R_L/R_3)\), so \(R_{L,max} = \dfrac{R_3}{2}\left(\dfrac{L}{|V_{in}|} - 1\right)\).</p>
+<div class="method"><h4>Method · Howland numbers</h4><ol>
+<li>\(V_{out} = V_L(1 + R_2/R_1) - V_{in}R_2/R_1\) (= \(2V_L - V_{in}\) when \(R_1 = R_2\)).</li>
+<li>KCL at L: \((V_{out} - V_L)/R_3 = V_L/R_4 + V_L/R_L\). Substitute, solve \(V_L\).</li>
+<li>\(i_L = V_L/R_L\); then \(V_{out}\).</li>
+<li>Rail check. If \(|V_{out}| &gt; L\): \(V_{out} = \pm L\), the virtual short fails, and \(V_L = V_{out}\dfrac{R_4\parallel R_L}{R_3 + R_4\parallel R_L}\), \(i_L = V_L/R_L\).</li>
+</ol></div>
+<h3>Worked example: 2024–25 Sec A Q3(a)</h3>
+<div id="wk-how"></div>
+<div id="dr-how"></div>
+
+<div class="trap"><h4>Traps (where marks go)</h4><ul>
+<li>Non-inverting gain is \(1 + R_f/R_N\) where \(R_N\) includes every grounded resistor at the \(-\) node, not \(R_f/R\).</li>
+<li>A divider on \(+\) can only reduce: for \(5V_1 - 3V_2\) you need the extra \(R_x\) to ground (2013–14).</li>
+<li>"Single op-amp" means no inverter stage: the sign of each term must come from which input it enters.</li>
+<li>Cascades: stage 2 sees stage 1's output with its sign. In 2018–19 the intermediate node is −15 V; keep the minus sign.</li>
+<li>\(\sin(100\pi \times 1) = 0\), not 1 (2018–19 at t = 1 s).</li>
+<li>Howland: forgetting the current in \(R_4\) at node L; forgetting the compliance (rail) check.</li>
+</ul></div>
+
+<h2>Exam questions</h2>
+
+<div class="exam">
+  <div class="exam-src">2024–25 · Sec A · Q3(a) · 18 marks</div>
+  <div class="exam-q"><p>The circuit functions as a voltage-to-current converter. The op-amp is biased with ±20 V and is linear while \(V_{out}\) is within the rails (\(V_1 = V_2\) valid). \(R_1 = R_2\) = 10 kΩ, \(R_3 = R_4\) = 1 kΩ, \(R_L\) = 100 Ω. Calculate \(i_L\) and \(V_{out}\) for \(V_{in}\) = −5 V.</p><div id="fig-q2425"></div></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>Units V, kΩ, mA. No current into the inputs. KCL at \(V_1\): \(\dfrac{V_{in} - V_1}{10} = \dfrac{V_1 - V_{out}}{10} \Rightarrow V_1 = \dfrac{V_{in} + V_{out}}{2}\), and \(V_1 = V_2\), so \(V_{out} = 2V_2 - V_{in}\).</p>
+    <p>KCL at \(V_2\): \(\dfrac{V_{out} - V_2}{1} = \dfrac{V_2}{1} + \dfrac{V_2}{0.1}\). Substitute: \(2V_2 - V_{in} - V_2 = 11V_2 \Rightarrow -V_{in} = 10V_2 \Rightarrow V_2 = -V_{in}/10 = 0.5\) V.</p>
+    <p>\(i_L = V_2/R_L = 0.5/0.1 = 5\) mA (downward through \(R_L\)).</p>
+    <p>\(V_{out} = 2(0.5) - (-5) = 6\) V, inside ±20 V, so the linear assumption holds.</p>
+    <p>Check with the balanced-bridge result (\(R_2/R_1 = R_3/R_4 = 1\)): \(i_L = -V_{in}R_2/(R_1R_3) = -(-5)/1 = 5\) mA, independent of \(R_L\). Compliance: \(V_{out} = 5(1 + 2R_L/1) \le 20 \Rightarrow R_L \le 1.5\) kΩ.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2022–23 · Sec B · Q8(b) · 15 marks</div>
+  <div class="exam-q"><p>Suppose you have two inputs \(v_1\) and \(v_2\). Design a subtractor circuit using op-amps so that the output voltage is \(v_o = v_1 - v_2\).</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>Circuit: Figure 3 with all four resistors equal, e.g. \(R_1 = R_2 = R_3 = R_4\) = 10 kΩ: \(v_2\) through \(R_1\) to \(-\), \(R_2\) from \(-\) to the output, \(v_1\) through \(R_3\) to \(+\), \(R_4\) from \(+\) to ground.</p>
+    <p>Proof (superposition). \(v_1 = 0\): inverting amplifier, \(v_o' = -\dfrac{R_2}{R_1}v_2 = -v_2\). \(v_2 = 0\): \(v_+ = v_1\dfrac{R_4}{R_3+R_4} = \dfrac{v_1}{2}\), non-inverting gain \(1 + R_2/R_1 = 2\), so \(v_o'' = v_1\).</p>
+    <p>Total \(v_o = v_1 - v_2\). General condition: \(R_4/R_3 = R_2/R_1\) gives \(v_o = (R_2/R_1)(v_1 - v_2)\); equal resistors give unity gain. Use 1 % (or matched) resistors: any mismatch gives a common-mode gain \(A_{cm} = (R_4R_1 - R_2R_3)/(R_1(R_3+R_4))\).</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2018–19 · Sec B · Q5(a) · 20 marks</div>
+  <div class="exam-q"><p>Find the expression of \(v_o\) in terms of the input voltages and resistances. Also calculate \(v_o\) at \(t\) = 1 s given \(v_1\) = 2 V, \(v_2\) = 5 V, \(v_3\) = 1 V and \(v_4 = 5\sin(100\pi t)\). Stage 1: \(v_1\) through 1 kΩ and \(v_2\) through 5 kΩ into the inverting node, 5 kΩ feedback, output \(x\). Stage 2: \(v_3\) through 500 Ω, \(x\) through 1 kΩ, \(v_4\) through 500 Ω into the inverting node, 1 kΩ feedback. Both \(+\) inputs grounded.</p><div id="fig-q1819"></div></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>Stage 1 (inverting summer): \(x = -\left(\dfrac{5}{1}v_1 + \dfrac{5}{5}v_2\right) = -(5v_1 + v_2)\).</p>
+    <p>Stage 2: \(v_o = -\left(\dfrac{1}{0.5}v_3 + \dfrac{1}{1}x + \dfrac{1}{0.5}v_4\right) = -(2v_3 + x + 2v_4)\).</p>
+    <p>Substitute: \(v_o = 5v_1 + v_2 - 2v_3 - 2v_4\). In terms of resistors: \(v_o = \dfrac{R_{f1}R_{f2}}{R_1R_x}v_1 + \dfrac{R_{f1}R_{f2}}{R_2R_x}v_2 - \dfrac{R_{f2}}{R_3}v_3 - \dfrac{R_{f2}}{R_4}v_4\).</p>
+    <p>At \(t\) = 1 s: \(v_4 = 5\sin(100\pi) = 0\). \(x = -(10 + 5) = -15\) V, \(v_o = -(2 - 15 + 0) = 13\) V.</p>
+    <p>Note: \(x = -15\) V is at the edge of a ±15 V supply (no rails are given; with ideal op-amps the answer is 13 V).</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2015–16 · Sec B · Q5(b) · 14 marks</div>
+  <div class="exam-q"><p>Design a circuit using a single op-amp that performs \(V_o = 3(V_1 - V_2)\), where \(V_1\) and \(V_2\) are input signals (AC or DC). Specify values of all resistors used.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>Difference amplifier (Figure 3) with \(R_2/R_1 = R_4/R_3 = 3\): \(R_1\) = 10 kΩ (\(V_2\) → \(-\)), \(R_2\) = 30 kΩ (\(-\) → output), \(R_3\) = 10 kΩ (\(V_1\) → \(+\)), \(R_4\) = 30 kΩ (\(+\) → ground).</p>
+    <p>Check: \(V_o = \dfrac{30}{40}\left(1 + \dfrac{30}{10}\right)V_1 - \dfrac{30}{10}V_2 = 0.75\times4\,V_1 - 3V_2 = 3(V_1 - V_2)\) ✓. Works for AC and DC since there are no capacitors.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2013–14 · Sec B · Q6(c) · 15 marks</div>
+  <div class="exam-q"><p>Implement \(z = 5V_1 - 3V_2\) using only one op-amp, where \(V_1\) and \(V_2\) are input signals.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>\(-3V_2\): \(V_2\) through \(R_1\) = 10 kΩ to \(-\), \(R_f\) = 30 kΩ feedback.</p>
+    <p>\(+5V_1\): the noise gain with only \(R_1\) is \(1 + 3 = 4 &lt; 5\), and a divider cannot amplify. So connect \(V_1\) directly to \(+\) and add \(R_x\) from \(-\) to ground: \(1 + \dfrac{30}{10} + \dfrac{30}{R_x} = 5 \Rightarrow R_x = 30\) kΩ.</p>
+    <p>Check: \(z = V_1\left(1 + \dfrac{30}{10\parallel30}\right) - \dfrac{30}{10}V_2 = V_1(1 + 4) - 3V_2 = 5V_1 - 3V_2\) ✓. Optional bias-current resistor in series with \(+\): \(R_1\parallel R_f\parallel R_x = 6\) kΩ.</p>
+  </div></details>
+</div>
+
+<h3>Class tests and slide examples</h3>
+<div class="exam">
+  <div class="exam-src">2018 CT3(B) · 8 marks</div>
+  <div class="exam-q"><p>Use the two-stage weighted summer (Figure 2) to obtain \(v_o = 2v_1 + v_2 - 3v_3\).</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>\(v_o = \dfrac{R_a}{R_1}\dfrac{R_c}{R_b}v_1 + \dfrac{R_a}{R_2}\dfrac{R_c}{R_b}v_2 - \dfrac{R_c}{R_3}v_3\). Choose \(R_a = R_b = R_3\) = 10 kΩ.</p>
+    <p>\(R_c/R_3 = 3 \Rightarrow R_c\) = 30 kΩ, so \(R_c/R_b = 3\). Then \(3R_a/R_1 = 2 \Rightarrow R_1\) = 15 kΩ and \(3R_a/R_2 = 1 \Rightarrow R_2\) = 30 kΩ. Check: \(\tfrac{10}{15}\cdot3 = 2\), \(\tfrac{10}{30}\cdot3 = 1\), \(-3\) ✓.</p>
+  </div></details>
+</div>
+<div class="exam">
+  <div class="exam-src">Khairul s.16 · Alexander–Sadiku Practice Problem 5.10</div>
+  <div class="exam-q"><p>\(v_1\) = 7 V into a follower (op-amp A); \(v_2\) = 3.1 V into an inverting amplifier with 10 kΩ input and 50 kΩ feedback (op-amp B). A's output through 20 kΩ and B's output through 30 kΩ enter an inverting summer with 60 kΩ feedback (op-amp C). Find \(v_o\).</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>A: \(v_A = 7\) V. B: \(v_B = -5\times3.1 = -15.5\) V. C: \(v_o = -\left(\dfrac{60}{20}(7) + \dfrac{60}{30}(-15.5)\right) = -(21 - 31) = 10\) V. (In general \(v_o = -3v_1 + 10v_2\).)</p>
+  </div></details>
+</div>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+
+<div class="key"><p><strong>Summary:</strong> inverting summer \(-\sum (R_f/R_k)v_k\); non-inverting side inputs are weighted by their divider and multiplied by the noise gain \(1 + R_f/R_N\). Difference amp \((R_2/R_1)(v_1 - v_2)\) when \(R_4/R_3 = R_2/R_1\). One op-amp for \(av_1 - bv_2\): \(R_f/R_1 = b\), then a divider if \(a &lt; 1 + b\) or \(R_x = R_f/(a - 1 - b)\) if \(a &gt; 1 + b\). Howland: balanced bridge gives \(i_L = -V_{in}R_2/(R_1R_3)\) independent of \(R_L\), valid while \(V_{out}\) stays inside the rails.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/eee.js"></script>
+<script>
+const k = v => si(v * 1e3, 'Ω');
+const co = (c, v) => (c === 1 ? '' : c) + v; // coefficient formatting: 1v -> v
+// inverting summer starting at x = ox; ins = [{lab, R, from?}] (from: [x,y] of a previous output to wire in instead of a terminal)
+function sumItems(ox, ins, Rf, outLab) {
+  const it = [], n = ins.length, ym = 80 + 40 * (n - 1), bx = ox + 130;
+  ins.forEach((s, i) => {
+    const y = 80 + 40 * i;
+    if (s.from) it.push(['W', s.from, [ox - 30, s.from[1]], [ox - 30, y], [ox, y]]);
+    else if (s.src) it.push(['V', [ox - 40, y], [ox - 40, y + 50], s.lab, -1], ['gnd', [ox - 40, y + 50]], ['W', [ox - 40, y], [ox, y]]);
+    else it.push(['open', [ox, y], ''], ['t', [ox - 6, y + 4], s.lab, 'end']);
+    it.push(['R', [ox, y], [ox + 90, y], s.R], ['W', [ox + 90, y], [bx, y]]);
+    if (i && i < n) it.push(['dot', [bx, y]]);
+  });
+  if (n > 1) it.push(['W', [bx, 80], [bx, ym]]);
+  it.push(['W', [bx, ym], [ox + 160, ym]], ['W', [bx, 80], [bx, 40]], ['R', [bx, 40], [ox + 270, 40], Rf], ['W', [ox + 270, 40], [ox + 270, ym + 16]],
+    ['W', [ox + 240, ym + 16], [ox + 270, ym + 16]], ['dot', [ox + 270, ym + 16]], ['W', [ox + 160, ym + 32], [ox + 145, ym + 32], [ox + 145, ym + 60]], ['gnd', [ox + 145, ym + 60]],
+    ['opamp', [ox + 160, ym + 16]]);
+  if (n > 1) it.push(['dot', [bx, 80]]);
+  if (outLab) it.push(['W', [ox + 270, ym + 16], [ox + 300, ym + 16]], ['open', [ox + 300, ym + 16], outLab]);
+  return it;
+}
+// difference amp / divider-on-plus (op-amp at 160,96)
+const diffItems = (V2, R1, R2, V1, R3, R4) => [
+  ['V', [20, 80], [20, 140], V2, -1], ['gnd', [20, 140]], ['R', [20, 80], [130, 80], R1], ['W', [130, 80], [160, 80]], ['dot', [140, 80]],
+  ['W', [140, 80], [140, 30]], ['R', [140, 30], [260, 30], R2], ['W', [260, 30], [260, 96]], ['W', [240, 96], [290, 96]], ['dot', [260, 96]], ['open', [290, 96], 'vₒ'],
+  ['V', [60, 112], [60, 180], V1], ['gnd', [60, 180]], ['R', [60, 112], [120, 112], R3, -1], ['dot', [120, 112]], ['R', [120, 112], [120, 180], R4], ['gnd', [120, 180]],
+  ['W', [120, 112], [160, 112]], ['opamp', [160, 96]]];
+// Howland: op-amp at (200,116)
+const howItems = (Vin, L, vmax) => [
+  ['V', [40, 100], [40, 160], Vin, -1], ['gnd', [40, 160]], ['R', [40, 100], [160, 100], L[0]], ['W', [160, 100], [200, 100]], ['dot', [170, 100]],
+  ['W', [170, 100], [170, 50]], ['R', [170, 50], [310, 50], L[1]], ['W', [310, 50], [310, 116]], ['W', [280, 116], [340, 116]], ['dot', [310, 116]], ['open', [340, 116], 'Vout'],
+  ['R', [310, 116], [310, 200], L[2]], ['dot', [310, 200]], ['W', [310, 200], [180, 200], [180, 132], [200, 132]], ['dot', [240, 200]],
+  ['R', [240, 200], [240, 260], L[3]], ['gnd', [240, 260]], ['W', [310, 200], [380, 200]], ['R', [380, 200], [380, 260], L[4]], ['gnd', [380, 260]],
+  ['t', [300, 214], 'L', 'end'], ['opamp', [200, 116], { vmax: vmax || 15 }]];
+
+$('#fig-sum').innerHTML = sch(sumItems(40, [{ lab: 'v₁', R: 'R₁' }, { lab: 'v₂', R: 'R₂' }, { lab: 'v₃', R: 'R₃' }], 'Rf', 'vₒ'), { w: 380, h: 240, sim: false });
+$('#fig-2stage').innerHTML = sch([...sumItems(40, [{ lab: 'v₁', R: 'R₁' }, { lab: 'v₂', R: 'R₂' }], 'Ra'),
+  ...sumItems(380, [{ R: 'Rb', from: [310, 136] }, { lab: 'v₃', R: 'R₃' }], 'Rc', 'vₒ')], { w: 720, h: 210, sim: false });
+$('#fig-diff').innerHTML = sch(diffItems('v₂', 'R₁', 'R₂', 'v₁', 'R₃', 'R₄'), { w: 310, h: 200, pad: 56, sim: false });
+$('#fig-how').innerHTML = sch(howItems('Vin', ['R₁', 'R₂', 'R₃', 'R₄', 'RL']), { w: 420, h: 280, sim: false });
+$('#fig-q2425').innerHTML = sch(howItems('−5 V', ['R₁ 10 kΩ', 'R₂ 10 kΩ', 'R₃ 1 kΩ', 'R₄ 1 kΩ', 'RL 100 Ω'], 20), { w: 420, h: 280 });
+$('#fig-q1819').innerHTML = sch([...sumItems(40, [{ lab: 'v₁', R: '1 kΩ' }, { lab: 'v₂', R: '5 kΩ' }], '5 kΩ'),
+  ...sumItems(380, [{ lab: 'v₃', R: '500 Ω' }, { R: '1 kΩ', from: [310, 136] }, { lab: 'v₄', R: '500 Ω' }], '1 kΩ', 'vₒ'), ['t', [318, 128], 'x', 'start']], { w: 720, h: 250, sim: false });
+
+drill('#dr-2stage', { id: 'o04-two-stage-summer', title: 'Design a two-stage summer for p v1 + q v2 − r v3', gen(r) {
+  const p = r.int(1, 5), q = r.int(1, 5), rr = r.int(1, 5), Ra = 10, Rc = 10 * rr, R1 = Ra * rr / p, R2 = Ra * rr / q;
+  return {
+    given: `Using the two-stage summer of Figure 2 with \\(R_a = R_b = R_3\\) = 10 kΩ, obtain \\(v_o = ${co(p, 'v_1')} + ${co(q, 'v_2')} - ${co(rr, 'v_3')}\\). Find \\(R_c\\), \\(R_1\\), \\(R_2\\).`,
+    ask: [{ l: 'Rc', v: Rc * 1e3, u: 'kΩ' }, { l: 'R_1', v: R1 * 1e3, u: 'kΩ' }, { l: 'R_2', v: R2 * 1e3, u: 'kΩ' }],
+    steps: [
+      { t: `\\(R_c/R_3 = ${rr} \\Rightarrow R_c = ${Rc}\\) kΩ, so stage 2 multiplies stage 1 by \\(R_c/R_b = ${rr}\\).`, a: { l: 'Rc', v: Rc * 1e3, u: 'kΩ' } },
+      { t: `\\(${rr}\\cdot R_a/R_1 = ${p} \\Rightarrow R_1 = 10\\times${rr}/${p} = ${num(R1)}\\) kΩ`, a: { l: 'R_1', v: R1 * 1e3, u: 'kΩ' } },
+      { t: `\\(${rr}\\cdot R_a/R_2 = ${q} \\Rightarrow R_2 = 10\\times${rr}/${q} = ${num(R2)}\\) kΩ`, a: { l: 'R_2', v: R2 * 1e3, u: 'kΩ' } },
+    ] };
+} });
+
+drill('#dr-cascade', { id: 'o01-cascaded-summers', title: 'Cascaded inverting summers: find x and vo', gen(r) {
+  const P = [0.5, 1, 2, 5, 10], R1 = r.pick(P), R2 = r.pick(P), Rf1 = r.pick(P), Rx = r.pick(P), R3 = r.pick(P), R4 = r.pick(P), Rf2 = r.pick(P);
+  const v1 = r.step(-3, 3, 0.5), v2 = r.step(-3, 3, 0.5), v3 = r.step(-3, 3, 0.5), A4 = r.pick([1, 2, 3, 5]), t = r.pick([0.25, 0.5, 1, 1.5]), f = r.pick([1, 50, 100]);
+  const w = r.pick(['sin', 'cos']), v4 = A4 * Math[w](2 * Math.PI * f * t), L = 15;
+  const x = -(Rf1 / R1 * v1 + Rf1 / R2 * v2), vo = -(Rf2 / Rx * x + Rf2 / R3 * v3 + Rf2 / R4 * v4);
+  if (Math.abs(x) > L || Math.abs(vo) > L || Math.abs(vo) < 0.3) return null;
+  return {
+    given: `Stage 1: \\(v_1\\) = ${v1} V through ${k(R1)} and \\(v_2\\) = ${v2} V through ${k(R2)} into an inverting summer with ${k(Rf1)} feedback; output \\(x\\). Stage 2: \\(x\\) through ${k(Rx)}, \\(v_3\\) = ${v3} V through ${k(R3)} and \\(v_4 = ${A4}\\${w}(${2 * f}\\pi t)\\) through ${k(R4)}; feedback ${k(Rf2)}. Supplies ±15 V. Find \\(x\\) and \\(v_o\\) at \\(t\\) = ${t} s.`,
+    ask: [{ l: 'x', v: x, u: 'V' }, { l: 'v_o', v: vo, u: 'V' }],
+    steps: [
+      { t: `\\(x = -\\left(\\dfrac{${Rf1}}{${R1}}(${v1}) + \\dfrac{${Rf1}}{${R2}}(${v2})\\right) = ${num(x)}\\) V`, a: { l: 'x', v: x, u: 'V' } },
+      `\\(v_4(${t}) = ${A4}\\${w}(${num(2 * f * t)}\\pi) = ${num(Math.abs(v4) < 1e-9 ? 0 : v4)}\\) V`,
+      { t: `\\(v_o = -\\left(\\dfrac{${Rf2}}{${Rx}}(${num(x)}) + \\dfrac{${Rf2}}{${R3}}(${v3}) + \\dfrac{${Rf2}}{${R4}}(${num(Math.abs(v4) < 1e-9 ? 0 : v4)})\\right) = ${num(vo)}\\) V`, a: { l: 'v_o', v: vo, u: 'V' } },
+    ] };
+} });
+
+worked('#wk-e29', {
+  given: 'Khairul s.13 (Sedra Exercise E2.9): 1 kΩ from − to ground, 9 kΩ from − to the output; v₁ through 2 kΩ and v₂ through 3 kΩ to the + input (nothing else on +). Find vₒ.',
+  steps: [
+    { t: 'Superposition on the + node: \\(v_+ = \\dfrac{v_1/2 + v_2/3}{1/2 + 1/3} = 0.6v_1 + 0.4v_2\\)', a: { l: '\\text{weight of } v_1', v: 0.6, u: '' } },
+    { t: 'Noise gain \\(1 + 9/1 = 10\\)', a: { l: '1 + R_F/R_N', v: 10, u: 'V/V' } },
+    { t: '\\(v_o = 10(0.6v_1 + 0.4v_2) = 6v_1 + 4v_2\\)', a: { l: '\\text{coefficient of } v_2', v: 4, u: '' } },
+  ] });
+
+drill('#dr-diff', { id: 'o04-diff-amp-output', title: 'Difference amplifier output and common-mode gain', gen(r) {
+  const R1 = r.pick([1, 2, 4.7, 10]), ratio = r.pick([1, 2, 3, 5, 10]), R2 = R1 * ratio, bal = r() < 0.6, R3 = bal ? R1 : r.pick([1, 2, 4.7, 10]), R4 = bal ? R2 : R3 * r.pick([1, 2, 3, 5, 10]);
+  const v1 = r.step(-2, 2, 0.25), v2 = r.step(-2, 2, 0.25), vo = R4 / (R3 + R4) * (1 + R2 / R1) * v1 - R2 / R1 * v2, Acm = (R4 * R1 - R2 * R3) / (R1 * (R3 + R4));
+  if (Math.abs(vo) > 14 || Math.abs(vo) < 0.1) return null;
+  return {
+    given: `Figure 3 with \\(R_1\\) = ${k(R1)}, \\(R_2\\) = ${k(R2)}, \\(R_3\\) = ${k(R3)}, \\(R_4\\) = ${k(R4)}; \\(v_1\\) = ${v1} V, \\(v_2\\) = ${v2} V. Find \\(v_o\\) and the common-mode gain \\(A_{cm}\\).`,
+    fig: sch(diffItems(v2 + ' V', k(R1), k(R2), v1 + ' V', k(R3), k(R4)), { w: 310, h: 200, pad: 56 }),
+    ask: [{ l: 'v_o', v: vo, u: 'V' }, { l: 'A_{cm}', v: Acm, u: 'V/V', tol: 0.02 }],
+    steps: [
+      `\\(v_+ = ${v1}\\times\\dfrac{${R4}}{${R3} + ${R4}} = ${num(v1 * R4 / (R3 + R4))}\\) V; noise gain \\(1 + ${R2}/${R1} = ${num(1 + R2 / R1)}\\).`,
+      { t: `\\(v_o = ${num(v1 * R4 / (R3 + R4))}\\times${num(1 + R2 / R1)} - ${num(R2 / R1)}\\times(${v2}) = ${num(vo)}\\) V`, a: { l: 'v_o', v: vo, u: 'V' } },
+      { t: `\\(A_{cm} = \\dfrac{R_4R_1 - R_2R_3}{R_1(R_3+R_4)} = \\dfrac{${R4}\\cdot${R1} - ${R2}\\cdot${R3}}{${R1}(${R3} + ${R4})} = ${num(Acm)}\\)${Math.abs(Acm) < 1e-9 ? ' (balanced: \\(R_4/R_3 = R_2/R_1\\))' : ' (unbalanced bridge)'}`, a: { l: 'A_{cm}', v: Acm, u: 'V/V', tol: 0.02 } },
+    ], note: 'For a balanced bridge type 0 for the common-mode gain.' };
+} });
+
+worked('#wk-53', {
+  given: 'z = 5V₁ − 3V₂, one op-amp. Start from R₁ = 10 kΩ.',
+  steps: [
+    { t: 'Negative term: \\(V_2\\) → \\(R_1\\) → \\(-\\); \\(R_f/R_1 = 3 \\Rightarrow R_f = 30\\) kΩ', a: { l: 'Rf', v: 30e3, u: 'kΩ' } },
+    'Noise gain with only \\(R_1\\): \\(1 + 3 = 4\\). Need 5 &gt; 4, so no divider: \\(V_1\\) straight to \\(+\\), add \\(R_x\\) from \\(-\\) to ground.',
+    { t: '\\(1 + 3 + 30/R_x = 5 \\Rightarrow R_x = 30\\) kΩ', a: { l: 'R_x', v: 30e3, u: 'kΩ' } },
+    'Check: \\(V_1 = 1, V_2 = 0\\): \\(1 + 30/(10\\parallel30) = 1 + 30/7.5 = 5\\) ✓; \\(V_1 = 0, V_2 = 1\\): \\(-30/10 = -3\\) ✓.',
+  ] });
+
+drill('#dr-single', { id: 'o04-single-opamp', title: 'One op-amp for a v1 − b v2', gen(r) {
+  const a = r.int(1, 8), b = r.int(1, 5), Rf = 10 * b; // kΩ, R1 = 10 k
+  if (a === 1 + b) return null;
+  const div = a < 1 + b, R4 = 10, R3 = div ? R4 * ((1 + b) / a - 1) : 0, Rx = div ? 0 : Rf / (a - 1 - b);
+  return {
+    given: `Design \\(v_o = ${co(a, 'v_1')} - ${co(b, 'v_2')}\\) with one op-amp. Use \\(R_1\\) = 10 kΩ from \\(v_2\\) to \\(-\\). If \\(v_1\\) needs a divider on \\(+\\), use \\(R_4\\) = 10 kΩ to ground and find the series \\(R_3\\); if it needs an extra resistor \\(R_x\\) from \\(-\\) to ground, find \\(R_x\\).`,
+    ask: [{ l: 'Rf', v: Rf * 1e3, u: 'kΩ' }, div ? { l: 'R_3', v: R3 * 1e3, u: 'kΩ' } : { l: 'R_x', v: Rx * 1e3, u: 'kΩ' }],
+    steps: [
+      { t: `\\(R_f/R_1 = ${b} \\Rightarrow R_f = ${Rf}\\) kΩ`, a: { l: 'Rf', v: Rf * 1e3, u: 'kΩ' } },
+      `Noise gain with only \\(R_1\\): \\(1 + ${b} = ${1 + b}\\); needed \\(a = ${a}\\) ${div ? '&lt;' : '&gt;'} ${1 + b}.`,
+      div ? { t: `Divider: \\(\\dfrac{R_4}{R_3 + R_4} = \\dfrac{${a}}{${1 + b}} \\Rightarrow R_3 = 10\\left(\\dfrac{${1 + b}}{${a}} - 1\\right) = ${num(R3)}\\) kΩ`, a: { l: 'R_3', v: R3 * 1e3, u: 'kΩ' } }
+          : { t: `\\(v_1\\) direct to \\(+\\); \\(1 + ${b} + ${Rf}/R_x = ${a} \\Rightarrow R_x = ${Rf}/${a - 1 - b} = ${num(Rx)}\\) kΩ`, a: { l: 'R_x', v: Rx * 1e3, u: 'kΩ' } },
+      `Check \\(v_1 = 1, v_2 = 0\\): ${div ? `\\(\\dfrac{10}{${num(R3)} + 10}\\times${1 + b} = ${num(10 / (R3 + 10) * (1 + b))}\\)` : `\\(1 + ${Rf}/(10\\parallel${num(Rx)}) = ${num(1 + Rf / par(10, Rx))}\\)`} ✓`,
+    ] };
+} });
+
+worked('#wk-how', {
+  given: 'R₁ = R₂ = 10 kΩ, R₃ = R₄ = 1 kΩ, R_L = 0.1 kΩ, V_in = −5 V, ±20 V.',
+  fig: sch(howItems('−5 V', ['R₁ 10 kΩ', 'R₂ 10 kΩ', 'R₃ 1 kΩ', 'R₄ 1 kΩ', 'RL 100 Ω'], 20), { w: 420, h: 280, sim: false }),
+  steps: [
+    '\\(V_1 = (V_{in} + V_{out})/2 = V_2 \\Rightarrow V_{out} = 2V_2 - V_{in}\\)',
+    { t: 'Node L: \\(V_{out} - V_2 = V_2 + V_2/0.1 \\Rightarrow -V_{in} = 10V_2 \\Rightarrow V_2 = 0.5\\) V', a: { l: 'V_2', v: 0.5, u: 'V' } },
+    { t: '\\(i_L = 0.5/0.1 = 5\\) mA', a: { l: 'i_L', v: 5e-3, u: 'mA' } },
+    { t: '\\(V_{out} = 2(0.5) + 5 = 6\\) V (inside ±20 V ✓)', a: { l: 'V_{out}', v: 6, u: 'V' } },
+    { t: 'Compliance: \\(V_{out} = 5(1 + 2R_L) \\le 20 \\Rightarrow R_{L,max} = 1.5\\) kΩ', a: { l: 'R_{L,max}', v: 1500, u: 'kΩ' } },
+  ] });
+
+drill('#dr-how', { id: 'o10-howland', title: 'Howland converter: load current, output, compliance', gen(r) {
+  const R1 = r.pick([10, 20, 47]), R3 = r.pick([0.5, 1, 2]), RL = r.pick([0.05, 0.1, 0.22, 0.47, 1, 2.2]), Vin = r.pick([-1, 1]) * r.step(0.5, 10, 0.5), L = r.pick([12, 15, 20]);
+  const VLlin = (-Vin / R3) / (1 / R3 + 1 / RL - 1 / R3) , Voutlin = 2 * VLlin - Vin; // R1 = R2, R3 = R4
+  const sat = Math.abs(Voutlin) > L, Vout = sat ? Math.sign(Voutlin) * L : Voutlin, Rp = par(R3, RL);
+  const VL = sat ? Vout * Rp / (R3 + Rp) : VLlin, iL = VL / RL, RLmax = R3 / 2 * (L / Math.abs(Vin) - 1);
+  if (RLmax <= 0) return null;
+  return {
+    given: `Howland converter: \\(R_1 = R_2\\) = ${k(R1)}, \\(R_3 = R_4\\) = ${k(R3)}, \\(R_L\\) = ${si(RL * 1e3, 'Ω')}, \\(V_{in}\\) = ${Vin} V, supplies ±${L} V. Find \\(i_L\\), \\(V_{out}\\), and the largest \\(R_L\\) for linear operation.`,
+    fig: sch(howItems(Vin + ' V', ['R₁ ' + k(R1), 'R₂ ' + k(R1), 'R₃ ' + k(R3), 'R₄ ' + k(R3), 'RL ' + si(RL * 1e3, 'Ω')], L), { w: 420, h: 280 }),
+    ask: [{ l: 'i_L', v: iL / 1000, u: 'mA' }, { l: 'V_{out}', v: Vout, u: 'V' }, { l: 'R_{L,max}', v: RLmax * 1e3, u: 'kΩ' }],
+    steps: [
+      `\\(R_1 = R_2\\): \\(V_{out} = 2V_L - V_{in}\\). Node L: \\(\\dfrac{V_{out} - V_L}{${R3}} = \\dfrac{V_L}{${R3}} + \\dfrac{V_L}{${RL}} \\Rightarrow V_L = -V_{in}R_L/R_3 = ${num(VLlin)}\\) V`,
+      `Linear result: \\(i_L = -V_{in}/R_3 = ${num(-Vin / R3)}\\) mA, \\(V_{out} = 2(${num(VLlin)}) - (${Vin}) = ${num(Voutlin)}\\) V.`,
+      ...(sat ? [`\\(|${num(Voutlin)}| &gt; ${L}\\): <b>saturated</b>. \\(V_{out} = ${num(Vout)}\\) V and the virtual short fails. \\(V_L = ${num(Vout)}\\times\\dfrac{R_4\\parallel R_L}{R_3 + R_4\\parallel R_L} = ${num(Vout)}\\times\\dfrac{${num(Rp)}}{${R3} + ${num(Rp)}} = ${num(VL)}\\) V`] : []),
+      { t: `\\(i_L = ${num(VL)}/${RL} = ${num(iL)}\\) mA, \\(V_{out} = ${num(Vout)}\\) V`, a: { l: 'i_L', v: iL / 1000, u: 'mA' } },
+      { t: `Compliance: \\(|V_{in}|(1 + 2R_L/R_3) \\le ${L} \\Rightarrow R_{L,max} = \\dfrac{${R3}}{2}\\left(\\dfrac{${L}}{${Math.abs(Vin)}} - 1\\right) = ${num(RLmax)}\\) kΩ`, a: { l: 'R_{L,max}', v: RLmax * 1e3, u: 'kΩ' } },
+    ] };
+} });
+
+flashcards('#cards', [
+  { f: 'Inverting summer', b: 'vₒ = −Σ (R_f/R_k) v_k' },
+  { f: 'Two-stage summer', b: 'Stage-1 inputs get (R_a/R_k)(R_c/R_b); stage-2 inputs get −R_c/R_k.' },
+  { f: 'Noise gain', b: '1 + R_F/R_N, R_N = parallel of all resistors at the − node except R_F.' },
+  { f: 'Difference amp', b: '(R₂/R₁)(v₁ − v₂) when R₄/R₃ = R₂/R₁.' },
+  { f: 'a·v₁ − b·v₂, a > 1 + b', b: 'v₁ direct to +, R_x = R_f/(a − 1 − b) from − to ground.' },
+  { f: 'Howland i_L', b: '−V_in·R₂/(R₁R₃), independent of R_L when R₂/R₁ = R₃/R₄.' },
+  { f: 'Howland compliance', b: 'Valid only while |V_out| < rail; V_out = 2V_L − V_in for R₁ = R₂.' },
+]);
+quiz('#quiz', [
+  { q: 'Inverting summer, R_f = 10 kΩ, inputs 2 V through 5 kΩ and −1 V through 10 kΩ. vₒ =', opts: ['−3 V', '−5 V', '3 V', '−4 V'], a: 0, why: '−(2·2 + 1·(−1)) = −3 V.' },
+  { q: 'Difference amp with all four resistors equal gives', opts: ['v₁ + v₂', 'v₁ − v₂', '2(v₁ − v₂)', '(v₁ − v₂)/2'], a: 1, why: 'R₂/R₁ = 1.' },
+  { q: 'One op-amp for 7v₁ − 2v₂ with R₁ = 10 kΩ, R_f = 20 kΩ. You need', opts: ['a divider on +', 'R_x = 5 kΩ from − to ground', 'an inverter', 'R_x = 20 kΩ'], a: 1, why: '7 > 1 + 2, so R_x = 20/(7 − 3) = 5 kΩ.' },
+  { q: 'Howland with R₁ = R₂, R₃ = R₄ = 2 kΩ, V_in = 4 V. i_L =', opts: ['2 mA', '−2 mA', '4 mA', 'depends on R_L'], a: 1, why: '−V_in/R₃ = −2 mA (flowing up out of R_L).' },
+  { q: 'Two-stage summer with R_c/R_b = 3: an input to stage 1 with R_a/R₁ = 2 gets coefficient', opts: ['−6', '6', '2', '−2'], a: 1, why: 'Two inversions: (+)·2·3 = 6.' },
+]);
+</script>
+</body>
+</html>

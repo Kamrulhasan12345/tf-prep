@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bistables and Schmitt Triggers · EEE 263 Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Oscillators · Chapter 5 · Sedra §18.4 · Khairul FG s.2–6 · type S-09</div>
+<h1>Comparators, Bistables and Schmitt Triggers</h1>
+<p class="lede">Asked in 2012–13 (zero-crossing detector), 2014–15 (design from switching points, 15 marks), 2016–17 (find the circuit from a transfer curve) and 2023–24 (draw the VTC, 15 marks). The Schmitt trigger is also the heart of every square/triangle generator in the next chapter. One decision decides the whole question: is the circuit <b>inverting</b> or <b>non-inverting</b>? Get that from the curve before writing any equation.</p>
+
+<h2>1. Comparator and zero-crossing detector</h2>
+<p>An op-amp with no feedback is a comparator: \(v_O = L_+\) when \(v_+ &gt; v_-\), \(L_-\) otherwise (\(L_\pm\) ≈ the rails, or Zener-clamped levels). With \(v_I\) on + and − grounded it is a <b>zero-crossing detector</b>: a sine in, a square wave out, switching at each zero crossing. Put \(v_I\) on − for the inverted output; put a reference \(V_R\) on the other input to switch at \(V_R\). Weakness: near the threshold, noise on \(v_I\) makes the output chatter (many false transitions). Cure: <b>hysteresis</b> by positive feedback, i.e. a Schmitt trigger.</p>
+
+<h2>2. Bistable circuits</h2>
+<p>Connect the output to the + input through a divider (\(R_2\) from \(v_O\) to +, \(R_1\) from + to ground). Positive feedback: any disturbance grows, so the output sits at \(L_+\) or \(L_-\), never in between (the state \(v_+ = v_O = 0\) is metastable, like a ball on a hilltop, Khairul s.3–5). The input only <b>triggers</b> the change. This is a bistable multivibrator, also called a Schmitt trigger.</p>
+
+<h3>Inverting Schmitt (input on −)</h3>
+<figure><div id="fig-inv"></div><figcaption><b>Figure 1.</b> Inverting bistable: \(v_I\) to the − input; \(R_2\) from \(v_O\) to +, \(R_1\) from + to ground (or to \(V_R\)). The simulator drives it with a 10 V sine.</figcaption></figure>
+<div class="formula">\[ \beta = \frac{R_1}{R_1 + R_2},\qquad V_{TH} = \beta L_+,\qquad V_{TL} = \beta L_- \]</div>
+<p>Output high for very negative \(v_I\); it drops to \(L_-\) when \(v_I\) rises past \(V_{TH}\), and returns to \(L_+\) when \(v_I\) falls below \(V_{TL}\): a <b>clockwise</b> loop. (Khairul FG s.4 prints the second threshold as "\(V_{TH} = L_+R_1/(R_1 + R_2)\)": a typo for \(V_{TL} = L_-R_1/(R_1 + R_2)\).)</p>
+<p>With \(R_1\) returned to a reference \(V_R\) instead of ground: \(v_+ = \dfrac{v_OR_1 + V_RR_2}{R_1 + R_2}\), so \(V_{TH} = \dfrac{L_+R_1 + V_RR_2}{R_1 + R_2}\), \(V_{TL} = \dfrac{L_-R_1 + V_RR_2}{R_1 + R_2}\), and the width is \(V_{TH} - V_{TL} = (L_+ - L_-)\dfrac{R_1}{R_1 + R_2}\).</p>
+
+<h3>Non-inverting Schmitt (input through R₁ to +)</h3>
+<figure><div id="fig-non"></div><figcaption><b>Figure 2.</b> Non-inverting bistable (the 2023–24 circuit): \(v_I\) through \(R_1\) to +, \(R_2\) from \(v_O\) to +, − grounded (or at \(V_R\)).</figcaption></figure>
+<p>Superposition: \(v_+ = v_I\dfrac{R_2}{R_1 + R_2} + v_O\dfrac{R_1}{R_1 + R_2}\). Switching happens when \(v_+\) crosses the − input (0 V):</p>
+<div class="formula">\[ V_{TH} = -L_-\frac{R_1}{R_2},\qquad V_{TL} = -L_+\frac{R_1}{R_2},\qquad \text{with } V_R \text{ on } -:\; v_I = \frac{V_R(R_1 + R_2) - v_OR_1}{R_2} \]</div>
+<p>Output low for very negative \(v_I\); it jumps to \(L_+\) at \(V_{TH}\) (computed with \(v_O = L_-\)) and back at \(V_{TL}\) (with \(v_O = L_+\)): a <b>counter-clockwise</b> loop. Width \((L_+ - L_-)R_1/R_2\). Note \(R_1/R_2\) here, \(R_1/(R_1 + R_2)\) for the inverting one.</p>
+<figure><div id="fig-vtc"></div><figcaption><b>Figure 3.</b> Transfer characteristics: inverting (left, clockwise) and non-inverting (right, counter-clockwise).</figcaption></figure>
+
+<div class="method"><h4>Method · analysis (find the VTC)</h4><ol>
+<li><b>Polarity:</b> input on − → inverting; input through a resistor to + → non-inverting.</li>
+<li>Write \(v_+\) by superposition (input, output, reference).</li>
+<li>Switching when \(v_+ = v_-\). Substitute \(v_O = L_+\) and \(v_O = L_-\) to get the two thresholds. Pair each threshold with the state that is ending.</li>
+<li>Draw the loop with arrows and label \(L_\pm\), \(V_{TH}\), \(V_{TL}\).</li>
+</ol></div>
+<div id="dr-an"></div>
+
+<div class="method"><h4>Method · design from a VTC or switching points</h4><ol>
+<li>Read the polarity: output high for very negative input → inverting; low → non-inverting. (This is where the bank's AI answer to 2016–17 went wrong.)</li>
+<li>Read \(L_+\), \(L_-\), \(V_{TH}\), \(V_{TL}\). If \(L_+ \ne -L_-\), say how: asymmetric supplies or Zener clamps at the output.</li>
+<li><b>Inverting:</b> \(\dfrac{R_1}{R_1 + R_2} = \dfrac{V_{TH} - V_{TL}}{L_+ - L_-}\); pick \(R_1\) = 10 kΩ (to \(V_R\)), get \(R_2\); then \(V_R = \dfrac{V_{TH}(R_1 + R_2) - L_+R_1}{R_2}\).</li>
+<li><b>Non-inverting:</b> \(\dfrac{R_1}{R_2} = \dfrac{V_{TH} - V_{TL}}{L_+ - L_-}\); then \(V_R = \dfrac{V_{TH}R_2 + L_-R_1}{R_1 + R_2}\) (on the − input).</li>
+<li>Check by recomputing both thresholds.</li>
+</ol></div>
+<div id="dr-di"></div>
+<div id="dr-dn"></div>
+
+<div class="trap"><h4>Traps (where marks go)</h4><ul>
+<li>Wrong polarity. Look at the output for very negative input first.</li>
+<li>\(R_1/(R_1 + R_2)\) (inverting) versus \(R_1/R_2\) (non-inverting).</li>
+<li>Pairing a threshold with the wrong output state: \(V_{TH}\) of the non-inverting circuit uses \(v_O = L_-\).</li>
+<li>Sign of \(V_R\); always recompute both thresholds.</li>
+<li>Asymmetric levels (+22 V, −12 V) cannot come from ±15 V rails: state the supplies or the Zener clamp.</li>
+</ul></div>
+
+<h2>Exam questions</h2>
+
+<div class="exam">
+  <div class="exam-src">2023–24 · Sec B · Q8(a) · 15 marks</div>
+  <div class="exam-q"><p>Write down the characteristics of an ideal op-amp. Draw the voltage transfer characteristics of the circuit in the figure (\(V_{in}\) through \(R_1\) to the + input; \(R_2\) from \(V_o\) to the + input; − input grounded; Figure 2). (VTC shows the variation of output voltage in response to variations in input voltage.)</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><b>Ideal op-amp:</b> infinite open-loop gain, infinite input resistance (zero input current), zero output resistance, infinite bandwidth, infinite CMRR (responds only to \(v_+ - v_-\)), zero offset, infinite slew rate. With negative feedback this gives the virtual short; here the feedback is <b>positive</b>, so the output saturates at \(\pm V_{sat}\) (= \(L_\pm\)).</p>
+    <p><b>Analysis:</b> \(V_+ = V_{in}\dfrac{R_2}{R_1 + R_2} + V_o\dfrac{R_1}{R_1 + R_2}\). The output switches when \(V_+\) crosses 0, i.e. at \(V_{in} = -V_o\dfrac{R_1}{R_2}\).</p>
+    <p>While \(V_o = -V_{sat}\): it switches up at \(V_{TH} = +V_{sat}\dfrac{R_1}{R_2}\). While \(V_o = +V_{sat}\): it switches down at \(V_{TL} = -V_{sat}\dfrac{R_1}{R_2}\).</p>
+    <p><b>VTC</b> (Figure 3, right): for large negative \(V_{in}\), \(V_o = -V_{sat}\); increasing \(V_{in}\), the output stays low until \(V_{TH} = +V_{sat}R_1/R_2\), then jumps to \(+V_{sat}\); decreasing \(V_{in}\), it stays high until \(V_{TL} = -V_{sat}R_1/R_2\), then falls. A rectangular hysteresis loop of width \(2V_{sat}R_1/R_2\), traversed counter-clockwise: a non-inverting Schmitt trigger (bistable).</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2016–17 · Sec A · Q2(b) · 11⅔ marks</div>
+  <div class="exam-q"><p>Determine the op-amp circuit that generates the transfer characteristic shown: \(V_{out}\) = −12 V for \(V_{in}\) below −8 V and +22 V for \(V_{in}\) above −8 V (one vertical switching edge at −8 V; the −12 V level is continued as a dashed line toward 0 V on the paper).</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><b>Polarity:</b> output low for very negative input, high for positive input → <b>non-inverting</b>. (The question bank's AI answer uses an inverting Schmitt with \(V_{in}\) on −; that circuit gives +22 V for very negative input, the opposite of the curve. Wrong.)</p>
+    <p><b>Reading 1 (single edge, no hysteresis):</b> a comparator with \(V_{in}\) on the + input and \(V_R\) = −8 V on the − input (a divider from the negative supply, or a −8 V source). Output levels +22 V and −12 V: run the op-amp from asymmetric supplies (about +24 V and −14 V), or clamp the output with Zeners (e.g. back-to-back Zeners giving +22 V / −12 V through a series resistor).</p>
+    <p><b>Reading 2 (the dashed line as the lower branch of a loop):</b> \(V_{TL}\) = −8 V, \(V_{TH}\) = 0 V. Non-inverting Schmitt with \(V_R\) on −: switching at \(V_{in} = [V_R(R_1 + R_2) - V_oR_1]/R_2\).</p>
+    <p>\(V_{TH}\) (with \(V_o = -12\)): \(0 = [V_R(R_1 + R_2) + 12R_1]/R_2\). \(V_{TL}\) (with \(V_o = +22\)): \(-8 = [V_R(R_1 + R_2) - 22R_1]/R_2\). Subtract: \(8 = 34R_1/R_2\), so \(R_2 = 4.25R_1\) (\(R_1\) = 10 kΩ, \(R_2\) = 42.5 kΩ). Then \(V_R = -12R_1/(R_1 + R_2) = -2.286\) V. Check: thresholds −8.0 V and 0.0 V.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2014–15 · Sec B · Q5(b) · 15 marks</div>
+  <div class="exam-q"><p>Design a Schmitt trigger that triggers from +16 V to −16 V at an input voltage of 12 V and triggers from −16 V to +16 V at an input voltage of 8 V. Specify all the values of resistors used and the reference DC voltage.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>High → low as the input rises (at 12 V): <b>inverting</b> Schmitt. \(L_\pm = \pm16\) V, \(V_{TH}\) = 12 V, \(V_{TL}\) = 8 V. Circuit: \(v_I\) to −; \(R_2\) from \(v_O\) to +; \(R_1\) from + to \(V_R\): \(v_+ = \dfrac{v_OR_1 + V_RR_2}{R_1 + R_2}\).</p>
+    <p>\(12(R_1 + R_2) = 16R_1 + V_RR_2\) and \(8(R_1 + R_2) = -16R_1 + V_RR_2\). Subtract: \(4(R_1 + R_2) = 32R_1 \Rightarrow R_2 = 7R_1\).</p>
+    <p>With \(R_1\) = 10 kΩ, \(R_2\) = 70 kΩ: \(12\times80 = 160 + 70V_R \Rightarrow V_R = 800/70 = 11.43\) V.</p>
+    <p>Check: \(V_{TH} = (16\times10 + 11.43\times70)/80 = 12.0\) V; \(V_{TL} = (-160 + 800)/80 = 8.0\) V. Op-amp on ±16 V-saturating supplies (e.g. ±18 V).</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2012–13 · Sec B · Q7(c) · 15 marks</div>
+  <div class="exam-q"><p>Draw a zero-crossing detector circuit using an op-amp and briefly describe its operation.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>Circuit: op-amp with no feedback; \(v_I\) to the + input, − input grounded (optionally a series input resistor and back-to-back diodes for input protection; Zeners at the output to set the levels).</p>
+    <p>Operation: with very high open-loop gain, \(v_O = +V_{sat}\) when \(v_I &gt; 0\) and \(-V_{sat}\) when \(v_I &lt; 0\); the output changes state each time the input crosses zero. A sine input becomes a square wave of the same frequency (draw both waveforms aligned). With \(v_I\) on −, the output is inverted.</p>
+    <p>Limitations: noise near zero causes multiple false transitions (fixed by hysteresis, i.e. a Schmitt trigger with small thresholds); finite slew rate limits the edge speed at high frequency. Uses: sine-to-square conversion, zero-crossing timing, phase measurement, triggering.</p>
+  </div></details>
+</div>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+
+<div class="key"><p><strong>Summary:</strong> decide polarity first. Inverting (input on −): \(V_{TH,TL} = \dfrac{L_\pm R_1 + V_RR_2}{R_1 + R_2}\), clockwise. Non-inverting (input via \(R_1\) to +): switching at \(v_I = [V_R(R_1 + R_2) - v_OR_1]/R_2\), so \(V_{TH} = -L_-R_1/R_2\), \(V_{TL} = -L_+R_1/R_2\) without reference, counter-clockwise. Design: width gives the resistor ratio, one threshold gives \(V_R\); recompute both.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/eee.js"></script>
+<script>
+$('#fig-inv').innerHTML = sch([
+  ['AC', [60, 104], [60, 180], 'vI', 1, { amp: 10, f: 50 }], ['gnd', [60, 180]], ['W', [60, 104], [200, 104]],
+  ['opamp', [200, 120]], ['W', [200, 136], [170, 136], [170, 170]], ['dot', [170, 170]],
+  ['R', [170, 170], [170, 240], 'R₁', 1, { val: 1e4 }], ['gnd', [170, 240]], ['R', [170, 170], [300, 170], 'R₂', 1, { val: 2e4 }],
+  ['W', [280, 120], [300, 120], [300, 170]], ['dot', [300, 120]], ['W', [300, 120], [330, 120]], ['open', [330, 120], 'vO'],
+], { w: 380, h: 260 });
+$('#fig-non').innerHTML = sch([
+  ['AC', [40, 104], [40, 180], 'vI', 1, { amp: 10, f: 50 }], ['gnd', [40, 180]], ['R', [40, 104], [140, 104], 'R₁', 1, { val: 1e4 }], ['W', [140, 104], [200, 104]], ['dot', [160, 104]],
+  ['opamp', [200, 120], { plusTop: true }], ['W', [200, 136], [180, 136]], ['gnd', [180, 136]],
+  ['W', [160, 104], [160, 50]], ['R', [160, 50], [300, 50], 'R₂', 1, { val: 2e4 }], ['W', [300, 50], [300, 120], [280, 120]], ['dot', [300, 120]],
+  ['W', [300, 120], [330, 120]], ['open', [330, 120], 'vO'],
+], { w: 380, h: 200 });
+
+// VTC loops: two panels
+const loop = (x0, inv) => {
+  const ax = [['W', [x0, 100], [x0 + 220, 100]], ['W', [x0 + 110, 10], [x0 + 110, 190]], ['t', [x0 + 222, 104], 'vI', 'start', 'sm'], ['t', [x0 + 116, 18], 'vO', 'start', 'sm']];
+  const H = 40, Lo = 160, a = x0 + 80, b = x0 + 140; // VTL at a, VTH at b
+  return [...ax, ['W', [x0 + 10, inv ? H : Lo], [inv ? b : a, inv ? H : Lo]], ['W', [inv ? a : b, inv ? Lo : H], [x0 + 210, inv ? Lo : H]],
+    ['W', [a, H], [b, H]], ['W', [a, Lo], [b, Lo]], ['W', [a, H], [a, Lo]], ['W', [b, H], [b, Lo]],
+    ['t', [a, 116], 'VTL', 'end', 'sm'], ['t', [b + 4, 116], 'VTH', 'start', 'sm'], ['t', [x0 + 14, H - 6], 'L+', 'start', 'sm'], ['t', [x0 + 206, Lo + 16], 'L−', 'end', 'sm'],
+    ['t', [b + 6, 72], inv ? '↓' : '↑', 'start'], ['t', [a - 6, 132], inv ? '↑' : '↓', 'end'], ['t', [x0 + 110, 205], inv ? 'inverting (clockwise)' : 'non-inverting (counter-clockwise)', 'middle', 'sm']];
+};
+$('#fig-vtc').innerHTML = sch([...loop(0, true), ...loop(280, false)], { w: 520, h: 210, sim: false });
+
+drill('#dr-an', { id: 's09-schmitt-analysis', title: 'Schmitt trigger thresholds (inverting or non-inverting, with reference)', gen(r) {
+  const inv = r() < 0.5, Lp = r.pick([10, 12, 13, 15]), Lm = r() < 0.75 ? -Lp : -r.pick([8, 10, 12, 13]);
+  const R1 = r.E(1e3, 47e3), R2 = r.E(4.7e3, 470e3), VR = r() < 0.3 ? 0 : r.pick([-6, -5, -3, -2, -1, 1, 2, 3, 5, 6]);
+  let TH, TL;
+  if (inv) { TH = (Lp * R1 + VR * R2) / (R1 + R2); TL = (Lm * R1 + VR * R2) / (R1 + R2); }
+  else { TH = (VR * (R1 + R2) - Lm * R1) / R2; TL = (VR * (R1 + R2) - Lp * R1) / R2; }
+  if (Math.abs(TH) > 14 || Math.abs(TL) > 14 || TH - TL < 0.2) return null;
+  return {
+    given: `${inv ? 'Inverting' : 'Non-inverting'} Schmitt trigger: ${inv ? '\\(v_I\\) to the − input, \\(R_2\\) = ' + si(R2, 'Ω') + ' from \\(v_O\\) to +, \\(R_1\\) = ' + si(R1, 'Ω') + ' from + to \\(V_R\\)' : '\\(v_I\\) through \\(R_1\\) = ' + si(R1, 'Ω') + ' to +, \\(R_2\\) = ' + si(R2, 'Ω') + ' from \\(v_O\\) to +, \\(V_R\\) on the − input'}; \\(V_R\\) = ${VR} V; \\(L_+\\) = ${Lp} V, \\(L_-\\) = ${Lm} V. Find \\(V_{TH}\\) and \\(V_{TL}\\).`,
+    ask: [{ l: 'V_{TH}', v: TH, u: 'V', tol: 0.01 }, { l: 'V_{TL}', v: TL, u: 'V', tol: 0.01 }],
+    steps: inv ? [
+      `\\(v_+ = \\dfrac{v_OR_1 + V_RR_2}{R_1 + R_2}\\); switching when \\(v_I = v_+\\).`,
+      { t: `\\(V_{TH} = \\dfrac{${Lp}\\times${num(R1 / 1e3)} + ${VR}\\times${num(R2 / 1e3)}}{${num((R1 + R2) / 1e3)}} = ${num(TH)}\\) V (ends the high state)`, a: { l: 'V_{TH}', v: TH, u: 'V', tol: 0.01 } },
+      { t: `\\(V_{TL} = \\dfrac{${Lm}\\times${num(R1 / 1e3)} + ${VR}\\times${num(R2 / 1e3)}}{${num((R1 + R2) / 1e3)}} = ${num(TL)}\\) V`, a: { l: 'V_{TL}', v: TL, u: 'V', tol: 0.01 } },
+    ] : [
+      `Switching when \\(v_+ = V_R\\): \\(v_I = \\dfrac{V_R(R_1 + R_2) - v_OR_1}{R_2}\\).`,
+      { t: `\\(V_{TH}\\) (with \\(v_O = L_-\\)): \\(\\dfrac{${VR}\\times${num((R1 + R2) / 1e3)} - (${Lm})\\times${num(R1 / 1e3)}}{${num(R2 / 1e3)}} = ${num(TH)}\\) V`, a: { l: 'V_{TH}', v: TH, u: 'V', tol: 0.01 } },
+      { t: `\\(V_{TL}\\) (with \\(v_O = L_+\\)): \\(\\dfrac{${VR}\\times${num((R1 + R2) / 1e3)} - ${Lp}\\times${num(R1 / 1e3)}}{${num(R2 / 1e3)}} = ${num(TL)}\\) V`, a: { l: 'V_{TL}', v: TL, u: 'V', tol: 0.01 } },
+    ] };
+} });
+
+drill('#dr-di', { id: 's09-design-inverting', title: 'Design an inverting Schmitt trigger from switching points', gen(r) {
+  const L = r.pick([10, 12, 13, 15, 16]), TL = r.pick([-6, -4, -2, 0, 1, 2, 4, 6, 8]), w = r.pick([1, 2, 3, 4, 5, 6]), TH = TL + w;
+  if (Math.abs(TH) >= L - 1) return null;
+  const R1 = 1e4, k = w / (2 * L), R2 = R1 * (1 / k - 1), VR = (TH * (R1 + R2) - L * R1) / R2;
+  if (Math.abs(VR) > 15) return null;
+  return {
+    given: `Design a Schmitt trigger whose output switches from +${L} V to −${L} V when the input rises to ${TH} V, and from −${L} V to +${L} V when the input falls to ${TL} V. Use \\(R_1\\) = 10 kΩ (from + to \\(V_R\\)). Find \\(R_2\\) and \\(V_R\\).`,
+    ask: [{ l: 'R_2', v: R2, u: 'kΩ' }, { l: 'V_R', v: VR, u: 'V', tol: 0.01 }],
+    steps: [
+      'High → low as the input rises: inverting Schmitt.',
+      { t: `\\(\\dfrac{R_1}{R_1 + R_2} = \\dfrac{V_{TH} - V_{TL}}{L_+ - L_-} = \\dfrac{${w}}{${2 * L}}\\) ⇒ \\(R_2 = 10\\times(${num(1 / k)} - 1) = ${num(R2 / 1e3)}\\) kΩ`, a: { l: 'R_2', v: R2, u: 'kΩ' } },
+      { t: `\\(V_R = \\dfrac{V_{TH}(R_1 + R_2) - L_+R_1}{R_2} = \\dfrac{${TH}\\times${num((R1 + R2) / 1e3)} - ${L}\\times10}{${num(R2 / 1e3)}} = ${num(VR)}\\) V`, a: { l: 'V_R', v: VR, u: 'V', tol: 0.01 } },
+    ] };
+} });
+
+drill('#dr-dn', { id: 's09-design-noninverting', title: 'Design a non-inverting Schmitt trigger from a transfer curve', gen(r) {
+  const Lp = r.pick([10, 12, 15, 22]), Lm = -r.pick([10, 12, 15]), TL = r.pick([-8, -6, -4, -2, 0, 1, 2]), w = r.pick([1, 2, 4, 6, 8]), TH = TL + w;
+  const R1 = 1e4, R2 = R1 * (Lp - Lm) / w, VR = (TH * R2 + Lm * R1) / (R1 + R2);
+  if (Math.abs(TH) > 12 || Math.abs(VR) > 15) return null;
+  return {
+    given: `A transfer curve shows \\(v_O = ${Lm}\\) V for very negative input and \\(+${Lp}\\) V for large positive input, with a hysteresis loop between \\(V_{TL}\\) = ${TL} V and \\(V_{TH}\\) = ${TH} V. Design it with \\(R_1\\) = 10 kΩ (input resistor): find \\(R_2\\) and the reference \\(V_R\\) on the − input.`,
+    ask: [{ l: 'R_2', v: R2, u: 'kΩ' }, { l: 'V_R', v: VR, u: 'V', tol: 0.01 }],
+    steps: [
+      'Low output for very negative input: non-inverting Schmitt.',
+      { t: `\\(\\dfrac{R_1}{R_2} = \\dfrac{V_{TH} - V_{TL}}{L_+ - L_-} = \\dfrac{${w}}{${Lp - Lm}}\\) ⇒ \\(R_2 = ${num(R2 / 1e3)}\\) kΩ`, a: { l: 'R_2', v: R2, u: 'kΩ' } },
+      { t: `\\(V_R = \\dfrac{V_{TH}R_2 + L_-R_1}{R_1 + R_2} = \\dfrac{${TH}\\times${num(R2 / 1e3)} + (${Lm})\\times10}{${num((R1 + R2) / 1e3)}} = ${num(VR)}\\) V`, a: { l: 'V_R', v: VR, u: 'V', tol: 0.01 } },
+    ] };
+} });
+
+flashcards('#cards', [
+  { f: 'Inverting Schmitt thresholds', b: 'V_TH = βL₊, V_TL = βL₋, β = R₁/(R₁ + R₂); clockwise loop.' },
+  { f: 'Non-inverting Schmitt thresholds', b: 'V_TH = −L₋R₁/R₂, V_TL = −L₊R₁/R₂; counter-clockwise loop.' },
+  { f: 'Polarity test', b: 'Output for very negative input: high → inverting, low → non-inverting.' },
+  { f: 'Why hysteresis?', b: 'Noise near the threshold no longer causes multiple false transitions.' },
+  { f: 'Zero-crossing detector', b: 'Open-loop comparator, v_I on +, − grounded: sine → square.' },
+  { f: 'Metastable state', b: 'v₊ = v_O = 0 in a bistable: unstable equilibrium, any noise flips it to L₊ or L₋.' },
+]);
+quiz('#quiz', [
+  { q: 'Inverting Schmitt, R₁ = 10 kΩ, R₂ = 40 kΩ, L± = ±10 V: V_TH =', opts: ['2.5 V', '2 V', '4 V', '8 V'], a: 1, why: 'β = 10/50 = 0.2; 0.2 × 10 = 2 V.' },
+  { q: 'Non-inverting Schmitt, R₁ = 10 kΩ, R₂ = 40 kΩ, L± = ±10 V: V_TH =', opts: ['2 V', '2.5 V', '−2.5 V', '4 V'], a: 1, why: '−L₋R₁/R₂ = 10 × 0.25.' },
+  { q: 'A curve shows the output high for very negative inputs. The circuit is', opts: ['non-inverting', 'inverting', 'a ZCD', 'cannot tell'], a: 1, why: 'Inverting: low input gives high output.' },
+  { q: 'Output levels +22 V and −12 V come from', opts: ['R₁/R₂', 'asymmetric supplies or Zener clamps', 'V_R', 'the input'], a: 1, why: 'The saturation levels are set by the output stage, not the feedback.' },
+  { q: 'Hysteresis width of the non-inverting Schmitt is', opts: ['(L₊ − L₋)R₁/(R₁ + R₂)', '(L₊ − L₋)R₁/R₂', '2L₊', 'V_R'], a: 1, why: 'V_TH − V_TL = (L₊ − L₋)R₁/R₂.' },
+]);
+</script>
+</body>
+</html>

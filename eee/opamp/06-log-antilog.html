@@ -1,0 +1,298 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Log, Antilog and Nonlinear Circuits · EEE 263 Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Op-amps · Chapter 6 · Sedra §2.5 problems, §4.2 (diode law) · Sadat L22, notes p.104 · types O-02, O-03</div>
+<h1>Log, Antilog and Nonlinear Circuits</h1>
+<p class="lede">Put a diode, a BJT or a MOSFET where a resistor used to be and the op-amp computes a logarithm, an exponential, a square root or a square. These questions appeared in 2011–12, 2013–14, 2014–15, 2015–16, 2017–18, 2019–20 and 2021–22 (10 to 27 marks), about 145 marks in all, but <b>none since 2021–22</b>: treat this as medium-low priority. The derivations are short and always the same idea, so learn the one idea and the two classic designs (multiplier and frequency doubler).</p>
+
+<h2>1. One idea: virtual ground fixes the current</h2>
+<p>With the + input grounded and negative feedback, the − input sits at 0 V and takes no current. So whatever device is at the input carries a current set by \(v_I\) alone, and the same current must flow through the feedback device. The output is whatever voltage makes the feedback device carry that current.</p>
+<dl class="def">
+  <dt>Device at the input</dt><dd>Its I–V law is applied to \(v_I\): \(i = f(v_I)\). With a resistor in feedback, \(v_O = -R\,f(v_I)\).</dd>
+  <dt>Device in the feedback</dt><dd>The inverse law is applied: \(i = v_I/R\) and \(v_O = -f^{-1}(v_I/R)\).</dd>
+  <dt>Diode law used</dt><dd>\(i_D = I_S\,e^{v_D/\eta V_T}\) (forward bias, \(v_D \gg V_T\)); \(V_T\) = 25 mV here (Sadat's notes use 25.9 mV), \(\eta = 1\) unless given.</dd>
+  <dt>MOSFET law used</dt><dd>Saturation: \(i_D = \tfrac12 k_n'(W/L)(v_{GS} - V_t)^2 = K(v_{GS}-V_t)^2\) with \(K = \tfrac12 k_n'W/L\). Valid only if \(v_{DS} \ge v_{OV}\), i.e. \(v_{GD} \le V_t\).</dd>
+</dl>
+
+<h2>2. Log amplifier (type O-02)</h2>
+<figure><div id="fig-log"></div><figcaption><b>Figure 1.</b> Inverting log amplifier: R at the input, diode in the feedback (anode at the − input).</figcaption></figure>
+<p><b>Derivation (2011–12, 26⅔ marks, is exactly this):</b></p>
+<ol>
+<li>Virtual ground: \(v_- = 0\), so \(i = v_I/R\), and all of it flows into the diode (\(i_- = 0\)).</li>
+<li>The diode's anode is at 0 V and its cathode at \(v_O\): \(v_D = 0 - v_O = -v_O\).</li>
+<li>\(\dfrac{v_I}{R} = I_S\,e^{-v_O/\eta V_T}\;\Rightarrow\; \boxed{v_O = -\eta V_T \ln\dfrac{v_I}{R\,I_S}}\).</li>
+<li>Conditions: \(v_I &gt; 0\) (otherwise the diode is reverse biased and the loop opens), \(v_I/R \gg I_S\), constant temperature.</li>
+</ol>
+<p>Each factor of 10 in \(v_I\) moves \(v_O\) by \(-\eta V_T\ln10 = -57.6\) mV (\(\eta\) = 1). The output is small (a few hundred mV) and depends on temperature through \(V_T\) and \(I_S\); practical log amps add a matched second diode to cancel \(I_S\).</p>
+<p><b>BJT version (transdiode log amp).</b> Replace the diode with an npn whose base is grounded, collector at the − input and emitter at the output: \(i_C = I_S e^{v_{BE}/V_T}\) with \(v_{BE} = -v_O\), so \(v_O = -V_T\ln\dfrac{v_I}{RI_S}\). The BJT follows the exponential law over many more decades than a diode (no \(\eta\), base current is not in the loop), which is why real log amps use it.</p>
+
+<h3>Worked example: log and antilog with numbers</h3>
+<div id="wk-log"></div>
+
+<h2>3. Antilog (exponential) amplifier</h2>
+<figure><div id="fig-exp"></div><figcaption><b>Figure 2.</b> Antilog amplifier: diode at the input (anode at \(v_I\)), R in the feedback.</figcaption></figure>
+<p><b>Derivation:</b> the diode has \(v_D = v_I - 0 = v_I\), so \(i = I_S e^{v_I/\eta V_T}\). This current flows on through R to the output: \(0 - v_O = iR\), so</p>
+<div class="formula">\[ v_O = -R\,I_S\,e^{v_I/\eta V_T} \qquad (v_I &gt; 0,\; v_I \gg V_T) \]</div>
+<p>Assumptions to state (2013–14 asked for them): ideal op-amp; diode forward biased with \(v_I \gg V_T\) so the "−1" in the diode equation is negligible; \(I_S\) and \(V_T\) constant (fixed temperature). The output is inverted and must stay inside the rails, so \(v_I\) can only range over a few hundred mV.</p>
+<div id="dr-log"></div>
+
+<h2>4. MOSFET in the loop: square root and square</h2>
+<figure><div id="fig-mos"></div><figcaption><b>Figure 3.</b> 2017–18 circuit: NMOS in the feedback path with gate grounded, drain toward the − input through \(R_D\), source at the output. With \(R_D\) = 0 (2015–16) it is the square-root amplifier.</figcaption></figure>
+<div class="method"><h4>Method · MOSFET feedback (square root)</h4><ol>
+<li>\(I_D = v_I/R_1\) (needs \(v_I &gt; 0\); current flows from the − input into the drain).</li>
+<li>Gate at 0 V, source at \(v_O\): \(v_{GS} = -v_O\). Saturation: \(I_D = K(-v_O - V_t)^2\).</li>
+<li>\(v_O = -V_t - \sqrt{I_D/K} = -V_t - \sqrt{\dfrac{v_I}{KR_1}}\). Keep the root with \(v_{GS} &gt; V_t\).</li>
+<li><b>Region check:</b> \(V_D = -I_DR_D\), \(V_{DS} = V_D - v_O\). Saturation needs \(V_{DS} \ge V_{OV}\). With \(R_D = 0\): \(V_{GD} = 0 &lt; V_t\), always saturated.</li>
+</ol></div>
+<p><b>Squarer (MOSFET at the input).</b> Drain at the virtual ground, gate held at \(V_t\) by a DC source, source driven by \(-v_I\) (from an inverter). Then \(v_{GS} = V_t + v_I\), \(v_{OV} = v_I\), \(I_D = K v_I^2\), drawn out of the − node, so it is supplied from the output through \(R_f\): \(v_O = +KR_f\,v_I^2\). \(V_{DS} = v_I = V_{OV}\): exactly at the edge of saturation (fine, but say so). For \(v_I &lt; 0\) the device is off and \(v_O = 0\).</p>
+<div id="dr-mos"></div>
+
+<h2>5. Log–antilog multiplier (type O-03)</h2>
+<p>Logs turn a product into a sum: \(\ln X_1 + \ln X_2 = \ln X_1X_2\). Chain: two log amps, an inverting summer, an antilog amp, an inverter.</p>
+<div class="method"><h4>Method · design \(V_o = k\,X_1X_2\)</h4><ol>
+<li>Log amps (input resistor \(R_{in}\), diode in feedback): \(V_{1}' = -V_T\ln\dfrac{X_1}{I_SR_{in}}\), \(V_{2}' = -V_T\ln\dfrac{X_2}{I_SR_{in}}\).</li>
+<li>Unity inverting summer (equal R): \(V_s = +V_T\ln\dfrac{X_1X_2}{(I_SR_{in})^2}\).</li>
+<li>Antilog (diode in, \(R_{out}\) feedback): \(V_a = -R_{out}I_S\,e^{V_s/V_T} = -\dfrac{R_{out}}{I_SR_{in}^2}X_1X_2\).</li>
+<li>Choose \(R_{in}\), then \(R_{out} = k\,I_SR_{in}^2\). Unity inverter for the sign.</li>
+<li>Variants: squarer = one log amp + an inverting amplifier of gain 2 (\(2\ln X = \ln X^2\)); divider = subtract the logs (difference amplifier).</li>
+</ol></div>
+<p>All diodes must match (same \(I_S\), \(\eta\), temperature), and \(X_1, X_2 &gt; 0\): this is a <b>one-quadrant</b> multiplier. A bipolar signal (a sine) needs a DC offset first, removed afterwards.</p>
+<div id="dr-mult"></div>
+
+<h2>6. Frequency doubler and \(\sin^2\)</h2>
+<p>Doubling a frequency is trigonometry, then op-amp blocks:</p>
+<div class="formula">\[ \sin^2\theta = \tfrac12 - \tfrac12\cos2\theta, \qquad 2\sin\theta\cos\theta = \sin2\theta \]</div>
+<ul>
+<li><b>90° shift:</b> a differentiator with \(RC = 1/\omega\) turns \(\sin\omega t\) into \(-\cos\omega t\) exactly. An integrator turns \(\cos\omega t\) into \(\frac{1}{\omega RC}\sin\omega t\) exactly (because \(\sin 0 = 0\)), but turns \(\sin\omega t\) into \(\frac{\cos\omega t - 1}{\omega RC}\): a DC error unless pre-charged.</li>
+<li><b>DC removal:</b> subtract a constant with a summer fed from a rail, or block it with a series capacitor.</li>
+<li><b>Squaring</b> a sine with a diode multiplier needs a positive offset first (log of a negative number does not exist).</li>
+</ul>
+
+<div class="trap"><h4>Traps (where marks go)</h4><ul>
+<li>Diode at the input is the <b>antilog</b>, diode in the feedback is the <b>log</b>. (Even the bank's solution first calls 2019–20's circuit a log amp.)</li>
+<li>Sign: both are inverting; the log amp needs \(v_I &gt; 0\).</li>
+<li>Using \(V_{GS}\) root with \(V_{GS} &lt; V_t\); forgetting the saturation check when the drain has a resistor (2017–18: the stated saturation is actually false).</li>
+<li>Mixing \(K\) and \(\tfrac12k_n'W/L\): write which one you use.</li>
+<li>Multiplier: \(R_{out} = kI_SR_{in}^2\) (units V·Ω/V); forgetting the final inverter.</li>
+<li>Generating cos from sin with an uncharged integrator (DC error); feeding a bipolar sine into a diode log amp.</li>
+</ul></div>
+
+<h2>Exam questions</h2>
+
+<div class="exam">
+  <div class="exam-src">2021–22 · Sec A · Q1(a) · 20 marks</div>
+  <div class="exam-q"><p>You have two sources, \(v_1 = \sin(100t)\) V and \(v_2 = 1\) V. Design a circuit using op-amps that produces \(v_o = \sin^2(50t)\) V, and show that it does.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><b>Identity:</b> \(\sin^2(50t) = \tfrac12 - \tfrac12\cos(100t)\). So we need \(\cos100t\) from \(\sin100t\), then half of \((1 - \cos100t)\).</p>
+    <p><b>Stage 1, differentiator</b> on \(v_1\): C = 1 µF in series, R = 10 kΩ feedback, \(RC\) = 0.01 s: \(v_A = -RC\dfrac{d}{dt}\sin100t = -0.01\times100\cos100t = -\cos100t\).</p>
+    <p><b>Stage 2, non-inverting averager:</b> \(v_A\) and \(v_2\) each through 10 kΩ to the + input; op-amp as a follower (output tied to −). \(v_+ = \dfrac{v_A + v_2}{2}\), so \(v_o = \dfrac{1 - \cos100t}{2} = \sin^2(50t)\) ✓.</p>
+    <div id="fig-sin2"></div>
+    <p><b>Show it works:</b> at \(t = 0\), \(v_A = -1\), \(v_o = 0 = \sin^2 0\) ✓; at \(50t = \pi/2\), \(\cos100t = -1\), \(v_o = 1\) ✓. Note: using an integrator to make the cosine (as the bank's solution does) gives \(v_A = \tfrac12(\cos100t - 1)\) from an uncharged capacitor and the output comes out 0.5 V too high.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2019–20 · Sec B · Q6(a) · 17 marks (exam held Jan 2021)</div>
+  <div class="exam-q"><p>Deduce the equation for the output voltage \(V_0\) in the circuit (diode from \(V_i\) to the inverting input, anode at \(V_i\); \(R_F\) from the inverting input to the output; + input grounded). Explain the function of the circuit.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>Virtual ground: \(v_- = 0\), so the diode voltage is \(V_i\) and \(I_D = I_S e^{V_i/\eta V_T}\) (\(V_i &gt; 0\), \(V_i \gg V_T\)).</p>
+    <p>No current enters the op-amp, so \(I_D\) flows through \(R_F\): \(\dfrac{0 - V_0}{R_F} = I_S e^{V_i/\eta V_T}\), so \(\boxed{V_0 = -R_FI_S\,e^{V_i/\eta V_T}}\).</p>
+    <p><b>Function:</b> an <b>antilog (exponential) amplifier</b>: the output is proportional to the exponential of the input, inverted. Used with log amps to multiply, divide and raise to powers. Limits: only positive \(V_i\); temperature-dependent through \(I_S\) and \(V_T\); \(|V_0|\) must stay inside the rails. (The question index labels this a log amplifier; with the diode at the input it is the antilog.)</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2017–18 · Sec B · Q5(a) · 10 marks</div>
+  <div class="exam-q"><p>Find \(V_0\) in Figure 3: 2 V source through 1 kΩ to the inverting input; feedback path 1 kΩ from the inverting input to the drain of an NMOS whose gate is grounded and source is the output. The MOSFET is in saturation with \(k_n'(W/L)\) = 1 mA/V² and \(V_t\) = 0.7 V. Ideal op-amp, ±15 V.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>Virtual ground: \(I = 2/1 = 2\) mA, flowing from the − input through 1 kΩ into the drain.</p>
+    <p>Saturation: \(2 = \tfrac12(1)(V_{GS} - 0.7)^2 \Rightarrow V_{OV} = 2\) V, \(V_{GS} = 2.7\) V (the root with \(V_{GS} &gt; V_t\)).</p>
+    <p>Gate at 0 V: \(V_S = -2.7\) V, so \(\boxed{V_0 = -2.7\text{ V}}\) (within ±15 V).</p>
+    <p><b>Check (worth writing):</b> \(V_D = 0 - 2\times1 = -2\) V, \(V_{DS} = -2 - (-2.7) = 0.7\) V \(&lt; V_{OV}\) = 2 V, so the device is really in triode. The examiner states saturation, so −2.7 V is the expected answer; the self-consistent triode solution is \(V_0 = -3.09\) V (\(V_{OV}\) = 2.39 V, \(V_{DS}\) = 1.09 V), which is what the simulator link on Figure 3 shows.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2015–16 · Sec B · Q6(a) · 26⅔ marks</div>
+  <div class="exam-q"><p>You have \(V_{in}(t) = \sin(4000\pi t)\) V. Design a frequency-multiplier circuit using op-amps that doubles the input frequency to give \(V_{out}(t) = \sin(8000\pi t)\) V. Use resistors, capacitors, inductors and diodes (\(I_S = 10^{-6}\) A) as needed. Show the calculations and specify all design values.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>Let \(\omega = 4000\pi\). Plan: shift the sine positive, square it with log–antilog, subtract the unwanted terms to leave \(-\cos2\omega t\), then integrate to get \(\sin2\omega t\). Op-amps ±15 V, \(V_T\) = 25 mV.</p>
+    <p><b>1. Level shift</b> (inverting summer, \(R_f\) = 10 kΩ): \(V_{in}\) through 10 kΩ and the −15 V rail through 75 kΩ: \(V_x = -[V_{in} + \tfrac{10}{75}(-15)] = 2 - \sin\omega t\), always between 1 and 3 V (positive, so the log amp works).</p>
+    <p><b>2. Squarer:</b> log amp (\(R_{in}\) = 100 kΩ, diode feedback): \(-V_T\ln\dfrac{V_x}{I_SR_{in}}\) (diode current 10–30 µA). Inverting amplifier of gain 2 (10 kΩ / 20 kΩ): \(+V_T\ln\dfrac{V_x^2}{(I_SR_{in})^2}\). Antilog (diode in, \(R_{out}\) feedback): \(S = -\dfrac{R_{out}}{I_SR_{in}^2}V_x^2\). With \(R_{out} = I_SR_{in}^2 = 10^{-6}\times10^{10} = 10\) kΩ: \(S = -V_x^2\).</p>
+    <p><b>3. Remove the extra terms.</b> \(V_x^2 = 4 - 4\sin\omega t + \sin^2\omega t = 4.5 - 4\sin\omega t - \tfrac12\cos2\omega t\). Using \(-4\sin\omega t = 4V_x - 8\): \(-\cos2\omega t = -[\,2S + 8V_x - 7\,]\). Inverting summer with \(R_f\) = 20 kΩ: from \(S\) 10 kΩ, from \(V_x\) 2.5 kΩ, from the −15 V rail \(20\times15/7 = 42.9\) kΩ. Output \(-\cos2\omega t\).</p>
+    <p><b>4. 90° shift:</b> integrator with \(RC = 1/(2\omega) = 1/(8000\pi) = 39.8\) µs (C = 10 nF, R = 3.98 kΩ): \(-\dfrac{1}{RC}\displaystyle\int_0^t(-\cos2\omega t)\,dt = \dfrac{\sin2\omega t}{2\omega RC} = \sin(8000\pi t)\) ✓. No DC error because \(\sin0 = 0\).</p>
+    <p>Six op-amps; checked numerically (error below \(10^{-13}\) V). No inductor is needed. <b>Alternative</b> (the bank's): make \(\cos\omega t\) with a 90° shifter and multiply \(2\sin\omega t\cos\omega t\) with a log–antilog multiplier. It needs offsets on both inputs, because sin and cos go negative, and the bank's version omits them.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2015–16 · Sec B · Q5(a) · 20⅔ marks</div>
+  <div class="exam-q"><p>(i) Find \(V_{out}\) as a function of \(V_{in}\) for the circuit: \(V_{in}\) through R to the inverting input; NMOS M1 with drain at the inverting input, gate grounded, source at the output; + input grounded; ±15 V. (ii) Using this, realise \(V_{out} = 3V_{in}^2\); extra op-amps and a DC source are allowed. \(V_{TH}\) = 0.5 V.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><b>(i)</b> \(I_D = V_{in}/R\) (\(V_{in} &gt; 0\)). \(V_G = V_D = 0\), so \(V_{GD} = 0 &lt; V_t\): always saturated. \(V_{GS} = -V_{out}\): \(\dfrac{V_{in}}{R} = K(-V_{out} - 0.5)^2\), so \(\boxed{V_{out} = -0.5 - \sqrt{\dfrac{V_{in}}{KR}}}\), a square-root amplifier (\(K = \tfrac12k_n'W/L\)).</p>
+    <p><b>(ii)</b> Squaring is the inverse of a square root, so move the MOSFET to the input: OA1 inverter (10 kΩ/10 kΩ) gives \(-V_{in}\). M1: source at \(-V_{in}\), gate at a 0.5 V DC source, drain at OA2's virtual ground; \(R_f\) from OA2's output to its − input. \(V_{GS} = 0.5 + V_{in}\), \(V_{OV} = V_{in}\), \(I_D = KV_{in}^2\) drawn out of the node, so \(V_{out} = +KR_fV_{in}^2\).</p>
+    <p>\(K\) is not given: assume \(K\) = 1 mA/V², then \(R_f\) = 3 kΩ gives \(V_{out} = 3V_{in}^2\) (V, mA, kΩ). M1 sits at the edge of saturation (\(V_{DS} = V_{in} = V_{OV}\)); valid for \(V_{in} \ge 0\).</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2014–15 · Sec B · Q6(b) · 26⅔ marks</div>
+  <div class="exam-q"><p>Design a circuit that gives \(V_o = 10\,X_1X_2\) using diodes with \(I_S = 10^{-6}\) A. Specify all resistor values.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><b>Log amps</b> (\(R_{in}\) = 100 kΩ, diode feedback): \(I_SR_{in} = 0.1\) V, so outputs \(-V_T\ln(10X_1)\) and \(-V_T\ln(10X_2)\).</p>
+    <p><b>Inverting summer</b> (all 10 kΩ): \(+V_T\ln(100X_1X_2)\).</p>
+    <p><b>Antilog</b> (diode in, \(R_{out}\) feedback): \(-R_{out}I_S\times100X_1X_2 = -10^{-4}R_{out}X_1X_2\). \(R_{out} = kI_SR_{in}^2 = 10\times10^{-6}\times(10^5)^2 = 100\) kΩ gives \(-10X_1X_2\).</p>
+    <p><b>Inverter</b> (10 kΩ/10 kΩ): \(V_o = +10X_1X_2\) ✓. Five op-amps; requires \(X_1, X_2 &gt; 0\) and matched diodes at the same temperature (\(V_T\) cancels).</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2013–14 · Sec B · Q5(c) · 15 marks</div>
+  <div class="exam-q"><p>Show that a proper connection of a diode, a resistor and an op-amp can perform the exponential (antilog) function. Mention the assumptions, if any.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>Circuit: Figure 2 (diode from \(v_I\) to the − input, R from − input to output, + grounded). Derivation as in §3: \(v_O = -RI_S\,e^{v_I/\eta V_T}\).</p>
+    <p>Assumptions: ideal op-amp (virtual ground, no input current); diode forward biased with \(v_I \gg \eta V_T\), so \(I_S(e^{v_I/\eta V_T} - 1) \approx I_Se^{v_I/\eta V_T}\); constant temperature (\(I_S\), \(V_T\) fixed); \(|v_O|\) below the supply. The output is inverted; an inverter restores the sign.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2011–12 · Sec A · Q3(a) · 26⅔ marks</div>
+  <div class="exam-q"><p>Draw the circuit diagram of an inverting logarithmic amplifier and derive the expression for its output voltage.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>Circuit: Figure 1. Derivation: §2 steps 1–4, giving \(v_O = -\eta V_T\ln\dfrac{v_I}{RI_S}\) for \(v_I &gt; 0\). Add: the BJT (grounded-base) version gives the same law with \(\eta = 1\) over a wider range; the output changes by −57.6 mV per decade of \(v_I\) at \(V_T\) = 25 mV; temperature dependence needs compensation.</p>
+  </div></details>
+</div>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+
+<div class="key"><p><strong>Summary:</strong> virtual ground fixes the current; the feedback device decides \(v_O\). Log amp (diode in feedback): \(v_O = -\eta V_T\ln(v_I/RI_S)\). Antilog (diode at input): \(v_O = -RI_Se^{v_I/\eta V_T}\). MOSFET in feedback: \(v_O = -V_t - \sqrt{v_I/KR}\) (check saturation); MOSFET at the input with gate at \(V_t\): \(v_O = KR_fv_I^2\). Multiplier: log, log, sum, antilog, invert, with \(R_{out} = kI_SR_{in}^2\). Frequency doubling: trig identity, 90° shift with \(RC = 1/\omega\), watch DC errors and positive-only inputs.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/eee.js"></script>
+<script>
+// inverting stage: input element kind ki (R or D), feedback element kind kf, labels
+const nlFig = (ki, li, kf, lf, vin = 'vᵢ') => sch([
+  ['open', [30, 100], ''], ['t', [24, 104], vin, 'end'], [ki, [30, 100], [110, 100], li], ['W', [110, 100], [140, 100]], ['dot', [120, 100]],
+  ['W', [120, 100], [120, 40]], [kf, [120, 40], [230, 40], lf], ['W', [230, 40], [230, 116]],
+  ['opamp', [140, 116]], ['W', [220, 116], [260, 116]], ['dot', [230, 116]], ['open', [260, 116], 'vₒ'],
+  ['W', [140, 132], [130, 132], [130, 146]], ['gnd', [130, 146]],
+], { w: 320, h: 170, sim: false });
+$('#fig-log').innerHTML = nlFig('R', 'R', 'D', 'D');
+$('#fig-exp').innerHTML = nlFig('D', 'D', 'R', 'R');
+
+// MOSFET in the feedback path (2017–18). RD = 0 gives the square-root amplifier.
+const mosItems = (vin = '2 V', r1 = '1 kΩ', rd = '1 kΩ', o = { vt: 0.7, k: 1e-3 }) => [
+  ['V', [40, 144], [40, 200], vin], ['gnd', [40, 200]], ['R', [40, 144], [120, 144], 'R₁ ' + r1], ['W', [120, 144], [140, 144]], ['dot', [120, 144]],
+  ['W', [120, 144], [120, 40], [150, 40]], ...(rd ? [['R', [150, 40], [230, 40], 'RD ' + rd], ['W', [230, 40], [280, 40]]] : [['W', [150, 40], [280, 40]]]),
+  ['nmos', [240, 80], o], ['W', [240, 80], [230, 80], [230, 90]], ['gnd', [230, 90]],
+  ['W', [280, 120], [280, 160]], ['opamp', [140, 160]], ['W', [220, 160], [310, 160]], ['dot', [280, 160]], ['open', [310, 160], 'V₀'],
+  ['W', [140, 176], [130, 176], [130, 190]], ['gnd', [130, 190]], ['t', [286, 36], 'D', 'start'], ['t', [286, 128], 'S', 'start'],
+];
+$('#fig-mos').innerHTML = sch(mosItems(), { w: 360, h: 220 });
+$('#fig-sin2').innerHTML = sch([
+  ['open', [30, 60], ''], ['t', [24, 64], 'v₁ = sin100t', 'end'], ['C', [30, 60], [100, 60], '1 µF'], ['W', [100, 60], [130, 60]], ['dot', [110, 60]],
+  ['W', [110, 60], [110, 20]], ['R', [110, 20], [220, 20], '10 kΩ'], ['W', [220, 20], [220, 76]], ['opamp', [130, 76]], ['W', [210, 76], [240, 76]], ['dot', [220, 76]],
+  ['W', [130, 92], [120, 92], [120, 104]], ['gnd', [120, 104]], ['t', [226, 96], 'vA', 'start'],
+  ['R', [240, 76], [320, 76], '10 kΩ'], ['W', [320, 76], [320, 166], [340, 166]], ['dot', [320, 166]],
+  ['open', [240, 196], ''], ['t', [234, 200], 'v₂ = 1 V', 'end'], ['R', [240, 196], [320, 196], '10 kΩ'], ['W', [320, 196], [320, 166]],
+  ['opamp', [340, 150], { plusTop: false }], ['W', [420, 150], [450, 150]], ['dot', [430, 150]], ['W', [340, 134], [330, 134], [330, 110], [430, 110], [430, 150]],
+  ['open', [450, 150], 'vₒ'],
+], { w: 490, h: 220, sim: false });
+
+worked('#wk-log', {
+  given: 'Diode with \\(I_S = 10^{-14}\\) A, \\(\\eta = 1\\), \\(V_T\\) = 25 mV, R = 10 kΩ. (a) Log amp: \\(v_O\\) for \\(v_I\\) = 1 V and for 10 V. (b) Antilog amp with the same parts: \\(v_O\\) for \\(v_I\\) = 0.6 V.',
+  steps: [
+    { t: '\\(RI_S = 10^4\\times10^{-14} = 10^{-10}\\) V. (a) \\(v_O = -0.025\\ln(1/10^{-10}) = -0.025\\times23.03 = -0.576\\) V.', a: { l: 'v_O(1\\text{ V})', v: -0.5756, u: 'V', tol: 0.005 } },
+    { t: '\\(v_O(10\\text{ V}) = -0.025\\ln(10^{11}) = -0.633\\) V: a decade of input moved the output by only −57.6 mV.', a: { l: 'v_O(10\\text{ V})', v: -0.6332, u: 'V', tol: 0.005 } },
+    { t: '(b) \\(v_O = -RI_Se^{0.6/0.025} = -10^{-10}\\times e^{24} = -10^{-10}\\times2.649\\times10^{10} = -2.65\\) V.', a: { l: 'v_O', v: -2.649, u: 'V' } },
+    'An extra 17.3 mV (\\(V_T\\ln2\\)) at the antilog input doubles the output: that steepness is why \\(v_I\\) must stay in a narrow range.',
+  ] });
+
+drill('#dr-log', { id: 'o02-log-antilog', title: 'Log or antilog amplifier output', gen(r) {
+  const log = r() < 0.6, R = r.pick([1e3, 10e3, 100e3]), Is = log ? r.pick([1e-14, 1e-12, 1e-9, 1e-6]) : r.pick([1e-14, 1e-13, 1e-12]), VT = 0.025;
+  if (log) {
+    const vi = r.pick([0.1, 0.2, 0.5, 1, 2, 3, 5, 10]); if (vi / R < 20 * Is) return null;
+    const vo = -VT * Math.log(vi / (R * Is)), vo10 = vo - VT * Math.log(10);
+    return {
+      given: `Log amplifier: R = ${si(R, 'Ω')} at the input, diode in the feedback with \\(I_S\\) = ${Is.toExponential(0)} A, \\(\\eta\\) = 1, \\(V_T\\) = 25 mV. Find \\(v_O\\) for \\(v_I\\) = ${vi} V, and \\(v_O\\) when \\(v_I\\) is ten times larger.`,
+      fig: nlFig('R', si(R, 'Ω'), 'D', 'D'),
+      ask: [{ l: 'v_O', v: vo, u: 'V', tol: 0.005 }, { l: 'v_O(10v_I)', v: vo10, u: 'V', tol: 0.005 }],
+      steps: [
+        `\\(RI_S = ${si(R, 'Ω')}\\times${Is.toExponential(0)} = ${(R * Is).toExponential(2)}\\) V`,
+        { t: `\\(v_O = -0.025\\ln\\dfrac{${vi}}{${(R * Is).toExponential(2)}} = -0.025\\times${num(Math.log(vi / (R * Is)))} = ${num(vo)}\\) V`, a: { l: 'v_O', v: vo, u: 'V', tol: 0.005 } },
+        { t: `Ten times the input: \\(-0.025\\ln10 = -0.0576\\) V more, \\(v_O = ${num(vo10)}\\) V`, a: { l: 'v_O(10v_I)', v: vo10, u: 'V', tol: 0.005 } },
+      ] };
+  }
+  const vi = r.step(0.3, 0.7, 0.05), vo = -R * Is * Math.exp(vi / VT);
+  if (Math.abs(vo) > 14 || Math.abs(vo) < 0.05) return null;
+  return {
+    given: `Antilog amplifier: diode at the input (\\(I_S\\) = ${Is.toExponential(0)} A, \\(\\eta\\) = 1, \\(V_T\\) = 25 mV), R = ${si(R, 'Ω')} in the feedback, ±15 V supplies. Find \\(v_O\\) for \\(v_I\\) = ${num(vi)} V, and the input that makes \\(v_O\\) twice as large.`,
+    fig: nlFig('D', 'D', 'R', si(R, 'Ω')),
+    ask: [{ l: 'v_O', v: vo, u: 'V' }, { l: "v_I'", v: vi + VT * Math.log(2), u: 'V', tol: 0.002 }],
+    steps: [
+      { t: `\\(v_O = -RI_Se^{v_I/V_T} = -${si(R, 'Ω')}\\times${Is.toExponential(0)}\\times e^{${num(vi)}/0.025} = -${(R * Is).toExponential(2)}\\times${Math.exp(vi / VT).toExponential(3)} = ${num(vo)}\\) V`, a: { l: 'v_O', v: vo, u: 'V' } },
+      { t: `Doubling needs \\(e^{\\Delta v/V_T} = 2\\): \\(\\Delta v = 0.025\\ln2 = 17.3\\) mV, so \\(v_I' = ${num(vi + VT * Math.log(2))}\\) V`, a: { l: "v_I'", v: vi + VT * Math.log(2), u: 'V', tol: 0.002 } },
+    ] };
+} });
+
+drill('#dr-mos', { id: 'o02-mosfet-feedback', title: 'MOSFET in the feedback: output and region check', gen(r) {
+  const kp = r.pick([0.5, 1, 2, 4]), Vt = r.pick([0.5, 0.7, 1]), Vin = r.pick([1, 2, 3, 5]), R1 = r.pick([1, 2, 5, 10]), RD = r.pick([0, 0.5, 1, 2]);
+  const I = Vin / R1, Vov = Math.sqrt(2 * I / kp), Vo = -(Vt + Vov), VD = -I * RD, VDS = VD - Vo, sat = VDS >= Vov;
+  return {
+    given: `\\(V_{in}\\) = ${Vin} V through \\(R_1\\) = ${R1} kΩ to the inverting input. Feedback: ${RD ? `\\(R_D\\) = ${RD} kΩ` : 'a wire'} from the inverting input to the drain of an NMOS (gate grounded, source = output). \\(k_n'(W/L)\\) = ${kp} mA/V², \\(V_t\\) = ${Vt} V, \\(i_D = \\tfrac12k_n'(W/L)V_{OV}^2\\). Assuming saturation, find \\(V_0\\); then find \\(V_{DS}\\) to check the assumption.`,
+    fig: sch(mosItems(Vin + ' V', R1 + ' kΩ', RD ? RD + ' kΩ' : null, { vt: Vt, k: kp * 1e-3 }), { w: 360, h: 220 }),
+    ask: [{ l: 'V_0', v: Vo, u: 'V' }, { l: 'V_{DS}', v: VDS, u: 'V' }],
+    steps: [
+      `\\(I_D = V_{in}/R_1 = ${Vin}/${R1} = ${num(I)}\\) mA`,
+      { t: `\\(V_{OV} = \\sqrt{2I_D/k_n'} = \\sqrt{2\\times${num(I)}/${kp}} = ${num(Vov)}\\) V, \\(V_{GS} = ${num(Vt + Vov)}\\) V, so \\(V_0 = -${num(Vt + Vov)}\\) V`, a: { l: 'V_0', v: Vo, u: 'V' } },
+      { t: `\\(V_D = -I_DR_D = ${num(VD)}\\) V, \\(V_{DS} = ${num(VD)} - (${num(Vo)}) = ${num(VDS)}\\) V`, a: { l: 'V_{DS}', v: VDS, u: 'V' } },
+      sat ? `\\(V_{DS} \\ge V_{OV}\\) (${num(VDS)} ≥ ${num(Vov)}): saturation confirmed.` : `\\(V_{DS} &lt; V_{OV}\\) (${num(VDS)} &lt; ${num(Vov)}): the device is actually in <b>triode</b>; the stated assumption fails (as in 2017–18). Say so in the answer.`,
+    ] };
+} });
+
+drill('#dr-mult', { id: 'o03-multiplier', title: 'Log–antilog multiplier: choose R out', gen(r) {
+  const k = r.pick([0.1, 0.5, 1, 2, 5, 10, 20]), Is = r.pick([1e-6, 1e-9, 1e-12]), Rin = r.pick([1e3, 10e3, 100e3, 1e6]);
+  const Rout = k * Is * Rin * Rin; if (Rout < 100 || Rout > 10e6) return null;
+  const X1 = r.pick([0.5, 1, 1.5, 2, 3]), X2 = r.pick([1, 2, 2.5, 4]);
+  const Vs = 0.025 * Math.log(X1 * X2 / (Is * Rin) ** 2);
+  return {
+    given: `Design \\(V_o = ${k}\\,X_1X_2\\) with two log amps (\\(R_{in}\\) = ${si(Rin, 'Ω')}), a unity inverting summer, an antilog amp and an inverter. Diodes: \\(I_S\\) = ${Is.toExponential(0)} A, \\(V_T\\) = 25 mV. Find \\(R_{out}\\), and the summer output for \\(X_1\\) = ${X1} V, \\(X_2\\) = ${X2} V.`,
+    ask: [{ l: 'R_{out}', v: Rout, u: 'kΩ' }, { l: 'V_s', v: Vs, u: 'V', tol: 0.005 }],
+    steps: [
+      'Chain: \\(V_s = V_T\\ln\\dfrac{X_1X_2}{(I_SR_{in})^2}\\), antilog \\(-\\dfrac{R_{out}}{I_SR_{in}^2}X_1X_2\\), inverter.',
+      { t: `\\(R_{out} = kI_SR_{in}^2 = ${k}\\times${Is.toExponential(0)}\\times(${Rin.toExponential(0)})^2 = ${si(Rout, 'Ω')}\\)`, a: { l: 'R_{out}', v: Rout, u: 'kΩ' } },
+      { t: `\\(I_SR_{in} = ${(Is * Rin).toExponential(1)}\\) V; \\(V_s = 0.025\\ln\\dfrac{${num(X1 * X2)}}{(${(Is * Rin).toExponential(1)})^2} = ${num(Vs)}\\) V`, a: { l: 'V_s', v: Vs, u: 'V', tol: 0.005 } },
+      `Check: \\(V_o = ${k}\\times${num(X1 * X2)} = ${num(k * X1 * X2)}\\) V (inside ±15 V${k * X1 * X2 > 14 ? ': no, it saturates' : ''}).`,
+    ] };
+} });
+
+flashcards('#cards', [
+  { f: 'Log amp', b: 'R in, diode in feedback: v_O = −ηV_T ln(v_I / R·I_S), v_I > 0.' },
+  { f: 'Antilog amp', b: 'Diode in, R in feedback: v_O = −R·I_S·e^(v_I/ηV_T).' },
+  { f: 'Per decade', b: 'Log amp output changes by ηV_T ln10 = 57.6 mV per decade of input.' },
+  { f: 'Square-root amp', b: 'MOSFET in feedback (G grounded, D at v−, S at out): v_O = −V_t − √(v_I/KR).' },
+  { f: 'Squarer', b: 'MOSFET at input, gate at V_t, source at −v_I: v_O = K·R_f·v_I².' },
+  { f: 'Multiplier R_out', b: 'R_out = k·I_S·R_in² for V_o = k·X1·X2 (then invert).' },
+  { f: 'sin² identity', b: 'sin²θ = ½ − ½cos 2θ' },
+  { f: 'Clean 90° shift of sin ωt', b: 'Differentiator, RC = 1/ω: −cos ωt with no DC error.' },
+]);
+quiz('#quiz', [
+  { q: 'A diode is connected from v_I (anode) to the inverting input, R from there to the output. This is', opts: ['a log amplifier', 'an antilog amplifier', 'a precision rectifier', 'a square-root amplifier'], a: 1, why: 'The diode at the input sets i = I_S·e^(v_I/V_T): exponential.' },
+  { q: 'A log amp gives −0.50 V at v_I = 1 V (η = 1, V_T = 25 mV). At v_I = 100 mV it gives', opts: ['−0.5576 V', '−0.4424 V', '−0.05 V', '−5 V'], a: 1, why: 'A decade less input: +57.6 mV, so −0.442 V.' },
+  { q: 'For V_o = 2·X1·X2 with I_S = 1 µA and R_in = 100 kΩ, R_out =', opts: ['2 kΩ', '20 kΩ', '200 kΩ', '2 MΩ'], a: 1, why: '2 × 10⁻⁶ × 10¹⁰ = 2 × 10⁴ Ω.' },
+  { q: 'In the 2017–18 circuit (R_D = 1 kΩ, I = 2 mA, V_OV = 2 V, V_0 = −2.7 V), V_DS is', opts: ['2.7 V', '0.7 V', '2 V', '4.7 V'], a: 1, why: 'V_D = −2 V, V_DS = −2 − (−2.7) = 0.7 V < V_OV: triode really.' },
+  { q: 'An uncharged integrator (RC = 1/ω) fed sin ωt outputs', opts: ['cos ωt', '−cos ωt', 'cos ωt − 1', '1 − cos ωt'], a: 2, why: '−ω∫₀ᵗ sin ωτ dτ = cos ωt − 1.' },
+]);
+</script>
+</body>
+</html>

@@ -1,0 +1,327 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Analog Computer for Differential Equations · EEE 263 Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Op-amps · Chapter 5 · Sedra §2.5 (integrator, summer) · Khairul OpAmp s.17–22 · Sadat L22, notes p.104 · type O-07</div>
+<h1>Analog Computer for Differential Equations</h1>
+<p class="lede">"Design an op-amp circuit that solves this differential equation" is the biggest single op-amp question type: it appeared in 2014–15, 2015–16, 2018–19, 2019–20, 2022–23 and 2024–25 (the 2024–25 one in the compulsory Q1), 17 to 30 marks each, about 132 marks in total. Every version is solved by the same five-step recipe: solve for the highest derivative, build a summer that outputs it, integrate it down to \(v\), feed the integrator outputs back to the summer with resistor ratios equal to the coefficients, and get the constant from a ±15 V rail. Once you have done it a few times it is close to free marks.</p>
+
+<h2>1. The three building blocks</h2>
+<p>Everything comes from the inverting summer and the integrator (chapter 2 and chapter 3 of this part). With the + input grounded, the − input is a virtual ground, so each input resistor carries \(v_i/R_i\) and all of it flows into the feedback element.</p>
+<dl class="def">
+  <dt>Inverting summer</dt><dd>\(v_o = -\left(\dfrac{R_f}{R_1}v_1 + \dfrac{R_f}{R_2}v_2 + \cdots\right)\). Each input gets its own weight \(R_f/R_i\), always with a minus sign.</dd>
+  <dt>Integrator</dt><dd>R in, C in feedback: \(v_o(t) = -\dfrac{1}{RC}\displaystyle\int_0^t v_i\,dt + v_o(0)\). With \(RC = 1\) s (1 MΩ, 1 µF) it is just "\(-\int\)".</dd>
+  <dt>Summing integrator</dt><dd>Several input resistors into one integrator: \(v_o = -\displaystyle\int\left(\frac{v_1}{R_1C} + \frac{v_2}{R_2C}\right)dt\). Useful for first-order equations (one op-amp).</dd>
+  <dt>Unity inverter</dt><dd>10 kΩ in, 10 kΩ feedback: \(v_o = -v_i\). Used whenever a signal is needed with the other sign.</dd>
+</dl>
+<p>The key idea: if some node holds \(v''\), one integrator turns it into \(-v'\) and a second one turns that into \(+v\). The differential equation says how \(v''\) is made from \(v'\), \(v\) and the forcing, so a summer fed from those integrator outputs can <b>make</b> \(v''\). The loop closes, and the only waveform that satisfies all three blocks at once is the solution of the equation.</p>
+<div class="formula">\[ v'' \xrightarrow{\;-\!\int\;} -v' \xrightarrow{\;-\!\int\;} +v \]</div>
+<figure><div id="fig-chain"></div><figcaption><b>Figure 1.</b> The standard analog computer: U1 sums the fed-back signals into \(v''\), U2 and U3 integrate (1 MΩ, 1 µF, so \(RC\) = 1 s). The input terminals on the left are wired to the nodes with the same name (U2 output = \(-v'\), U3 output = \(v\)), to a ±15 V rail for the constant, or to the input \(x(t)\).</figcaption></figure>
+
+<h2>2. The method that always works</h2>
+<div class="method"><h4>Method · analog computer for a second-order equation</h4><ol>
+<li><b>Solve for the highest derivative.</b> Divide by \(a\): \(v'' = \alpha v' + \beta v + \gamma + \delta x\) with \(\alpha = -b/a\), \(\beta = -c/a\), \(\gamma = -d/a\), \(\delta = e/a\). Write this line on the script: examiners look for it.</li>
+<li><b>Chain:</b> summer U1 outputs \(v''\); integrator U2 gives \(-v'\); integrator U3 gives \(+v\) (the solution node). Integrators: \(R\) = 1 MΩ, \(C\) = 1 µF.</li>
+<li><b>Pick the signal for each term.</b> U1 inverts, so a term with a <b>positive</b> coefficient needs the <b>negative</b> signal and vice versa:
+  <ul>
+  <li>\(\alpha &gt; 0\): feed \(-v'\) (U2 directly). \(\alpha &lt; 0\): feed \(+v'\) (add an inverter after U2).</li>
+  <li>\(\beta &gt; 0\): feed \(-v\) (add an inverter after U3). \(\beta &lt; 0\): feed \(+v\) (U3 directly).</li>
+  <li>\(\gamma &gt; 0\): from the \(-15\) V rail. \(\gamma &lt; 0\): from the \(+15\) V rail.</li>
+  <li>\(\delta &gt; 0\): feed \(-x\) (input inverter). \(\delta &lt; 0\): feed \(x\) directly.</li>
+  </ul></li>
+<li><b>Resistors:</b> choose \(R_f\) (100 kΩ is convenient). Then \(R_{v'} = R_f/|\alpha|\), \(R_v = R_f/|\beta|\), \(R_x = R_f/|\delta|\), and for the constant \(R_c = R_f\cdot 15/|\gamma|\) (the rail is 15 V, not 1 V).</li>
+<li><b>Initial conditions:</b> pre-charge U3's capacitor so its output starts at \(v(0)\), and U2's so its output starts at \(-v'(0)\). "All initial conditions zero" means both capacitors are shorted by reset switches until \(t\) = 0.</li>
+<li><b>Finish:</b> draw the full diagram with every value, mark the solution node, and write two lines of explanation (below). Count the op-amps.</li>
+</ol></div>
+<p><b>The explanation examiners want</b> ("briefly discuss the operation", 2018–19 and 2019–20): the summer forms the highest derivative from the lower derivatives and the forcing, exactly as the equation says; the two integrators produce \(-v'\) and \(v\) from it; feeding them back closes the loop, so the voltage at the solution node is forced to obey the equation. The integrator capacitors hold the initial conditions; the ±15 V rail supplies the constant term.</p>
+<p><b>Inverters you cannot avoid.</b> Whether the summer outputs \(v''\) or \(-v''\), you need an inverter for the \(v'\) term exactly when \(\alpha &lt; 0\) and for the \(v\) term exactly when \(\beta &gt; 0\). A normal (stable, damped) equation has \(\alpha &lt; 0\), \(\beta &lt; 0\): one inverter, four op-amps. Choosing \(-v''\) at the summer only moves the remaining sign problems to the input \(x\) and the output node (2022–23 below).</p>
+
+<h3>Worked example: a first-order equation with one op-amp</h3>
+<p>For a first-order equation one summing integrator does the whole job: its output is \(v\), and the equation tells you what to integrate.</p>
+<div id="wk-first"></div>
+
+<h3>Worked example: Khairul s.21–22, \(v'' + 20v' + 100v - 25 = 0\)</h3>
+<div id="wk-khairul"></div>
+
+<h3>Drill (a): equation → resistor values</h3>
+<p>Random equation every time. Answer with the canonical architecture of the method box (U1 outputs \(v''\), U2 → \(-v'\), U3 → \(v\), inverters only where a sign is missing).</p>
+<div id="dr-design"></div>
+
+<h2>3. Reading a given circuit: which equation does it solve?</h2>
+<p>The reverse question (and a good check on your own design): write the summer equation, then replace each fed-back node by what it holds.</p>
+<div class="method"><h4>Method · circuit → differential equation</h4><ol>
+<li>Name the nodes along the chain: summer output \(s\), U2 output \(= -\frac{1}{RC}\int s\), U3 output. With \(RC\) = 1 s and U3 output called \(v\): \(s = v''\) and U2 output \(= -v'\).</li>
+<li>Write the summer: \(v'' = -\sum (R_f/R_i)\,(\text{signal}_i)\), with each signal written in terms of \(v'\), \(v\), the rail voltage or \(x\).</li>
+<li>Move everything to the left: \(v'' + p\,v' + q\,v = r\). Stable (settles) if \(p &gt; 0\) and \(q &gt; 0\); then the final value is \(r/q\).</li>
+</ol></div>
+<div id="dr-read"></div>
+<p><b>Variant (2016–17 Sec A Q1(a)):</b> "determine the differential equation solved by the circuit" for a non-inverting amplifier with RC networks. There you write KCL at the capacitor node and replace \(s\) with \(d/dt\); it is worked out in <a href="07-active-filters.html">Active filters</a>.</p>
+
+<h2>4. Scaling, forcing functions and initial conditions</h2>
+<p><b>Time scaling.</b> If every integrator has \(RC = \tau\) instead of 1 s and the summer ratios stay the same, the circuit produces \(v(t/\tau)\): the same waveform with the time axis stretched by \(\tau\) (\(\tau\) = 0.1 s runs ten times faster). So "use \(RC\) = 1 s" is what makes the circuit solve the equation in real seconds; say so.</p>
+<p><b>Magnitude scaling.</b> The solution must stay inside ±15 V. If it would not (or if a resistor comes out below about 1 kΩ or above 10 MΩ), solve for \(u = v/k\): divide the constant and forcing terms by \(k\) and read \(v = k\,u\). Changing \(R_f\) for all inputs together (e.g. 1 MΩ) rescales every resistor without changing the equation.</p>
+<p><b>Sinusoidal forcing from a given oscillator.</b> If \(\sin\omega t\) is available but \(\cos\omega t\) is needed, use a <b>differentiator</b> with \(RC = 1/\omega\): \(-RC\frac{d}{dt}\sin\omega t = -\cos\omega t\), exact from \(t\) = 0. An uncharged integrator gives \(-\frac{1}{RC}\int_0^t\sin\omega t\,dt = \frac{\cos\omega t - 1}{\omega RC}\): the extra \(-1\) adds a false constant forcing, unless the capacitor is pre-charged to cancel it.</p>
+<p><b>Initial conditions.</b> The capacitor sits between the virtual ground and the output, so the integrator output equals the capacitor voltage (output side positive). To start at \(v(0) = 2\) V, charge U3's capacitor to 2 V through a switch that opens at \(t\) = 0. A homogeneous equation (no constant, no input) with zero initial conditions has the solution \(v \equiv 0\): you must give a non-zero initial condition or nothing happens (2014–15).</p>
+<p><b>Stability remark.</b> Roots of \(as^2 + bs + c = 0\): if any has a positive real part (\(b/a &lt; 0\) or \(c/a &lt; 0\)), the solution grows and a real circuit runs into the ±15 V rails. 2019–20, 2022–23 and 2024–25 all set such equations. One line saying so shows understanding; the design itself is unchanged.</p>
+
+<div class="trap"><h4>Traps (where marks go)</h4><ul>
+<li>Forgetting to divide by the coefficient of \(v''\) (2024–25: \(2v''\), so every term halves).</li>
+<li>Sign of each fed-back signal: the summer inverts, so a positive coefficient needs the negative signal. Check one term by substitution before drawing.</li>
+<li>Constant term: \(R_c = R_f\cdot15/|\gamma|\) from the rail with the opposite sign to \(\gamma\). Writing \(R_f/|\gamma|\) assumes a 1 V source that the question did not give.</li>
+<li>Not marking the solution node, or leaving it at \(-v\) without saying so.</li>
+<li>Integrator \(RC\) not equal to 1 s while claiming the circuit solves the equation in real time.</li>
+<li>Zero initial conditions on a homogeneous equation: the answer is 0; say which capacitor you pre-charge.</li>
+<li>Generating \(\cos\) from \(\sin\) with an uncharged integrator (adds a DC term).</li>
+</ul></div>
+
+<h2>Exam questions</h2>
+
+<div class="exam">
+  <div class="exam-src">2024–25 · Sec A · Q1(b) · 17 marks · compulsory</div>
+  <div class="exam-q"><p>Design a circuit using op-amps and other passive elements that can solve \(2\dfrac{d^2v}{dt^2} - 3\dfrac{dv}{dt} + 4v + 5 = 0\). Draw the overall connection diagram with proper element values. Op-amps are biased with ±15 V. All initial conditions are zero.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><b>Highest derivative:</b> \(v'' = 1.5v' - 2v - 2.5\).</p>
+    <p><b>Chain:</b> U1 (summer) → \(v''\); U2 integrator (1 MΩ, 1 µF) → \(-v'\); U3 integrator (1 MΩ, 1 µF) → \(v\).</p>
+    <p><b>Signals:</b> \(+1.5v'\) needs \(-v'\): U2 output, available. \(-2v\) needs \(+v\): U3 output, available. \(-2.5\) needs the \(+15\) V rail. No inverters: three op-amps.</p>
+    <p><b>Summer</b> with \(R_f\) = 100 kΩ: \(v'' = -\left[\dfrac{100}{R_1}(-v') + \dfrac{100}{R_2}(v) + \dfrac{100}{R_3}(15)\right]\) needs \(R_1 = 100/1.5 = 66.7\) kΩ, \(R_2 = 100/2 = 50\) kΩ, \(R_3 = 100\times15/2.5 = 600\) kΩ.</p>
+    <p><b>Check:</b> \(-[1.5(-v') + 2v + 2.5] = 1.5v' - 2v - 2.5\) ✓. Solution \(v(t)\) at U3's output. Zero initial conditions: reset switches across both capacitors open at \(t\) = 0.</p>
+    <div id="fig-q2425"></div>
+    <p><b>Remark:</b> the roots of \(2s^2 - 3s + 4\) are \(0.75 \pm j1.20\) (right half-plane), so the forced value \(v = -1.25\) V is unstable: the output oscillates with growing amplitude and ends at the ±15 V rails. The circuit still "solves" the equation as long as it stays linear. (The figure above is fully wired: open it in the simulator and watch this happen.)</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2022–23 · Sec B · Q8(a) · 20 marks</div>
+  <div class="exam-q"><p>Using op-amps, design a circuit to solve \(\dfrac{d^2y}{dt^2} - 2\dfrac{dy}{dt} + 2y = 8x\), where \(x\) is the input and \(y\) the output.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>\(y'' = 2y' - 2y + 8x\). Here it is neater to let the summer output \(-y''\), because then \(x\) can be fed directly:</p>
+    <p>\(-y'' = -2y' + 2y - 8x = -\left[2y' + 2(-y) + 8x\right]\).</p>
+    <p><b>Chain:</b> U1 summer → \(-y''\); U2 integrator → \(-\int(-y'') = +y'\); U3 integrator → \(-y\). Both needed signals (\(+y'\), \(-y\)) are integrator outputs, and \(x\) goes in directly.</p>
+    <p><b>Summer</b> \(R_f\) = 100 kΩ: from \(y'\) (U2) \(R_1\) = 100/2 = 50 kΩ; from \(-y\) (U3) \(R_2\) = 50 kΩ; from \(x\) \(R_x\) = 100/8 = 12.5 kΩ. Integrators 1 MΩ, 1 µF.</p>
+    <p><b>Output:</b> U3 holds \(-y\); a unity inverter U4 (10 kΩ/10 kΩ) gives \(y\). Four op-amps. (With the summer at \(+y''\) you would need an inverter on \(x\) instead and read \(y\) at U3: also four.)</p>
+    <div id="fig-q2223"></div>
+    <p><b>Remark:</b> roots \(1 \pm j\): unstable, so for any input the output eventually saturates.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2019–20 · Sec B · Q5(b) · 29⅔ marks (exam held Jan 2021)</div>
+  <div class="exam-q"><p>Design a circuit using op-amps that can provide the solution to \(3\dfrac{d^2v}{dt^2} + K\dfrac{dv}{dt} - 3v + 8 = 0\), where \(K\) is the last digit of your student ID. Briefly discuss the operation of your circuit.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>\(v'' = -\dfrac{K}{3}v' + v - \dfrac{8}{3}\).</p>
+    <p><b>Chain:</b> U1 → \(v''\), U2 → \(-v'\), U3 → \(v\) (1 MΩ, 1 µF each).</p>
+    <p><b>Signals:</b> \(-\frac{K}{3}v'\) needs \(+v'\): inverter U4 after U2. \(+v\) needs \(-v\): inverter U5 after U3. \(-\frac83\) needs the \(+15\) V rail.</p>
+    <p><b>Summer</b> \(R_f\) = 100 kΩ: \(R_1 = 100/(K/3) = 300/K\) kΩ (from \(+v'\)); \(R_2\) = 100 kΩ (from \(-v\)); \(R_3 = 100\times15/(8/3) = 562.5\) kΩ (from +15 V). Inverters 10 kΩ/10 kΩ. Five op-amps.</p>
+    <div class="tbl"><table><tr><th>K</th><td>1</td><td>2</td><td>3</td><td>4</td><td>5</td><td>6</td><td>7</td><td>8</td><td>9</td><td>0</td></tr><tr><th>\(R_1\) (kΩ)</th><td>300</td><td>150</td><td>100</td><td>75</td><td>60</td><td>50</td><td>42.9</td><td>37.5</td><td>33.3</td><td>omit (no \(v'\) term)</td></tr></table></div>
+    <p><b>Check:</b> \(-[(K/3)v' + 1\cdot(-v) + (8/3)]\) ✓.</p>
+    <div id="fig-q1920"></div>
+    <p><b>Operation:</b> U1 adds \(-\frac K3 v'\), \(+v\) and \(-\frac83\) to form \(v''\); U2 and U3 integrate it to \(-v'\) and \(v\); U4, U5 supply the signs U1 needs. The loop forces U3's output to satisfy the equation. Since \(3s^2 + Ks - 3\) always has one positive root (the product of the roots is \(-1\)), the solution grows and the output finally saturates.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2018–19 · Sec B · Q5(b) · 26⅔ marks</div>
+  <div class="exam-q"><p>Design an electronic analog computer using op-amps that can solve \(\dfrac{d^2v}{dt^2} + 4\dfrac{dv}{dt} + 5v - 5 = 0\). Give a brief explanation of the operation of the designed computer.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>\(v'' = -4v' - 5v + 5\).</p>
+    <p><b>Signals:</b> \(-4v'\) needs \(+v'\) (inverter U4 after U2); \(-5v\) needs \(+v\) (U3 directly); \(+5\) needs the \(-15\) V rail.</p>
+    <p><b>Summer</b> \(R_f\) = 100 kΩ: \(R_1\) = 100/4 = 25 kΩ (from \(+v'\)), \(R_2\) = 100/5 = 20 kΩ (from \(v\)), \(R_3\) = 100 × 15/5 = 300 kΩ (from −15 V). Integrators 1 MΩ, 1 µF; inverter 10 kΩ/10 kΩ. Four op-amps.</p>
+    <p><b>Check:</b> \(-\left[4v' + 5v + \tfrac{100}{300}(-15)\right] = -4v' - 5v + 5\) ✓.</p>
+    <div id="fig-q1819"></div>
+    <p><b>Explanation:</b> as in the method box. This equation is stable (roots \(-2 \pm j\)): \(v\) rises with a small overshoot and settles at \(5/5 = 1\) V.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2015–16 · Sec B · Q6(b) · 20 marks</div>
+  <div class="exam-q"><p>Design an analog computer circuit to solve, for \(t &gt; 0\), \(\dfrac{d^2v}{dt^2} + 3\dfrac{dv}{dt} + 2v + 4\cos 10t = 0\), with \(v(0) = 2\) and \(v'(0) = 0\). An oscillator providing \(\sin 10t\) is available.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>\(v'' = -3v' - 2v - 4\cos10t\).</p>
+    <p><b>Forcing:</b> differentiator U5 on the oscillator (C = 1 µF, R = 100 kΩ, \(RC\) = 0.1 s = \(1/\omega\)): \(-0.1\frac{d}{dt}\sin10t = -\cos10t\). Inverter U6 → \(+\cos10t\).</p>
+    <p><b>Signals:</b> \(-3v'\) needs \(+v'\) (inverter U4 after U2); \(-2v\) needs \(v\) (U3); \(-4\cos10t\) needs \(+\cos10t\) (U6).</p>
+    <p><b>Summer</b> \(R_f\) = 100 kΩ: 33.3 kΩ from \(+v'\), 50 kΩ from \(v\), 25 kΩ from \(+\cos10t\). Integrators 1 MΩ, 1 µF.</p>
+    <p><b>Initial conditions:</b> U2's capacitor uncharged (\(-v'(0) = 0\)); U3's capacitor pre-charged to 2 V, output side positive, released at \(t\) = 0, so \(v(0)\) = 2 V. Solution at U3's output.</p>
+    <div id="fig-q1516"></div>
+    <p><b>Alternative:</b> replace U5 + U6 by one integrator on \(\sin10t\) with \(RC\) = 0.1 s whose capacitor is pre-charged so its output starts at +1 V: output \(= 1 + (\cos10t - 1) = \cos10t\). Without the pre-charge it gives \(\cos10t - 1\), a false constant forcing of \(-4\) (the bank's Gemini answer has this flaw). The equation is stable (roots −1, −2): \(v\) decays from 2 V to a small steady sinusoid of amplitude 0.039 V.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2014–15 · Sec B · Q6(a) · 20 marks</div>
+  <div class="exam-q"><p>Design a circuit using op-amps that can solve \(3\dfrac{d^2x}{dt^2} + 4x = 0\). Point out the node that represents the solution \(x(t)\). Specify all resistor and capacitor values.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>\(x'' = -\frac43 x\). U1 (summer/scaler, \(R_f\) = 100 kΩ) → \(x''\); U2 integrator → \(-x'\); U3 integrator → \(x\) (1 MΩ, 1 µF). The term \(-\frac43x\) needs \(+x\): U3 output through \(R = 100/(4/3) = 75\) kΩ. Three op-amps; the <b>solution node is U3's output</b>.</p>
+    <div id="fig-q1415"></div>
+    <p><b>Essential remark:</b> with zero initial conditions the solution is \(x \equiv 0\). Pre-charge U3's capacitor (e.g. \(x(0)\) = 1 V): then \(x(t) = \cos(1.155t)\) V, a sinusoid at \(\omega = \sqrt{4/3} = 1.155\) rad/s (0.184 Hz). This circuit is a sine-wave oscillator.</p>
+  </div></details>
+</div>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+
+<div class="key"><p><strong>Summary:</strong> divide by the leading coefficient and write \(v'' = \alpha v' + \beta v + \gamma + \delta x\). Summer → \(v''\), integrator → \(-v'\), integrator → \(v\) (1 MΩ, 1 µF). Positive coefficient ⇒ feed the negative signal (inverter if needed); \(R = R_f/|\text{coef}|\); constant from the opposite-sign 15 V rail with \(R = 15R_f/|\gamma|\). Initial conditions are pre-charged capacitors; mark the solution node; one line on stability.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/eee.js"></script>
+<script>
+// Summer + two integrators with labelled input terminals (not wired back: labels name the node each comes from).
+// ins: [[terminal label, resistor label], ...] (1–4); n: names of U1, U2, U3 outputs; invs: up to two unity inverters [[in, out], ...]
+function acFig({ ins, rf = 'Rf 100 kΩ', ri = '1 MΩ', ci = '1 µF', n = ['v″', '−v′', 'v'], invs = [] }) {
+  const it = [], y0 = 70;
+  ins.forEach(([lab, rl], i) => { const y = y0 + 40 * i; it.push(['t', [24, y + 4], lab, 'end'], ['open', [28, y], ''], ['R', [30, y], [100, y], rl]); });
+  const yl = y0 + 40 * (ins.length - 1);
+  if (ins.length > 1) it.push(['W', [100, y0], [100, yl]]);
+  it.push(['W', [100, y0], [130, y0]], ['dot', [115, y0]], ['W', [115, y0], [115, 30]], ['R', [115, 30], [220, 30], rf], ['W', [220, 30], [220, 86]],
+    ['opamp', [130, 86]], ['W', [210, 86], [230, 86], [230, 70]], ['W', [130, 102], [120, 102], [120, 112]], ['gnd', [120, 112]], ['dot', [220, 86]], ['t', [168, 90], 'U1', 'middle', 'sm']);
+  for (const [x, u, lab] of [[300, 'U2', n[1]], [480, 'U3', n[2]]]) {
+    it.push(['R', [x - 70, 70], [x - 10, 70], ri], ['W', [x - 10, 70], [x, 70]], ['W', [x - 10, 70], [x - 10, 30]], ['C', [x - 10, 30], [x + 90, 30], ci],
+      ['W', [x + 90, 30], [x + 90, 86]], ['opamp', [x, 86]], ['W', [x + 80, 86], [x + 90, 86]], ['W', [x, 102], [x - 10, 102], [x - 10, 112]], ['gnd', [x - 10, 112]],
+      ['dot', [x + 90, 86]], ['t', [x + 38, 90], u, 'middle', 'sm'], ['t', [x + 96, 106], lab, 'start']);
+  }
+  it.push(['W', [390, 86], [410, 86], [410, 70]], ['W', [570, 86], [600, 86]], ['open', [600, 86], ''], ['t', [226, 106], n[0], 'start']);
+  const yb = Math.max(150, yl + 60);
+  invs.forEach(([a, b], i) => {
+    const x = 40 + 310 * i, y = yb + 40;
+    it.push(['t', [x - 4, y + 4], a, 'end'], ['open', [x, y], ''], ['R', [x, y], [x + 70, y], '10 kΩ'], ['W', [x + 70, y], [x + 80, y]], ['dot', [x + 75, y]],
+      ['W', [x + 75, y], [x + 75, y - 30]], ['R', [x + 75, y - 30], [x + 170, y - 30], '10 kΩ'], ['W', [x + 170, y - 30], [x + 170, y + 16]],
+      ['opamp', [x + 80, y + 16]], ['W', [x + 160, y + 16], [x + 190, y + 16]], ['open', [x + 190, y + 16], b],
+      ['W', [x + 80, y + 32], [x + 75, y + 32], [x + 75, y + 42]], ['gnd', [x + 75, y + 42]], ['t', [x + 118, y + 20], 'U' + (4 + i), 'middle', 'sm']);
+  });
+  const sh = it.map(e => e.map(q => Array.isArray(q) && q.length === 2 && typeof q[0] === 'number' ? [q[0] + 70, q[1]] : q)); // room for long terminal labels
+  return sch(sh, { w: 690, h: invs.length ? yb + 80 : Math.max(140, yl + 30), sim: false });
+}
+$('#fig-chain').innerHTML = acFig({ ins: [['−v′ (U2)', 'R₁'], ['±v', 'R₂'], ['±15 V', 'R₃'], ['±x', 'Rₓ']] });
+
+// Fully wired 2024–25 computer (simulates: zero ICs, unstable equation, so it grows into the rails)
+const q2425 = [
+  ['W', [450, 60], [40, 60], [40, 120]], ['R', [40, 120], [150, 120], '66.7 kΩ'],
+  ['W', [630, 270], [30, 270], [30, 170]], ['R', [30, 170], [150, 170], '50 kΩ'],
+  ['R', [60, 210], [150, 210], '600 kΩ'], ['W', [60, 210], [60, 226]], ['rail', [60, 226], '+15 V', false],
+  ['W', [150, 120], [150, 210]], ['dot', [150, 144]], ['dot', [150, 170]],
+  ['W', [150, 144], [180, 144]], ['dot', [170, 144]], ['W', [170, 144], [170, 100]], ['R', [170, 100], [270, 100], '100 kΩ'], ['W', [270, 100], [270, 160]],
+  ['opamp', [180, 160]], ['W', [260, 160], [270, 160]], ['W', [180, 176], [170, 176], [170, 190]], ['gnd', [170, 190]],
+  ['W', [270, 160], [280, 160], [280, 144]], ['dot', [270, 160]], ['t', [274, 178], 'v″', 'start'],
+  ['R', [280, 144], [350, 144], '1 MΩ'], ['W', [350, 144], [360, 144]], ['W', [350, 144], [350, 100]], ['C', [350, 100], [450, 100], '1 µF'],
+  ['W', [450, 60], [450, 160]], ['opamp', [360, 160]], ['W', [440, 160], [450, 160]], ['W', [360, 176], [350, 176], [350, 190]], ['gnd', [350, 190]],
+  ['dot', [450, 100]], ['dot', [450, 160]], ['t', [456, 178], '−v′', 'start'],
+  ['W', [450, 160], [460, 160], [460, 144]], ['R', [460, 144], [530, 144], '1 MΩ'], ['W', [530, 144], [540, 144]], ['W', [530, 144], [530, 100]], ['C', [530, 100], [630, 100], '1 µF'],
+  ['W', [630, 100], [630, 160]], ['opamp', [540, 160]], ['W', [620, 160], [630, 160]], ['W', [540, 176], [530, 176], [530, 190]], ['gnd', [530, 190]],
+  ['W', [630, 160], [630, 270]], ['W', [630, 160], [660, 160]], ['open', [660, 160], 'v'], ['dot', [630, 160]],
+  ['t', [218, 164], 'U1', 'middle', 'sm'], ['t', [398, 164], 'U2', 'middle', 'sm'], ['t', [578, 164], 'U3', 'middle', 'sm'],
+];
+$('#fig-q2425').innerHTML = sch(q2425, { w: 680, h: 280 });
+$('#fig-q2223').innerHTML = acFig({ ins: [['+y′ (U2)', '50 kΩ'], ['−y (U3)', '50 kΩ'], ['x', '12.5 kΩ']], n: ['−y″', '+y′', '−y'], invs: [['−y (U3)', 'y']] });
+$('#fig-q1920').innerHTML = acFig({ ins: [['+v′ (U4)', '300/K kΩ'], ['−v (U5)', '100 kΩ'], ['+15 V', '562.5 kΩ']], invs: [['−v′ (U2)', '+v′'], ['v (U3)', '−v']] });
+$('#fig-q1819').innerHTML = acFig({ ins: [['+v′ (U4)', '25 kΩ'], ['v (U3)', '20 kΩ'], ['−15 V', '300 kΩ']], invs: [['−v′ (U2)', '+v′']] });
+$('#fig-q1516').innerHTML = acFig({ ins: [['+v′ (U4)', '33.3 kΩ'], ['v (U3)', '50 kΩ'], ['+cos10t (U6)', '25 kΩ']], invs: [['−v′ (U2)', '+v′']] }) +
+  sch([['t', [24, 74], 'sin10t', 'end'], ['open', [28, 70], ''], ['C', [30, 70], [100, 70], '1 µF'], ['W', [100, 70], [120, 70]], ['dot', [110, 70]], ['W', [110, 70], [110, 30]],
+    ['R', [110, 30], [210, 30], '100 kΩ'], ['W', [210, 30], [210, 86]], ['opamp', [120, 86]], ['W', [200, 86], [230, 86]], ['open', [230, 86], '−cos10t → U6 (inverter) → +cos10t'],
+    ['W', [120, 102], [110, 102], [110, 112]], ['gnd', [110, 112]], ['t', [158, 90], 'U5', 'middle', 'sm']], { w: 520, h: 130, sim: false });
+$('#fig-q1415').innerHTML = acFig({ ins: [['x (U3)', '75 kΩ']], n: ['x″', '−x′', 'x'] });
+
+worked('#wk-first', {
+  given: 'Solve \\(2\\dfrac{dv}{dt} + 4v - 6 = 0\\) with \\(v(0) = 0\\), using one op-amp. Integrator capacitor C = 1 µF.',
+  steps: [
+    { t: 'Highest derivative: \\(v\' = -2v + 3\\).', a: { l: '\\text{coefficient of } v', v: -2, u: '' } },
+    'Write \\(v = \\int v\'\\,dt = -\\int (2v - 3)\\,dt\\). A summing integrator gives \\(-\\int\\left(\\frac{v_1}{R_1C} + \\frac{v_2}{R_2C}\\right)dt\\), so feed it its own output \\(v\\) with \\(1/(R_1C) = 2\\) and a negative constant with \\(15/(R_2C) = 3\\).',
+    { t: '\\(R_1 = 1/(2\\times10^{-6}) = 500\\) kΩ from the output back to the − input (in parallel with C: a "leaky" integrator).', a: { l: 'R_1', v: 500e3, u: 'kΩ' } },
+    { t: '\\(R_2 = 15/(3\\times10^{-6}) = 5\\) MΩ from the \\(-15\\) V rail: \\(-\\int\\frac{-15}{5\\text{ M}\\Omega\\cdot1\\,\\mu\\text{F}}dt = +3t\\) ✓.', a: { l: 'R_2', v: 5e6, u: 'MΩ' } },
+    { t: 'Check: \\(v\' = -2v + 3\\) settles at \\(v = 1.5\\) V with time constant 0.5 s (\\(= R_1C\\)).', a: { l: 'v(\\infty)', v: 1.5, u: 'V' } },
+  ] });
+
+worked('#wk-khairul', {
+  given: 'Build an op-amp circuit that solves \\(v\'\' + 20v\' + 100v - 25 = 0\\) (Khairul OpAmp s.21–22).',
+  fig: acFig({ ins: [['v (U3)', '100 kΩ'], ['+v′ (U4)', '500 kΩ'], ['−25 V', '10 MΩ']], rf: 'Rf 10 MΩ', invs: [['−v′ (U2)', '+v′']] }),
+  steps: [
+    { t: 'Highest derivative: \\(v\'\' = -20v\' - 100v + 25\\).', a: { l: '\\alpha', v: -20, u: '' } },
+    'Signals: \\(-20v\'\\) needs \\(+v\'\\) (inverter U4 after U2); \\(-100v\\) needs \\(+v\\) (U3); \\(+25\\) needs a negative source.',
+    { t: 'Slide choice \\(R_f\\) = 10 MΩ: \\(R_v = 10\\text{ M}/100 = 100\\) kΩ.', a: { l: 'R_v', v: 100e3, u: 'kΩ' } },
+    { t: '\\(R_{v\'} = 10\\text{ M}/20 = 500\\) kΩ from \\(+v\'\\).', a: { l: 'R_{v\'}', v: 500e3, u: 'kΩ' } },
+    { t: 'Constant: the slide inverts a 25 V source to \\(-25\\) V and feeds it through 10 MΩ (gain 1). From the \\(-15\\) V rail instead: \\(R_c = 10\\text{ M}\\times15/25 = 6\\) MΩ.', a: { l: 'R_c\\ (\\text{rail})', v: 6e6, u: 'MΩ' } },
+    'Integrators 1 MΩ, 1 µF. Roots of \\(s^2 + 20s + 100\\): \\(-10, -10\\) (critically damped), so \\(v\\) rises to \\(25/100 = 0.25\\) V without overshoot.',
+  ] });
+
+// signals chosen by the canonical architecture: returns {sig, inv}
+const fmt = x => num(x, 4);
+drill('#dr-design', { id: 'o07-ode-to-resistors', title: 'Analog computer: summing resistors for a random equation', gen(r) {
+  const a = r.pick([1, 2, 3, 4]), b = r.pick([-4, -3, -2, -1, 1, 2, 3, 4]), c = r.pick([-5, -4, -3, -2, -1, 1, 2, 3, 4, 5]), d = r.pick([-10, -8, -6, -5, -4, -3, -2, 2, 3, 4, 5, 6, 8, 10]);
+  const e = r() < 0.5 ? 0 : r.pick([-8, -6, -4, -3, -2, 2, 3, 4, 5, 6, 8]);
+  const Rf = r.pick([100e3, 100e3, 1e6]);
+  const [Ri, Ci] = r.pick([[1e6, 1e-6], [100e3, 10e-6], [10e6, 0.1e-6]]);
+  const al = -b / a, be = -c / a, ga = -d / a, de = e / a;
+  const R1 = Rf / Math.abs(al), R2 = Rf / Math.abs(be), R3 = Rf * 15 / Math.abs(ga), Rx = de ? Rf / Math.abs(de) : 0;
+  if ([R1, R2, R3, ...(de ? [Rx] : [])].some(x => x < 10e3 || x > 10e6)) return null;
+  const n = 3 + (al < 0) + (be > 0) + (de > 0);
+  const term = (k, s) => (k === 1 ? '' : k === -1 ? '-' : fmt(k)) + s;
+  const eq = `${a === 1 ? '' : a}v'' ${b < 0 ? '-' : '+'} ${Math.abs(b) === 1 ? '' : Math.abs(b)}v' ${c < 0 ? '-' : '+'} ${Math.abs(c) === 1 ? '' : Math.abs(c)}v ${d < 0 ? '-' : '+'} ${Math.abs(d)} = ${e ? (e === 1 ? '' : e) + 'x(t)' : '0'}`;
+  const rhs = [term(al, "v'"), term(be, 'v'), fmt(ga), ...(de ? [term(de, 'x')] : [])].join(' + ').replace(/\+ -/g, '- ');
+  const stable = b / a > 0 && c / a > 0;
+  const ask = [{ l: "R_{v'}", v: R1, u: 'kΩ' }, { l: 'R_v', v: R2, u: 'kΩ' }, { l: 'R_c', v: R3, u: 'kΩ' }];
+  if (de) ask.push({ l: 'R_x', v: Rx, u: 'kΩ' });
+  ask.push({ l: '\\text{op-amps}', v: n, u: '', tol: 0.001 });
+  return {
+    given: `Design an analog computer for \\(${eq}\\). Integrators use R = ${si(Ri, 'Ω')}, C = ${si(Ci, 'F')}; the summer has \\(R_f\\) = ${si(Rf, 'Ω')}; rails ±15 V supply the constant. Find the summing resistors (for the \\(v'\\) term, the \\(v\\) term, the constant${de ? ', the input x' : ''}) and the number of op-amps with the canonical architecture (U1 → \\(v''\\), U2 → \\(-v'\\), U3 → \\(v\\), inverters only where needed).`,
+    ask,
+    steps: [
+      `Integrators: \\(RC = ${si(Ri, 'Ω')}\\times${si(Ci, 'F')} = 1\\) s, so each is a plain \\(-\\int\\).`,
+      { t: `Divide by ${a}: \\(v'' = ${rhs}\\).`, a: { l: '\\alpha', v: al, u: '' } },
+      { t: `\\(v'\\) term: coefficient ${fmt(al)} ${al > 0 ? '&gt; 0, so feed \\(-v\'\\) straight from U2' : '&lt; 0, so feed \\(+v\'\\): inverter after U2'}. \\(R_{v'} = ${si(Rf, 'Ω')}/${fmt(Math.abs(al))} = ${si(R1, 'Ω')}\\).`, a: { l: "R_{v'}", v: R1, u: 'kΩ' } },
+      { t: `\\(v\\) term: coefficient ${fmt(be)} ${be < 0 ? '&lt; 0, so feed \\(+v\\) straight from U3' : '&gt; 0, so feed \\(-v\\): inverter after U3'}. \\(R_v = ${si(Rf, 'Ω')}/${fmt(Math.abs(be))} = ${si(R2, 'Ω')}\\).`, a: { l: 'R_v', v: R2, u: 'kΩ' } },
+      { t: `Constant ${fmt(ga)}: from the ${ga > 0 ? '−15 V' : '+15 V'} rail, \\(R_c = ${si(Rf, 'Ω')}\\times15/${fmt(Math.abs(ga))} = ${si(R3, 'Ω')}\\). Check: \\(-\\frac{R_f}{R_c}(${ga > 0 ? '-' : '+'}15) = ${fmt(ga)}\\) ✓.`, a: { l: 'R_c', v: R3, u: 'kΩ' } },
+      ...(de ? [{ t: `Input term ${fmt(de)}x: ${de > 0 ? 'needs \\(-x\\): input inverter' : 'feed \\(x\\) directly'}, \\(R_x = ${si(Rf, 'Ω')}/${fmt(Math.abs(de))} = ${si(Rx, 'Ω')}\\).`, a: { l: 'R_x', v: Rx, u: 'kΩ' } }] : []),
+      { t: `Op-amps: summer + 2 integrators${al < 0 ? ' + inverter for \\(+v\'\\)' : ''}${be > 0 ? ' + inverter for \\(-v\\)' : ''}${de > 0 ? ' + inverter for \\(-x\\)' : ''} = ${n}. Solution node: U3 output.`, a: { l: '\\text{op-amps}', v: n, u: '', tol: 0.001 } },
+    ],
+    note: stable ? `Stable equation (\\(b/a\\) and \\(c/a\\) positive)${de ? '' : `: v settles at \\(-d/c = ${fmt(-d / c)}\\) V`}.` : 'Unstable equation (a root in the right half-plane): the real circuit grows until it hits the ±15 V rails. Worth one line in the answer.',
+  };
+} });
+
+drill('#dr-read', { id: 'o07-circuit-to-ode', title: 'Which differential equation does this circuit solve?', gen(r) {
+  const Rf = 100;
+  const s1 = r.pick([1, -1]), s2 = r.pick([1, -1]), Vr = r.pick([15, -15]);
+  const R1 = r.pick([20, 25, 33, 47, 50, 68, 100, 150, 200, 330]), R2 = r.pick([10, 20, 25, 33, 47, 50, 100, 200]), R3 = r.pick([150, 300, 500, 750, 1000, 1500, 3000]);
+  const p = s1 * Rf / R1, q = s2 * Rf / R2, rr = -(Rf / R3) * Vr;
+  const invs = [];
+  if (s1 > 0) invs.push(['−v′ (U2)', '+v′']);
+  if (s2 < 0) invs.push(['v (U3)', '−v']);
+  const L1 = s1 > 0 ? '+v′ (U4)' : '−v′ (U2)', L2 = s2 > 0 ? 'v (U3)' : `−v (U${4 + (s1 > 0)})`;
+  return {
+    given: 'Integrators are 1 MΩ, 1 µF, so U2 outputs \\(-v\'\\) and U3 outputs \\(v\\). Write the equation in the form \\(v\'\' + p\\,v\' + q\\,v = r\\) and give p, q, r.',
+    fig: acFig({ ins: [[L1, R1 + ' kΩ'], [L2, R2 + ' kΩ'], [(Vr > 0 ? '+' : '−') + '15 V', si(R3 * 1e3, 'Ω')]], invs }),
+    ask: [{ l: 'p', v: p, u: '' }, { l: 'q', v: q, u: '' }, { l: 'r', v: rr, u: '' }],
+    steps: [
+      `Summer: \\(v'' = -\\left[\\frac{100}{${R1}}(${s1 > 0 ? '+' : '-'}v') + \\frac{100}{${R2}}(${s2 > 0 ? '+' : '-'}v) + \\frac{100}{${R3}}(${Vr})\\right]\\)`,
+      { t: `\\(v'' = ${fmt(-p)}v' ${-q < 0 ? '-' : '+'} ${fmt(Math.abs(q))}v ${rr < 0 ? '-' : '+'} ${fmt(Math.abs(rr))}\\)`, a: { l: 'p', v: p, u: '' } },
+      { t: `Move to the left: \\(v'' ${p < 0 ? '-' : '+'} ${fmt(Math.abs(p))}v' ${q < 0 ? '-' : '+'} ${fmt(Math.abs(q))}v = ${fmt(rr)}\\)`, a: { l: 'r', v: rr, u: '' } },
+      p > 0 && q > 0 ? `Stable (p, q &gt; 0): v settles at \\(r/q = ${fmt(rr / q)}\\) V.` : 'p or q negative: unstable, the output grows into the rails.',
+    ] };
+} });
+
+flashcards('#cards', [
+  { f: 'First line of every answer', b: "Solve for the highest derivative: v'' = αv' + βv + γ + δx." },
+  { f: 'Chain', b: "Summer → v''; integrator → −v'; integrator → v (1 MΩ, 1 µF, RC = 1 s)." },
+  { f: 'Sign rule', b: 'Summer inverts: positive coefficient ⇒ feed the negative signal (inverter if not available).' },
+  { f: 'Resistor for a term', b: 'R = Rf/|coefficient|' },
+  { f: 'Constant term', b: 'From the opposite-sign 15 V rail: R = 15·Rf/|γ|.' },
+  { f: 'Initial condition', b: "Pre-charge the capacitor: U3 output = v(0), U2 output = −v'(0). Zero IC = reset switch." },
+  { f: 'cos from sin', b: 'Differentiator with RC = 1/ω gives −cos ωt (no DC error); uncharged integrator gives cos − 1.' },
+  { f: 'Stable?', b: 'All coefficients of av″ + bv′ + cv the same sign. Otherwise the circuit saturates.' },
+]);
+quiz('#quiz', [
+  { q: "For v'' + 6v' + 9v = 0, which signal feeds the summer for the v' term (summer output v'')?", opts: ["−v′ from the first integrator", "+v′ from an inverter", "v from the second integrator", "the +15 V rail"], a: 1, why: "v'' needs −6v'; the summer inverts, so it must be fed +v'." },
+  { q: 'Rf = 100 kΩ and the equation gives γ = +2.5. The constant resistor is', opts: ['40 kΩ from +15 V', '600 kΩ from −15 V', '600 kΩ from +15 V', '250 kΩ from −15 V'], a: 1, why: '−(100/600)(−15) = +2.5.' },
+  { q: '3v″ + 12v′ + 6v = 0. After normalising, R for the v term with Rf = 100 kΩ is', opts: ['16.7 kΩ', '50 kΩ', '33.3 kΩ', '200 kΩ'], a: 1, why: 'β = −6/3 = −2, R = 100/2 = 50 kΩ.' },
+  { q: "Integrators with RC = 0.1 s, summer unchanged. The output is", opts: ['v(t)', 'v(10t): same waveform, 10× faster', '10·v(t)', 'v(t/10)'], a: 1, why: 'Time scaling: RC = τ gives v(t/τ) = v(10t).' },
+  { q: '3x″ + 4x = 0 with all capacitors uncharged. The output is', opts: ['cos 1.155t', '0 for all t', 'it saturates', 'sin 1.155t'], a: 1, why: 'Homogeneous equation with zero ICs: x ≡ 0. Pre-charge a capacitor.' },
+  { q: 'Which equation will drive a real analog computer into saturation?', opts: ["v″ + 4v′ + 5v = 5", "2v″ − 3v′ + 4v + 5 = 0", "v″ + 3v′ + 2v = 0", "v″ + 20v′ + 100v = 25"], a: 1, why: 'Negative damping: roots 0.75 ± j1.2 in the right half-plane.' },
+]);
+</script>
+</body>
+</html>

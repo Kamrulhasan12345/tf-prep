@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Barkhausen Criterion and Limiters · EEE 263 Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Oscillators · Chapter 1 · Sedra §18.1–18.2 · Khairul s.2–13 · Sadat L25, notes p.112–116 · type S-T1</div>
+<h1>The Barkhausen Criterion and Amplitude Limiters</h1>
+<p class="lede">"Write down the Barkhausen criterion" was asked on its own in 2014–15 and 2018–19 (6 to 11 marks), and it is part (a) of almost every oscillator derivation since: Wien 2023–24 and 2019–20, Colpitts 2022–23 and 2024–25. Learn the loop-gain idea and the three-step method here once; every later chapter (Wien, phase shift, Colpitts) is the same three steps on a different network. The diode limiter that holds the amplitude steady is the second half.</p>
+
+<h2>1. Feedback: negative, positive, and the loop gain</h2>
+<p>An amplifier \(A\) and a feedback network \(\beta\) form a loop. The signal that comes back is \(x_f = \beta x_o\). What happens depends on whether it is subtracted or added at the input (Sadat notes p.112–113):</p>
+<div class="formula">\[ \begin{gathered} \text{negative feedback: } A_f = \frac{A}{1 + A\beta}, \qquad \text{positive feedback: } A_f = \frac{A}{1 - A\beta} \\ L \equiv A\beta \text{ (loop gain)} \end{gathered} \]</div>
+<figure><div id="fig-loop"></div><figcaption><b>Figure 1.</b> Positive-feedback loop (Sedra Fig. 18.1). In a real oscillator \(x_s = 0\); the loop must make \(x_o\) by itself.</figcaption></figure>
+<dl class="def">
+  <dt>Loop gain \(L(s) = A(s)\beta(s)\)</dt><dd>The gain all the way round the loop: break the loop at the amplifier input, inject \(V_i\), and see what comes back. It is a complex number at each frequency.</dd>
+  <dt>Desensitivity \(D = 1 + A\beta\)</dt><dd>The factor by which negative feedback reduces gain and the sensitivity to changes in \(A\).</dd>
+  <dt>Characteristic equation</dt><dd>\(1 - L(s) = 0\) for the positive-feedback loop. Its roots are the closed-loop poles.</dd>
+</dl>
+
+<h3>Desensitivity (2014–15)</h3>
+<p>Differentiate \(A_f = A/(1 + A\beta)\) with respect to \(A\):</p>
+<div class="formula">\[ \frac{dA_f}{dA} = \frac{(1 + A\beta) - A\beta}{(1 + A\beta)^2} = \frac{1}{(1+A\beta)^2} \;\Rightarrow\; \frac{dA_f}{A_f} = \frac{1}{1 + A\beta}\cdot\frac{dA}{A} \]</div>
+<p>So a 10% change in \(A\) becomes a \(10\%/D\) change in \(A_f\). With <b>negative</b> feedback \(A\beta &gt; 0\), \(D &gt; 1\): the gain is stable, the bandwidth widens, distortion falls. With <b>positive</b> feedback the denominator is \(1 - A\beta\), i.e. \(D &lt; 1\): the closed-loop gain is <i>more</i> sensitive than \(A\), and when \(A\beta \to 1\) (\(D \to 0\)) the gain goes to infinity. A finite output with zero input: that is an oscillator.</p>
+<div id="dr-desens"></div>
+
+<h2>2. The Barkhausen criterion</h2>
+<p>With no input, the loop must reproduce its own signal: \(x_o = A x_f = A\beta x_o\), so \(A\beta = 1\). Since \(A\beta\) is complex, this is two conditions at the oscillation frequency \(\omega_0\) (Khairul s.3–4):</p>
+<div class="formula">\[ L(j\omega_0) = A(j\omega_0)\beta(j\omega_0) = 1 \iff \big|A\beta\big| = 1 \;\text{ and }\; \angle A\beta = 0^\circ \;(\text{or } 360^\circ) \]</div>
+<ul>
+<li><b>Phase condition sets the frequency.</b> The loop oscillates at the one frequency where the total phase shift round the loop is 0° (360°). If several frequencies satisfied it, the output would not be a pure sine (Sadat p.114: frequencies that fail the criterion die out).</li>
+<li><b>Magnitude condition sets the gain.</b> \(|A\beta| &lt; 1\): the oscillation decays. \(|A\beta| = 1\): it is sustained. \(|A\beta| &gt; 1\): it grows.</li>
+<li><b>Start-up:</b> design \(|A\beta|\) <i>slightly greater</i> than 1 so that noise grows into an oscillation. The closed-loop poles are then just inside the right half-plane. The amplitude then grows until something non-linear (op-amp saturation, a diode limiter, a thermistor or JFET gain control) pulls the effective loop gain back to exactly 1. Without a limiter the sine saturates at the supply and looks squarish (Sadat p.116).</li>
+</ul>
+
+<h2>3. The three-step method (every oscillator in this book)</h2>
+<div class="method"><h4>Method · find ω₀ and the start condition (Khairul s.5)</h4><ol>
+<li><b>Break the loop</b> at the amplifier input. Write \(A\) (non-inverting op-amp: \(1 + R_2/R_1\); inverting: \(-R_2/R_1\)) and \(\beta(j\omega) = V_f/V_o\) of the network by voltage division or nodal analysis (ideal op-amp input draws no current).</li>
+<li><b>Phase condition → \(\omega_0\).</b> Write \(A\beta\) as (numerator)/(real part + j·imaginary part). If the numerator is purely imaginary (like \(j\omega RL\)), set the <b>real</b> part of the denominator to zero; if the numerator is real, set the imaginary part to zero. Equivalent shortcut: write \(1/\beta\) and set \(\text{Im}(1/\beta) = 0\) for a non-inverting amplifier (or require \(\beta\) real and negative for an inverting one).</li>
+<li><b>Magnitude → gain condition.</b> Substitute \(\omega_0\): \(\beta(\omega_0)\) is now real. Require \(A\beta(\omega_0) \ge 1\) (start), "= 1" (sustain). Solve for the resistor ratio.</li>
+</ol></div>
+
+<h3>Worked example: the LCR band-pass oscillator (Sedra Ex. 18.1, Khairul s.6–8, Sadat p.115)</h3>
+<p>A non-inverting amplifier (\(r_1\) to ground, \(r_2\) feedback) drives a resistor \(R\) into the + input; \(L\) and \(C\) in parallel go from the + input to ground. The parallel LC is a band-pass filter: it passes only frequencies near \(1/\sqrt{LC}\).</p>
+<figure><div id="fig-lcr"></div><figcaption><b>Figure 2.</b> LCR band-pass oscillator. Values shown are the worked example (\(r_2/r_1\) = 0.1 for a quick start). The simulator link runs it: the op-amp model clips at ±15 V, and the oscillation needs a moment to build up from noise.</figcaption></figure>
+<p>Derivation as an exam answer:</p>
+<div class="formula">\[ Z_{LC} = \frac{1}{sC}\parallel sL = \frac{sL}{1 + s^2LC} \]</div>
+<div class="formula">\[ \beta(s) = \frac{Z_{LC}}{R + Z_{LC}} = \frac{sL}{s^2RLC + sL + R} = \frac{s/RC}{s^2 + s/RC + 1/LC} \]</div>
+<div class="formula">\[ A(j\omega)\beta(j\omega) = \Big(1 + \frac{r_2}{r_1}\Big)\frac{j\omega/RC}{\big(\tfrac{1}{LC} - \omega^2\big) + j\omega/RC} \]</div>
+<p>The numerator is imaginary, so the phase is zero when the real part of the denominator is zero: \(\omega_0 = 1/\sqrt{LC}\). There \(\beta(\omega_0) = 1\) (the filter passes the centre frequency at full amplitude), so \(|A\beta| = 1 + r_2/r_1 \ge 1\), i.e. \(r_2/r_1 \ge 0\): any non-negative feedback ratio starts it. In Sadat's words, ideally \(R_2 = 0\) (a follower); in practice any \(R_2\) makes \(A\beta &gt; 1\) and the output grows until it saturates.</p>
+<div id="wk-lcr"></div>
+<p>The closed-loop poles show the growth. \(1 - L(s) = 0\) gives \(s^2 + s\,\dfrac{1 - K}{RC} + \dfrac{1}{LC} = 0\) with \(K = 1 + r_2/r_1\). For \(K\) slightly above 1 the poles are \(s \approx \sigma \pm j\omega_0\) with \(\sigma = \dfrac{K - 1}{2RC} &gt; 0\): the envelope grows as \(e^{\sigma t}\).</p>
+<div id="dr-lcr"></div>
+
+<h2>4. Amplitude control: the diode limiter</h2>
+<p>A loop gain slightly above 1 makes the amplitude grow without bound until the op-amp saturates (distorted). A limiter makes the gain drop smoothly once the output reaches a set level \(L_+\) or \(L_-\). Sedra Fig. 18.4 (Khairul s.9–13) is the standard one.</p>
+<figure><div id="fig-lim"></div><figcaption><b>Figure 3.</b> Limiter: an inverting amplifier (\(R_1\), \(R_f\)) with a resistor string \(R_2\)–\(R_3\)–\(R_4\)–\(R_5\) between ±V and two diodes to the virtual-ground node. Values are the worked example below.</figcaption></figure>
+<p><b>How it works.</b> With both diodes off, \(v_O = -(R_f/R_1)v_I\). The string nodes follow \(v_O\):</p>
+<div class="formula">\[ v_A = V\frac{R_3}{R_2 + R_3} + v_O\frac{R_2}{R_2 + R_3}, \qquad v_B = -V\frac{R_4}{R_4 + R_5} + v_O\frac{R_5}{R_4 + R_5} \]</div>
+<p>As \(v_O\) goes negative, \(v_A\) falls. When \(v_A = -V_D\) (the virtual-ground node is at 0), \(D_1\) conducts. Setting \(v_A = -V_D\) and solving for \(v_O\) gives the <b>negative limiting level</b>; \(D_2\) does the same for positive \(v_O\) when \(v_B = +V_D\):</p>
+<div class="formula">\[ L_- = -V\frac{R_3}{R_2} - V_D\Big(1 + \frac{R_3}{R_2}\Big), \qquad L_+ = V\frac{R_4}{R_5} + V_D\Big(1 + \frac{R_4}{R_5}\Big) \]</div>
+<p>Beyond a limit, \(v_A\) is pinned at \(-V_D\), so the current in \(R_2\) is constant and every extra bit of current goes through \(R_3\): \(R_3\) appears in parallel with \(R_f\). Slopes of the transfer characteristic:</p>
+<div class="formula">\[ \text{linear: } -\frac{R_f}{R_1}, \qquad \text{below } L_-: \; -\frac{R_f\parallel R_3}{R_1}, \qquad \text{above } L_+: \; -\frac{R_f\parallel R_4}{R_1} \]</div>
+<p>Remove \(R_f\) and the gain becomes huge: the same circuit is a comparator with clean output levels \(L_\pm\) (used later for Schmitt triggers).</p>
+<div class="method"><h4>Method · limiter levels and slopes</h4><ol>
+<li>\(L_- = -V R_3/R_2 - V_D(1 + R_3/R_2)\) and \(L_+ = V R_4/R_5 + V_D(1 + R_4/R_5)\).</li>
+<li>Input where limiting starts: divide by the linear gain, \(v_I = L/(-R_f/R_1)\).</li>
+<li>Limiting slopes: replace \(R_f\) by \(R_f\parallel R_3\) (negative side) or \(R_f\parallel R_4\) (positive side).</li>
+<li>In an oscillator, the diodes hang on the feedback divider of the amplifier instead of the virtual ground (Wien example in the next chapter); the turn-on condition is the same idea: diode node = other node ± \(V_D\).</li>
+</ol></div>
+<div id="wk-lim"></div>
+<div id="dr-lim"></div>
+
+<div class="trap"><h4>Traps (where marks go)</h4><ul>
+<li>Writing only "\(A\beta = 1\)". Write both parts: \(|A\beta| = 1\) and \(\angle A\beta = 0^\circ\) (360°), and add the practical start-up remark (\(|A\beta|\) slightly &gt; 1, then non-linear amplitude control). That remark is a mark.</li>
+<li>Mixing sign conventions: in the positive-feedback form the criterion is \(A\beta = +1\); in the negative-feedback form \(A_f = A/(1 + A\beta)\) it is \(A\beta = -1\). State which one you use.</li>
+<li>Setting the wrong part of the denominator to zero. Check the numerator first: imaginary numerator → real part of denominator = 0.</li>
+<li>Limiter levels: \(R_3/R_2\) (not \(R_3/(R_2 + R_3)\)), and the \(V_D\) term is multiplied by \(1 + R_3/R_2\).</li>
+<li>Desensitivity: \(dA_f/A_f = (dA/A)/(1 + A\beta)\); do not forget it is a relative change.</li>
+</ul></div>
+
+<h2>Exam questions</h2>
+
+<div class="exam">
+  <div class="exam-src">2018–19 · Sec B · Q6(c) · 10⅔ marks &nbsp;|&nbsp; also part (a) of 2023–24 Sec B Q5(a) and 2019–20 Sec B Q7(a)(i)</div>
+  <div class="exam-q"><p>Write down the Barkhausen criterion.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>Draw Figure 1: amplifier \(A(s)\) with a frequency-selective feedback network \(\beta(s)\) connected for positive feedback. Closed-loop gain \(A_f = A/(1 - A\beta)\); loop gain \(L(s) = A(s)\beta(s)\).</p>
+    <p>If at some frequency \(\omega_0\) the loop gain equals 1, \(A_f \to \infty\): the circuit gives a finite output with zero input, i.e. it oscillates. With no input, \(x_o = A\beta x_o\), so \(A\beta = 1\).</p>
+    <p><b>Barkhausen criterion:</b> \(L(j\omega_0) = A(j\omega_0)\beta(j\omega_0) = 1\), i.e. (i) magnitude \(|A(j\omega_0)\beta(j\omega_0)| = 1\); (ii) phase \(\angle A(j\omega_0)\beta(j\omega_0) = 0^\circ\) or \(360^\circ\). The phase condition fixes \(\omega_0\) (it must hold at one frequency only, for a pure sine); the magnitude condition fixes the amplifier gain.</p>
+    <p><b>Practical note:</b> if \(|A\beta| &lt; 1\) oscillations die out; if \(|A\beta| &gt; 1\) they grow. A real oscillator is designed with \(|A\beta|\) slightly above 1 (poles slightly in the right half-plane) so it starts from noise, and a non-linear mechanism (op-amp saturation or a diode limiter) reduces the effective gain until \(|A\beta| = 1\) at the final amplitude.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2014–15 · Sec B · Q8(b) · 15 marks (10 + 5)</div>
+  <div class="exam-q"><p>Derive the expression of desensitivity. Explain positive and negative feedback from desensitivity.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><b>Derivation (10).</b> Negative-feedback amplifier: \(x_o = A(x_s - \beta x_o)\), so \(A_f = \dfrac{A}{1 + A\beta}\). Differentiate with respect to \(A\):</p>
+    <p>\(\dfrac{dA_f}{dA} = \dfrac{1}{(1 + A\beta)^2}\). Divide by \(A_f = A/(1 + A\beta)\): \(\dfrac{dA_f}{A_f} = \dfrac{1}{1 + A\beta}\cdot\dfrac{dA}{A}\).</p>
+    <p>The factor \(D = 1 + A\beta\) is the <b>desensitivity factor</b>: a fractional change in the open-loop gain is reduced by \(D\) in the closed-loop gain. (Sensitivity \(S = 1/D\).) Example: \(A = 10^4\), \(\beta = 0.01\): \(D = 101\), \(A_f = 99.0\); a 10% drop in \(A\) changes \(A_f\) by only \(10\%/101 \approx 0.1\%\).</p>
+    <p><b>Explanation (5).</b> <i>Negative feedback</i>: \(A\beta &gt; 0\), \(D &gt; 1\). Gain is reduced but becomes insensitive to \(A\) (transistor, temperature), bandwidth increases and distortion falls by the same factor. <i>Positive feedback</i>: the fed-back signal adds, \(A_f = A/(1 - A\beta)\), so effectively \(D = 1 - A\beta &lt; 1\): the gain increases and becomes <i>more</i> sensitive to \(A\). As \(A\beta \to 1\), \(D \to 0\) and \(A_f \to \infty\): output without input, which is the Barkhausen (oscillation) condition. Hence amplifiers use negative feedback; oscillators use positive feedback.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2014–15 · Sec B · Q7(c) · 6⅔ marks</div>
+  <div class="exam-q"><p>Write down the Barkhausen stability criterion for an oscillation in a linear electronic circuit to sustain.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>For a loop with amplifier \(A(s)\) and feedback network \(\beta(s)\) (positive feedback), the characteristic equation is \(1 - A(s)\beta(s) = 0\). Sustained oscillation at \(\omega_0\) needs a pair of closed-loop poles exactly on the \(j\omega\) axis at \(\pm j\omega_0\), i.e.</p>
+    <p>\(A(j\omega_0)\beta(j\omega_0) = 1\): \(|A\beta| = 1\) and \(\angle A\beta = 0^\circ\) (or an integer multiple of \(360^\circ\)).</p>
+    <p>Poles in the left half-plane (\(|A\beta| &lt; 1\)) give a decaying response; poles in the right half-plane (\(|A\beta| &gt; 1\)) give a growing one. In practice the poles are placed slightly in the right half-plane for reliable start-up, and amplitude control (limiter, AGC, saturation) brings them back to the \(j\omega\) axis.</p>
+  </div></details>
+</div>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+
+<div class="key"><p><strong>Summary:</strong> oscillation needs \(A\beta = 1\): magnitude 1 and phase 0° at one frequency \(\omega_0\). Method: break the loop, write \(A\) and \(\beta(j\omega)\), set the phase to zero to get \(\omega_0\), then require \(A\beta(\omega_0) \ge 1\) for the gain. Design slightly above 1 so it starts; a limiter (\(L_\pm = \pm V R_3/R_2 \pm V_D(1 + R_3/R_2)\)) holds the amplitude. Desensitivity \(1 + A\beta\) explains why negative feedback stabilises and positive feedback oscillates.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/eee.js"></script>
+<script>
+$('#fig-loop').innerHTML = sch([
+  ['open', [0, 60], 'xₛ'], ['W', [0, 60], [60, 60]], ['t', [72, 64], 'Σ'], ['W', [60, 45], [90, 45], [90, 75], [60, 75], [60, 45]],
+  ['t', [64, 40], '+', 'start', 'sm'], ['W', [90, 60], [130, 60]], ['W', [130, 35], [210, 35], [210, 85], [130, 85], [130, 35]], ['t', [170, 66], 'A(s)'],
+  ['W', [210, 60], [300, 60]], ['open', [300, 60], 'xₒ'], ['dot', [260, 60]], ['W', [260, 60], [260, 150], [210, 150]],
+  ['W', [130, 125], [210, 125], [210, 175], [130, 175], [130, 125]], ['t', [170, 156], 'β(s)'], ['W', [130, 150], [75, 150], [75, 75]], ['t', [82, 100], '+ xf', 'start', 'sm'],
+], { w: 330, h: 190, sim: false });
+
+const lcrFig = (L, C, R, r1, r2) => sch([
+  ['opamp', [200, 100], { plusTop: true }], ['W', [280, 100], [330, 100]], ['dot', [330, 100]],
+  ['W', [200, 116], [180, 116], [180, 170]], ['R', [180, 170], [330, 170], 'r₂ ' + r2], ['W', [330, 170], [330, 100]], ['dot', [180, 170]],
+  ['R', [180, 170], [180, 240], 'r₁ ' + r1], ['gnd', [180, 240]],
+  ['W', [330, 100], [330, 20]], ['R', [330, 20], [190, 20], 'R ' + R], ['W', [190, 20], [20, 20]], ['dot', [190, 20]], ['dot', [110, 20]],
+  ['W', [190, 20], [190, 84], [200, 84]],
+  ['L', [110, 20], [110, 120], 'L ' + L], ['C', [20, 20], [20, 120], 'C ' + C], ['W', [20, 120], [110, 120]], ['gnd', [70, 120]],
+  ['t', [340, 96], 'vₒ', 'start'],
+], { w: 380, h: 260 });
+$('#fig-lcr').innerHTML = lcrFig('10 mH', '10 nF', '1 kΩ', '10 kΩ', '1 kΩ');
+
+worked('#wk-lcr', {
+  given: 'L = 10 mH, C = 10 nF, R = 1 kΩ, r₁ = 10 kΩ, r₂ = 1 kΩ. Find ω₀, f₀, β(ω₀), the loop gain at ω₀, and the pole real part σ.',
+  steps: [
+    { t: '\\(\\omega_0 = 1/\\sqrt{LC} = 1/\\sqrt{10^{-2}\\times10^{-8}} = 10^5\\) rad/s', a: { l: '\\omega_0', v: 1e5, u: 'rad/s' } },
+    { t: '\\(f_0 = \\omega_0/2\\pi = 15.9\\) kHz', a: { l: 'f_0', v: 15915, u: 'kHz' } },
+    { t: 'At \\(\\omega_0\\) the j terms cancel in the denominator: \\(\\beta(\\omega_0) = \\dfrac{j\\omega_0/RC}{j\\omega_0/RC} = 1\\)', a: { l: '\\beta(\\omega_0)', v: 1, u: 'V/V' } },
+    { t: '\\(A\\beta = 1 + r_2/r_1 = 1 + 1/10 = 1.1 \\ge 1\\): it starts.', a: { l: 'A\\beta', v: 1.1, u: 'V/V' } },
+    { t: '\\(\\sigma = \\dfrac{K-1}{2RC} = \\dfrac{0.1}{2\\times10^3\\times10^{-8}} = 5000\\) s⁻¹ (envelope grows as \\(e^{5000t}\\) until it clips)', a: { l: '\\sigma', v: 5000, u: '1/s' } },
+  ] });
+
+drill('#dr-lcr', { id: 'st1-lcr-bandpass', title: 'LCR band-pass oscillator: f0, loop gain and growth rate', gen(r) {
+  const L = r.pick([1, 2.2, 4.7, 10, 22, 47, 100]) * 1e-3, C = r.pick([1, 2.2, 4.7, 10, 22, 47, 100]) * 1e-9, R = r.pick([0.47, 1, 2.2, 4.7, 10]) * 1e3;
+  const r1 = r.pick([10, 22, 47, 100]) * 1e3, r2 = r.pick([0.47, 1, 2.2, 4.7]) * 1e3;
+  const w0 = 1 / Math.sqrt(L * C), f0 = w0 / (2 * Math.PI), K = 1 + r2 / r1, sig = (K - 1) / (2 * R * C);
+  if (f0 > 2e5 || f0 < 300) return null;
+  return {
+    given: `An LCR band-pass oscillator (Figure 2) has L = ${si(L, 'H')}, C = ${si(C, 'F')}, R = ${si(R, 'Ω')}, r₁ = ${si(r1, 'Ω')}, r₂ = ${si(r2, 'Ω')}. Find f₀, the loop gain at f₀, and the real part σ of the closed-loop poles.`,
+    fig: lcrFig(si(L, 'H'), si(C, 'F'), si(R, 'Ω'), si(r1, 'Ω'), si(r2, 'Ω')),
+    ask: [{ l: 'f_0', v: f0, u: 'kHz' }, { l: 'A\\beta(\\omega_0)', v: K, u: 'V/V', tol: 0.005 }, { l: '\\sigma', v: sig, u: '1/s' }],
+    steps: [
+      { t: `\\(\\omega_0 = 1/\\sqrt{LC} = 1/\\sqrt{${num(L)}\\times${num(C)}} = ${num(w0)}\\) rad/s, \\(f_0 = ${num(f0 / 1000)}\\) kHz`, a: { l: 'f_0', v: f0, u: 'kHz' } },
+      { t: `\\(\\beta(\\omega_0) = 1\\), so \\(A\\beta = 1 + ${num(r2 / 1e3)}/${num(r1 / 1e3)} = ${num(K, 5)}\\)`, a: { l: 'A\\beta', v: K, u: 'V/V', tol: 0.005 } },
+      { t: `\\(\\sigma = \\dfrac{K-1}{2RC} = \\dfrac{${num(K - 1, 4)}}{2\\times${num(R)}\\times${num(C)}} = ${num(sig)}\\) s⁻¹`, a: { l: '\\sigma', v: sig, u: '1/s' } },
+    ] };
+} });
+
+drill('#dr-desens', { id: 'st1-desensitivity', title: 'Desensitivity: closed-loop gain and its percentage change', gen(r) {
+  const A = r.pick([1e2, 5e2, 1e3, 2e3, 5e3, 1e4, 2e4, 1e5]), b = r.pick([0.001, 0.002, 0.005, 0.01, 0.02, 0.05, 0.1, 0.2, 0.5]), dA = r.pick([5, 10, 20, 25, 50]);
+  const D = 1 + A * b; if (D < 2) return null;
+  const Af = A / D, dAf = dA / D;
+  return {
+    given: `An amplifier with open-loop gain A = ${A} has negative feedback with β = ${b}. Find the desensitivity factor D, the closed-loop gain \\(A_f\\), and the percentage change in \\(A_f\\) when A changes by ${dA}% (use the differential formula).`,
+    ask: [{ l: 'D', v: D, u: '' }, { l: 'A_f', v: Af, u: 'V/V' }, { l: 'dA_f/A_f', v: dAf, u: '%' }],
+    steps: [
+      { t: `\\(D = 1 + A\\beta = 1 + ${A}\\times${b} = ${num(D)}\\)`, a: { l: 'D', v: D, u: '' } },
+      { t: `\\(A_f = A/D = ${A}/${num(D)} = ${num(Af)}\\) (close to \\(1/\\beta = ${num(1 / b)}\\))`, a: { l: 'A_f', v: Af, u: 'V/V' } },
+      { t: `\\(dA_f/A_f = (dA/A)/D = ${dA}\\%/${num(D)} = ${num(dAf)}\\%\\)`, a: { l: 'dA_f/A_f', v: dAf, u: '%' } },
+    ] };
+} });
+
+const limFig = (V, R1, Rf, R2, R3, R4, R5) => sch([
+  ['AC', [40, 156], [40, 220], 'vI', 1, { amp: 5, f: 200 }], ['gnd', [40, 220]], ['R', [40, 156], [140, 156], 'R₁ ' + R1], ['W', [140, 156], [220, 156]],
+  ['opamp', [220, 140], { plusTop: true }], ['W', [220, 124], [190, 124]], ['gnd', [190, 124]],
+  ['dot', [160, 156]], ['W', [160, 156], [160, 230]], ['R', [160, 230], [340, 230], 'Rf ' + Rf], ['W', [340, 230], [340, 140]], ['W', [300, 140], [420, 140]], ['dot', [340, 140]],
+  ['rail', [420, 40], '+' + V + ' V'], ['R', [420, 40], [420, 100], 'R₂ ' + R2], ['R', [420, 100], [420, 140], 'R₃ ' + R3], ['dot', [420, 100]], ['dot', [420, 140]],
+  ['R', [420, 140], [420, 180], 'R₄ ' + R4], ['dot', [420, 180]], ['R', [420, 180], [420, 240], 'R₅ ' + R5], ['rail', [420, 240], '−' + V + ' V', false],
+  ['W', [160, 156], [160, 80], [240, 80]], ['D', [240, 80], [300, 80], 'D₁'], ['W', [300, 80], [380, 80], [380, 100], [420, 100]],
+  ['W', [420, 180], [380, 180], [380, 280], [300, 280]], ['D', [300, 280], [240, 280], 'D₂'], ['W', [240, 280], [160, 280], [160, 230]], ['dot', [160, 230]],
+  ['t', [434, 104], 'A', 'start'], ['t', [434, 184], 'B', 'start'], ['t', [350, 132], 'vO', 'start'],
+], { w: 500, h: 300 });
+$('#fig-lim').innerHTML = limFig(15, '30 kΩ', '60 kΩ', '9 kΩ', '3 kΩ', '3 kΩ', '9 kΩ');
+
+worked('#wk-lim', {
+  given: 'Figure 3 with V = 15 V, R₁ = 30 kΩ, \\(R_f\\) = 60 kΩ, R₂ = R₅ = 9 kΩ, R₃ = R₄ = 3 kΩ, \\(V_D\\) = 0.7 V. Find \\(L_+\\), \\(L_-\\), the input where limiting starts, and the limiting slope.',
+  steps: [
+    { t: '\\(L_- = -15\\times\\frac{3}{9} - 0.7\\big(1 + \\frac{3}{9}\\big) = -5 - 0.933 = -5.93\\) V', a: { l: 'L_-', v: -5.933, u: 'V' } },
+    { t: 'By symmetry \\(L_+ = 15\\times\\frac{3}{9} + 0.7\\times\\frac{4}{3} = +5.93\\) V', a: { l: 'L_+', v: 5.933, u: 'V' } },
+    { t: 'Linear gain \\(-60/30 = -2\\), so limiting starts at \\(v_I = \\pm5.93/2 = \\pm2.97\\) V', a: { l: '|v_I|', v: 2.967, u: 'V' } },
+    { t: 'Limiting slope \\(-\\dfrac{R_f\\parallel R_3}{R_1} = -\\dfrac{60\\parallel3}{30} = -\\dfrac{2.857}{30} = -0.095\\) V/V', a: { l: '\\text{slope}', v: -0.0952, u: 'V/V' } },
+  ] });
+
+drill('#dr-lim', { id: 'st1-limiter', title: 'Diode limiter: limiting levels, onset input and slopes', gen(r) {
+  const V = r.pick([10, 12, 15]), VD = 0.7, R1 = r.pick([10, 20, 30, 47]), Rf = r.pick([20, 47, 60, 100]);
+  const R2 = r.pick([4.7, 6.8, 9, 10, 15]), R3 = r.pick([1, 2.2, 3, 4.7]), R4 = r.pick([1, 2.2, 3, 4.7]), R5 = r.pick([4.7, 6.8, 9, 10, 15]);
+  const Lm = -V * R3 / R2 - VD * (1 + R3 / R2), Lp = V * R4 / R5 + VD * (1 + R4 / R5), G = -Rf / R1;
+  if (Math.abs(Lm) > V - 1 || Lp > V - 1) return null;
+  const vIm = Lm / G, sm = -par(Rf, R3) / R1;
+  return {
+    given: `Limiter of Figure 3: V = ${V} V, R₁ = ${R1} kΩ, \\(R_f\\) = ${Rf} kΩ, R₂ = ${R2} kΩ, R₃ = ${R3} kΩ, R₄ = ${R4} kΩ, R₅ = ${R5} kΩ, \\(V_D\\) = 0.7 V. Find \\(L_+\\), \\(L_-\\), the (positive) input \\(v_I\\) at which negative limiting starts, and the slope beyond \\(L_-\\).`,
+    fig: limFig(V, R1 + ' kΩ', Rf + ' kΩ', R2 + ' kΩ', R3 + ' kΩ', R4 + ' kΩ', R5 + ' kΩ'),
+    ask: [{ l: 'L_+', v: Lp, u: 'V' }, { l: 'L_-', v: Lm, u: 'V' }, { l: 'v_I', v: vIm, u: 'V' }, { l: '\\text{slope}', v: sm, u: 'V/V' }],
+    steps: [
+      { t: `\\(L_+ = ${V}\\times\\frac{${R4}}{${R5}} + 0.7\\big(1 + \\frac{${R4}}{${R5}}\\big) = ${num(Lp)}\\) V`, a: { l: 'L_+', v: Lp, u: 'V' } },
+      { t: `\\(L_- = -${V}\\times\\frac{${R3}}{${R2}} - 0.7\\big(1 + \\frac{${R3}}{${R2}}\\big) = ${num(Lm)}\\) V`, a: { l: 'L_-', v: Lm, u: 'V' } },
+      { t: `Linear gain \\(-${Rf}/${R1} = ${num(G)}\\), so \\(v_I = ${num(Lm)}/(${num(G)}) = ${num(vIm)}\\) V`, a: { l: 'v_I', v: vIm, u: 'V' } },
+      { t: `Slope \\(-\\dfrac{${Rf}\\parallel${R3}}{${R1}} = -\\dfrac{${num(par(Rf, R3))}}{${R1}} = ${num(sm)}\\) V/V`, a: { l: '\\text{slope}', v: sm, u: 'V/V' } },
+    ] };
+} });
+
+flashcards('#cards', [
+  { f: 'Barkhausen criterion', b: 'A(jω₀)β(jω₀) = 1: |Aβ| = 1 and ∠Aβ = 0° (360°).' },
+  { f: 'What sets ω₀?', b: 'The phase condition alone: the frequency where the loop phase is 0°.' },
+  { f: 'Start-up condition', b: '|Aβ| slightly greater than 1 (poles just in the right half-plane); a non-linearity then limits the amplitude.' },
+  { f: 'Three-step method', b: 'Break the loop → A and β(jω) → phase 0 gives ω₀ → |Aβ(ω₀)| ≥ 1 gives the gain.' },
+  { f: 'LCR band-pass oscillator', b: 'ω₀ = 1/√(LC), β(ω₀) = 1, so r₂/r₁ ≥ 0.' },
+  { f: 'Desensitivity', b: 'D = 1 + Aβ; dA_f/A_f = (dA/A)/D.' },
+  { f: 'Limiter levels', b: 'L₋ = −V R₃/R₂ − V_D(1 + R₃/R₂); L₊ = V R₄/R₅ + V_D(1 + R₄/R₅).' },
+  { f: 'Limiter slope', b: '−(R_f ∥ R₃)/R₁ beyond L₋; −(R_f ∥ R₄)/R₁ beyond L₊.' },
+]);
+quiz('#quiz', [
+  { q: 'Which condition determines the oscillation frequency?', opts: ['|Aβ| = 1', '∠Aβ = 0°', '|A| = 1', 'β = 1/3'], a: 1, why: 'Only the phase condition depends on ω in a way that picks a single frequency; the magnitude then fixes the gain.' },
+  { q: 'An oscillator is built with |Aβ| = 0.95 at ω₀. The output', opts: ['grows until it clips', 'is a steady sine', 'decays to zero', 'becomes a square wave immediately'], a: 2, why: 'Loop gain below 1 means closed-loop poles in the left half-plane: decaying.' },
+  { q: 'In the LCR band-pass oscillator, β(ω₀) equals', opts: ['1/3', '1', '1/29', '−1/8'], a: 1, why: 'At ω₀ the parallel LC is an open circuit, so V_f = V_o.' },
+  { q: 'A = 1000, β = 0.1 (negative feedback). A 20% drop in A changes A_f by about', opts: ['20%', '2%', '0.2%', '0.02%'], a: 2, why: 'D = 101, so 20%/101 ≈ 0.2%.' },
+  { q: 'With V = 15 V, R₂ = 10 kΩ, R₃ = 2 kΩ, V_D = 0.7 V, L₋ is', opts: ['−3.0 V', '−3.84 V', '−3.7 V', '−2.3 V'], a: 1, why: '−15(0.2) − 0.7(1.2) = −3 − 0.84 = −3.84 V.' },
+]);
+</script>
+</body>
+</html>

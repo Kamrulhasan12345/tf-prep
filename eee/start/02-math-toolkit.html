@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Maths Toolkit · EEE 263 Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Start here · Chapter 2 · used in every topic</div>
+<h1>The Maths Toolkit</h1>
+<p class="lede">Every EEE 263 numerical is built from about ten small moves: a divider, a Thevenin equivalent, a KVL loop, a log, a quadratic, an assume-and-check, a DC/AC split, a phasor, an integral. Get these automatic and the big questions become a chain of small ones. Each section ends with a practice box that generates fresh numbers every time.</p>
+
+<h2>1. Work in mA, kΩ, V and mS</h2>
+<p>Most marks are lost to powers of ten, not to physics. Pick one unit system and never leave it:</p>
+<div class="formula">\[ \text{V} = \text{mA} \times \text{k}\Omega, \qquad \text{mA} = \frac{\text{V}}{\text{k}\Omega}, \qquad g_m\,[\text{mA/V} = \text{mS}] \times R\,[\text{k}\Omega] = \text{gain (V/V)} \]</div>
+<p>So a 2.2 kΩ resistor carrying 1.5 mA drops 3.3 V, with no \(10^{-3}\) anywhere. A transconductance of 40 mA/V into 5 kΩ gives a gain of 200. Write units on every line of the exam script; examiners give method marks for lines they can follow.</p>
+<div class="tbl"><table>
+<tr><th>Quantity</th><th>Typical size</th><th>Write it as</th></tr>
+<tr><td>Thermal voltage \(V_T = kT/q\)</td><td>25 mV (Sedra) or 25.9 mV at 300 K</td><td>use 25 mV unless the question gives T</td></tr>
+<tr><td>Diode / BE drop</td><td>0.6 to 0.8 V</td><td>0.7 V (CVD model)</td></tr>
+<tr><td>Bias currents</td><td>µA to tens of mA</td><td>mA</td></tr>
+<tr><td>\(g_m = I_C/V_T\)</td><td>4 to 400 mA/V</td><td>mA/V</td></tr>
+<tr><td>\(r_\pi = \beta/g_m\)</td><td>0.1 to 100 kΩ</td><td>kΩ</td></tr>
+</table></div>
+
+<h2>2. Dividers, parallel resistors and Thevenin</h2>
+<p>The base of a BJT or the gate of a MOSFET is almost always fed by a two-resistor divider. Replace it by its Thevenin equivalent before doing anything else:</p>
+<div class="formula">\[ V_{TH} = V_{CC}\,\frac{R_2}{R_1+R_2}, \qquad R_{TH} = R_1 \parallel R_2 = \frac{R_1R_2}{R_1+R_2} \]</div>
+<p>\(R_1\) is the resistor to the supply, \(R_2\) the resistor to ground. For a MOSFET no gate current flows, so the gate voltage is just \(V_{TH}\). For a BJT the base current flows through \(R_{TH}\) and drops \(I_B R_{TH}\); that is why you need the Thevenin form.</p>
+<div id="dr-thev"></div>
+
+<h2>3. KVL around the base–emitter loop</h2>
+<p>The one equation that solves almost every BJT bias question. Walk from the Thevenin source through \(R_{TH}\), across \(V_{BE}\), down through \(R_E\) to ground:</p>
+<div class="formula">\[ V_{TH} = I_B R_{TH} + V_{BE} + I_E R_E, \quad I_E = (\beta+1) I_B \;\Rightarrow\; I_E = \frac{V_{TH}-V_{BE}}{R_E + R_{TH}/(\beta+1)} \]</div>
+<p>Read it as: the base resistance, seen from the emitter, shrinks by \((\beta+1)\). The same "reflection" rule gives the input resistance of an emitter follower in the opposite direction: emitter resistance seen from the base grows by \((\beta+1)\).</p>
+
+<h2>4. Exponentials and logs</h2>
+<p>The diode and BJT laws are exponential, \(I = I_S e^{V/V_T}\). Two forms come up again and again:</p>
+<div class="formula">\[ V_2 - V_1 = V_T \ln\frac{I_2}{I_1} = 2.3\,V_T \log_{10}\frac{I_2}{I_1} \]</div>
+<p>With \(V_T = 25\) mV and \(n = 1\), \(2.3V_T \approx 60\) mV: <b>a tenfold change in current changes the voltage by about 60 mV</b>. With ideality factor \(n\), multiply by \(n\). Watch which log your calculator uses: <code>ln</code> is natural, <code>log</code> is base 10.</p>
+<div id="dr-log"></div>
+
+<h2>5. Quadratics: keep the physical root</h2>
+<p>A MOSFET with a source resistor gives a quadratic, because the current depends on \(V_{GS}\) squared and \(V_{GS}\) depends on the current. With \(V_{OV} = V_{GS} - V_t\) and \(V_G\) fixed:</p>
+<div class="formula">\[ V_G = V_{GS} + I_D R_S, \quad I_D = \tfrac12 k_n' \tfrac{W}{L} V_{OV}^2 \;\Rightarrow\; \tfrac12 k_n R_S\,V_{OV}^2 + V_{OV} - (V_G - V_t) = 0 \]</div>
+<p>Two roots appear. One gives \(V_{OV} &lt; 0\) (that is \(V_{GS} &lt; V_t\): the transistor would be off, so no current could flow). <b>Reject it and keep the positive root.</b> Say so in one line on the script; it is worth a mark. On a Casio fx-991, use <code>MODE → EQN → aX²+bX+c</code>.</p>
+<div id="dr-quad"></div>
+
+<h2>6. Assume, solve, verify</h2>
+<p>Nonlinear devices have regions (diode on/off, BJT active/saturation/cutoff, MOSFET saturation/triode/cutoff). You never know the region in advance. The method is always the same:</p>
+<div class="method"><h4>Method · assume and verify</h4><ol>
+<li>Guess the region (diode on; BJT active; MOSFET saturation is the usual first guess).</li>
+<li>Replace the device by that region's model and solve the linear circuit.</li>
+<li>Check the condition the guess requires: diode current \(&gt; 0\) (or reverse voltage for an off diode \(&lt; V_{D0}\)); BJT \(V_{CE} &gt; 0.2\) V (or \(V_{CB} \ge 0\) for strict active); MOSFET \(V_{DS} \ge V_{OV}\).</li>
+<li>If the check fails, change the guess and solve again. State the check explicitly in the answer.</li>
+</ol></div>
+
+<h2>7. Split DC from AC</h2>
+<p>An amplifier question is two problems glued together. Solve them separately (superposition):</p>
+<ul>
+<li><b>DC (bias):</b> capacitors are open circuits, signal sources are zero. Find \(I_C\) or \(I_D\).</li>
+<li><b>AC (small signal):</b> large coupling and bypass capacitors are short circuits, DC supplies become ground. Replace the transistor by its small-signal model with parameters computed from the DC current.</li>
+</ul>
+<p>The DC answer feeds the AC answer: \(g_m = I_C/V_T\) (BJT) or \(g_m = 2I_D/V_{OV}\) (MOSFET). If the bias is wrong, every gain after it is wrong, so check the bias twice.</p>
+
+<h2>8. Phasors for oscillators and filters</h2>
+<p>Capacitor impedance \(1/(j\omega C)\), inductor \(j\omega L\). An oscillator runs at the frequency where the loop gain \(L(j\omega) = A\beta\) is purely real, and it starts when that real gain is at least 1 (Barkhausen). The recipe:</p>
+<ol>
+<li>Write the feedback network's transfer function \(\beta(j\omega)\) as one fraction.</li>
+<li>Set its imaginary part (or the imaginary part of the denominator) to zero: this gives \(\omega_0\).</li>
+<li>Put \(\omega_0\) back in to get \(\beta(\omega_0)\); the amplifier needs \(A \ge 1/\beta(\omega_0)\).</li>
+</ol>
+<p>For a first-order RC section: \(\dfrac{1}{1 + j\omega RC}\) (low-pass) and \(\dfrac{j\omega RC}{1 + j\omega RC}\) (high-pass). The corner is \(f_c = 1/(2\pi RC)\), where the magnitude is \(1/\sqrt2\) (−3 dB) and the phase is ∓45°.</p>
+
+<h2>9. Integrals for op-amp waveforms</h2>
+<p>An inverting integrator gives \(v_O(t) = -\dfrac{1}{RC}\displaystyle\int v_I\,dt + v_O(0)\). A constant input makes a ramp of slope \(-V_I/(RC)\) V/s; a square wave makes a triangle whose peak-to-peak value is \(\dfrac{V_I}{RC}\cdot\dfrac{T}{2}\). A differentiator gives \(v_O = -RC\,dv_I/dt\): a triangle in, a square out.</p>
+<div id="dr-int"></div>
+
+<h2>10. Calculator moves that save minutes</h2>
+<ul>
+<li><b>SOLVE</b> (fx-991: <code>SHIFT CALC</code>) for transcendental equations like \(5 = V_D/1 + 10^{-13}e^{V_D/0.025}\). Give a starting guess of 0.7.</li>
+<li><b>EQN</b> mode for quadratics and 2×2 / 3×3 linear systems (node equations).</li>
+<li><b>TABLE</b> mode to tabulate a transfer characteristic or a diode current for several inputs.</li>
+<li>Store intermediate results in memories (A, B, C …) instead of retyping rounded values: rounding early is how a correct method ends with a wrong final number.</li>
+</ul>
+
+<h2>Practice</h2>
+<h3>Key moves</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+
+<div class="key"><p><strong>Summary:</strong> work in mA·kΩ·V; Thevenin every bias divider; one KVL loop solves BJT bias; 60 mV per decade of current; keep the quadratic root with \(V_{OV} &gt; 0\); always assume a region then verify it; solve DC first, then AC with \(g_m\) from the DC current; oscillators: imaginary part zero gives \(\omega_0\), real part gives the gain condition.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/eee.js"></script>
+<script>
+drill('#dr-thev', { id: 'tk-thevenin', title: 'Thevenin of a bias divider', gen(r) {
+  const V = r.pick([5, 9, 10, 12, 15]), R1 = r.E(10e3, 220e3), R2 = r.E(4.7e3, 100e3);
+  const Vth = V * R2 / (R1 + R2), Rth = par(R1, R2);
+  return {
+    given: `A divider \\(R_1\\) = ${si(R1, 'Ω')} (to +${V} V) and \\(R_2\\) = ${si(R2, 'Ω')} (to ground) feeds a transistor base. Find the Thevenin equivalent.`,
+    fig: sch([['rail', [60, 20], `+${V} V`], ['R', [60, 20], [60, 100], 'R₁ ' + si(R1, 'Ω')], ['R', [60, 100], [60, 180], 'R₂ ' + si(R2, 'Ω')], ['gnd', [60, 180]], ['dot', [60, 100]], ['W', [60, 100], [140, 100]], ['open', [140, 100], 'to base']], { w: 220, h: 200 }),
+    ask: [{ l: 'V_{TH}', v: Vth, u: 'V' }, { l: 'R_{TH}', v: Rth, u: 'kΩ' }],
+    steps: [
+      { t: `\\(V_{TH} = ${V}\\times\\dfrac{${num(R2 / 1e3)}}{${num(R1 / 1e3)}+${num(R2 / 1e3)}} = ${num(Vth)}\\) V`, a: { l: 'V_{TH}', v: Vth, u: 'V' } },
+      { t: `\\(R_{TH} = \\dfrac{${num(R1 / 1e3)}\\times${num(R2 / 1e3)}}{${num(R1 / 1e3)}+${num(R2 / 1e3)}} = ${num(Rth / 1e3)}\\) kΩ (work in kΩ, no powers of ten)`, a: { l: 'R_{TH}', v: Rth, u: 'kΩ' } },
+    ] };
+} });
+drill('#dr-log', { id: 'tk-log', title: 'Diode voltage at a new current', gen(r) {
+  const n = r.pick([1, 1, 2]), V1 = r.step(0.6, 0.75, 0.01), I1 = r.pick([0.1, 0.5, 1, 2, 5, 10]) * 1e-3;
+  const ratio = r.pick([0.1, 0.2, 0.5, 2, 5, 10, 20, 100]), I2 = I1 * ratio, dV = n * 0.025 * Math.log(ratio), V2 = V1 + dV;
+  return {
+    given: `A diode with \\(n = ${n}\\) drops ${V1} V at ${si(I1, 'A')}. Find its voltage at ${si(I2, 'A')} (use \\(V_T\\) = 25 mV).`,
+    ask: [{ l: 'V_2', v: V2, u: 'V', tol: 0.003 }],
+    steps: [
+      `\\(V_2 - V_1 = nV_T\\ln(I_2/I_1)\\), from dividing \\(I_2 = I_Se^{V_2/nV_T}\\) by \\(I_1 = I_Se^{V_1/nV_T}\\).`,
+      { t: `\\(\\Delta V = ${n}\\times 0.025\\times\\ln(${num(ratio)}) = ${num(dV * 1e3, 4)}\\) mV`, a: { l: '\\Delta V', v: dV, u: 'mV', tol: 0.02 } },
+      { t: `\\(V_2 = ${V1} ${dV >= 0 ? '+' : '−'} ${num(Math.abs(dV), 4)} = ${num(V2, 4)}\\) V`, a: { l: 'V_2', v: V2, u: 'V', tol: 0.003 } },
+    ],
+    note: `Check: ×10 in current ≈ +${60 * n} mV for n = ${n}.` };
+} });
+drill('#dr-quad', { id: 'tk-quad', title: 'MOSFET with source resistor (quadratic)', gen(r) {
+  const VG = r.step(3, 8, 0.5), Vt = r.pick([0.5, 0.7, 1, 1.5]), kn = r.pick([0.5, 1, 2, 4]) * 1e-3, RS = r.E(470, 10e3);
+  const a = 0.5 * kn * RS, b = 1, c = -(VG - Vt); if (c >= 0) return null;
+  const disc = b * b - 4 * a * c, x1 = (-b + Math.sqrt(disc)) / (2 * a), x2 = (-b - Math.sqrt(disc)) / (2 * a);
+  const ID = 0.5 * kn * x1 * x1;
+  return {
+    given: `An NMOS has \\(V_t\\) = ${Vt} V and \\(k_n = k_n'(W/L)\\) = ${num(kn * 1e3)} mA/V². Its gate is held at ${VG} V and its source goes to ground through \\(R_S\\) = ${si(RS, 'Ω')}. Assume saturation (\\(\\lambda = 0\\)) and find \\(V_{OV}\\) and \\(I_D\\).`,
+    fig: sch([['open', [20, 80], ''], ['t', [20, 64], `V_G = ${VG} V`, 'start'], ['W', [20, 80], [60, 80]], ['nmos', [60, 80]], ['W', [100, 40], [100, 20]], ['t', [110, 24], 'to V_DD', 'start'], ['R', [100, 120], [100, 190], 'R_S ' + si(RS, 'Ω')], ['gnd', [100, 190]]], { w: 220, h: 210 }),
+    ask: [{ l: 'V_{OV}', v: x1, u: 'V' }, { l: 'I_D', v: ID, u: 'mA' }],
+    steps: [
+      `KVL gate→source→ground: \\(V_G = V_{GS} + I_DR_S\\), with \\(V_{GS} = V_t + V_{OV}\\) and \\(I_D = \\tfrac12k_nV_{OV}^2\\).`,
+      `Substitute (mA, kΩ): \\(${num(0.5 * kn * 1e3)}\\times${num(RS / 1e3)}\\,V_{OV}^2 + V_{OV} - ${num(VG - Vt)} = 0\\), i.e. \\(${num(a, 4)}V_{OV}^2 + V_{OV} - ${num(VG - Vt)} = 0\\).`,
+      { t: `Roots: \\(V_{OV} = ${num(x1, 4)}\\) V or \\(${num(x2, 4)}\\) V. The negative root means \\(V_{GS} &lt; V_t\\) (off), so reject it: \\(V_{OV} = ${num(x1, 4)}\\) V.`, a: { l: 'V_{OV}', v: x1, u: 'V' } },
+      { t: `\\(I_D = \\tfrac12\\times${num(kn * 1e3)}\\times${num(x1, 4)}^2 = ${num(ID * 1e3, 4)}\\) mA. Check: \\(V_{GS} + I_DR_S = ${num(Vt + x1, 4)} + ${num(ID * RS, 4)} = ${num(Vt + x1 + ID * RS, 4)}\\) V ✓`, a: { l: 'I_D', v: ID, u: 'mA' } },
+    ] };
+} });
+drill('#dr-int', { id: 'tk-integrator', title: 'Integrator driven by a square wave', gen(r) {
+  const R = r.E(1e3, 100e3), C = r.pick([1e-9, 2.2e-9, 4.7e-9, 10e-9, 22e-9, 47e-9, 100e-9]), V = r.pick([0.5, 1, 2, 5]), f = r.pick([100, 200, 500, 1000, 2000, 5000]);
+  const T = 1 / f, slope = V / (R * C), vpp = slope * T / 2;
+  if (vpp > 26 || vpp < 0.05) return null;
+  return {
+    given: `A ±${V} V square wave at ${si(f, 'Hz')} (zero average) drives an inverting integrator with R = ${si(R, 'Ω')}, C = ${si(C, 'F')}. Find the slope magnitude of the output ramps and the peak-to-peak output (assume the op-amp does not saturate).`,
+    ask: [{ l: '|dv_O/dt|', v: slope, u: 'V/ms', mul: 1e3, tol: 0.02 }, { l: 'V_{pp}', v: vpp, u: 'V' }],
+    steps: [
+      { t: `During each half cycle the input is constant, so \\(|dv_O/dt| = V/(RC) = ${V}/(${si(R, 'Ω')}\\times${si(C, 'F')}) = ${num(slope)}\\) V/s \\(= ${num(slope / 1e3)}\\) V/ms.`, a: { l: '|dv_O/dt|', v: slope, u: 'V/ms', mul: 1e3 } },
+      { t: `Each ramp lasts \\(T/2 = ${si(T / 2, 's')}\\), so \\(V_{pp} = ${num(slope)}\\times${num(T / 2)} = ${num(vpp)}\\) V. The output is a triangle wave.`, a: { l: 'V_{pp}', v: vpp, u: 'V' } },
+    ] };
+} });
+flashcards('#cards', [
+  { f: 'V = ? (unit trick)', b: 'mA × kΩ. Gain = mS × kΩ.' },
+  { f: 'Thevenin of a divider', b: 'V_TH = V·R₂/(R₁+R₂), R_TH = R₁∥R₂' },
+  { f: 'Base resistance seen from emitter', b: 'R_B/(β+1). Emitter resistance seen from base: (β+1)R_E.' },
+  { f: 'Diode: ×10 current', b: '+2.3·n·V_T ≈ 60n mV' },
+  { f: 'MOSFET quadratic: which root?', b: 'The one with V_OV > 0 (V_GS > V_t).' },
+  { f: 'Amplifier: capacitors at DC / AC', b: 'Open at DC, short at AC; DC supplies are AC ground.' },
+  { f: 'Oscillation frequency', b: 'Where the loop gain Aβ(jω) is real (imaginary part = 0).' },
+  { f: 'Integrator, constant input V', b: 'Ramp with slope −V/(RC).' },
+]);
+quiz('#quiz', [
+  { q: 'A 4.7 kΩ resistor carries 1.2 mA. Its voltage is…', opts: ['5.64 mV', '5.64 V', '0.255 V', '3.92 V'], a: 1, why: 'mA × kΩ = V: 1.2 × 4.7 = 5.64 V.' },
+  { q: 'A diode with n = 1 carries 1 mA at 0.70 V. At 100 mA it drops about…', opts: ['0.76 V', '0.82 V', '0.94 V', '1.40 V'], a: 1, why: 'Two decades × 60 mV = 120 mV.' },
+  { q: 'Solving a MOSFET quadratic gives V_OV = 1.2 V or −2.8 V. Keep…', opts: ['1.2 V', '−2.8 V', 'both', 'the average'], a: 0, why: 'V_OV < 0 means the transistor is off, which contradicts I_D > 0.' },
+  { q: 'In small-signal analysis a +12 V supply becomes…', opts: ['a 12 V source', 'an open circuit', 'ground', 'a current source'], a: 2, why: 'A constant voltage has zero signal component.' },
+  { q: 'A BJT has V_TH = 4 V, R_TH = 20 kΩ, R_E = 1 kΩ, β = 99. I_E ≈', opts: ['3.3 mA', '2.75 mA', '0.165 mA', '4 mA'], a: 1, why: 'I_E = (4 − 0.7)/(1 + 20/100) = 3.3/1.2 = 2.75 mA.' },
+]);
+</script>
+</body>
+</html>

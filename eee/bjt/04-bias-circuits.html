@@ -1,0 +1,376 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BJT Bias Circuits and Design · EEE 263 Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">BJT · Chapter 4 · Sedra §6.4, §7.4 · Sadat L12, L16, notes p.49–53, 75–77 · Khairul s.15, s.24, s.39 · types B-02, B-04</div>
+<h1>Bias Circuits, Stability and Bias Design</h1>
+<p class="lede">Bias design (B-04) appeared in six papers, most recently as the compulsory 2022–23 Q5(a) (cascode, 15 marks) and 2021–22 Q6(b) (20 marks). Voltage-divider analysis (B-02) was asked four times up to 2016–17 and is the first step of every amplifier question. Both reduce to the same two tools: <b>Thevenin the base network</b>, and <b>walk the node voltages backwards from the specification</b>. Theory on "why bias, how to make it stable" adds 5–16 marks in several years.</p>
+
+<h2>1. Why a bias, and what makes it stable</h2>
+<p>A bias sets the quiescent point (\(I_{CQ}\), \(V_{CEQ}\)) with no signal applied. It must (i) keep the transistor in the active region for the whole signal swing (Q near the middle of the load line: too high clips at saturation, too low clips at cutoff); (ii) fix the small-signal parameters (\(g_m = I_C/V_T\)); (iii) make \(I_C\) insensitive to β (which varies between units and with temperature), to \(V_{BE}\) (−2 mV/°C) and to leakage \(I_{CBO}\) (prevents thermal runaway).</p>
+<dl class="def">
+  <dt>Fixed bias</dt><dd>\(R_B\) from \(V_{CC}\) to the base, no \(R_E\): \(I_C = \beta(V_{CC} - 0.7)/R_B\). \(I_C\) is proportional to β: bad.</dd>
+  <dt>Emitter (self) bias</dt><dd>Add \(R_E\): \(I_C = \beta(V_{BB} - 0.7)/(R_B + (\beta+1)R_E)\). With \(R_B\) = 100 kΩ, \(R_E\) = 1 kΩ, \(V_{BB}\) = 5 V: β 100 → 150 (×1.5) moves \(I_C\) only from 2.14 to 2.57 mA (×1.2). Sadat sir calls this "self-bias".</dd>
+  <dt>Stability factor</dt><dd>\(S = \partial I_C/\partial I_{CBO}\); smaller is better. Negative feedback through \(R_E\) (or collector-to-base \(R_B\)) reduces it.</dd>
+</dl>
+
+<h2>2. Voltage-divider (four-resistor) bias (type B-02)</h2>
+<figure><div id="fig-div"></div><figcaption><b>Figure 1.</b> Four-resistor bias. Replace \(R_1\), \(R_2\) by their Thevenin equivalent \(V_{BB}\), \(R_B\) seen from the base.</figcaption></figure>
+<p><b>Derivation (2014–15 Q3(a), 16 marks).</b> Thevenin at the base: \(V_{BB} = V_{CC}\dfrac{R_2}{R_1 + R_2}\), \(R_B = R_1\parallel R_2\). KVL around \(V_{BB}\) → \(R_B\) → B–E → \(R_E\) with \(I_B = I_E/(\beta+1)\):</p>
+<div class="formula">\[ V_{BB} = \frac{I_E}{\beta+1}R_B + V_{BE} + I_ER_E \;\Rightarrow\; I_E = \frac{V_{BB} - V_{BE}}{R_E + R_B/(\beta+1)} \]</div>
+<p><b>Conditions</b> for \(I_E\) to be independent of β and \(V_{BE}\): \(R_E \gg R_B/(\beta+1)\) (in practice \((\beta+1)R_E \ge 10R_B\)) and \(V_{BB} \gg V_{BE}\). These fight each other (a large \(V_{BB}\) leaves less for \(V_{CE}\)), so the rule of thumb is one third of \(V_{CC}\) each for \(V_{BB}\), \(V_{CE}\) and \(I_CR_C\), with a divider current of about \(0.1I_E\). <b>Feedback action of \(R_E\):</b> if \(I_C\) rises (temperature, β), \(V_E = I_ER_E\) rises; with \(V_B\) held by the divider, \(V_{BE}\) falls, so \(I_B\) and therefore \(I_C\) fall back: negative feedback.</p>
+<div class="method"><h4>Method · divider-bias analysis</h4><ol>
+<li>Thevenin: \(V_{BB}\), \(R_B\) (combine any extra resistors to other rails first).</li>
+<li>\(I_E = (V_{BB} - 0.7 - V_{EE})/(R_E + R_B/(\beta+1))\); \(I_B = I_E/(\beta+1)\), \(I_C = \alpha I_E\).</li>
+<li>\(V_E = V_{EE} + I_ER_E\), \(V_B = V_E + 0.7\) (also \(= V_{BB} - I_BR_B\)), \(V_C = V_{CC} - I_CR_C\).</li>
+<li>Branch currents: \(I_{R1} = (V_{CC} - V_B)/R_1\), \(I_{R2} = V_B/R_2\); check \(I_{R1} = I_{R2} + I_B\).</li>
+<li>Mode check \(V_{CE} \ge 0.3\) V; if it fails, solve the saturation case (Chapter 3).</li>
+</ol></div>
+<h3>Worked example: 2015–16 Sec A Q4(a) = 2011–12 Sec B Q7(c) = Sedra Example 6.11</h3>
+<div id="wk-div"></div>
+<div id="dr-div"></div>
+<p><b>Other bias circuits, same idea.</b> Two supplies (base through \(R_B\) to ground, \(R_E\) to \(-V_{EE}\)): \(I_E = (V_{EE} - 0.7)/(R_E + R_B/(\beta+1))\). Collector-to-base feedback: \(I_E = (V_{CC} - 0.7)/(R_C + R_E + R_B/(\beta+1))\) (Chapter 3, section 6). Current-source bias: a mirror sets \(I \approx I_{REF} = (V_{CC} + V_{EE} - 0.7)/R\), independent of β to first order.</p>
+
+<h2>3. Bias design (type B-04)</h2>
+<div class="method"><h4>Method · choose resistors for a target operating point</h4><ol>
+<li>Currents first: \(I_B = I_C/\beta\), \(I_E = I_C(\beta+1)/\beta\) (with β "very large", \(I_E = I_C\) and base currents are ignored).</li>
+<li>If \(V_{BE}\) is given at another current, scale it: \(V_{BE2} = V_{BE1} + V_T\ln(I_{C2}/I_{C1})\) (from \(i_C = I_Se^{v_{BE}/V_T}\)).</li>
+<li>Emitter: \(V_E = V_B - V_{BE}\); \(R_E = (V_E - V_{EE})/I_E\) (use \(I_E\), not \(I_C\)).</li>
+<li>Collector: \(R_C = (V_{CC} - V_C)/I_C\).</li>
+<li>Divider: \(R_2 = V_B/I_{R2}\), \(R_1 = (V_{CC} - V_B)/(I_{R2} + I_B)\). Collector feedback: \(R_1\) goes from the collector, so \(R_C\) carries \(I_C + I_{R1}\).</li>
+<li>Stacked (cascode) bias: one string current, walk up the node voltages one junction at a time.</li>
+<li>Re-check the mode with the chosen values.</li>
+</ol></div>
+<div id="dr-split"></div>
+<div id="dr-ddes"></div>
+<h3>Worked example: cascode bias, 2022–23 Sec B Q5(a) (compulsory)</h3>
+<div id="wk-cas"></div>
+
+<h3>Design for a β spread (2018–19 Q3(b))</h3>
+<p>With a base resistor from a fixed supply, \(I_B\) does not depend on β, so \(I_C = \beta I_B\) spreads with β. The unit most likely to saturate is the one with \(\beta_{max}\): choose \(R_C \le (V_{CC} - V_{CE,EOS})/(\beta_{max}I_B)\), with the edge of saturation at \(V_{CE,EOS}\) = 0.3 V (Sedra; state it). The collector voltage then ranges from \(V_{CC} - \beta_{min}I_BR_C\) down to \(V_{CC} - \beta_{max}I_BR_C\).</p>
+<div id="dr-spread"></div>
+<div id="dr-cfd"></div>
+
+<div class="trap"><h4>Traps (where marks go)</h4><ul>
+<li>Writing \(I_E = (V_{BB} - 0.7)/R_E\) and dropping \(R_B/(\beta+1)\): that is only the β = ∞ answer.</li>
+<li>Taking the divider voltage as \(V_B\) when β is finite: the base current loads the divider (\(V_B = V_{BB} - I_BR_B\)).</li>
+<li>\(R_E\) from \(I_C\) instead of \(I_E\); forgetting the \(V_{BE}\) scaling (0.760 V at 0.2 mA, 0.717 V at 2 mA).</li>
+<li>Collector-feedback design: \(R_C\) carries \(I_C + I_{R1}\), not \(I_C\).</li>
+<li>β-spread design using \(\beta_{min}\): the worst case for saturation is \(\beta_{max}\).</li>
+</ul></div>
+
+<h2>Exam questions</h2>
+
+<div class="exam">
+  <div class="exam-src">2022–23 · Sec B · Q5(a) · 15 marks · compulsory &nbsp;|&nbsp; Neamen cascode</div>
+  <div class="exam-q"><p>Design the circuit to meet: \(V_{CE1} = V_{CE2}\) = 2.5 V, \(V_{RE}\) = 0.7 V, \(I_{C1} \approx I_{C2} \approx\) 1 mA and \(I_{R1} \approx I_{R2} \approx I_{R3} \approx\) 0.10 mA. \(V^+\) = 9 V.</p><div id="fig-cas"></div></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>β large: base currents neglected, so one string current 0.1 mA flows through \(R_1, R_2, R_3\), and \(I_E \approx I_C\) = 1 mA in both transistors. \(V_{BE}\) = 0.7 V.</p>
+    <p>\(R_E = V_{RE}/I_E = 0.7/1 = 0.7\) kΩ. \(V_{B1} = V_{RE} + 0.7 = 1.4\) V → \(R_3 = 1.4/0.1 = 14\) kΩ.</p>
+    <p>\(V_{C1} = V_{E2} = 0.7 + 2.5 = 3.2\) V; \(V_{B2} = 3.9\) V → \(R_2 = (3.9 - 1.4)/0.1 = 25\) kΩ; \(R_1 = (9 - 3.9)/0.1 = 51\) kΩ.</p>
+    <p>\(V_{C2} = 3.2 + 2.5 = 5.7\) V → \(R_C = (9 - 5.7)/1 = 3.3\) kΩ. Both \(V_{CE}\) = 2.5 V ≥ 0.3 V: active ✓. (\(C_B\) only grounds \(B_2\) for signals; it does not affect the DC design.)</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2021–22 · Sec B · Q6(b) · 20 marks &nbsp;|&nbsp; = Sedra P6.34 (highlighted by the teacher)</div>
+  <div class="exam-q"><p>Design the circuit (base grounded, \(R_C\) to +1.5 V, \(R_E\) to −1.5 V) to establish \(I_C\) = 0.2 mA and \(V_C\) = 0.5 V. The transistor exhibits \(V_{BE}\) = 0.8 V at \(i_C\) = 1 mA, and β = 100.</p><div id="fig-2122d"></div></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>\(R_C = (1.5 - 0.5)/0.2 = 5\) kΩ.</p>
+    <p>\(V_{BE} = 0.8 + 0.025\ln(0.2/1) = 0.8 - 0.0402 = 0.760\) V; \(V_E = -0.760\) V. \(I_E = 0.2\times101/100 = 0.202\) mA. \(R_E = (-0.760 + 1.5)/0.202 = 3.66\) kΩ.</p>
+    <p>Check: \(V_{CE} = 0.5 + 0.760 = 1.26\) V ≥ 0.3 V, active.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2020–21 · Sec A · Q1(c) · 20 marks &nbsp;|&nbsp; = Sedra Example 6.2 · Sadat L16, notes p.76–77 · Khairul s.15</div>
+  <div class="exam-q"><p>The transistor (base grounded, \(R_C\) to +15 V, \(R_E\) to −15 V) has β = 100 and exhibits \(V_{BE}\) = 0.7 V at \(i_C\) = 1 mA. Design the circuit so that a current of 2 mA flows through the collector and a voltage of +5 V appears at the collector.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>\(R_C = (15 - 5)/2 = 5\) kΩ. \(V_{BE} = 0.7 + 0.025\ln 2 = 0.717\) V, \(V_E = -0.717\) V. \(I_E = 2/0.99 = 2.02\) mA. \(R_E = (15 - 0.717)/2.02 = 14.283/2.02 = 7.07\) kΩ. \(V_{CE}\) = 5.72 V: active. (The class notes write "7.781 kΩ": an arithmetic slip.)</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2020–21 · Sec A · Q1(b) · 10⅔ marks &nbsp;|&nbsp; also 2013–14 Sec A Q3(a) and 2012–13 Sec A Q3(a), 5 marks each</div>
+  <div class="exam-q"><p>What is transistor biasing? Why do we need it? How can you achieve bias stability? (2012–13, 2013–14: Why do we need to bias a BJT at a proper Q-point before using it as an amplifier?)</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><b>Biasing</b> is applying DC voltages and currents that set the operating point (\(I_{CQ}\), \(V_{CEQ}\)) with no signal.</p>
+    <p><b>Why:</b> the BJT amplifies only in the active region; the Q-point must sit near the middle of the load line so the signal swings both ways without reaching saturation (top clipped) or cutoff (bottom clipped). The bias also sets \(g_m = I_C/V_T\), hence the gain. Sketch: load line with Q too high, optimum and too low.</p>
+    <p><b>Stability:</b> \(I_C\) must not drift with β (unit-to-unit spread, temperature), \(V_{BE}\) (−2 mV/°C) or \(I_{CBO}\) (doubles every ~10 °C; risk of thermal runaway). Achieved with negative feedback: emitter resistor \(R_E\) with a stiff divider (\((\beta+1)R_E \ge 10R_B\)), collector-to-base feedback, or a current-source/mirror bias; diode or thermistor compensation for \(V_{BE}\).</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2018–19 · Sec A · Q3(b) · 20 marks</div>
+  <div class="exam-q"><p>+5 V drives the base through 100 kΩ, \(R_C\) to +10 V, emitter grounded. β can vary from 50 to 150. Find \(R_C\) so that all fabricated circuits are guaranteed to be in the active mode. What is the range of collector voltages?</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>\(I_B = (5 - 0.7)/100 = 43\) µA for every unit. \(I_C\) = 2.15 mA (β = 50) to 6.45 mA (β = 150).</p>
+    <p>Worst case β = 150, edge of saturation \(V_{CE}\) = 0.3 V: \(R_C \le 9.7/6.45 = 1.504\) kΩ → choose \(R_C\) = 1.5 kΩ.</p>
+    <p>\(V_C\) ranges from \(10 - 1.5\times6.45 = 0.325\) V (β = 150) to \(10 - 1.5\times2.15 = 6.775\) V (β = 50). (With 0.2 V as the edge: \(R_C \le\) 1.519 kΩ.)</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2016–17 · Sec B · Q6(c) · 15 marks</div>
+  <div class="exam-q"><p>Design the circuit (\(R_C\) from \(V_{CC}\) to the collector, \(R_1\) from the collector to the base, \(R_2\) from the base to ground, emitter grounded) to provide \(I_C\) = 3 mA and \(V_{CE}\) = 1.5 V for β = 90. Use \(V_{CC}\) = 3 V and a current through \(R_2\) equal to the base current.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>\(I_B = 3/90 = 33.33\) µA = \(I_{R2}\). \(R_2 = 0.7/0.03333 = 21\) kΩ.</p>
+    <p>\(I_{R1} = I_{R2} + I_B = 66.67\) µA; \(R_1 = (1.5 - 0.7)/0.06667 = 12\) kΩ.</p>
+    <p>\(I_{RC} = 3 + 0.0667 = 3.067\) mA; \(R_C = (3 - 1.5)/3.067 = 0.489\) kΩ.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2016–17 · Sec B · Q6(b) · 16 marks</div>
+  <div class="exam-q"><p>Find \(I_C\) and \(V_{CE}\). β = 100. Base: 60 kΩ from a +5 V source, 30 kΩ from the +5 V rail, 20 kΩ to ground. 500 Ω from +10 V to the collector, 200 Ω from the emitter to −5 V.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>Thevenin: 60 ∥ 30 = 20 kΩ to +5 V, with 20 kΩ to ground: \(V_{BB}\) = 2.5 V, \(R_B\) = 10 kΩ.</p>
+    <p>Active test: \(I_B = (2.5 + 5 - 0.7)/(10 + 101\times0.2) = 0.2252\) mA, \(I_C\) = 22.5 mA, \(V_E = -0.45\) V, \(V_C = 10 - 0.5\times22.5 = -1.26\) V &lt; \(V_E\): not active.</p>
+    <p>Saturation: base loop \(2.5 = 10I_B + 0.7 + 0.2(I_B + I_C) - 5\) → \(10.2I_B + 0.2I_C = 6.8\); collector loop \(10 = 0.5I_C + 0.2 + 0.2(I_B + I_C) - 5\) → \(0.2I_B + 0.7I_C = 14.8\). So \(I_B\) = 0.2535 mA, \(I_C\) = 21.07 mA, \(\beta_{forced}\) = 83.1 &lt; 100 ✓. \(V_{CE}\) = 0.2 V (\(V_E\) = −0.735 V, \(V_B\) = −0.035 V, \(V_C\) = −0.535 V). (The senior "BJT TF Analysis" file stops at "saturated" without these numbers.)</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2015–16 · Sec A · Q4(a) · 20 marks &nbsp;|&nbsp; also 2011–12 Sec B Q7(c) · 18 marks (identical)</div>
+  <div class="exam-q"><p>Determine the voltages of all nodes and currents through all branches. β = 100. \(R_1\) = 100 kΩ from +15 V to the base, \(R_2\) = 50 kΩ to ground, \(R_C\) = 5 kΩ, \(R_E\) = 3 kΩ.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>\(V_{BB} = 15\times50/150 = 5\) V, \(R_B\) = 33.33 kΩ. \(I_B = 4.3/(33.33 + 101\times3) = 12.78\) µA; \(I_C\) = 1.278 mA; \(I_E\) = 1.291 mA.</p>
+    <p>\(V_E\) = 3.874 V, \(V_B\) = 4.574 V, \(V_C = 15 - 5\times1.278 = 8.608\) V; \(V_{CE}\) = 4.73 V: active.</p>
+    <p>\(I_{R1} = (15 - 4.574)/100 = 104.3\) µA, \(I_{R2} = 4.574/50 = 91.5\) µA (difference = \(I_B\) ✓).</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2014–15 · Sec A · Q3(a) 16 marks + Q3(b) 10⅔ marks</div>
+  <div class="exam-q"><p>(a) Find the expression for the emitter current of the four-resistor bias circuit. What conditions should be satisfied? How does the feedback of \(R_E\) work? (b) \(R_1\) = 40 kΩ, \(R_2\) = 10 kΩ, \(R_C\) = 1.5 kΩ, \(R_E\) = 1 kΩ, \(V_{CC}\) = 12 V, β = 1000: find the bias point. How should \(R_1\), \(R_2\) be changed for a good bias design?</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>(a) Derivation, conditions and feedback mechanism exactly as in section 2: \(I_E = (V_{BB} - V_{BE})/(R_E + R_B/(\beta+1))\); need \(R_E \gg R_B/(\beta+1)\) and \(V_{BB} \gg V_{BE}\).</p>
+    <p>(b) \(V_{BB}\) = 2.4 V, \(R_B\) = 8 kΩ. β = 1000 (as printed): \(I_E = 1.7/(1 + 8/1001) = 1.687\) mA, \(I_C\) = 1.685 mA, \(I_B\) = 1.685 µA, \(V_{CE} = 12 - 1.5\times1.685 - 1.687 = 7.79\) V. (If β = 100 was meant: \(I_C\) = 1.560 mA, \(V_{CE}\) = 8.09 V.)</p>
+    <p>Improvement: here \(R_B/(\beta+1)\) is already small compared with \(R_E\) for β = 1000, but for realistic β ≈ 100 it is 8 % of \(R_E\). Lower \(R_1\) and \(R_2\) in the same 4:1 ratio (keeping \(V_{BB}\)) so that \(R_B \approx 0.1\beta_{min}R_E\); the cost is more divider current and a lower input resistance.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2012–13 · Sec A · Q2(b) · 16 marks</div>
+  <div class="exam-q"><p>Graphically explain the benefit of having \(R_E\) &gt; 0 in a bias scheme with a battery \(V_B\) at the base, \(R_C\) to +15 V and \(R_E\) to ground.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <div id="fig-re"></div>
+    <p>The base loop gives the bias line \(I_C \approx (V_B - V_{BE})/R_E\): a straight line of slope \(-1/R_E\) on the \(I_C\)–\(V_{BE}\) plane. The operating point is where it crosses the exponential device curve. When temperature rises the curve shifts left by about 2 mV/°C. With \(R_E\) = 0 the bias line is vertical at \(V_{BE} = V_B\), so \(I_C\) jumps up the steep exponential (Q₁ → Q₁′). With \(R_E\) &gt; 0 the sloped line meets the shifted curve at nearly the same current (Q₂ → Q₂′): \(I_C\) is stabilised by negative feedback. The same argument covers spreads in \(I_S\) and β.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2011–12 · Sec B · Q7(a) · 16 marks</div>
+  <div class="exam-q"><p>Four-resistor bias with \(V_{CC}\) = 18 V, \(R_2\) = 18 kΩ, \(R_E\) = 1.2 kΩ, β = 150. Determine \(R_1\) and \(R_C\) if \(I_B\) = 0.02 mA and \(V_{CE}\) = 10 V.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>\(I_C\) = 3 mA, \(I_E\) = 3.02 mA, \(V_E\) = 3.624 V, \(V_B\) = 4.324 V. \(R_C = (18 - 10 - 3.624)/3 = 1.459\) kΩ. \(I_{R2} = 4.324/18 = 0.2402\) mA, \(I_{R1}\) = 0.2602 mA, \(R_1 = (18 - 4.324)/0.2602 = 52.56\) kΩ.</p>
+  </div></details>
+</div>
+
+<h3>Class test</h3>
+<div class="exam">
+  <div class="exam-src">CT-2 2021 · second question bank V1-57</div>
+  <div class="exam-q"><p>pnp, β = 60: \(R_E\) = 2 kΩ from +5 V to the emitter, base through \(R_B\) to \(V_{BB}\) = −2 V, collector grounded. Find \(R_B\) for \(V_{EC}\) = 2.5 V.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a"><p>\(V_E\) = 2.5 V, \(I_E = 2.5/2 = 1.25\) mA, \(I_B = 1.25/61 = 20.5\) µA, \(V_B\) = 1.8 V, \(R_B = (1.8 + 2)/0.0205 = 185\) kΩ.</p></div></details>
+</div>
+
+<h3>Highlighted textbook problems</h3>
+<div class="exam">
+  <div class="exam-src">Sedra 7e D6.23, D6.26 · highlighted by the teacher</div>
+  <div class="exam-q"><p>(D6.23) Base at +4 V, \(R_E\) to ground, \(R_C\) to +10 V: redesign for \(I_C\) = 0.5 mA and \(V_{CB}\) = 2 V (α ≈ 1). (D6.26) pnp, \(R_E\) from +10 V, base grounded, \(R_C\) to −10 V: redesign for \(I_C\) = 1 mA and a reverse bias of 4 V on the collector junction.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a"><p>D6.23: \(V_E\) = 3.3 V, \(R_E = 3.3/0.5 = 6.6\) kΩ; \(V_C\) = 6 V, \(R_C = 4/0.5 = 8\) kΩ. D6.26: \(V_E\) = 0.7 V, \(R_E = 9.3/1 = 9.3\) kΩ; \(V_C\) = −4 V, \(R_C = 6/1 = 6\) kΩ.</p></div></details>
+</div>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+
+<div class="key"><p><strong>Summary:</strong> Thevenin the base: \(V_{BB} = V_{CC}R_2/(R_1 + R_2)\), \(R_B = R_1\parallel R_2\), then \(I_E = (V_{BB} - 0.7)/(R_E + R_B/(\beta+1))\). Stable bias needs \((\beta+1)R_E \gg R_B\) and \(V_{BB} \gg V_{BE}\); \(R_E\) works by negative feedback. Design runs backwards: \(R_C = \Delta V/I_C\), \(R_E = \Delta V/I_E\), scale \(V_{BE}\) by \(V_T\ln\) of the current ratio, divider \(R_2 = V_B/I_{R2}\), \(R_1 = \Delta V/(I_{R2} + I_B)\). For a β spread design at \(\beta_{max}\).</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/eee.js"></script>
+<script>
+function bjt1(o) {
+  const it = [], B = [120, 140], T = [160, 100], D = [160, 180];
+  it.push([o.t || 'npn', B, { beta: o.beta || 100 }]);
+  it.push(['rail', [160, 20], o.top]);
+  if (o.cf) { it.push(['R', [160, 20], [160, 70], o.up], ['W', [160, 70], T], ['dot', [160, 70]], ['W', [160, 70], [80, 70]], ['R', [80, 70], [80, 140], o.rb, -1], ['W', [80, 140], B]); }
+  else {
+    it.push(o.up ? ['R', [160, 20], T, o.up] : ['W', [160, 20], T]);
+    if (o.rb) {
+      it.push(['W', B, [90, 140]]);
+      if (o.base) it.push(['R', [90, 140], [90, 40], o.rb, -1], ['rail', [90, 40], o.base]);
+      else it.push(['R', [90, 140], [90, 230], o.rb, -1], ['gnd', [90, 230]]);
+    } else if (o.base) it.push(['W', B, [90, 140]], ['V', [90, 180], [90, 230], o.base, -1], ['W', [90, 140], [90, 180]], ['gnd', [90, 230]]);
+    else it.push(['W', B, [90, 140]], ['gnd', [90, 140]]);
+  }
+  it.push(o.dn ? ['R', D, [160, 250], o.dn] : ['W', D, [160, 250]]);
+  it.push(o.bot ? ['rail', [160, 250], o.bot, false] : ['gnd', [160, 250]]);
+  const nm = o.nm || {};
+  if (nm.c) it.push(['t', [168, (o.t === 'pnp' ? 186 : 112)], nm.c, 'start']);
+  if (nm.e) it.push(['t', [168, (o.t === 'pnp' ? 112 : 186)], nm.e, 'start']);
+  if (nm.b) it.push(['t', [108, 132], nm.b]);
+  return sch(it, { w: 300, h: 290 });
+}
+
+const kO = v => si(v * 1e3, 'Ω');
+// four-resistor bias
+function divfig(o) {
+  return sch([
+    ['npn', [120, 140], { beta: o.beta || 100 }], ['rail', [70, 20], o.top], ['rail', [160, 20], o.top],
+    ['R', [70, 20], [70, 140], o.r1, -1], ['R', [70, 140], [70, 250], o.r2, -1], ['gnd', [70, 250]], ['W', [70, 140], [120, 140]], ['dot', [70, 140]],
+    ['R', [160, 20], [160, 100], o.rc], ['R', [160, 180], [160, 250], o.re], ['gnd', [160, 250]],
+  ], { w: 280, h: 290 });
+}
+$('#fig-div').innerHTML = divfig({ top: 'VCC', r1: 'R1', r2: 'R2', rc: 'RC', re: 'RE' });
+const casfig = () => sch([
+  ['rail', [80, 20], '+9 V'], ['rail', [180, 20], '+9 V'],
+  ['R', [80, 20], [80, 170], 'R1'], ['R', [80, 170], [80, 250], 'R2'], ['R', [80, 250], [80, 350], 'R3'], ['gnd', [80, 350]],
+  ['W', [80, 170], [140, 170]], ['W', [80, 250], [140, 250]], ['dot', [80, 170]], ['dot', [80, 250]],
+  ['W', [80, 170], [30, 170]], ['C', [30, 170], [30, 350], 'CB', -1], ['gnd', [30, 350]],
+  ['npn', [140, 170]], ['npn', [140, 250]], ['t', [188, 136], 'Q2', 'start'], ['t', [188, 286], 'Q1', 'start'],
+  ['R', [180, 20], [180, 130], 'RC'], ['R', [180, 290], [180, 350], 'RE'], ['gnd', [180, 350]], ['dot', [180, 210]],
+], { w: 260, h: 380, sim: false });
+$('#fig-cas').innerHTML = casfig();
+$('#fig-2122d').innerHTML = bjt1({ top: '+1.5 V', up: 'RC', dn: 'RE', bot: '−1.5 V', nm: { c: 'VC = 0.5 V' } });
+
+// I_C–V_BE plot for the R_E argument
+(function () {
+  const W = 400, H = 230, X = v => 40 + (v - 0.55) / 0.3 * 330, Y = i => 200 - i / 6 * 180;
+  const curve = sh => Array.from({ length: 60 }, (_, k) => { const v = 0.55 + k * 0.3 / 59, i = 1 * Math.exp((v - 0.70 + sh) / 0.025); return i <= 6.2 ? `${X(v).toFixed(1)},${Y(i).toFixed(1)}` : null; }).filter(Boolean).join(' ');
+  const o = [`<line x1="40" y1="200" x2="380" y2="200" class="arr"/>`, `<line x1="40" y1="200" x2="40" y2="12" class="arr"/>`,
+    `<polyline points="${curve(0)}"/>`, `<polyline points="${curve(0.03)}" style="stroke-dasharray:5 3"/>`,
+    `<line x1="${X(0.70)}" y1="200" x2="${X(0.70)}" y2="20" class="hi"/>`,
+    `<line x1="${X(0.62)}" y1="${Y(6)}" x2="${X(0.84)}" y2="${Y(0)}" class="hi"/>`,
+    `<text x="384" y="214" class="sl" text-anchor="end">vBE</text><text x="46" y="20" class="sl">iC</text>`,
+    `<text x="${X(0.70) + 4}" y="34" class="sl">RE = 0</text><text x="${X(0.80)}" y="${Y(1.6)}" class="sl">RE &gt; 0</text>`,
+    `<text x="${X(0.705)}" y="${Y(5.6)}" class="sl" text-anchor="end">hot</text><text x="${X(0.75)}" y="${Y(5.6)}" class="sl">cold</text>`];
+  $('#fig-re').innerHTML = `<svg class="sch" viewBox="0 0 ${W} ${H}" width="${W}">${o.join('')}</svg>`;
+})();
+
+worked('#wk-div', {
+  given: '\\(V_{CC}\\) = 15 V, \\(R_1\\) = 100 kΩ, \\(R_2\\) = 50 kΩ, \\(R_C\\) = 5 kΩ, \\(R_E\\) = 3 kΩ, β = 100. Find all node voltages and branch currents.',
+  fig: divfig({ top: '+15 V', r1: 'R1 100 kΩ', r2: 'R2 50 kΩ', rc: 'RC 5 kΩ', re: 'RE 3 kΩ' }),
+  steps: [
+    { t: 'Thevenin: \\(V_{BB} = 15\\times50/150 = 5\\) V, \\(R_B = 100\\parallel50 = 33.33\\) kΩ', a: { l: 'R_B', v: 33333, u: 'kΩ' } },
+    { t: '\\(I_B = \\dfrac{5 - 0.7}{33.33 + 101\\times3} = 12.78\\) µA', a: { l: 'I_B', v: 12.78e-6, u: 'µA' } },
+    { t: '\\(I_C = 1.278\\) mA, \\(I_E = 1.291\\) mA; \\(V_E = 3.874\\) V, \\(V_B = 4.574\\) V', a: { l: 'V_B', v: 4.574, u: 'V', tol: 0.003 } },
+    { t: '\\(V_C = 15 - 5\\times1.278 = 8.608\\) V; \\(V_{CE} = 4.73\\) V ≥ 0.3: active', a: { l: 'V_C', v: 8.608, u: 'V', tol: 0.003 } },
+    { t: '\\(I_{R1} = (15 - 4.574)/100 = 104.3\\) µA, \\(I_{R2} = 4.574/50 = 91.5\\) µA', a: { l: 'I_{R1}', v: 104.3e-6, u: 'µA' } },
+  ] });
+
+worked('#wk-cas', {
+  given: '\\(V^+\\) = 9 V; \\(V_{CE1} = V_{CE2}\\) = 2.5 V, \\(V_{RE}\\) = 0.7 V, \\(I_C\\) = 1 mA, string current 0.1 mA; β large.',
+  fig: casfig(),
+  steps: [
+    { t: '\\(R_E = 0.7/1 = 0.7\\) kΩ', a: { l: 'R_E', v: 700, u: 'kΩ' } },
+    { t: '\\(V_{B1} = 0.7 + 0.7 = 1.4\\) V, \\(R_3 = 1.4/0.1 = 14\\) kΩ', a: { l: 'R_3', v: 14e3, u: 'kΩ' } },
+    { t: '\\(V_{E2} = V_{C1} = 0.7 + 2.5 = 3.2\\) V, \\(V_{B2} = 3.9\\) V, \\(R_2 = 2.5/0.1 = 25\\) kΩ', a: { l: 'R_2', v: 25e3, u: 'kΩ' } },
+    { t: '\\(R_1 = (9 - 3.9)/0.1 = 51\\) kΩ', a: { l: 'R_1', v: 51e3, u: 'kΩ' } },
+    { t: '\\(V_{C2} = 5.7\\) V, \\(R_C = 3.3/1 = 3.3\\) kΩ', a: { l: 'R_C', v: 3300, u: 'kΩ' } },
+  ] });
+
+drill('#dr-div', { id: 'b02-divider', title: 'Voltage-divider bias: I C, V CE and beta sensitivity', gen(r) {
+  const VCC = r.pick([9, 10, 12, 15, 18]), R1 = r.pick([22, 33, 47, 68, 100, 150]), R2 = r.pick([5.6, 10, 15, 22, 33, 50]), RC = r.pick([1, 2.2, 3.3, 4.7, 5]), RE = r.pick([0.2, 0.5, 1, 2, 3]), b = r.pick([50, 100, 150, 200, 300]);
+  const VBB = VCC * R2 / (R1 + R2), RB = R1 * R2 / (R1 + R2); if (VBB < 1) return null;
+  const ie = bb => (VBB - 0.7) / (RE + RB / (bb + 1));
+  const IE = ie(b), IC = IE * b / (b + 1), VE = IE * RE, VC = VCC - IC * RC, VCE = VC - VE, IC2 = ie(2 * b) * 2 * b / (2 * b + 1);
+  if (VCE < 0.5) return null;
+  return {
+    given: `\\(V_{CC}\\) = ${VCC} V, \\(R_1\\) = ${R1} kΩ, \\(R_2\\) = ${R2} kΩ, \\(R_C\\) = ${kO(RC)}, \\(R_E\\) = ${kO(RE)}, β = ${b}. Find \\(V_B\\), \\(I_C\\), \\(V_{CE}\\), and \\(I_C\\) if β doubles to ${2 * b}.`,
+    fig: divfig({ top: '+' + VCC + ' V', r1: 'R1 ' + kO(R1), r2: 'R2 ' + kO(R2), rc: 'RC ' + kO(RC), re: 'RE ' + kO(RE), beta: b }),
+    ask: [{ l: 'V_B', v: VE + 0.7, u: 'V' }, { l: 'I_C', v: IC * 1e-3, u: 'mA' }, { l: 'V_{CE}', v: VCE, u: 'V' }, { l: 'I_C\\,(2\\beta)', v: IC2 * 1e-3, u: 'mA' }],
+    steps: [
+      `\\(V_{BB} = ${VCC}\\times\\dfrac{${R2}}{${R1} + ${R2}} = ${num(VBB)}\\) V, \\(R_B = ${R1}\\parallel${R2} = ${num(RB)}\\) kΩ`,
+      { t: `\\(I_E = \\dfrac{${num(VBB)} - 0.7}{${RE} + ${num(RB)}/${b + 1}} = ${num(IE)}\\) mA, \\(I_C = \\alpha I_E = ${num(IC)}\\) mA`, a: { l: 'I_C', v: IC * 1e-3, u: 'mA' } },
+      { t: `\\(V_E = ${num(VE)}\\) V, \\(V_B = ${num(VE + 0.7)}\\) V`, a: { l: 'V_B', v: VE + 0.7, u: 'V' } },
+      { t: `\\(V_C = ${VCC} - ${num(IC)}\\times${RC} = ${num(VC)}\\) V, \\(V_{CE} = ${num(VCE)}\\) V ≥ 0.3: active`, a: { l: 'V_{CE}', v: VCE, u: 'V' } },
+      { t: `β = ${2 * b}: \\(I_C = ${num(IC2)}\\) mA, a change of ${num((IC2 / IC - 1) * 100, 3)} % for a 100 % change in β (stiffness \\((\\beta+1)R_E/R_B = ${num((b + 1) * RE / RB, 3)}\\))`, a: { l: 'I_C\\,(2\\beta)', v: IC2 * 1e-3, u: 'mA' } },
+    ] };
+} });
+
+drill('#dr-split', { id: 'b04-split-design', title: 'Design R C and R E with V BE scaling', gen(r) {
+  const V = r.pick([1.5, 3, 5, 10, 15]), IC = r.pick([0.2, 0.5, 1, 2, 5]), ref = r.pick([0.7, 0.8]), b = r.pick([50, 100, 200]);
+  const VBE = ref + 0.025 * Math.log(IC), lo = -VBE + 0.5, VC = r.step(Math.ceil(lo * 2) / 2, V - 0.5, 0.5);
+  if (VC < lo || VC > V - 0.5) return null;
+  const IE = IC * (b + 1) / b, RC = (V - VC) / IC, RE = (V - VBE) / IE;
+  return {
+    given: `npn with the base grounded, \\(R_C\\) to +${V} V, \\(R_E\\) to −${V} V. β = ${b}; \\(V_{BE}\\) = ${ref} V at \\(i_C\\) = 1 mA. Design for \\(I_C\\) = ${IC} mA and \\(V_C\\) = ${VC} V (\\(V_T\\) = 25 mV).`,
+    ask: [{ l: 'R_C', v: RC * 1e3, u: 'kΩ' }, { l: 'V_{BE}', v: VBE, u: 'V', tol: 0.002 }, { l: 'R_E', v: RE * 1e3, u: 'kΩ' }],
+    steps: [
+      { t: `\\(R_C = (${V} - ${VC})/${IC} = ${num(RC)}\\) kΩ`, a: { l: 'R_C', v: RC * 1e3, u: 'kΩ' } },
+      { t: `\\(V_{BE} = ${ref} + 0.025\\ln(${IC}/1) = ${num(VBE, 4)}\\) V, so \\(V_E = ${num(-VBE, 4)}\\) V`, a: { l: 'V_{BE}', v: VBE, u: 'V', tol: 0.002 } },
+      { t: `\\(I_E = ${IC}\\times${b + 1}/${b} = ${num(IE)}\\) mA; \\(R_E = (${num(-VBE, 4)} + ${V})/${num(IE)} = ${num(RE)}\\) kΩ`, a: { l: 'R_E', v: RE * 1e3, u: 'kΩ' } },
+      `Check: \\(V_{CE} = ${VC} + ${num(VBE, 4)} = ${num(VC + VBE)}\\) V ≥ 0.3: active.`,
+    ] };
+} });
+
+drill('#dr-ddes', { id: 'b04-divider-design', title: 'Design a four-resistor bias for a target I C and V CE', gen(r) {
+  const VCC = r.pick([9, 12, 15, 18]), IC = r.pick([0.5, 1, 2, 3]), b = r.pick([50, 100, 150, 200]), VE = r.pick([1, 2, VCC / 3]), VCE = r.pick([VCC / 3, VCC / 2]), k = r.pick([0.1, 0.2]);
+  const IE = IC * (b + 1) / b, IB = IC / b, RE = VE / IE, RC = (VCC - VCE - VE) / IC; if (RC <= 0.1) return null;
+  const VB = VE + 0.7, I2 = k * IE, R2 = VB / I2, R1 = (VCC - VB) / (I2 + IB);
+  return {
+    given: `\\(V_{CC}\\) = ${VCC} V, β = ${b}. Design the four-resistor bias for \\(I_C\\) = ${IC} mA, \\(V_E\\) = ${num(VE)} V, \\(V_{CE}\\) = ${num(VCE)} V, with a current through \\(R_2\\) of ${k} \\(I_E\\).`,
+    fig: divfig({ top: '+' + VCC + ' V', r1: 'R1 ?', r2: 'R2 ?', rc: 'RC ?', re: 'RE ?' }),
+    ask: [{ l: 'R_E', v: RE * 1e3, u: 'kΩ' }, { l: 'R_C', v: RC * 1e3, u: 'kΩ' }, { l: 'R_2', v: R2 * 1e3, u: 'kΩ' }, { l: 'R_1', v: R1 * 1e3, u: 'kΩ' }],
+    steps: [
+      { t: `\\(I_E = ${num(IE)}\\) mA, \\(R_E = ${num(VE)}/${num(IE)} = ${num(RE)}\\) kΩ`, a: { l: 'R_E', v: RE * 1e3, u: 'kΩ' } },
+      { t: `\\(R_C = (${VCC} - ${num(VCE)} - ${num(VE)})/${IC} = ${num(RC)}\\) kΩ`, a: { l: 'R_C', v: RC * 1e3, u: 'kΩ' } },
+      { t: `\\(V_B = ${num(VB)}\\) V, \\(I_{R2} = ${num(I2)}\\) mA, \\(R_2 = ${num(VB)}/${num(I2)} = ${num(R2)}\\) kΩ`, a: { l: 'R_2', v: R2 * 1e3, u: 'kΩ' } },
+      { t: `\\(I_B = ${num(IB)}\\) mA, \\(R_1 = (${VCC} - ${num(VB)})/(${num(I2)} + ${num(IB)}) = ${num(R1)}\\) kΩ`, a: { l: 'R_1', v: R1 * 1e3, u: 'kΩ' } },
+    ] };
+} });
+
+drill('#dr-spread', { id: 'b04-beta-spread', title: 'Design R C for a beta spread', gen(r) {
+  const VBB = r.pick([3, 5]), RB = r.pick([47, 100, 220]), VCC = r.pick([10, 12, 15]), [b1, b2] = r.pick([[50, 150], [80, 240], [100, 300]]), eos = r.pick([0.2, 0.3]);
+  const IB = (VBB - 0.7) / RB, RC = (VCC - eos) / (b2 * IB), VCmax = VCC - b1 * IB * RC;
+  return {
+    given: `+${VBB} V drives the base through ${RB} kΩ; \\(R_C\\) to +${VCC} V; emitter grounded. β ranges from ${b1} to ${b2}. Find the largest \\(R_C\\) that keeps every unit active (edge of saturation at \\(V_{CE}\\) = ${eos} V) and the highest collector voltage with that \\(R_C\\).`,
+    ask: [{ l: 'R_{C,max}', v: RC * 1e3, u: 'kΩ' }, { l: 'V_{C,max}', v: VCmax, u: 'V' }],
+    steps: [
+      `\\(I_B = (${VBB} - 0.7)/${RB} = ${num(IB)}\\) mA, independent of β`,
+      { t: `Worst case β = ${b2}: \\(I_C = ${num(b2 * IB)}\\) mA, \\(R_C \\le (${VCC} - ${eos})/${num(b2 * IB)} = ${num(RC)}\\) kΩ`, a: { l: 'R_{C,max}', v: RC * 1e3, u: 'kΩ' } },
+      { t: `β = ${b1}: \\(I_C = ${num(b1 * IB)}\\) mA, \\(V_C = ${VCC} - ${num(b1 * IB)}\\times${num(RC)} = ${num(VCmax)}\\) V (lowest is ${eos} V)`, a: { l: 'V_{C,max}', v: VCmax, u: 'V' } },
+    ] };
+} });
+
+drill('#dr-cfd', { id: 'b04-cf-design', title: 'Collector-feedback bias design', gen(r) {
+  const VCC = r.pick([3, 5, 9]), IC = r.pick([1, 2, 3]), VCE = r.pick([1, 1.5, 2]), b = r.pick([50, 90, 100, 150]), k = r.pick([1, 2, 10]);
+  if (VCE > VCC - 0.5) return null;
+  const IB = IC / b, I2 = k * IB, R2 = 0.7 / I2, I1 = I2 + IB, R1 = (VCE - 0.7) / I1, IRC = IC + I1, RC = (VCC - VCE) / IRC;
+  return {
+    given: `\\(R_C\\) from \\(V_{CC}\\) = ${VCC} V to the collector, \\(R_1\\) from the collector to the base, \\(R_2\\) from the base to ground, emitter grounded, β = ${b}. Design for \\(I_C\\) = ${IC} mA, \\(V_{CE}\\) = ${VCE} V, with \\(I_{R2}\\) = ${k === 1 ? '' : k}\\(I_B\\).`,
+    ask: [{ l: 'R_2', v: R2 * 1e3, u: 'kΩ' }, { l: 'R_1', v: R1 * 1e3, u: 'kΩ' }, { l: 'R_C', v: RC * 1e3, u: 'kΩ' }],
+    steps: [
+      { t: `\\(I_B = ${num(IB)}\\) mA, \\(I_{R2} = ${num(I2)}\\) mA, \\(R_2 = 0.7/${num(I2)} = ${num(R2)}\\) kΩ`, a: { l: 'R_2', v: R2 * 1e3, u: 'kΩ' } },
+      { t: `\\(I_{R1} = ${num(I2)} + ${num(IB)} = ${num(I1)}\\) mA, \\(R_1 = (${VCE} - 0.7)/${num(I1)} = ${num(R1)}\\) kΩ`, a: { l: 'R_1', v: R1 * 1e3, u: 'kΩ' } },
+      { t: `\\(R_C\\) carries \\(I_C + I_{R1} = ${num(IRC)}\\) mA: \\(R_C = (${VCC} - ${VCE})/${num(IRC)} = ${num(RC)}\\) kΩ`, a: { l: 'R_C', v: RC * 1e3, u: 'kΩ' } },
+    ] };
+} });
+
+flashcards('#cards', [
+  { f: 'Thevenin of the divider', b: 'V_BB = V_CC·R2/(R1+R2), R_B = R1 ∥ R2' },
+  { f: 'I_E with divider bias', b: '(V_BB − V_BE)/(R_E + R_B/(β+1))' },
+  { f: 'Stiff-bias conditions', b: '(β+1)R_E ≥ 10R_B and V_BB ≫ V_BE' },
+  { f: 'R_E feedback', b: 'I_C↑ → V_E↑ → V_BE↓ → I_B↓ → I_C↓' },
+  { f: 'V_BE at another current', b: 'V_BE2 = V_BE1 + V_T ln(I_C2/I_C1)' },
+  { f: 'Rule of thumb', b: 'One third of V_CC each across R_E (≈V_BB), the transistor and R_C; divider current ≈ 0.1 I_E.' },
+  { f: 'β-spread design', b: 'R_C ≤ (V_CC − V_CE,EOS)/(β_max·I_B)' },
+]);
+quiz('#quiz', [
+  { q: 'R1 = 100 k, R2 = 50 k from 15 V. V_BB and R_B are', opts: ['5 V, 150 kΩ', '5 V, 33.3 kΩ', '10 V, 33.3 kΩ', '7.5 V, 50 kΩ'], a: 1, why: '15·50/150 and 100∥50.' },
+  { q: 'Why is fixed bias (no R_E) poor?', opts: ['It needs two supplies', 'I_C is proportional to β', 'It cannot saturate', 'V_BE is undefined'], a: 1, why: 'I_C = β(V_CC − 0.7)/R_B.' },
+  { q: 'V_BE = 0.8 V at 1 mA. At 0.2 mA (V_T = 25 mV) V_BE ≈', opts: ['0.84 V', '0.76 V', '0.72 V', '0.80 V'], a: 1, why: '0.8 + 0.025 ln 0.2 = 0.760 V.' },
+  { q: 'In collector-feedback design, R_C carries', opts: ['I_C', 'I_B', 'I_C + I_R1', 'I_R2'], a: 2, why: 'R1 leaves from the collector node.' },
+  { q: 'A β range 50–150 with a base resistor from a fixed supply: R_C is limited by', opts: ['β = 50', 'β = 100', 'β = 150', 'none'], a: 2, why: 'The largest β gives the largest I_C and the largest drop.' },
+]);
+</script>
+</body>
+</html>

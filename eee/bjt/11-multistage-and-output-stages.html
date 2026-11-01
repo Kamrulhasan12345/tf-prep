@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Multistage Amplifiers and Output Stages · EEE 263 Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">BJT · Chapter 11 · Sedra §7.5, §7.6 (cascade), ch.12 (output stages, overview only) · Sadat L21 note p.93, "skip push-pull" p.81 · Khairul s.52–54 · type B-11</div>
+<h1>Multistage Amplifiers and Output Stages</h1>
+<p class="lede">The one cascaded BJT amplifier in the question set is 2016–17 Sec B Q8(a) (36⅔ marks: CE followed by an emitter follower, "find g<sub>m</sub>, r<sub>π</sub>, r<sub>e</sub> of both transistors, the overall gain, R<sub>in</sub> and R<sub>out</sub>"). It is medium priority: it is nothing new, only the CE and CC chapters chained with the loading done correctly, so if you can do those you can do this. Class A/B/AB output stages are only a short overview: <b>not examinable per Sadat sir (he said skip push-pull)</b>.</p>
+
+<h2>1. Cascading and loading</h2>
+<p>Each stage is a two-port with its own \(R_{in}\), \(A_{vo}\), \(R_o\). Joined by a coupling capacitor, the input resistance of stage 2 becomes the <b>load</b> of stage 1, and the output resistance of stage 1 becomes the <b>source resistance</b> of stage 2. Units: mA, kΩ, V.</p>
+<div class="formula">\[ R_{in} = R_{in1},\qquad A_{v1} = A_{vo1}\frac{R_{in2}}{R_{in2}+R_{o1}},\qquad A_v = A_{v1}A_{v2},\qquad R_{out} = R_{o2}\Big|_{R_{sig2} = R_{o1}} \]\[ G_v = \frac{R_{in1}}{R_{in1}+R_{sig}}\,A_{v1}A_{v2} \]</div>
+<p>Two equivalent ways to find \(A_{v1}\): (a) put stage 2 into the collector load of stage 1, \(A_{v1} = -g_{m1}(R_{C1}\parallel R_{ib2})\); or (b) the Thevenin voltage-divider form above. Work from the load backwards: stage 2's \(R_{in}\) first, then stage 1's gain, then the front end. For a CE → CC amplifier with a follower \(R_{ib2} = (\beta+1)(r_{e2} + R_{E2}\parallel R_L)\):</p>
+<ul>
+<li>stage 1 collector load: \(R_{C1}\parallel R_{B2}\parallel R_{ib2}\) (\(R_{B2} = R_3\parallel R_4\) if stage 2 has a divider);</li>
+<li>\(A_{v2} = R_{E2}'/(r_{e2} + R_{E2}')\) with \(R_{E2}' = R_{E2}\parallel R_L\) (slightly below 1);</li>
+<li>\(R_{in} = R_1\parallel R_2\parallel r_{\pi1}\) (emitter of stage 1 bypassed), \(R_{out} = R_{E2}\parallel\big[r_{e2} + (R_{C1}\parallel R_{B2})/(\beta+1)\big]\): the source resistance of stage 2 is the stage-1 collector side.</li>
+</ul>
+<p>The follower at the end is there for the load: a 250 Ω load on a CE stage alone would kill the gain (\(R_C\parallel 250\approx 244\) Ω), but behind a follower it only sees \(R_{ib2}\approx\) tens of kΩ.</p>
+
+<h2>2. DC with several stages</h2>
+<p>With capacitor coupling the stages are DC-isolated: solve the bias of each stage separately (Thevenin base network, \(I_E\), \(I_C\), mode check). With direct coupling the base current of stage 2 is drawn from the collector node of stage 1 and must be included in KCL (Sadat, note p.93: ignoring it only approximates the BJT cascade; a MOSFET gate draws none, so there the answer is exact). Chapter 5 covers the DC part.</p>
+
+<h2>3. The current-source-biased amplifier (2024–25)</h2>
+<p>2024–25 Q7(a) used a transistor with an ideal current source \(I\) in the emitter (a bias circuit that fixes \(I_E = I\) regardless of β) and three terminals X, Y, Z coupled to the signal, the load and the emitter. Z grounded gives a CE stage (done in Chapter 8). With the source in a CE stage, AC: the source is open, the emitter bypass puts \(R_e = 0\); with an unbypassed \(R_e\) the Chapter 9 formulas apply. In a follower the same current source makes \(R_E = \infty\), so the emitter load is just \(R_L\) (and \(r_o\)). Chaining the two gives the drill below.</p>
+<figure><div id="fig-two"></div><figcaption><b>Figure 1.</b> CE stage (current-source bias \(I_1\), bypassed emitter) coupled to a follower (current-source bias \(I_2\), base resistor \(R_{B2}\) for DC) driving \(R_L\).</figcaption></figure>
+
+<div class="method"><h4>Method · two-stage small-signal gain (CE → CC)</h4><ol>
+<li><b>DC</b>, stage by stage: \(I_{E1} = I_1\), \(I_{E2} = I_2\) (current-source bias); \(I_C = \alpha I_E\); mode check for each.</li>
+<li><b>Parameters</b> of each transistor: \(r_e = V_T/I_E\), \(g_m\), \(r_\pi\).</li>
+<li><b>Small-signal circuit</b> of the whole chain: rails and current sources off, capacitors short; stage 1 with \(R_{C}\), then stage 2 as a load.</li>
+<li><b>Backwards:</b> \(R_{in2} = R_{B2}\parallel(\beta+1)(r_{e2} + R_L)\); \(A_{v2} = R_L/(r_{e2} + R_L)\); \(A_{v1} = -g_{m1}(R_C\parallel R_{in2})\); \(R_{in} = R_{B1}\parallel r_{\pi1}\); \(R_{out} = r_{e2} + (R_C\parallel R_{B2})/(\beta+1)\) (current source open).</li>
+<li>\(A_v = A_{v1}A_{v2}\); \(G_v = [R_{in}/(R_{in}+R_{sig})]A_v\).</li>
+</ol></div>
+<div id="dr-two"></div>
+
+<div class="trap"><h4>Traps (where marks go)</h4><ul>
+<li>Forgetting that stage 2 loads stage 1: using \(A_{v1} = -g_{m1}R_{C1}\) is the commonest loss.</li>
+<li>Putting \(R_{in2}\) with \(R_L\) removed (it contains \(R_L\) for a follower), or forgetting the stage-2 bias divider \(R_3\parallel R_4\) in stage 1's load.</li>
+<li>\(R_{out}\) of the last stage needs the stage-1 collector resistance as its source resistance: \(R_{C1}\parallel R_3\parallel R_4\) divided by \(\beta+1\).</li>
+<li>Both stages must be DC solved separately: do not reuse \(I_{C1}\) for stage 2. Different \(I_C\) means different \(g_m\), \(r_\pi\), \(r_e\).</li>
+<li>The figure of 2016–17 omits the supply voltage. State your assumption (10 V is the likely value, with 12 V given for comparison).</li>
+</ul></div>
+
+<h2>Exam questions</h2>
+<div class="exam">
+  <div class="exam-src">2016–17 · Sec B · Q8(a) · 36⅔ marks</div>
+  <div class="exam-q"><p>For the circuit shown, determine the small-signal parameters \(g_m\), \(r_\pi\) and \(r_e\) for both transistors, the overall small-signal voltage gain \(A_v = v_o/v_s\), the input resistance \(R_{in}\) and the output resistance \(R_{out}\). β = 120.</p><div id="fig-1617"></div><p><i>Figure as read from the scan: stage 1 is a CE amplifier with R<sub>1</sub> = 67.3 kΩ, R<sub>2</sub> = 12.7 kΩ, R<sub>C1</sub> = 10 kΩ, R<sub>E1</sub> = 2 kΩ bypassed by C<sub>E</sub>; stage 2 is an emitter follower with R<sub>3</sub> = 15 kΩ, R<sub>4</sub> = 45 kΩ, R<sub>E2</sub> = 1.6 kΩ and the load R<sub>L</sub> = 250 Ω capacitor-coupled to the emitter; v<sub>s</sub> is coupled to the base of Q<sub>1</sub> with no source resistance. The supply voltage V<sub>CC</sub> is not legible. V<sub>CC</sub> = 10 V is assumed here (it gives I<sub>C2</sub> ≈ 4 mA as in the textbook cascade); results for 12 V are at the end.</i></p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><b>DC, stage 1</b> (the coupling capacitors block DC): \(V_{BB1} = 10\times12.7/80 = 1.5875\) V, \(R_{BB1} = 67.3\parallel12.7 = 10.68\) kΩ. \(I_{E1} = \dfrac{1.5875 - 0.7}{2 + 10.68/121} = 0.425\) mA, \(I_{C1} = 0.4215\) mA, \(V_{CE1} = 10 - 0.4215\times10 - 0.425\times2 = 4.94\) V: active ✓.</p>
+    <p><b>DC, stage 2:</b> \(V_{BB2} = 10\times45/60 = 7.5\) V, \(R_{BB2} = 15\parallel45 = 11.25\) kΩ. \(I_{E2} = \dfrac{7.5 - 0.7}{1.6 + 11.25/121} = 4.016\) mA, \(I_{C2} = 3.983\) mA, \(V_{CE2} = 10 - 4.016\times1.6 = 3.57\) V: active ✓.</p>
+    <p><b>Parameters.</b> Q<sub>1</sub>: \(g_{m1} = 0.4215/0.025 = 16.86\) mA/V, \(r_{\pi1} = 120/16.86 = 7.12\) kΩ, \(r_{e1} = 25/0.425 = 58.8\) Ω. Q<sub>2</sub>: \(g_{m2} = 3.983/0.025 = 159.3\) mA/V, \(r_{\pi2} = 0.753\) kΩ, \(r_{e2} = 25/4.016 = 6.22\) Ω.</p>
+    <p><b>AC, from the output backwards.</b> \(R_{E2}\parallel R_L = 1.6\parallel0.25 = 0.2162\) kΩ. \(R_{ib2} = (\beta+1)(r_{e2} + 0.2162) = 121\times0.2224 = 26.9\) kΩ. \(A_{v2} = 0.2162/(0.00622 + 0.2162) = \mathbf{0.972}\).</p>
+    <p>Stage 1 load: \(R_{C1}\parallel R_3\parallel R_4\parallel R_{ib2} = 10\parallel15\parallel45\parallel26.9 = 4.424\) kΩ. \(A_{v1} = -g_{m1}\times4.424 = -16.86\times4.424 = \mathbf{-74.6}\).</p>
+    <p><b>Overall:</b> \(A_v = -74.6\times0.972 = \mathbf{-72.5}\) V/V (no source resistance, so \(G_v = A_v\)).</p>
+    <p><b>\(R_{in}\)</b> \(= R_1\parallel R_2\parallel r_{\pi1} = 10.68\parallel7.12 = \mathbf{4.27}\) <b>kΩ</b> (emitter of Q<sub>1</sub> bypassed).</p>
+    <p><b>\(R_{out}\)</b> (source off, load removed): the source resistance seen by stage 2 is \(R_{C1}\parallel R_3\parallel R_4 = 10\parallel11.25 = 5.29\) kΩ: \(R_{out} = R_{E2}\parallel[r_{e2} + 5.29/121] = 1600\parallel(6.22 + 43.7)\) Ω \(= \mathbf{48.5}\) <b>Ω</b>.</p>
+    <p>If \(V_{CC}\) = 12 V: \(I_{C1}\) = 0.572 mA, \(I_{C2}\) = 4.86 mA; \(g_{m1}\) = 22.9, \(r_{\pi1}\) = 5.24 kΩ, \(r_{e1}\) = 43.3 Ω; \(g_{m2}\) = 194.5, \(r_{\pi2}\) = 617 Ω, \(r_{e2}\) = 5.10 Ω; \(R_{in}\) = 3.52 kΩ, \(A_v\) = −98.8, \(R_{out}\) = 47.4 Ω. State the assumption in the exam; the method carries the marks.</p>
+  </div></details>
+</div>
+
+<h2>4. Output stages: class A, B, AB (overview, not examinable)</h2>
+<p><b>Not examinable per Sadat sir (he said skip push-pull).</b> For completeness (Khairul s.52–54): the output stage drives a low-resistance load and is judged by efficiency and linearity.</p>
+<div class="tbl"><table>
+<tr><th>Class</th><th>Circuit and Q-point</th><th>Good</th><th>Bad</th></tr>
+<tr><td>A</td><td>one transistor, divider bias, Q mid load line, conducts the whole cycle</td><td>linear</td><td>high idling current, very poor efficiency</td></tr>
+<tr><td>B</td><td>complementary npn/pnp, bases tied, emitters to the output, Q at cutoff, each device one half-cycle</td><td>no idling current, better efficiency</td><td>crossover distortion (both off near \(v_i = 0\), a dead band of about ±0.7 V)</td></tr>
+<tr><td>AB</td><td>as B but the bases biased apart by two diodes, Q just above cutoff</td><td>efficiency close to B, much less crossover distortion</td><td>small idling current</td></tr>
+</table></div>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+
+<div class="key"><p><strong>Summary:</strong> In a cascade the \(R_{in}\) of each stage loads the stage before it and the \(R_o\) of each stage is the source resistance of the next: \(A_{v1} = A_{vo1}R_{in2}/(R_{in2}+R_{o1})\), \(A_v = A_{v1}A_{v2}\), \(R_{in} = R_{in1}\), \(R_{out}\) from the last stage with stage 1's output resistance as its source. Bias each stage separately (coupled by capacitors), then solve backwards from the load. A follower at the end buys a low \(R_{out}\). Class A/B/AB: overview only, not examinable.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/eee.js"></script>
+<script>
+const NS = { sim: false };
+const k = x => si(x * 1e3, 'Ω');
+const twoStage = (num = false) => sch([
+  ['AC', [0, 230], [0, 150], ''], ['t', [18, 205], 'vs', 'start'], ['R', [0, 150], [40, 150], num ? '' : 'Rsig'], ['W', [40, 150], [60, 150]], ['C', [60, 150], [100, 150], ''], ['W', [100, 150], [160, 150]], ['dot', [130, 150]],
+  ['R', [130, 150], [130, 250], 'RB1'], ['gnd', [130, 250]], ['npn', [160, 150]],
+  ['W', [200, 110], [200, 90]], ['R', [200, 90], [200, 30], 'RC'], ['rail', [200, 30], '+VCC'],
+  ['W', [200, 190], [200, 210]], ['dot', [200, 210]], ['I', [200, 210], [200, 270], 'I₁'], ['rail', [200, 270], '−VEE', false], ['W', [200, 210], [240, 210]], ['C', [240, 210], [280, 210], ''], ['W', [280, 210], [280, 240]], ['gnd', [280, 240]],
+  ['dot', [200, 100]], ['W', [200, 100], [260, 100]], ['C', [260, 100], [300, 100], ''], ['W', [300, 100], [340, 100]], ['dot', [320, 100]], ['R', [320, 100], [320, 190], 'RB2'], ['gnd', [320, 190]],
+  ['npn', [340, 100]], ['W', [380, 60], [380, 40]], ['rail', [380, 40], '+VCC'], ['W', [380, 140], [380, 160]], ['dot', [380, 160]], ['I', [380, 160], [380, 220], 'I₂'], ['rail', [380, 220], '−VEE', false],
+  ['W', [380, 160], [430, 160]], ['C', [430, 160], [470, 160], ''], ['W', [470, 160], [500, 160]], ['R', [500, 160], [500, 260], 'RL'], ['gnd', [500, 260]], ['open', [500, 160], 'vₒ'],
+  ['W', [0, 230], [0, 250]], ['gnd', [0, 250]],
+], { w: 560, h: 330, ...NS });
+$('#fig-two').innerHTML = twoStage();
+// 2016-17 figure
+$('#fig-1617').innerHTML = sch([
+  ['AC', [0, 260], [0, 150], ''], ['t', [18, 220], 'vs', 'start'], ['W', [0, 150], [30, 150]], ['C', [30, 150], [70, 150], ''], ['W', [70, 150], [160, 150]], ['dot', [110, 150]],
+  ['R', [110, 150], [110, 80], 'R₁ 67.3k'], ['rail', [110, 80], 'VCC'], ['R', [110, 150], [110, 260], 'R₂ 12.7k'], ['npn', [160, 150]],
+  ['W', [200, 110], [200, 90]], ['R', [200, 90], [200, 30], 'RC 10k'], ['rail', [200, 30], 'VCC'],
+  ['W', [200, 190], [200, 200]], ['R', [200, 200], [200, 260], 'RE 2k', -1], ['dot', [200, 200]], ['W', [200, 200], [240, 200]], ['C', [240, 200], [240, 260], 'CE'],
+  ['W', [0, 260], [240, 260]], ['gnd', [150, 260]],
+  ['dot', [200, 100]], ['W', [200, 100], [250, 100]], ['C', [250, 100], [290, 100], ''], ['W', [290, 100], [340, 100]], ['dot', [310, 100]], ['R', [310, 100], [310, 40], 'R₃ 15k'], ['rail', [310, 40], 'VCC'], ['R', [310, 100], [310, 190], 'R₄ 45k'], ['gnd', [310, 190]],
+  ['npn', [340, 100]], ['W', [380, 60], [380, 40]], ['rail', [380, 40], 'VCC'], ['W', [380, 140], [380, 160]], ['dot', [380, 160]], ['R', [380, 160], [380, 230], 'RE₂ 1.6k'], ['gnd', [380, 230]],
+  ['W', [380, 160], [430, 160]], ['C', [430, 160], [470, 160], ''], ['W', [470, 160], [500, 160]], ['R', [500, 160], [500, 230], 'RL 250'], ['gnd', [500, 230]], ['open', [500, 160], 'vₒ'],
+], { w: 570, h: 300, ...NS });
+
+drill('#dr-two', { id: 'b11-two-stage', title: 'Two-stage amplifier (CE then follower): overall gain, R_in, R_out', gen(r) {
+  const b = r.pick([100, 120, 150]), I1 = r.pick([0.5, 1, 2]), RB1 = r.pick([47, 100, 200]), RC = r.pick([2, 4.7, 5, 8, 10]), I2 = r.pick([1, 2, 5]), RB2 = r.pick([47, 100, 200]), RL = r.pick([0.5, 1, 2, 5]), Rs = r.pick([1, 2, 5]), VCC = 12;
+  const al = b / (b + 1), IC1 = al * I1, IB1 = I1 / (b + 1), VE1 = -IB1 * RB1 - 0.7, VCE1 = VCC - IC1 * RC - VE1;
+  if (VCE1 < 1) return null;
+  const gm1 = IC1 / 0.025, rpi1 = b / gm1, re2 = 0.025 / I2;
+  const Rin2 = par(RB2, (b + 1) * (re2 + RL)), Av2 = RL / (re2 + RL), Av1 = -gm1 * par(RC, Rin2), Rin = par(RB1, rpi1);
+  const Gv = Rin / (Rin + Rs) * Av1 * Av2, Rout = re2 + par(RC, RB2) / (b + 1);
+  return {
+    given: `Figure 1 (stage 1 emitter bypassed): β = ${b}, \\(r_o\\) neglected, \\(I_1\\) = ${I1} mA, \\(I_2\\) = ${I2} mA (ideal current sources), \\(R_{B1}\\) = ${k(RB1)}, \\(R_C\\) = ${k(RC)} to \\(V_{CC}\\) = ${VCC} V, \\(R_{B2}\\) = ${k(RB2)}, \\(R_L\\) = ${k(RL)}, \\(R_{sig}\\) = ${k(Rs)}. Find \\(R_{in}\\), \\(A_{v1}\\) (with stage 2 as its load), \\(A_{v2}\\), \\(G_v\\) and \\(R_{out}\\).`,
+    fig: twoStage(),
+    ask: [{ l: 'R_{in}', v: Rin * 1e3, u: 'kΩ' }, { l: 'A_{v1}', v: Av1, u: 'V/V' }, { l: 'A_{v2}', v: Av2, u: 'V/V', tol: 0.01 }, { l: 'G_v', v: Gv, u: 'V/V' }, { l: 'R_{out}', v: Rout * 1e3, u: 'Ω' }],
+    steps: [
+      `DC: \\(I_{C1} = ${num(al, 4)}\\times${I1} = ${num(IC1)}\\) mA; \\(V_{CE1} = ${num(VCE1)}\\) V (active). Stage 2: \\(I_{E2} = ${I2}\\) mA.`,
+      `\\(g_{m1} = ${num(gm1)}\\) mA/V, \\(r_{\\pi1} = ${num(rpi1)}\\) kΩ; \\(r_{e2} = 25/${I2} = ${num(re2 * 1000)}\\) Ω.`,
+      { t: `\\(R_{in} = R_{B1}\\parallel r_{\\pi1} = ${RB1}\\parallel${num(rpi1)} = ${num(Rin)}\\) kΩ`, a: { l: 'R_{in}', v: Rin * 1e3, u: 'kΩ' } },
+      `Stage 2: \\(R_{in2} = R_{B2}\\parallel(\\beta+1)(r_{e2}+R_L) = ${RB2}\\parallel${num((b + 1) * (re2 + RL))} = ${num(Rin2)}\\) kΩ.`,
+      { t: `\\(A_{v2} = R_L/(r_{e2} + R_L) = ${RL}/(${num(re2, 4)} + ${RL}) = ${num(Av2, 4)}\\)`, a: { l: 'A_{v2}', v: Av2, u: 'V/V', tol: 0.01 } },
+      { t: `\\(A_{v1} = -g_{m1}(R_C\\parallel R_{in2}) = -${num(gm1)}\\times${num(par(RC, Rin2))} = ${num(Av1)}\\) V/V`, a: { l: 'A_{v1}', v: Av1, u: 'V/V' } },
+      { t: `\\(G_v = \\dfrac{${num(Rin)}}{${num(Rin)} + ${Rs}}\\times(${num(Av1)})\\times${num(Av2, 4)} = ${num(Gv)}\\) V/V`, a: { l: 'G_v', v: Gv, u: 'V/V' } },
+      { t: `\\(R_{out} = r_{e2} + (R_C\\parallel R_{B2})/(\\beta+1) = ${num(re2 * 1000)} + ${num(par(RC, RB2) * 1000 / (b + 1))} = ${num(Rout * 1000)}\\) Ω`, a: { l: 'R_{out}', v: Rout * 1e3, u: 'Ω' } },
+    ] };
+} });
+
+flashcards('#cards', [
+  { f: 'What does stage 2 do to stage 1?', b: 'R_in2 is the load of stage 1: A_v1 = A_vo1·R_in2/(R_in2 + R_o1)' },
+  { f: 'Cascade gain', b: 'A_v = A_v1·A_v2 (each with its load); G_v = R_in/(R_in + R_sig)·A_v' },
+  { f: 'Cascade R_in and R_out', b: 'R_in = R_in1; R_out = R_o2 with source resistance R_o1' },
+  { f: 'Why CE then CC?', b: 'CE gives the gain, the follower gives low R_out for a small load' },
+  { f: 'DC in a capacitor-coupled cascade', b: 'Each stage separately (coupling capacitors block DC)' },
+  { f: 'Class A / B / AB', b: 'A: mid load line, poor efficiency; B: cutoff, crossover distortion; AB: diodes bias, compromise (not examinable)' },
+]);
+quiz('#quiz', [
+  { q: 'In a CE → CC cascade the gain of the CE stage is', opts: ['−g_mR_C', '−g_m(R_C ∥ R_in2)', '−g_m(R_C ∥ R_L)', '−g_mR_in2'], a: 1, why: 'The follower input resistance is the load of stage 1.' },
+  { q: 'In 2016–17 (V_CC = 10 V assumed) the overall gain is about', opts: ['−72.5', '−101', '−0.97', '−7.2'], a: 0, why: '−74.6 × 0.972 = −72.5.' },
+  { q: 'R_out of the cascade with an emitter-follower last stage depends on', opts: ['R_L', 'R_C1 ∥ R_3 ∥ R_4 and β', 'g_m1 only', 'V_CC'], a: 1, why: 'Source resistance of stage 2 is stage 1’s collector side, divided by β+1.' },
+  { q: 'Class B stage distortion near v_i = 0 is called', opts: ['clipping', 'crossover distortion', 'slewing', 'Miller effect'], a: 1, why: 'Both devices are off for |v_i| < about 0.7 V.' },
+]);
+</script>
+</body>
+</html>

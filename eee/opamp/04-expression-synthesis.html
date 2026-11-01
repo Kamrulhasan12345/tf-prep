@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Building a Given Expression · EEE 263 Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Op-amps · Chapter 4 · Sedra §2.5–2.6 · Khairul s.19–20 · Sadat L24, Ikra p.82–86 · type O-05</div>
+<h1>Building a Given Expression</h1>
+<p class="lede">"Design an op-amp circuit that gives \(v_{out} = 5\sin40t - 4\cos100t + 4\)" was the compulsory 2023–24 Q5(b) (18 marks); the same type came in 2021–22, 2020–21, 2012–13 and 2011–12 (94 marks in all). It is pure bookkeeping: one inverting summer at the end, one small stage per term, and careful signs. This chapter gives a procedure that always works, plus the one trap that cost the circulating solutions their marks: the constant an uncharged integrator adds.</p>
+
+<h2>1. The building blocks</h2>
+<div class="tbl"><table>
+<tr><th>Stage</th><th>Output</th><th>Use it for</th></tr>
+<tr><td>Inverter (R/R)</td><td>\(-v\)</td><td>fixing a sign</td></tr>
+<tr><td>Inverting amplifier</td><td>\(-\dfrac{R_f}{R}v\)</td><td>a gain (often unnecessary: the summer does the gain)</td></tr>
+<tr><td>Inverting summer</td><td>\(-R_f\left(\dfrac{x_1}{R_1} + \dfrac{x_2}{R_2} + \cdots\right)\)</td><td>the final stage; branch gain \(R_f/R_i\)</td></tr>
+<tr><td>Differentiator (C in, R feedback)</td><td>\(-RC\,\dfrac{dv}{dt}\)</td><td>derivatives; \(\cos\omega t\) from \(\sin\omega t\)</td></tr>
+<tr><td>Integrator (R in, C feedback)</td><td>\(-\dfrac{1}{RC}\displaystyle\int_0^t v\,dt + v_O(0)\)</td><td>integrals</td></tr>
+<tr><td>Rail through a resistor</td><td>a constant into the summer</td><td>DC terms (from the ±15 V supply or a given 1 V source)</td></tr>
+</table></div>
+<p>Basic circuits are in <a href="01-ideal-opamp.html">Chapter 1</a>, summers and single-op-amp \(a v_1 - b v_2\) (type O-04) in <a href="02-summers-and-difference.html">Chapter 2</a>, integrators and differentiators in <a href="03-integrator-differentiator.html">Chapter 3</a>.</p>
+
+<h2>2. The procedure</h2>
+<div class="method"><h4>Method · synthesis with a final inverting summer</h4><ol>
+<li><b>Rewrite every term in terms of the available signals.</b> \(\cos\omega t = \frac{1}{\omega}\frac{d}{dt}\sin\omega t\); \(\sin^2\theta = \tfrac12 - \tfrac12\cos2\theta\); a constant comes from a source or a rail.</li>
+<li><b>Choose the final stage:</b> an inverting summer, \(v_{out} = -\sum (R_f/R_i)\,x_i\). So each summer input must be <b>minus</b> the wanted term's shape: for a term \(+a\,g(t)\) feed \(x = -g\); for \(-a\,g(t)\) feed \(x = +g\). Branch resistor \(R_i = R_f/|a|\).</li>
+<li><b>Build each \(x_i\)</b> from the signals with the fewest stages: direct wire, inverter, differentiator (output \(-RC\,\dot v\)), integrator (output \(-\frac{1}{RC}\int v\)). Count every inversion.</li>
+<li><b>Pick values:</b> \(R_f\) = 100 kΩ (or 1 MΩ), C = 1 µF, so R lands in 1 kΩ–1 MΩ. Differentiator \(RC = 1/\omega\) gives a unit-amplitude cosine.</li>
+<li><b>Verify:</b> substitute back stage by stage; check the peak \(|a_1| + |a_2| + |K| \lt L\) (about 13 V with a 15 V supply).</li>
+<li><b>Integrators:</b> state the initial condition. Prefer a differentiator for \(\cos\) (no constant appears).</li>
+</ol></div>
+
+<h2>3. The integrator constant (the trap)</h2>
+<p>An integrator that starts with an uncharged capacitor computes a <i>definite</i> integral from 0:</p>
+<div class="formula">\[ -100\int_0^t \sin(100\tau)\,d\tau = \cos(100t) - 1 \quad\text{not}\quad \cos(100t) \]</div>
+<p>So building \(\cos\) with an integrator adds a DC offset. In 2023–24 this turns the intended "+4" into "+8"; in the 2021–22 \(\sin^2\) question it adds +0.5 V. Two clean fixes: use a <b>differentiator</b> (\(-RC\frac{d}{dt}\sin\omega t = -RC\omega\cos\omega t\), no constant), or say explicitly that the integrator capacitor is pre-charged to the right initial value. Practical note: a real differentiator needs a small series resistor (noise) and a real integrator a large resistor across C (drift); mention it in one line.</p>
+
+<h2>4. Worked example: the 2023–24 compulsory question</h2>
+<div id="wk-trig"></div>
+<figure><div id="fig-trig"></div><figcaption><b>Figure 1.</b> \(v_{out} = 5\sin40t - 4\cos100t + 4\): inverter on \(V_1\) (→ \(-\sin40t\)), inverter + differentiator on \(V_2\) (→ \(+\cos100t\)), constant from the −15 V rail, inverting summer with \(R_f\) = 100 kΩ. In the simulator the sources are already set to 6.37 Hz (40 rad/s) and 15.9 Hz (100 rad/s); add a scope on V<sub>out</sub> to see the sum.</figcaption></figure>
+<div id="dr-trig"></div>
+
+<h2>5. Terms with derivatives and integrals of different inputs</h2>
+<p>Khairul s.19–20 realise \(V_O = 10V_1 - 5\dot V_2 + 2\int V_3\,dt\): differentiator (1 µF, 1 MΩ, RC = 1 s) + inverter → \(+\dot V_2\); integrator (1 MΩ, 1 µF) → \(-\int V_3\); inverter → \(-V_1\); summer \(R_f\) = 1 MΩ with 100 kΩ (from \(-V_1\), gain 10), 200 kΩ (from \(+\dot V_2\), gain 5), 500 kΩ (from \(-\int V_3\), gain 2). Six op-amps. The inverter after the differentiator is needed because the term is \(-5\dot V_2\): the summer must receive \(+\dot V_2\), and a differentiator only gives \(-\dot V_2\). For each term ask: "what sign must enter the summer, and what sign does my stage give?"</p>
+<div id="dr-mix"></div>
+
+<div class="trap"><h4>Traps</h4><ul>
+<li>Uncharged integrator for a cosine: adds a constant (the 2023–24 and 2021–22 senior answers are off by +4 V and +0.5 V).</li>
+<li>Sign bookkeeping: the final summer inverts; every differentiator and integrator inverts too.</li>
+<li>The summer's \(R_f/R_i\) multiplies the whole branch, including any gain already built into a pre-stage.</li>
+<li>Differentiator for a unit cosine needs \(RC = 1/\omega\) with ω in rad/s (\(\sin40t\): ω = 40, not \(2\pi\cdot40\)).</li>
+<li>Check the output peak against the supply: a design whose sum exceeds about 13 V clips.</li>
+<li>"Minimum number of op-amps" questions: every inversion you can absorb into the summer saves one stage.</li>
+</ul></div>
+
+<h2>Exam questions</h2>
+<div class="exam">
+  <div class="exam-src">2023–24 · Sec B · Q5(b) · 18 marks · compulsory</div>
+  <div class="exam-q"><p>You have three voltage sources: \(V_1 = \sin(40t)\), \(V_2 = \sin(100t)\), \(V_3\) = 1 V. Design a circuit using op-amps to generate \(V_{out} = 5\sin(40t) - 4\cos(100t) + 4\). Draw the overall connection diagram with element values. The op-amps are biased from a 15 V source.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><b>Plan:</b> final inverting summer, \(R_f\) = 100 kΩ. Its inputs must be \(-\sin40t\) (×5), \(+\cos100t\) (×4) and \(-1\) V (×4).</p>
+    <ol>
+      <li>\(-\sin40t\): inverter on \(V_1\) (10 kΩ/10 kΩ). Summer resistor \(100/5 = 20\) kΩ.</li>
+      <li>\(+\cos100t\): inverter on \(V_2\) gives \(-\sin100t\); differentiator with C = 1 µF, R = 10 kΩ (RC = 0.01 s = 1/100): \(-0.01\frac{d}{dt}(-\sin100t) = +\cos100t\). Summer resistor \(100/4 = 25\) kΩ.</li>
+      <li>\(-1\) V: inverter on \(V_3\). Summer resistor 25 kΩ. (Or, saving an op-amp, the −15 V rail through \(100\times15/4 = 375\) kΩ.)</li>
+      <li>Summer: \(V_{out} = -100\left(\frac{-\sin40t}{20} + \frac{\cos100t}{25} + \frac{-1}{25}\right) = 5\sin40t - 4\cos100t + 4\) ✓.</li>
+    </ol>
+    <p><b>Peak check:</b> \(|V_{out}| \le 5 + 4 + 4 = 13\) V \(&lt; 15\) V ✓.</p>
+    <p><b>Note on the circulating solutions:</b> building \(\cos100t\) with an integrator (\(R_iC_i\) = 0.01 s) from an uncharged capacitor gives \(\cos100t - 1\), so their circuit outputs \(5\sin40t - 4\cos100t + 8\). Use the differentiator, or state that the integrator capacitor is pre-charged to give an initial output of +1 V.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2021–22 · Sec A · Q1(a) · 20 marks</div>
+  <div class="exam-q"><p>Sources \(v_1 = \sin(100t)\) V and \(v_2\) = 1 V are available. Using op-amps, produce \(v_o = \sin^2(50t)\) and show that your circuit works.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>\(\sin^2(50t) = \tfrac12 - \tfrac12\cos(100t)\).</p>
+    <ol>
+      <li>Differentiator on \(v_1\) with RC = 0.01 s (C = 1 µF, R = 10 kΩ): \(v_A = -0.01\times100\cos100t = -\cos100t\).</li>
+      <li>Non-inverting averager: \(v_A\) and \(v_2\) each through 10 kΩ to the + input of a follower: \(v_o = \frac{v_A + v_2}{2} = \tfrac12 - \tfrac12\cos100t = \sin^2(50t)\) ✓.</li>
+    </ol>
+    <p>Two op-amps. Check at t = 0: \(\sin^20 = 0\) and \(\tfrac12 - \tfrac12 = 0\) ✓. (An integrator route gives \(1 - \tfrac12\cos100t\) with an uncharged capacitor, 0.5 V too high; that is the error in the circulating answer.)</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2020–21 · Sec B · Q7(a) · 20 marks</div>
+  <div class="exam-q"><p>Design an op-amp circuit whose output is proportional to \(\int(v_1 + v_2)\,dt\), and express \(v_o\) in terms of the components.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>Summing integrator: \(R_1\) from \(v_1\) and \(R_2\) from \(v_2\) to the inverting input, C from the inverting input to the output, + grounded. KCL at the virtual ground: \(\frac{v_1}{R_1} + \frac{v_2}{R_2} = -C\frac{dv_o}{dt}\), so</p>
+    <p>\(v_o = -\dfrac{1}{C}\displaystyle\int\left(\frac{v_1}{R_1} + \frac{v_2}{R_2}\right)dt + v_o(0)\). With \(R_1 = R_2 = R\): \(v_o = -\dfrac{1}{RC}\displaystyle\int(v_1 + v_2)\,dt\). Add an inverter if a positive constant of proportionality is required.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2012–13 · Sec B · Q8(b) · 16 marks</div>
+  <div class="exam-q"><p>Design an op-amp circuit that performs \(v_{out} = 5v_1 - 2\,\dfrac{dv_2}{dt} + 6\displaystyle\int v_3\,dt\).</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>Final summer with \(R_f\) = 100 kΩ; its inputs must be \(-v_1\) (×5), \(+\dot v_2\) (×2), \(-\int v_3\) (×6).</p>
+    <ol>
+      <li>\(-v_1\): inverter. Summer resistor 20 kΩ.</li>
+      <li>\(+\dot v_2\): differentiator (C = 10 µF, R = 100 kΩ, RC = 1 s) gives \(-\dot v_2\); inverter → \(+\dot v_2\). Summer resistor 50 kΩ.</li>
+      <li>\(-\int v_3\): integrator (R = 100 kΩ, C = 10 µF, RC = 1 s). Summer resistor 100/6 = 16.7 kΩ.</li>
+    </ol>
+    <p>\(v_{out} = -100\left(\frac{-v_1}{20} + \frac{\dot v_2}{50} + \frac{-\int v_3}{16.7}\right) = 5v_1 - 2\dot v_2 + 6\int v_3\) ✓. Five op-amps. (Equivalent: put the gains in the pre-stages and use a unity summer.)</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2011–12 · Sec A · Q2(c) · 20⅔ marks</div>
+  <div class="exam-q"><p>Propose an op-amp circuit producing \(V_{out} = -4V_1 + 2V_2 + 7\dfrac{dV_1}{dt} - 8\displaystyle\int V_2\,dt\), where \(V_1\) and \(V_2\) are two sources.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>Summer \(R_F\) = 100 kΩ; inputs needed: \(+V_1\) (×4), \(-V_2\) (×2), \(-\dot V_1\) (×7), \(+\int V_2\) (×8).</p>
+    <ol>
+      <li>\(+V_1\): direct, 25 kΩ.</li>
+      <li>\(-V_2\): inverter on \(V_2\); 50 kΩ.</li>
+      <li>\(-\dot V_1\): differentiator on \(V_1\), RC = 1 s (C = 10 µF, R = 100 kΩ); summer resistor 100/7 = 14.3 kΩ. (Or RC = 7 s with R = 700 kΩ and a 100 kΩ summer resistor.)</li>
+      <li>\(+\int V_2\): integrator fed from \(-V_2\) (the inverter output): \(-\frac{1}{RC}\int(-V_2) = +\int V_2\) with RC = 1 s; summer resistor 12.5 kΩ.</li>
+    </ol>
+    <p>Check: \(-100\left(\frac{V_1}{25} + \frac{-V_2}{50} + \frac{-\dot V_1}{14.3} + \frac{\int V_2}{12.5}\right) = -4V_1 + 2V_2 + 7\dot V_1 - 8\int V_2\) ✓. Four op-amps.</p>
+  </div></details>
+</div>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+
+<div class="key"><p><strong>Summary:</strong> end with an inverting summer; each branch must carry minus the wanted term's shape, through \(R_i = R_f/|a_i|\). Build each branch with inverters, a differentiator (\(-RC\,\dot v\); cos from sin with RC = 1/ω) or an integrator (\(-\frac{1}{RC}\int v\)). Count inversions, check the peak against the rails, and never let an uncharged integrator add a constant you did not ask for.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/eee.js"></script>
+<script>
+// 2023-24 synthesis circuit (Figure 1)
+$('#fig-trig').innerHTML = sch([
+  ['AC', [30, 70], [30, 130], 'sin 40t', { amp: 1, f: 6.366 }], ['gnd', [30, 130]], ['W', [30, 70], [30, 44], [60, 44]], ['R', [60, 44], [110, 44], '10k'],
+  ['W', [110, 44], [120, 44]], ['opamp', [120, 60]], ['W', [120, 76], [112, 76], [112, 86]], ['gnd', [112, 86]], ['W', [115, 44], [115, 14], [210, 14], [210, 60], [200, 60]], ['R', [130, 14], [190, 14], '10k'],
+  ['AC', [30, 210], [30, 270], 'sin 100t', { amp: 1, f: 15.915 }], ['gnd', [30, 270]], ['W', [30, 210], [30, 184], [60, 184]], ['R', [60, 184], [110, 184], '10k'],
+  ['W', [110, 184], [120, 184]], ['opamp', [120, 200]], ['W', [120, 216], [112, 216], [112, 226]], ['gnd', [112, 226]], ['W', [115, 184], [115, 154], [210, 154], [210, 200], [200, 200]], ['R', [130, 154], [190, 154], '10k'],
+  ['W', [210, 200], [230, 200]], ['C', [230, 200], [270, 200], '1µF'], ['W', [270, 200], [290, 200], [290, 184], [300, 184]], ['opamp', [300, 200]],
+  ['W', [300, 216], [292, 216], [292, 226]], ['gnd', [292, 226]], ['W', [295, 184], [295, 154], [390, 154], [390, 200], [380, 200]], ['R', [310, 154], [370, 154], '10k'],
+  ['W', [210, 60], [420, 60]], ['R', [420, 60], [480, 60], '20k'], ['W', [390, 200], [420, 200]], ['R', [420, 200], [480, 200], '25k'],
+  ['rail', [420, 270], '−15 V', false], ['W', [420, 270], [420, 260]], ['R', [420, 260], [480, 260], '375k', { val: 375e3 }],
+  ['W', [480, 60], [500, 60], [500, 260], [480, 260]], ['W', [480, 200], [500, 200]], ['dot', [500, 200]], ['W', [500, 130], [520, 130]], ['dot', [500, 130]],
+  ['opamp', [520, 146], { plusTop: false }], ['W', [520, 162], [512, 162], [512, 172]], ['gnd', [512, 172]],
+  ['W', [510, 130], [510, 100], [610, 100], [610, 146], [600, 146]], ['R', [530, 100], [590, 100], '100k'], ['W', [610, 146], [630, 146]], ['open', [630, 146], 'Vout'],
+], { w: 680, h: 290 });
+worked('#wk-trig', {
+  given: 'V₁ = sin 40t, V₂ = sin 100t, V₃ = 1 V; build V_out = 5 sin 40t − 4 cos 100t + 4 with 15 V supplies.',
+  steps: [
+    'Final stage: inverting summer, R_f = 100 kΩ. Inputs needed: −sin 40t (gain 5), +cos 100t (gain 4), a negative constant (giving +4).',
+    { t: 'Branch 1: inverter on V₁ → −sin 40t; summer resistor \\(R_f/5 = 20\\) kΩ', a: { l: 'R_1', v: 20e3, u: 'kΩ' } },
+    { t: 'Branch 2: inverter on V₂ → −sin 100t, then differentiator with \\(RC = 1/100\\) s: C = 1 µF, R = 10 kΩ → \\(-0.01\\frac{d}{dt}(-\\sin100t) = +\\cos100t\\)', a: { l: 'R_{diff}', v: 10e3, u: 'kΩ' } },
+    { t: 'Summer resistor for branch 2: \\(100/4 = 25\\) kΩ', a: { l: 'R_2', v: 25e3, u: 'kΩ' } },
+    { t: 'Constant from the −15 V rail: \\(-\\frac{100}{R_3}(-15) = 4 \\Rightarrow R_3 = 375\\) kΩ', a: { l: 'R_3', v: 375e3, u: 'kΩ' } },
+    'Check: \\(-100\\left(\\frac{-\\sin40t}{20} + \\frac{\\cos100t}{25} + \\frac{-15}{375}\\right) = 5\\sin40t - 4\\cos100t + 4\\) ✓; peak 13 V &lt; 15 V ✓.',
+  ] });
+
+drill('#dr-trig', { id: 'o05-trig', title: 'Synthesise A sin(w1 t) + B cos(w2 t) + K', gen(r) {
+  const w1 = r.pick([20, 40, 50, 100, 200]), w2 = r.pick([50, 100, 200, 500, 1000].filter(w => w !== w1));
+  const A = r.pick([-6, -5, -4, -3, -2, 2, 3, 4, 5, 6]), B = r.pick([-5, -4, -3, -2, -1, 1, 2, 3, 4, 5]), K = r.pick([-5, -4, -3, -2, 2, 3, 4, 5]);
+  if (Math.abs(A) + Math.abs(B) + Math.abs(K) > 13) return null;
+  const Rf = 100e3, C = 1e-6, Rd = 1 / (w2 * C), RA = Rf / Math.abs(A), RB = Rf / Math.abs(B), RK = Rf * 15 / Math.abs(K);
+  const nOp = 1 + (A > 0 ? 1 : 0) + 1 + (B < 0 ? 1 : 0);
+  const fmt = (c, s) => `${c < 0 ? '−' : '+'} ${Math.abs(c)}${s}`;
+  return {
+    given: `Sources: \\(\\sin(${w1}t)\\), \\(\\sin(${w2}t)\\), and ±15 V supplies. Build \\(v_{out} = ${A}\\sin(${w1}t) ${fmt(B, `\\cos(${w2}t)`)} ${fmt(K, '')}\\) with a final inverting summer, \\(R_f\\) = 100 kΩ, a differentiator with C = 1 µF for the cosine (no integrator), and the constant from a 15 V rail. Find the differentiator R, the three summer input resistors, and the number of op-amps.`,
+    ask: [{ l: 'R_{diff}', v: Rd, u: 'kΩ' }, { l: 'R_{sin}', v: RA, u: 'kΩ' }, { l: 'R_{cos}', v: RB, u: 'kΩ' }, { l: 'R_K', v: RK, u: 'kΩ' }, { l: 'N_{op}', v: nOp, u: '', tol: 0.001 }],
+    steps: [
+      `The summer inverts, so it needs \\(${A > 0 ? '-' : '+'}\\sin${w1}t\\) (gain ${Math.abs(A)}), \\(${B > 0 ? '-' : '+'}\\cos${w2}t\\) (gain ${Math.abs(B)}), and the ${K > 0 ? '−15 V' : '+15 V'} rail.`,
+      { t: `Sine branch: ${A > 0 ? 'an inverter gives −sin' : 'wire sin directly (+sin needed)'}; \\(R_{sin} = 100/${Math.abs(A)} = ${num(RA / 1e3)}\\) kΩ`, a: { l: 'R_{sin}', v: RA, u: 'kΩ' } },
+      { t: `Cosine: a differentiator on \\(+\\sin${w2}t\\) gives \\(-RC\\,${w2}\\cos${w2}t\\); unit amplitude needs \\(RC = 1/${w2}\\) s, so with 1 µF, \\(R = ${si(Rd, 'Ω')}\\). It outputs \\(-\\cos\\); ${B > 0 ? 'that is what the summer needs.' : 'we need +cos, so put an inverter before the differentiator.'}`, a: { l: 'R_{diff}', v: Rd, u: 'kΩ' } },
+      { t: `\\(R_{cos} = 100/${Math.abs(B)} = ${num(RB / 1e3)}\\) kΩ`, a: { l: 'R_{cos}', v: RB, u: 'kΩ' } },
+      { t: `Constant: \\(-\\frac{100}{R_K}(${K > 0 ? '-15' : '+15'}) = ${K} \\Rightarrow R_K = 100\\times15/${Math.abs(K)} = ${num(RK / 1e3)}\\) kΩ`, a: { l: 'R_K', v: RK, u: 'kΩ' } },
+      { t: `Op-amps: summer + differentiator${A > 0 ? ' + sine inverter' : ''}${B < 0 ? ' + cosine inverter' : ''} = ${nOp}. Peak \\(|A|+|B|+|K| = ${Math.abs(A) + Math.abs(B) + Math.abs(K)}\\) V ≤ 13 V ✓`, a: { l: 'N_{op}', v: nOp, u: '', tol: 0.001 } },
+    ] };
+} });
+
+drill('#dr-mix', { id: 'o05-mixed', title: 'Synthesise a v1 + b dv2/dt + c times the integral of v3', gen(r) {
+  const co = () => r.pick([-8, -6, -5, -4, -3, -2, 2, 3, 4, 5, 6, 8]);
+  const a = co(), b = co(), c = co(), Rf = 1e6;
+  const Ra = Rf / Math.abs(a), Rb = Rf / Math.abs(b), Rc = Rf / Math.abs(c), n = 3 + (a > 0 ? 1 : 0) + (b < 0 ? 1 : 0) + (c < 0 ? 1 : 0);
+  const t = (k, s) => `${k < 0 ? '-' : '+'} ${Math.abs(k)}${s}`;
+  return {
+    given: `Build \\(v_{out} = ${a}v_1 ${t(b, '\\,\\dfrac{dv_2}{dt}')} ${t(c, '\\displaystyle\\int v_3\\,dt')}\\). Use a differentiator and an integrator each with RC = 1 s (outputs \\(-\\dot v_2\\) and \\(-\\int v_3\\)), inverters where needed, and a final inverting summer with \\(R_f\\) = 1 MΩ. Find the three summer resistors and the total number of op-amps.`,
+    ask: [{ l: 'R_a', v: Ra, u: 'kΩ' }, { l: 'R_b', v: Rb, u: 'kΩ' }, { l: 'R_c', v: Rc, u: 'kΩ' }, { l: 'N_{op}', v: n, u: '', tol: 0.001 }],
+    steps: [
+      `The summer must receive \\(${a > 0 ? '-' : '+'}v_1\\), \\(${b > 0 ? '-' : '+'}\\dot v_2\\), \\(${c > 0 ? '-' : '+'}\\int v_3\\).`,
+      { t: `\\(v_1\\): ${a > 0 ? 'inverter (1 op-amp)' : 'direct'}; \\(R_a = 1000/${Math.abs(a)} = ${num(Ra / 1e3)}\\) kΩ`, a: { l: 'R_a', v: Ra, u: 'kΩ' } },
+      { t: `\\(\\dot v_2\\): the differentiator gives \\(-\\dot v_2\\)${b < 0 ? ', so add an inverter' : ', which is what is needed'}; \\(R_b = 1000/${Math.abs(b)} = ${num(Rb / 1e3)}\\) kΩ`, a: { l: 'R_b', v: Rb, u: 'kΩ' } },
+      { t: `\\(\\int v_3\\): the integrator gives \\(-\\int v_3\\)${c < 0 ? ', so add an inverter' : ', which is what is needed'}; \\(R_c = 1000/${Math.abs(c)} = ${num(Rc / 1e3)}\\) kΩ`, a: { l: 'R_c', v: Rc, u: 'kΩ' } },
+      { t: `Op-amps: summer + differentiator + integrator + ${n - 3} inverter(s) = ${n}`, a: { l: 'N_{op}', v: n, u: '', tol: 0.001 } },
+    ] };
+} });
+
+flashcards('#cards', [
+  { f: 'Final stage for synthesis', b: 'Inverting summer: each input carries minus the wanted term; R_i = R_f/|a_i|.' },
+  { f: 'cos ωt from sin ωt', b: 'Differentiator with RC = 1/ω gives −cos ωt (no constant).' },
+  { f: 'Why not an integrator for cos?', b: 'From an uncharged C it gives cos ωt − 1: an extra DC term.' },
+  { f: 'sin²θ', b: '½ − ½cos 2θ' },
+  { f: 'Constant term', b: 'From a rail: −(R_f/R_K)·V_rail = K, so R_K = R_f·15/|K|.' },
+  { f: 'Summing integrator', b: 'v_o = −(1/C)∫(v₁/R₁ + v₂/R₂)dt' },
+]);
+quiz('#quiz', [
+  { q: 'Summer R_f = 100 kΩ. For a term +6v₁ you feed −v₁ through', opts: ['600 kΩ', '16.7 kΩ', '6 kΩ', '100 kΩ'], a: 1, why: '100/6 = 16.7 kΩ.' },
+  { q: 'Differentiator on sin(500t) with C = 1 µF for a unit cosine needs R =', opts: ['500 Ω', '2 kΩ', '2 MΩ', '318 Ω'], a: 1, why: 'RC = 1/500 = 2 ms; R = 2 kΩ.' },
+  { q: 'An uncharged integrator with RC = 0.01 s fed sin(100t) gives', opts: ['−cos 100t', 'cos 100t − 1', '−sin 100t', 'cos 100t'], a: 1, why: '−100∫₀ᵗ sin(100τ)dτ = cos(100t) − 1.' },
+  { q: 'Summer R_f = 100 kΩ; a +3 V constant from the −15 V rail needs', opts: ['500 kΩ', '20 kΩ', '300 kΩ', '45 kΩ'], a: 0, why: '100 × 15/3 = 500 kΩ.' },
+]);
+</script>
+</body>
+</html>

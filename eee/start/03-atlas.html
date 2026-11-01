@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Problem-Type Atlas · EEE 263 Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<style>
+.atl td:first-child a { text-decoration: none; }
+.atl .tag { font: 12px var(--mono); color: var(--muted); white-space: nowrap; }
+.mix { display: flex; flex-wrap: wrap; gap: 8px; margin: 1em 0; }
+.mix button { font: 600 15px var(--serif); padding: 8px 14px; border-radius: 6px; border: 1px solid var(--accent); background: var(--accent); color: var(--bg); cursor: pointer; }
+.mix button.alt { background: var(--plate); color: var(--fg); border-color: var(--line); }
+.bar { height: 10px; background: var(--plate); border: 1px solid var(--line); border-radius: 5px; overflow: hidden; margin: .4em 0 1em; }
+.bar > div { height: 100%; background: var(--amber); width: 0; }
+</style>
+</head>
+<body>
+<main>
+<div class="eyebrow">Start here · Chapter 3 · every practice box in the book</div>
+<h1>Problem-Type Atlas</h1>
+<p class="lede">Every practice box in the book, grouped by topic, with your progress on each. Use it to see what is left, and use mixed practice once several types are mastered: choosing the right recipe for an unlabelled problem is exactly what the exam tests.</p>
+
+<h2>Your progress</h2>
+<p id="sum">Loading the chapters…</p>
+<div class="bar"><div id="barfill"></div></div>
+<div class="mix">
+  <button type="button" id="next-new">Next type I haven't mastered →</button>
+  <button type="button" class="alt" id="random">Random mastered type (spaced review) →</button>
+</div>
+<p class="recog">Progress is stored in this browser only. A type counts as mastered after three solo answers in a row without opening the solution. The list needs the site to be served over http (GitHub Pages or <code>python3 -m http.server</code>), not opened as a file.</p>
+
+<h2>All problem types</h2>
+<div id="list"></div>
+<p class="recog">The tag after each chapter is the type id used in the source analysis (D = diode, B = BJT, M = MOSFET, O = op-amp, S = oscillators and signal generators). For the ranking of types by exam marks see <a href="../index.html">the home page</a> and <a href="04-exam-strategy.html">Exam format and strategy</a>.</p>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/eee.js"></script>
+<script>
+(async function atlas() {
+  const root = new URL('../', location.href).href;
+  const found = []; // {group, part, file, ch, tag, anchor, id, title}
+  let group = '';
+  const jobs = [];
+  for (const p of BOOK.parts) {
+    if (p.group) { group = p.group; continue; }
+    for (const [file, ch, tag] of p.chapters) {
+      if (file.startsWith('exam/') || file.startsWith('start/03')) continue;
+      const g = group, part = p.title;
+      jobs.push(fetch(root + file).then(r => r.ok ? r.text() : '').catch(() => '').then(html => {
+        for (const m of html.matchAll(/drill\(\s*'#([\w-]+)'\s*,\s*\{\s*id:\s*'([\w-]+)'\s*,\s*title:\s*'((?:[^'\\]|\\.)*)'/g))
+          found.push({ group: g, part, file, ch, tag, anchor: m[1], id: m[2], title: m[3].replace(/\\'/g, "'") });
+      }));
+    }
+  }
+  await Promise.all(jobs);
+  const order = BOOK.parts.flatMap(p => p.chapters || []).map(c => c[0]);
+  found.sort((a, b) => order.indexOf(a.file) - order.indexOf(b.file));
+  const all = prog.all(), done = found.filter(d => (all[d.id]?.best || 0) >= MASTER);
+  const tried = found.filter(d => all[d.id]?.tries);
+  $('#sum').textContent = found.length
+    ? `${found.length} practice types in the book · ${tried.length} tried · ${done.length} mastered.`
+    : 'No practice boxes found. Serve the site over http to load the list.';
+  $('#barfill').style.width = found.length ? `${100 * done.length / found.length}%` : '0';
+  let html = '', lastG = '', lastCh = '';
+  for (const d of found) {
+    if (d.group !== lastG) { html += (lastG ? '</table></div>' : '') + `<h3>${d.group}</h3><div class="tbl atl"><table><tr><th>Practice</th><th>Chapter</th><th>Progress</th></tr>`; lastG = d.group; }
+    html += `<tr><td><a href="../${d.file}#${d.anchor}">${d.title}</a></td><td>${d.ch === lastCh ? '<span class="tag">〃</span>' : `<a href="../${d.file}">${d.ch}</a> <span class="tag">${d.tag}</span>`}</td><td>${progressBadge(d.id)}</td></tr>`;
+    lastCh = d.ch;
+  }
+  $('#list').innerHTML = html + (lastG ? '</table></div>' : '');
+  const go = d => { if (d) location.href = `../${d.file}#${d.anchor}`; };
+  $('#next-new').onclick = () => go(found.find(d => (all[d.id]?.best || 0) < MASTER));
+  $('#random').onclick = () => go(done.length ? done[Math.floor(Math.random() * done.length)] : null);
+  if (!done.length) $('#random').disabled = true;
+  tex();
+})();
+</script>
+</body>
+</html>

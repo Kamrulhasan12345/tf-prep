@@ -1,0 +1,311 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Clampers and Voltage Doublers · EEE 263 Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Diodes · Chapter 11 · Sedra §4.6.2–4.6.3 · Sadat L10, notes p.37–44, slides 29–31, Clipper-Clamper Note · Khairul s.60–63 · type D-15</div>
+<h1>Clampers and Voltage Doublers</h1>
+<p class="lede">A clamper question appeared in 2011–12, 2013–14, 2014–15 (clipper followed by clamper, 20 marks), 2015–16, 2019–20 and 2022–23 (design, 12 marks): six papers out of the last eleven. It skipped 2023–24 and 2024–25, but Sadat sir spent a whole lecture (L10) on it, gave a handout combining a clamper with a clipper, and asked for design from a given graph. One idea solves every question: the capacitor charges once to whatever value makes the diode just touch its clamp level, and then the whole waveform is shifted by that value.</p>
+
+<h2>1. How a clamper works</h2>
+<p>A capacitor \(C\) in series, a diode (maybe with a battery) across the output. On the first extreme of the input that forward-biases the diode, \(C\) charges until the diode is at its threshold. After that the diode is off (with \(RC \gg T\) there is no discharge path), \(C\) keeps its voltage and \(v_o = v_i + V_C\): the same waveform, shifted. The peak-to-peak value is unchanged, so the transfer characteristic is a line of slope 1 that does not pass through the origin (Sadat: "a straight line with slope 1 not through the origin means a clamper").</p>
+<dl class="def">
+  <dt>Positive clamper</dt><dd>Diode cathode at \(v_o\), anode at \(V_{ref}\). It pins the <b>minimum</b>: \(v_{o,min} = V_{ref} - V_\gamma\). Shift \(= V_{ref} - V_\gamma - v_{i,min}\).</dd>
+  <dt>Negative clamper</dt><dd>Diode anode at \(v_o\), cathode at \(V_{ref}\). It pins the <b>maximum</b>: \(v_{o,max} = V_{ref} + V_\gamma\). Shift \(= V_{ref} + V_\gamma - v_{i,max}\).</dd>
+  <dt>\(V_C\)</dt><dd>The capacitor voltage equals the shift (taking + on the output side). It is the same for a square wave or a sine of the same peaks: "as long as the peak-to-peak voltages are the same, the clamping will be the same; just evaluate the peak values" (Sadat's handout).</dd>
+  <dt>Condition</dt><dd>\(RC \gg T\) (Khairul boxes it on every slide). The diode must actually conduct: for a positive clamper \(v_{i,min} &lt; V_{ref} - V_\gamma\) (Sadat slide 31).</dd>
+</dl>
+<figure><div id="fig-clamp"></div><figcaption><b>Figure 1.</b> Positive clamper with a bias battery (here \(V_{ref}\) = +2 V). Reverse the diode for a negative clamper; reverse the battery for a negative reference.</figcaption></figure>
+<figure><div id="fig-table"></div><figcaption><b>Figure 2.</b> Sadat sir's five cases for a +4 / −6 V square input with 0.7 V diodes (notes p.37–39): positive clamper 9.3 / −0.7; with +2 V bias 11.3 / 1.3; with −2 V bias 7.3 / −2.7; negative clamper with −2 V bias −1.3 / −11.3; with +2 V bias 2.7 / −7.3.</figcaption></figure>
+<p>Sadat's warning (p.38): a positive clamper with a large negative bias can shift downwards, but a big reverse voltage may break the diode down. For a downward shift use a negative clamper.</p>
+
+<h2>2. Output levels of a biased clamper</h2>
+<div class="method"><h4>Method · four lines</h4><ol>
+<li>Orientation: cathode at \(v_o\) → positive clamper (pins the minimum); anode at \(v_o\) → negative clamper (pins the maximum).</li>
+<li>Clamp level: \(V_{ref} - V_\gamma\) (positive) or \(V_{ref} + V_\gamma\) (negative), \(V_{ref}\) signed by the battery polarity (long plate +).</li>
+<li>Shift \(V_C\) = clamp level − \(v_{i,min}\) (positive) or clamp level − \(v_{i,max}\) (negative). Check the diode does conduct.</li>
+<li>\(v_o = v_i + V_C\): both levels; draw the shifted waveform and the transfer line \(v_o = v_i + V_C\).</li>
+</ol></div>
+<div id="wk-lev"></div>
+<div id="dr-lev"></div>
+
+<h2>3. Design a clamper for a target waveform</h2>
+<div class="method"><h4>Method · design (Sadat notes p.40–41)</h4><ol>
+<li>Check the peak-to-peak values are equal; if not, a clipper is needed as well.</li>
+<li>Shift \(= v_{o,max} - v_{i,max}\). Upward → positive clamper; downward → negative clamper.</li>
+<li>Positive: \(V_{ref} = v_{o,min} + V_\gamma\). Negative: \(V_{ref} = v_{o,max} - V_\gamma\). Draw the battery with the right polarity (a negative \(V_{ref}\): + at ground).</li>
+<li>State \(RC \gg T\) and pick values (e.g. \(R\) = 100 kΩ, \(C\) = 1 µF for a 1 kHz input).</li>
+</ol></div>
+<div id="dr-des"></div>
+
+<h2>4. Finite RC: tilt, and the clamper with source and load resistors</h2>
+<p>With a load \(R\), \(C\) discharges while the diode is off: \(V_C(t) = V_{C0}e^{-t/RC}\), so the flat top droops by about \(\Delta V \approx V\frac{T/2}{RC}\), and at the next edge the diode recharges \(C\) almost instantly (a small spike past the clamp level, Sadat p.42: top 8 → 7.5 V, bottom kicks to −2.5 V and returns to −2 V). Large \(RC\) → ideal clamper.</p>
+<p>With a source resistor \(R_s\) as well (2015–16), the capacitor current is no longer an instant spike: find \(V_C\) by <b>charge balance</b>. In steady state the average capacitor current is zero, so for equal half-periods (\(V_C\) = input side minus output side, positive clamper, ±\(V_m\) square):</p>
+<div class="formula">\[ \frac{V_m - V_C}{R_s + R_L} + \frac{-V_m + V_\gamma - V_C}{R_s} = 0 \;\Rightarrow\; V_C = \frac{V_mR_s + (V_\gamma - V_m)(R_s + R_L)}{2R_s + R_L} \]</div>
+<p>Diode-off half: \(v_o = (V_m - V_C)\dfrac{R_L}{R_s + R_L}\). Diode-on half: \(v_o = -V_\gamma\). Check the diode current is positive, and give the tilt from \(\tau = (R_s + R_L)C\).</p>
+<div id="dr-cb"></div>
+
+<h2>5. Combinations and the voltage doubler</h2>
+<p><b>Clipper then clamper</b> (2014–15): clip first, then clamp the clipped waveform's extreme. <b>Clamper then clipper</b> (Sadat's handout): find the shifted waveform \(v_x\), then clip it; the breakpoint in \(v_i\) is the clip level minus the shift.</p>
+<div id="wk-cc"></div>
+<p><b>Voltage doubler</b> (Sedra Fig. 4.31): a clamper followed by a peak rectifier. \(C_1\) and \(D_1\) clamp the input so it swings from 0 to \(-2V_p\); \(D_2\) and \(C_2\) hold its negative peak. Output \(= -2V_p\) (ideal), \(-2(V_p - V_D)\) with CVD diodes. Flip both diodes for \(+2V_p\).</p>
+<figure><div id="fig-dbl"></div><figcaption><b>Figure 3.</b> Voltage doubler: clamper (\(C_1\), \(D_1\)) and peak detector (\(D_2\), \(C_2\)). The output settles at \(-2V_p\).</figcaption></figure>
+
+<div class="trap"><h4>Traps (where marks go)</h4><ul>
+<li>Forgetting \(V_\gamma\) or using the wrong sign: positive clamper level is \(V_{ref} - V_\gamma\), negative clamper \(V_{ref} + V_\gamma\). (The question-bank note on 2019–20 says 5.7 V with CVD; it is 4.3 V.)</li>
+<li>Not stating \(RC \gg T\) (or an ideal diode) when the question gives no values.</li>
+<li>Clamping the raw input instead of the clipped waveform in a clipper–clamper chain.</li>
+<li>The sign of \(V_C\): say which side is +.</li>
+<li>A clamper changes only the DC level; if the target peak-to-peak differs, you also need a clipper.</li>
+</ul></div>
+
+<h2>Exam questions</h2>
+
+<div class="exam">
+  <div class="exam-src">2022–23 · Sec A · Q4(a) · 12 marks</div>
+  <div class="exam-q"><p>Design a clamper circuit to perform the function shown: input \(v_i\) a ±20 V square wave, output \(v_o\) a square wave between +30 V and −10 V. Assume ideal diodes.</p><div id="pl-2223"></div></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>Both waves are 40 V peak-to-peak, so a clamper alone works. Shift \(= 30 - 20 = +10\) V (upward) → positive clamper. The minimum is pinned at −10 V: diode cathode at \(v_o\), anode at \(V_{ref} = -10\) V (ideal), i.e. a 10 V battery with + at ground.</p>
+    <div id="fig-a2223"></div>
+    <p>During the −20 V half the diode conducts and \(C\) charges to 10 V (+ on the output side); then \(v_o = v_i + 10\): +30 / −10 V. Choose \(RC \gg T\), e.g. 1 µF with a 100 kΩ load at 1 kHz. (With 0.7 V diodes use a 9.3 V battery.)</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2019–20 (paper dated "January 2021") · Sec A · Q1(b) · 16 marks</div>
+  <div class="exam-q"><p>Draw the output waveshape for the circuit with the given square input (+10 V / −20 V): series C, diode with cathode at \(v_o\) and anode at the + terminal of a 5 V battery (− at ground), load R across the output.</p><div id="fig-q1920"></div></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>Assume an ideal diode and \(RC \gg T\). Positive clamper with \(V_{ref}\) = +5 V: the minimum of \(v_o\) is pinned at +5 V. During the −20 V half the diode conducts: \(V_C = 5 - (-20) = 25\) V (+ on the output side).</p>
+    <p>\(v_o = v_i + 25\): a square wave between +35 V and +5 V (peak-to-peak 30 V kept).</p>
+    <div id="pl-1920"></div>
+    <p>With 0.7 V diodes the clamp level is \(5 - 0.7 = 4.3\) V, so +34.3 / +4.3 V.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2015–16 · Sec A · Q2(b) · 15 marks</div>
+  <div class="exam-q"><p>Draw the steady-state output for the ±5 V square input (period 1 ms): 1 kΩ in series, then 10 µF in series, diode with anode at ground and cathode at \(v_o\), 2 kΩ load. The diode is non-ideal (0.7 V).</p><div id="fig-q1516"></div></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>Let \(V_C\) = (resistor side) − (output side). Positive half: diode off, current \((5 - V_C)/3\) mA. Negative half: diode on, \(v_o = -0.7\) V, current \((-5 + 0.7 - V_C)/1\) mA. Charge balance (equal halves):</p>
+    <p>\(\dfrac{5 - V_C}{3} + (-4.3 - V_C) = 0 \Rightarrow 5 - V_C - 12.9 - 3V_C = 0 \Rightarrow V_C = -1.975\) V.</p>
+    <p>Positive half: \(v_o = (5 + 1.975)\frac{2}{3} = +4.65\) V. Negative half: \(v_o = -0.7\) V; diode current \(= 2.325 - 0.35 = 1.975\) mA &gt; 0 ✓.</p>
+    <p>Tilt: \(\tau_{off} = (1 + 2)\text{ kΩ}\times10\ \mu\text{F} = 30\) ms over 0.5 ms, so the top droops by about \(4.65\times0.5/30 = 0.08\) V (exact steady state: 4.69 → 4.61 V); the bottom is flat at −0.7 V.</p>
+    <div id="pl-1516"></div>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2014–15 · Sec A · Q2(a) · 20 marks</div>
+  <div class="exam-q"><p>Assuming ideal diodes, find and draw \(V_o\). Input: triangle, 0 → +10 V at 2.5 ms → −10 V at 7.5 ms → 0 at 10 ms. Circuit: 10 Ω from \(v_{in}\) to node A; D1 from A (anode) to +6 V; D2 from −4 V (anode) to A; C from A to the output; D3 from ground (anode) to the output (cathode).</p><div id="fig-q1415"></div></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><b>Clipper:</b> \(v_A = v_{in}\) clipped to the range −4 V … +6 V. With slope 4 V/ms: \(v_A\) reaches 6 V at 1.5 ms, stays until 3.5 ms; reaches −4 V at 6.0 ms, stays until 9.0 ms.</p>
+    <p><b>Clamper:</b> D3 (cathode at the output) is a positive clamper with \(V_{ref}\) = 0: it pins the minimum of \(v_o\) at 0. The minimum of \(v_A\) is −4 V, so \(V_C\) = 4 V and \(V_o = v_A + 4\).</p>
+    <p>\(V_o\) is the clipped triangle shifted up: 0 to +10 V, flat at 10 V from 1.5 to 3.5 ms and flat at 0 V from 6.0 to 9.0 ms.</p>
+    <div id="pl-1415"></div>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2013–14 · Sec A · Q2(a) · 20 marks</div>
+  <div class="exam-q"><p>Draw the output \(v_o\) and the \(v_i\)–\(v_o\) graph: \(v_i = 3\sin\omega t\), a series loop of C (with \(v_o\) defined across C), a diode and a 1 V battery; constant 0.7 V drop; C initially uncharged.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>There is no resistor, so the capacitor charges on the first quarter-cycle and can never discharge.</p>
+    <p><b>Question-bank reading</b> (diode anode toward C, cathode to +1 V): the diode conducts when \(v_i - v_o \ge 1.7\) V, first at \(\omega t = \sin^{-1}(1.7/3)\). Then \(v_o = v_i - 1.7\) until the peak: \(v_o = 3 - 1.7 = 1.3\) V at \(T/4\). After that the diode stays off and \(v_o = 1.3\) V DC for ever; the \(v_i\)–\(v_o\) graph is a horizontal line at 1.3 V. The voltage across the diode + battery branch is \(v_i - 1.3\): a clamped sine from −4.3 V to +1.7 V (probably what the figure's "\(V_L\)" means).</p>
+    <p><b>As drawn in the scan</b> (cathode toward C, anode at −1 V): the same reasoning gives \(v_o = -1.3\) V DC and the branch voltage \(v_i + 1.3\) (−1.7 V to +4.3 V). State which reading you use.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2011–12 · Sec B · Q6(c) · 12 marks</div>
+  <div class="exam-q"><p>Design a clamper circuit to perform the indicated function using an ideal diode: input ±10 V square, output 0 / +20 V square.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>Peak-to-peak 20 V on both, shift +10 V with the minimum at 0: a positive clamper with no battery. Series C; diode with anode at ground and cathode at \(v_o\); load R with \(RC \gg T\). \(V_C\) = 10 V (+ on the output side), \(v_o = v_i + 10\).</p>
+  </div></details>
+</div>
+
+<h3>Class examples and exercises (Sadat L10, handout, Ikra p.34–36)</h3>
+<div class="exam">
+  <div class="exam-src">Sadat notes p.40 · Ikra p.34</div>
+  <div class="exam-q"><p>Design a clamper with \(v_o = v_i + 3\) for an input from −5 V to +5 V (0.7 V diode).</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a"><p>Upward shift → positive clamper. Minimum output \(-5 + 3 = -2\) V \(= V_{ref} - 0.7\) → \(V_{ref} = -1.3\) V (1.3 V battery, + at ground). Output +8 / −2 V.</p></div></details>
+</div>
+<div class="exam">
+  <div class="exam-src">Sadat notes p.41 · Ikra p.35 (left unsolved in Ikra's notes)</div>
+  <div class="exam-q"><p>Design a clamper from the graph: a line of slope 1 crossing the \(v_o\) axis at −4 V (\(v_o = v_i - 4\)); the input goes from −8 V to +10 V.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a"><p>Intercept negative → negative clamper (diode anode at \(v_o\)). Maximum output \(10 - 4 = 6\) V \(= V_{ref} + 0.7\) → \(V_{ref}\) = 5.3 V (battery + toward the diode cathode). Output +6 / −12 V. With \(RC \gg T\) "the capacitor decays extremely slowly" (Ikra's red note), so the levels hold.</p></div></details>
+</div>
+<div class="exam">
+  <div class="exam-src">Sadat sir's Clipper-Clamper Note (handout; Ikra p.36) · exercise (i) and (ii)</div>
+  <div class="exam-q"><p>For a 10 V p-p input (−5 to +5 V) and 0.7 V diodes, design circuits that give: (i) \(v_o = v_i + 2\), flat below \(v_i\) = −3 V and above \(v_i\) = 4 V; (ii) \(v_o = v_i - 1\), flat below \(v_i\) = −2 V and above \(v_i\) = 2 V.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><b>(i)</b> Clamper then clipper. Shift +2: positive clamper, \(v_{x,min} = -5 + 2 = -3 = V_{ref} - 0.7\) → anode at −2.3 V; \(v_x\) runs −3 … 7 V. Clip at \(v_o = -3 + 2 = -1\) V: diode cathode at \(v_o\), anode at −0.3 V. Clip at \(v_o = 4 + 2 = 6\) V: diode anode at \(v_o\), cathode at +5.3 V. Output −1 … 6 V.</p>
+    <p><b>(ii)</b> Shift −1: negative clamper, \(v_{x,max} = 5 - 1 = 4 = V_{ref} + 0.7\) → cathode at +3.3 V; \(v_x\) runs −6 … 4 V. Clip at \(2 - 1 = 1\) V: diode anode at \(v_o\), cathode at +0.3 V. Clip at \(-2 - 1 = -3\) V: diode cathode at \(v_o\), anode at −2.3 V. Output −3 … 1 V.</p>
+    <p>Both verified by tracing the peaks: each clipper branch sits after a series R from \(v_x\).</p>
+  </div></details>
+</div>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+
+<div class="key"><p><strong>Summary:</strong> cathode at \(v_o\) → positive clamper, minimum pinned at \(V_{ref} - V_\gamma\); anode at \(v_o\) → negative clamper, maximum pinned at \(V_{ref} + V_\gamma\). Shift = pinned level − the input's matching extreme; \(v_o = v_i + V_C\), peak-to-peak unchanged; needs \(RC \gg T\). Finite \(R_s\), \(R_L\): charge balance. Chains: process stage by stage. Doubler: clamper + peak rectifier, \(-2V_p\).</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/eee.js"></script>
+<script>
+// plot(o): axes + curves for waveforms and transfer characteristics.
+// o = {w, h, x:[x0,x1], y:[y0,y1], xl, yl, xt:[[v,'label']], yt:[[v,'label']], c:[{f | pts, cls}], g:[{x} | {y}], m:[[x, y, 'text', anchor, cls]], al}
+function plot(o) {
+  const W = o.w || 440, H = o.h || 200, L = 46, R = 30, T = 16, B = 24, s = [];
+  const X = v => L + (v - o.x[0]) / (o.x[1] - o.x[0]) * (W - L - R), Y = v => T + (o.y[1] - v) / (o.y[1] - o.y[0]) * (H - T - B);
+  const n = v => v.toFixed(1), cl = (v, a, b) => Math.min(Math.max(v, a), b);
+  const ax = X(cl(0, o.x[0], o.x[1])), ay = Y(cl(0, o.y[0], o.y[1]));
+  for (const g of o.g || []) s.push(g.x !== undefined ? `<line x1="${n(X(g.x))}" y1="${T}" x2="${n(X(g.x))}" y2="${H - B}" class="s-fg dash" opacity=".45"/>` : `<line x1="${L}" y1="${n(Y(g.y))}" x2="${W - R}" y2="${n(Y(g.y))}" class="s-fg dash" opacity=".45"/>`);
+  s.push(`<line x1="${L}" y1="${n(ay)}" x2="${W - R + 8}" y2="${n(ay)}" class="s-fg"/><line x1="${n(ax)}" y1="${H - B + 4}" x2="${n(ax)}" y2="${T - 8}" class="s-fg"/>`);
+  s.push(`<text x="${W - R + 10}" y="${n(ay + 4)}" class="lbl">${o.xl || ''}</text><text x="${n(ax + 5)}" y="${T - 4}" class="lbl">${o.yl || ''}</text>`);
+  for (const [v, t] of o.xt || []) s.push(`<line x1="${n(X(v))}" y1="${n(ay - 3)}" x2="${n(X(v))}" y2="${n(ay + 3)}" class="s-fg"/><text x="${n(X(v))}" y="${n(ay + 15)}" text-anchor="middle" class="lbl">${t}</text>`);
+  for (const [v, t] of o.yt || []) s.push(`<line x1="${n(ax - 3)}" y1="${n(Y(v))}" x2="${n(ax + 3)}" y2="${n(Y(v))}" class="s-fg"/><text x="${n(ax - 6)}" y="${n(Y(v) + 4)}" text-anchor="end" class="lbl">${t}</text>`);
+  for (const c of o.c || []) {
+    const pts = c.pts || Array.from({ length: 401 }, (_, k) => { const x = o.x[0] + (o.x[1] - o.x[0]) * k / 400; return [x, c.f(x)]; });
+    s.push(`<polyline points="${pts.map(([x, y]) => n(X(x)) + ',' + n(Y(cl(y, o.y[0], o.y[1])))).join(' ')}" class="${c.cls || 's-acc'}"/>`);
+  }
+  for (const [x, y, t, a, c] of o.m || []) s.push(`<text x="${n(X(x))}" y="${n(Y(y))}" text-anchor="${a || 'start'}" class="lbl ${c || ''}">${t}</text>`);
+  return `<svg viewBox="0 0 ${W} ${H}" width="${W}" style="max-width:100%;height:auto;display:block;margin:0 auto" role="img" aria-label="${o.al || 'Plot'}">${s.join('')}</svg>`;
+}
+
+// clamper schematic: o = {pos (true = cathode at vo), V (signed ref), Rs, RL, C}
+function clampFig(o = {}) {
+  const X = o.RL ? 330 : 300, it = [['AC', [40, 60], [40, 220], 'vᵢ', 1, { amp: 5, f: 1000 }], ['W', [40, 220], [o.RL ? 330 : 260, 220]], ['gnd', [100, 220]]];
+  if (o.Rs) it.push(['W', [40, 60], [70, 60]], ['R', [70, 60], [130, 60], o.Rs], ['W', [130, 60], [150, 60]]); else it.push(['W', [40, 60], [150, 60]]);
+  it.push(['C', [150, 60], [210, 60], o.C || 'C'], ['W', [210, 60], [X, 60]], ['dot', [260, 60]], ['dot', [260, 220]]);
+  it.push(o.pos !== false ? ['D', [260, 140], [260, 60], ''] : ['D', [260, 60], [260, 140], '']);
+  if (o.V) it.push(['W', [260, 140], [260, 160]], o.V > 0 ? ['V', [260, 160], [260, 210], num(o.V) + ' V'] : ['V', [260, 210], [260, 160], num(-o.V) + ' V'], ['W', [260, 210], [260, 220]]);
+  else it.push(['W', [260, 140], [260, 220]]);
+  if (o.RL) it.push(['dot', [330, 60]], ['R', [330, 60], [330, 220], o.RL]);
+  it.push(['open', [X, 60], ''], ['t', [X + 8, 50], 'vₒ', 'start']);
+  return sch(it, { w: X + 40, h: 250 });
+}
+const sq = (hi, lo, T = 1) => t => ((t % T) + T) % T < T / 2 ? hi : lo;
+const sqPts = (hi, lo, cyc = 2) => { const p = []; for (let k = 0; k < cyc; k++) p.push([k, hi], [k + 0.5, hi], [k + 0.5, lo], [k + 1, lo]); return p; };
+$('#fig-clamp').innerHTML = clampFig({ pos: true, V: 2, RL: 'R' });
+$('#fig-table').innerHTML = '<div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center">' + [[9.3, -0.7, '+ clamper'], [11.3, 1.3, '+ clamper, +2 V'], [7.3, -2.7, '+ clamper, −2 V'], [-1.3, -11.3, '− clamper, −2 V'], [2.7, -7.3, '− clamper, +2 V']]
+  .map(([h, l, t]) => plot({ w: 200, h: 170, x: [0, 2], y: [-12, 12], xl: 't', yl: 'v', yt: [[h, String(h)], [l, String(l)]], c: [{ pts: sqPts(4, -6), cls: 's-fg dash' }, { pts: sqPts(h, l) }], m: [[0.05, -10.5, t, 'start', 'acc']], al: t })).join('') + '</div>';
+
+worked('#wk-lev', {
+  given: 'Sadat notes p.38: square input +4 / −6 V; positive clamper (cathode at v_o) with the anode at a +2 V battery; 0.7 V diode.',
+  fig: clampFig({ pos: true, V: 2, RL: '' }),
+  steps: [
+    'Cathode at \\(v_o\\): positive clamper, pins the minimum.',
+    { t: 'Clamp level \\(= V_{ref} - V_\\gamma = 2 - 0.7 = 1.3\\) V', a: { l: 'v_{o,min}', v: 1.3, u: 'V' } },
+    { t: 'Shift \\(V_C = 1.3 - (-6) = 7.3\\) V (+ on the output side)', a: { l: 'V_C', v: 7.3, u: 'V' } },
+    { t: '\\(v_{o,max} = 4 + 7.3 = 11.3\\) V; output 11.3 / 1.3 V; transfer line \\(v_o = v_i + 7.3\\)', a: { l: 'v_{o,max}', v: 11.3, u: 'V' } },
+  ] });
+
+drill('#dr-lev', { id: 'd15-clamper-levels', title: 'Output levels of a biased clamper', gen(r) {
+  const pos = r() < 0.5, Vg = r.pick([0, 0.7]), V = r.int(-10, 10), sine = r() < 0.3;
+  let hi, lo; if (sine) { hi = r.pick([5, 8, 10, 12]); lo = -hi; } else { hi = r.pick([4, 5, 10, 15, 20]); lo = r.pick([-5, -6, -10, -20]); }
+  const lvl = pos ? V - Vg : V + Vg;
+  if (pos ? lo >= lvl - 0.2 : hi <= lvl + 0.2) return null;
+  const sh = pos ? lvl - lo : lvl - hi;
+  return {
+    given: `Input: ${sine ? `a sine of amplitude ${hi} V` : `a square wave between +${hi} V and ${lo} V`}. Series C, then a diode across the output with its ${pos ? 'cathode' : 'anode'} at \\(v_o\\) and its other end at ${V ? `a battery giving ${V} V` : 'ground'}. ${Vg ? 'CVD 0.7 V' : 'Ideal diode'}, \\(RC \\gg T\\). Find \\(v_{o,max}\\), \\(v_{o,min}\\) and \\(V_C\\) (+ on the output side).`,
+    fig: clampFig({ pos, V }),
+    ask: [{ l: 'v_{o,max}', v: hi + sh, u: 'V' }, { l: 'v_{o,min}', v: lo + sh, u: 'V' }, { l: 'V_C', v: sh, u: 'V' }],
+    steps: [
+      `${pos ? 'Cathode' : 'Anode'} at \\(v_o\\): ${pos ? 'positive clamper, pins the minimum at \\(V_{ref} - V_\\gamma' : 'negative clamper, pins the maximum at \\(V_{ref} + V_\\gamma'} = ${num(lvl)}\\) V.`,
+      { t: `Shift \\(V_C = ${num(lvl)} - (${pos ? lo : hi}) = ${num(sh)}\\) V`, a: { l: 'V_C', v: sh, u: 'V' } },
+      { t: `\\(v_{o,max} = ${hi} + (${num(sh)}) = ${num(hi + sh)}\\) V`, a: { l: 'v_{o,max}', v: hi + sh, u: 'V' } },
+      { t: `\\(v_{o,min} = ${lo} + (${num(sh)}) = ${num(lo + sh)}\\) V`, a: { l: 'v_{o,min}', v: lo + sh, u: 'V' } },
+    ] };
+} });
+
+drill('#dr-des', { id: 'd15-clamper-design', title: 'Design a clamper: orientation and battery', gen(r) {
+  const Vg = r.pick([0, 0.7]), hi = r.pick([5, 10, 20]), lo = -r.pick([5, 10, 20]), sh = r.pick([-15, -10, -8, -5, -4, -3, 3, 4, 5, 8, 10, 15]);
+  const up = sh > 0, oh = hi + sh, ol = lo + sh, Vref = up ? ol + Vg : oh - Vg;
+  return {
+    given: `Input: square wave +${hi} / ${lo} V. Required output: +${oh} / ${ol} V (written as signed values: ${oh}, ${ol}). ${Vg ? 'Diode drop 0.7 V' : 'Ideal diode'}. Choose the clamper type (positive for an upward shift, negative for downward) and the reference voltage at the diode's far end.`,
+    ask: [{ l: 'V_C', v: Math.abs(sh), u: 'V' }, { l: 'V_{ref}', v: Vref, u: 'V' }],
+    steps: [
+      { t: `Peak-to-peak ${hi - lo} V on both ✓. Shift \\(= ${oh} - ${hi} = ${sh}\\) V: ${up ? 'upward → positive clamper (cathode at \\(v_o\\))' : 'downward → negative clamper (anode at \\(v_o\\))'}`, a: { l: 'V_C', v: Math.abs(sh), u: 'V' } },
+      { t: up ? `Pins the minimum: \\(V_{ref} = ${ol} + ${Vg} = ${num(Vref)}\\) V` : `Pins the maximum: \\(V_{ref} = ${oh} - ${Vg} = ${num(Vref)}\\) V`, a: { l: 'V_{ref}', v: Vref, u: 'V' } },
+      `${Vref < 0 ? 'Negative reference: battery with + at ground.' : Vref > 0 ? 'Battery + toward the diode.' : 'No battery.'} State \\(RC \\gg T\\).`,
+    ] };
+} });
+
+drill('#dr-cb', { id: 'd15-charge-balance', title: 'Clamper with source and load resistors (charge balance)', gen(r) {
+  const Vm = r.pick([5, 10]), Rs = r.pick([0.5, 1, 2]), RL = r.pick([1, 2, 5, 10]), C = r.pick([10, 47, 100]) * 1e-6, f = r.pick([100, 500, 1000]), Vg = 0.7;
+  const T2 = 0.5 / f, tau = (Rs + RL) * 1e3 * C; if (tau < 10 * T2) return null;
+  const VC = (Vm * Rs + (Vg - Vm) * (Rs + RL)) / (2 * Rs + RL), H = (Vm - VC) * RL / (Rs + RL), iD = -Vg / RL - (-Vm + Vg - VC) / Rs;
+  if (iD <= 0) return null;
+  const tilt = H * T2 / tau;
+  return {
+    given: `±${Vm} V square wave at ${si(f, 'Hz')} → ${Rs} kΩ → C = ${si(C, 'F')} → output; diode with anode at ground and cathode at \\(v_o\\) (0.7 V); load ${RL} kΩ. Find \\(V_C\\) (resistor side minus output side), the two output levels and the approximate droop of the top.`,
+    fig: clampFig({ pos: true, Rs: Rs + ' kΩ', RL: RL + ' kΩ', C: si(C, 'F') }),
+    ask: [{ l: 'V_C', v: VC, u: 'V' }, { l: 'v_{o,high}', v: H, u: 'V' }, { l: 'v_{o,low}', v: -Vg, u: 'V' }, { l: '\\Delta V', v: tilt, u: 'mV', tol: 0.05 }],
+    steps: [
+      `Balance: \\(\\dfrac{${Vm} - V_C}{${Rs} + ${RL}} + \\dfrac{-${Vm} + 0.7 - V_C}{${Rs}} = 0\\)`,
+      { t: `\\(V_C = \\dfrac{${Vm}(${Rs}) + (0.7 - ${Vm})(${Rs + RL})}{2(${Rs}) + ${RL}} = ${num(VC)}\\) V`, a: { l: 'V_C', v: VC, u: 'V' } },
+      { t: `Diode off: \\(v_o = (${Vm} - (${num(VC)}))\\frac{${RL}}{${Rs + RL}} = ${num(H)}\\) V`, a: { l: 'v_{o,high}', v: H, u: 'V' } },
+      { t: `Diode on: \\(v_o = -0.7\\) V; its current \\(= ${num(iD)}\\) mA &gt; 0 ✓`, a: { l: 'v_{o,low}', v: -Vg, u: 'V' } },
+      { t: `\\(\\tau = (${Rs} + ${RL})\\text{ kΩ}\\times${si(C, 'F')} = ${si(tau, 's')}\\); droop \\(\\approx ${num(H)}\\times${si(T2, 's')}/${si(tau, 's')} = ${si(tilt, 'V')}\\)`, a: { l: '\\Delta V', v: tilt, u: 'mV', tol: 0.05 } },
+    ] };
+} });
+
+worked('#wk-cc', {
+  given: "Sadat's handout: v_i = ±5 V (10 V p-p); C; D1 cathode at v_x, anode at −2 V; then R from v_x to v_o; D2 cathode at v_o, anode at −1 V. CVD 0.7 V.",
+  steps: [
+    { t: 'D1 conducts at the negative peak: \\(v_x = -2 - 0.7 = -2.7\\) V when \\(v_i = -5\\)', a: { l: 'v_{x,min}', v: -2.7, u: 'V' } },
+    { t: 'Clamp amount \\(V_C = -2.7 - (-5) = 2.3\\) V: \\(v_x = v_i + 2.3\\) (−2.7 … 7.3 V)', a: { l: 'V_C', v: 2.3, u: 'V' } },
+    { t: 'D2 clips \\(v_o\\) at \\(-1 - 0.7 = -1.7\\) V', a: { l: 'v_{o,min}', v: -1.7, u: 'V' } },
+    { t: 'Clipping starts when \\(v_x = -1.7\\), i.e. \\(v_i = -1.7 - 2.3 = -4\\) V. Transfer: \\(v_o = v_i + 2.3\\) for \\(v_i &gt; -4\\), flat −1.7 V below; \\(v_o\\) runs −1.7 … 7.3 V', a: { l: 'v_{i,bp}', v: -4, u: 'V' } },
+  ] });
+
+$('#fig-dbl').innerHTML = sch([
+  ['AC', [40, 60], [40, 200], 'vₛ', 1, { amp: 5, f: 1000 }], ['W', [40, 60], [70, 60]], ['C', [70, 60], [140, 60], 'C₁ 10 µF'], ['W', [140, 60], [200, 60]], ['dot', [180, 60]],
+  ['D', [180, 60], [180, 200], 'D1'], ['D', [250, 60], [200, 60], 'D2'], ['W', [250, 60], [310, 60]], ['C', [310, 60], [310, 200], 'C₂ 10 µF'], ['R', [370, 60], [370, 200], '100 kΩ'], ['W', [310, 60], [370, 60]],
+  ['W', [40, 200], [370, 200]], ['dot', [180, 200]], ['dot', [310, 200]], ['gnd', [110, 200]], ['t', [378, 50], 'vₒ ≈ −2Vₚ', 'start'],
+], { w: 450, h: 230 });
+
+$('#pl-2223').innerHTML = plot({ w: 420, h: 190, x: [0, 2], y: [-22, 32], xl: 't', yl: 'v (V)', yt: [[20, '20'], [-20, '−20'], [30, '30'], [-10, '−10']], c: [{ pts: sqPts(20, -20), cls: 's-fg dash' }, { pts: sqPts(30, -10) }], m: [[1.05, 26, 'vₒ', 'start', 'acc'], [1.55, -18, 'vᵢ', 'start']], al: '2022-23 waveforms' });
+$('#fig-a2223').innerHTML = clampFig({ pos: true, V: -10, RL: '100 kΩ' });
+$('#fig-q1920').innerHTML = clampFig({ pos: true, V: 5, RL: 'R' });
+$('#pl-1920').innerHTML = plot({ w: 420, h: 190, x: [0, 2], y: [-22, 37], xl: 't', yl: 'v (V)', yt: [[10, '10'], [-20, '−20'], [35, '35'], [5, '5']], c: [{ pts: sqPts(10, -20), cls: 's-fg dash' }, { pts: sqPts(35, 5) }], al: '2019-20 output' });
+$('#fig-q1516').innerHTML = clampFig({ pos: true, Rs: '1 kΩ', RL: '2 kΩ', C: '10 µF' });
+$('#pl-1516').innerHTML = plot({ w: 420, h: 190, x: [0, 2], y: [-6, 6], xl: 't (ms)', yl: 'v (V)', yt: [[4.65, '4.65'], [-0.7, '−0.7'], [5, '5'], [-5, '−5']], c: [{ pts: sqPts(5, -5), cls: 's-fg dash' },
+  { pts: [0, 1].flatMap(k => [[k, 4.69], [k + 0.5, 4.61], [k + 0.5, -0.7], [k + 1, -0.7]]) }], al: '2015-16 output' });
+const tri = t => { t = ((t % 10) + 10) % 10; return t <= 2.5 ? 4 * t : t <= 7.5 ? 10 - 4 * (t - 2.5) : -10 + 4 * (t - 7.5); };
+$('#pl-1415').innerHTML = plot({ w: 500, h: 210, x: [0, 10], y: [-11, 11], xl: 't (ms)', yl: 'v (V)', xt: [[1.5, '1.5'], [3.5, '3.5'], [6, '6'], [9, '9']], yt: [[6, '6'], [-4, '−4'], [10, '10']],
+  c: [{ f: tri, cls: 's-fg dash' }, { f: t => Math.min(6, Math.max(-4, tri(t))), cls: 's-fg' }, { f: t => Math.min(6, Math.max(-4, tri(t))) + 4 }], m: [[2.5, 10.3, 'Vₒ', 'middle', 'acc'], [6.2, -3.2, 'v_A', 'start']], al: '2014-15 waveforms' });
+$('#fig-q1415').innerHTML = sch([
+  ['AC', [40, 60], [40, 220], 'vᵢₙ', 1, { amp: 10, f: 100 }], ['W', [40, 60], [70, 60]], ['R', [70, 60], [130, 60], '10 Ω'], ['W', [130, 60], [270, 60]], ['dot', [170, 60]], ['dot', [230, 60]],
+  ['D', [170, 60], [170, 120], 'D1', -1], ['V', [170, 140], [170, 200], '6 V', -1], ['W', [170, 120], [170, 140]], ['W', [170, 200], [170, 220]],
+  ['D', [230, 120], [230, 60], 'D2'], ['V', [230, 200], [230, 140], '4 V'], ['W', [230, 120], [230, 140]], ['W', [230, 200], [230, 220]],
+  ['C', [270, 60], [330, 60], 'C 10 µF'], ['W', [330, 60], [380, 60]], ['dot', [380, 60]], ['D', [380, 220], [380, 60], 'D3'],
+  ['W', [40, 220], [380, 220]], ['dot', [170, 220]], ['dot', [230, 220]], ['gnd', [100, 220]], ['W', [380, 60], [420, 60]], ['open', [420, 60], ''], ['t', [428, 50], 'Vₒ', 'start'], ['t', [272, 50], 'A', 'start'],
+], { w: 460, h: 250 });
+
+flashcards('#cards', [
+  { f: 'Positive clamper', b: 'cathode at v_o; minimum pinned at V_ref − V_γ' },
+  { f: 'Negative clamper', b: 'anode at v_o; maximum pinned at V_ref + V_γ' },
+  { f: 'Shift', b: 'pinned level − matching input extreme; v_o = v_i + V_C' },
+  { f: 'Condition', b: 'RC ≫ T, and the diode must conduct at the input extreme' },
+  { f: 'Droop with load R', b: 'ΔV ≈ V·(T/2)/RC' },
+  { f: 'Charge balance', b: 'average capacitor current = 0 over a period' },
+  { f: 'Voltage doubler', b: 'clamper + peak rectifier: −2V_p (−2(V_p − V_D) with CVD)' },
+]);
+quiz('#quiz', [
+  { q: 'Square ±10 V, positive clamper, no battery, ideal diode. Output:', opts: ['0 / 20 V', '−20 / 0 V', '10 / −10 V', '0.7 / 20.7 V'], a: 0, why: 'Minimum pinned at 0, shift +10.' },
+  { q: 'Same with CVD 0.7 V. Output:', opts: ['0 / 20 V', '−0.7 / 19.3 V', '0.7 / 20.7 V', '−0.7 / 20.7 V'], a: 1, why: 'Minimum pinned at −0.7 V.' },
+  { q: 'Negative clamper, cathode at +2 V, CVD, input +4 / −6 V. Maximum output:', opts: ['1.3 V', '2.7 V', '4 V', '−1.3 V'], a: 1, why: '2 + 0.7 (Sadat notes p.39).' },
+  { q: 'A clamper changes', opts: ['the peak-to-peak value', 'the DC level only', 'the frequency', 'the shape'], a: 1, why: 'Same waveform, shifted.' },
+  { q: 'Voltage doubler with V_p = 10 V, ideal diodes: output', opts: ['−10 V', '−20 V', '+10 V', '−14.1 V'], a: 1, why: '−2V_p.' },
+]);
+</script>
+</body>
+</html>

@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Colpitts, Hartley and Crystal · EEE 263 Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Oscillators · Chapter 4 · Sedra §18.4 · Khairul s.24–32 · Sadat L27, notes p.122–125 · types S-03, S-04</div>
+<h1>LC Oscillators: Colpitts, Hartley and the Crystal</h1>
+<p class="lede">Colpitts is the oscillator derivation of recent papers: 2018–19 (20 marks), 2020–21 (26⅔, MOSFET small-signal), 2022–23 (20) and 2024–25 (18, compulsory). It alternates with Wien, so expect one of the two. Every version gives the same two results: \(\omega_0 = 1/\sqrt{L\,C_1C_2/(C_1 + C_2)}\) and a gain condition set by the capacitor ratio. The only trap is <b>which capacitor is on top</b> of that ratio; this chapter gives a label-free rule so you cannot get it wrong.</p>
+
+<h2>1. The LC resonator (Sadat p.122–123, Khairul s.24–25)</h2>
+<p>Charge C to \(V_0\), connect it across L. With \(i_C + i_L = 0\):</p>
+<div class="formula">\[ C\frac{dv}{dt} + i_L = 0 \;\Rightarrow\; C\frac{d^2v}{dt^2} + \frac{v}{L} = 0 \;\Rightarrow\; \frac{d^2v}{dt^2} + \omega_0^2v = 0,\quad \omega_0 = \frac{1}{\sqrt{LC}} \]</div>
+<p>So \(v_C = V_0\cos\omega_0t\) and \(i_L \propto \sin\omega_0t\): energy swings between C and L, 90° apart. Equivalently \(Z_L + Z_C = 0\): \(j\omega L + 1/(j\omega C) = 0 \Rightarrow \omega_0 = 1/\sqrt{LC}\). A real tank loses energy in its resistance; the amplifier's job is to replace it. Colpitts and Hartley are ways of tapping the tank to get the feedback signal.</p>
+
+<h2>2. Colpitts: the label-free rule</h2>
+<p>Split the tank capacitance into two capacitors in series with L between them: one across the amplifier <b>output</b>, one across the amplifier <b>input</b>. The loop current circulates through L, \(C_{out}\) and \(C_{in}\) in series, so</p>
+<div class="formula">\[ \omega_0 = \frac{1}{\sqrt{L\,C_T}},\qquad C_T = \frac{C_{in}C_{out}}{C_{in} + C_{out}} \;(\text{series, not } C_1 + C_2) \]</div>
+<p>The same current flows through both capacitors in opposite senses, so the voltages across them are in antiphase with ratio of their reactances: \(\beta = V_{in}/V_{out} = -\dfrac{1/(\omega C_{in})}{1/(\omega C_{out})} = -\dfrac{C_{out}}{C_{in}}\). The network gives 180°, the amplifier must be inverting with</p>
+<div class="formula">\[ |A| \ge \frac{C_{in}}{C_{out}} \qquad (\text{capacitor at the amplifier input over capacitor at its output}) \]</div>
+<p>In each source the labels differ, but the rule is the same:</p>
+<div class="tbl"><table>
+<tr><th>Source</th><th>Labels</th><th>Condition</th></tr>
+<tr><td>Sadat p.124, Khairul s.27 (op-amp, inverting)</td><td>\(C_1\) at \(v_f\) (input), \(C_2\) at \(v_o\) (output)</td><td>\(R_2/R_1 \ge C_1/C_2\)</td></tr>
+<tr><td>Sedra, MOSFET (2020–21 paper)</td><td>\(C_2\) gate–source (input), \(C_1\) drain–source (output)</td><td>\(g_mR \ge C_2/C_1\)</td></tr>
+<tr><td>Question bank</td><td>prints "\(C_1/C_2 = g_mR\)"</td><td>misprint: the paper says \(C_2/C_1\)</td></tr>
+</table></div>
+
+<h3>Op-amp Colpitts as taught (Sadat p.124, Khairul s.26–27)</h3>
+<figure><div id="fig-opc"></div><figcaption><b>Figure 1.</b> Op-amp Colpitts: inverting amplifier \(-R_2/R_1\); tank \(C_1\) (input side, at \(v_f\)), L, \(C_2\) (output side). Simulator: L = 10 mH, \(C_1 = C_2\) = 100 nF (about 7.1 kHz), \(R_1\) = 10 kΩ, \(R_2\) = 22 kΩ. It needs a moment to build up and clips at ±15 V.</figcaption></figure>
+<p>Exam derivation: amplifier \(A = -R_2/R_1\) (∠180°). Tank current \(I_1\) (the amplifier input draws ≈ 0): \(V_f = \dfrac{I_1}{j\omega_0C_1}\), \(V_o = -\dfrac{I_1}{j\omega_0C_2}\), so \(\beta = V_f/V_o = -C_2/C_1\) (∠180°: "phase handled automatically"). Resonance of L with \(C_1\), \(C_2\) in series: \(\omega_0 = 1/\sqrt{LC_T}\). Barkhausen \(A\beta = 1\): \(\dfrac{R_2}{R_1}\cdot\dfrac{C_2}{C_1} = 1\), i.e. \(R_2/R_1 = C_1/C_2\); to start, \(R_2/R_1 \ge C_1/C_2\).</p>
+<p><b>A more rigorous op-amp form</b> (useful if the examiner wants β(jω) written out): non-inverting amplifier, R from the output to node A, L from A to ground, \(C_1\) from A to B and \(C_2\) from B to ground, B to the + input. \(Z_A = L \parallel (C_1 \text{ series } C_2)\) is infinite at \(\omega_0 = 1/\sqrt{LC_T}\), so \(V_A = V_o\) and \(\beta = V_B/V_o = C_1/(C_1 + C_2)\) (real, phase 0 exactly there). Gain: \(1 + R_f/R_1 \ge 1 + C_2/C_1\). Same frequency, same rule (input capacitor \(C_2\) over output-side \(C_1\)).</p>
+
+<h2>3. MOSFET Colpitts by KCL (2020–21: show ω₀ and C₂/C₁ = gₘR)</h2>
+<figure><div id="fig-mos"></div><figcaption><b>Figure 2.</b> Small-signal model (Sedra Fig. 18.8 labels): \(C_2\) from gate to ground (= source), \(C_1\), R (\(r_o \parallel R_L \parallel\) tank loss) and \(g_mv_{gs}\) from drain to ground, L from drain to gate.</figcaption></figure>
+<p>Write it exactly like this in the exam:</p>
+<ol>
+<li><b>Gate node</b> (no gate current): the current through \(C_2\) comes through L: \(sC_2v_{gs} = \dfrac{v_d - v_{gs}}{sL} \Rightarrow v_d = v_{gs}(1 + s^2LC_2)\).</li>
+<li><b>Drain node</b> (sum of currents leaving = 0): \(g_mv_{gs} + \dfrac{v_d}{R} + sC_1v_d + sC_2v_{gs} = 0\) (the current into L equals the current in \(C_2\)).</li>
+<li>Substitute and divide by \(v_{gs} \ne 0\): \(g_m + (1 + s^2LC_2)\Big(\dfrac1R + sC_1\Big) + sC_2 = 0\), i.e.
+<div class="formula">\[ s^3LC_1C_2 + s^2\frac{LC_2}{R} + s(C_1 + C_2) + \Big(g_m + \frac1R\Big) = 0 \]</div></li>
+<li><b>Put \(s = j\omega_0\)</b>: imaginary part \(-\omega_0^3LC_1C_2 + \omega_0(C_1 + C_2) = 0 \Rightarrow \omega_0 = \dfrac{1}{\sqrt{L\,\frac{C_1C_2}{C_1 + C_2}}}\).</li>
+<li>Real part: \(-\omega_0^2\dfrac{LC_2}{R} + g_m + \dfrac1R = 0 \Rightarrow g_mR = \omega_0^2LC_2 - 1 = \dfrac{C_1 + C_2}{C_1} - 1 = \dfrac{C_2}{C_1}\).</li>
+</ol>
+<p>So sustained oscillation needs \(g_mR = C_2/C_1\) (gate capacitor over drain capacitor), and start-up needs \(g_mR &gt; C_2/C_1\). A BJT works the same way with \(R' = r_o \parallel R_C \parallel R_L\) and the base input resistance ignored (\(g_mR' \ge C_2/C_1\); with \(r_\pi\) included, \(h_{fe} \ge (h_{ie}/R')(C_2/C_1)\) approximately). The DC bias uses an RF choke so that only the tank sets the AC load.</p>
+<div class="method"><h4>Method · Colpitts numbers</h4><ol>
+<li>\(C_T = C_1C_2/(C_1 + C_2)\); \(f_0 = 1/(2\pi\sqrt{LC_T})\).</li>
+<li>Identify the input (gate/base/\(v_f\)) capacitor and the output (drain/collector/\(v_o\)) capacitor.</li>
+<li>Transistor: \(g_mR \ge C_{in}/C_{out}\) → \(R_{min}\) or \(g_{m,min}\). Op-amp: \(|A| \ge C_{in}/C_{out}\).</li>
+</ol></div>
+<div id="wk-col"></div>
+<div id="dr-col"></div>
+
+<h2>4. Hartley (Sadat p.125, Khairul s.29–31)</h2>
+<p>The dual: split the inductor, one capacitor C between the taps. \(\omega_0 = 1/\sqrt{(L_1 + L_2)C}\) (series inductors; mutual inductance ignored). Now the reactances are \(\omega L\), so \(\beta = -L_{in}/L_{out}\) and \(|A| \ge L_{out}/L_{in}\). Sadat/Khairul: \(L_1\) at \(v_f\), \(L_2\) at \(v_o\), so \(R_2/R_1 \ge L_2/L_1\); MOSFET form: \(g_mR \ge L_{drain}/L_{gate}\). Not yet asked in a term final, but it is in both teachers' notes.</p>
+<div id="dr-hart"></div>
+
+<h2>5. Crystal oscillators (type S-04)</h2>
+<figure><div id="fig-xtal"></div><figcaption><b>Figure 3.</b> Crystal equivalent circuit (Sedra Fig. 18.17): motional arm L–\(C_s\)–r in parallel with the electrode capacitance \(C_p\) (\(C_p \gg C_s\)); and reactance against frequency (r neglected).</figcaption></figure>
+<div class="formula">\[ Z(s) = \frac{1}{sC_p}\cdot\frac{s^2 + 1/(LC_s)}{s^2 + (C_p + C_s)/(LC_sC_p)} \]</div>
+<div class="formula">\[ \omega_s = \frac{1}{\sqrt{LC_s}},\qquad \omega_p = \frac{1}{\sqrt{L\,\frac{C_sC_p}{C_s + C_p}}} \approx \omega_s\Big(1 + \frac{C_s}{2C_p}\Big) \]</div>
+<ul>
+<li>Below \(f_s\): capacitive. At \(f_s\) (series resonance): \(X = 0\). Between \(f_s\) and \(f_p\): <b>inductive</b> (very narrow band, about 0.1%). At \(f_p\) (parallel resonance): \(|X| \to \infty\). Above \(f_p\): capacitive again.</li>
+<li>Q is \(10^4\) to \(10^6\) (\(Q = \omega_sL/r\)), so the frequency is extremely stable. In a Pierce (Colpitts-type) oscillator the crystal replaces L and operates in its inductive band, so \(f_0\) lies between \(f_s\) and \(f_p\), essentially fixed by the crystal.</li>
+</ul>
+<div id="dr-xtal"></div>
+
+<h2>6. RL/LC networks with a non-inverting amplifier (2015–16)</h2>
+<p>The 2015–16 paper used a Wien-type ladder with inductors: L in series from the output to node m, \(R_1\) from m to ground, \(R_2\) from m to the + input, L from the + input to ground; amplifier gain \(1 + R_f/R_i = 3\) (\(R_f\) = 40 kΩ, \(R_i\) = 20 kΩ). Same nodal method as Chapter 2:</p>
+<div class="formula">\[ \frac{1}{\beta} = 2 + \frac{R_2}{R_1} + j\Big(\frac{\omega L}{R_1} - \frac{R_2}{\omega L}\Big) \;\Rightarrow\; \omega_0 = \frac{\sqrt{R_1R_2}}{L},\quad \beta(\omega_0) = \frac{1}{2 + R_2/R_1} \]</div>
+<div id="dr-rl"></div>
+
+<div class="trap"><h4>Traps (where marks go)</h4><ul>
+<li>Using \(C_1 + C_2\): the capacitors are in <b>series</b> around the loop.</li>
+<li>The ratio upside down. Rule: input capacitor over output capacitor (Colpitts), output inductor over input inductor (Hartley). Always say which capacitor is at the gate.</li>
+<li>In the KCL derivation, forgetting the L current at the drain node (it equals the \(C_2\) current).</li>
+<li>Calling the crystal capacitive between \(f_s\) and \(f_p\): that band is inductive.</li>
+<li>Crystal: \(f_p\) uses the series combination \(C_sC_p/(C_s + C_p)\), not \(C_s + C_p\). Keep the pF exponents.</li>
+</ul></div>
+
+<h2>Exam questions</h2>
+
+<div class="exam">
+  <div class="exam-src">2024–25 · Sec A · Q1(a) · 18 marks · compulsory</div>
+  <div class="exam-q"><p>With an appropriate circuit diagram, describe the operation of an op-amp based Colpitts oscillator. Derive the frequency of oscillation and explain how this circuit satisfies the conditions for sustained oscillation.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><b>Circuit</b> (Figure 1): inverting amplifier, \(R_1\) into the − input, \(R_2\) feedback, + grounded: \(A = -R_2/R_1\) (180°). Feedback network: \(C_2\) from \(v_o\) to ground, L from \(v_o\) to \(v_f\), \(C_1\) from \(v_f\) to ground; \(v_f\) drives \(R_1\).</p>
+    <p><b>Operation:</b> the \(C_1\)–L–\(C_2\) tank resonates; energy exchanges between L and the capacitors. The tank voltage across \(C_2\) (output) and \(C_1\) (input) are 180° apart, so the network adds 180° to the amplifier's 180°: positive feedback at one frequency. The amplifier replaces the energy lost in the tank and in \(R_1\).</p>
+    <p><b>Frequency:</b> with the amplifier input drawing negligible current, one current \(I_1\) circulates through \(C_2\), L and \(C_1\). The loop impedance must be zero: \(j\omega L + \dfrac{1}{j\omega C_1} + \dfrac{1}{j\omega C_2} = 0 \Rightarrow \omega_0^2L = \dfrac{1}{C_1} + \dfrac{1}{C_2}\), so \(\omega_0 = \dfrac{1}{\sqrt{LC_T}}\), \(C_T = \dfrac{C_1C_2}{C_1 + C_2}\), \(f_0 = \dfrac{1}{2\pi\sqrt{LC_T}}\).</p>
+    <p><b>Feedback factor:</b> \(V_f = \dfrac{I_1}{j\omega_0C_1}\), \(V_o = -\dfrac{I_1}{j\omega_0C_2}\), so \(\beta = -\dfrac{C_2}{C_1}\).</p>
+    <p><b>Sustained oscillation (Barkhausen):</b> \(A\beta = \Big(-\dfrac{R_2}{R_1}\Big)\Big(-\dfrac{C_2}{C_1}\Big) = 1\): phase 0° (180° + 180°) and \(R_2/R_1 = C_1/C_2\). For start-up \(R_2/R_1\) slightly greater than \(C_1/C_2\); the amplitude then settles by op-amp saturation (or a limiter).</p>
+    <p>(Alternative accepted form: non-inverting amplifier with series R and the tapped tank, \(\beta = C_1/(C_1 + C_2)\) at \(\omega_0\), \(R_f/R_1 \ge C_2/C_1\) with \(C_2\) the capacitor at the input. Same \(\omega_0\).)</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2022–23 · Sec B · Q7(a) · 20 marks</div>
+  <div class="exam-q"><p>Derive the expression of oscillation frequency for a Colpitts oscillator. Then derive the conditions for Barkhausen criteria to be satisfied.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>Draw a transistor Colpitts (common-source MOSFET or common-emitter BJT with RF choke bias): \(C_1\) drain (collector) to ground, \(C_2\) gate (base) to ground, L between drain and gate; R = total resistance at the drain. Then follow Section 3:</p>
+    <p>Gate node: \(v_d = v_{gs}(1 + s^2LC_2)\). Drain node: \(g_mv_{gs} + v_d(1/R + sC_1) + sC_2v_{gs} = 0\). Characteristic equation: \(s^3LC_1C_2 + s^2LC_2/R + s(C_1 + C_2) + (g_m + 1/R) = 0\).</p>
+    <p><b>Frequency:</b> imaginary part at \(s = j\omega_0\): \(\omega_0^2 = \dfrac{C_1 + C_2}{LC_1C_2}\), \(f_0 = \dfrac{1}{2\pi\sqrt{L\,C_1C_2/(C_1 + C_2)}}\).</p>
+    <p><b>Barkhausen magnitude condition:</b> real part: \(g_mR = C_2/C_1\) (loop gain exactly 1). Start-up: \(g_mR &gt; C_2/C_1\). Phase condition: the CS stage gives 180°, the \(C_1\)–L–\(C_2\) network another 180° at \(\omega_0\) (\(\beta = -C_1/C_2\) from drain to gate), total 360°.</p>
+    <p>(Approximate method from the bank: \(A_v = -g_mR'\), \(\beta = -C_1/C_2\), \(A_v\beta \ge 1 \Rightarrow g_mR' \ge C_2/C_1\). Same result.)</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2020–21 · Sec A · Q3(b) · 26⅔ marks &nbsp;|&nbsp; also 2018–19 Sec B Q7(a), 20 marks (ω₀ part only)</div>
+  <div class="exam-q"><p>Draw the circuit of the Colpitts oscillator. Then using the small-signal model of the MOSFET show that the frequency of oscillation is \(\omega_0 = 1/\sqrt{L\,C_1C_2/(C_1 + C_2)}\) and \(C_2/C_1 = g_mR\). (2018–19: "For the Colpitts oscillator, show that the frequency of oscillation is \(\omega_0 = 1/\sqrt{LC_1C_2/(C_1+C_2)}\).")</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><b>Circuit:</b> NMOS common source, drain fed from \(V_{DD}\) through an RF choke, gate biased through a large resistor; \(C_1\) from drain to ground, \(C_2\) from gate to ground, L from drain to gate. <b>Small-signal model</b>: Figure 2 (R = \(r_o \parallel R_L\) ∥ tank loss resistance, source grounded).</p>
+    <p>1. Gate node: \(sC_2V_{gs} + \dfrac{V_{gs} - V_d}{sL} = 0 \Rightarrow V_d = V_{gs}(1 + s^2LC_2)\).</p>
+    <p>2. Drain node: \(g_mV_{gs} + \dfrac{V_d}{R} + sC_1V_d + sC_2V_{gs} = 0\).</p>
+    <p>3. Substitute: \(V_{gs}\Big[g_m + (1 + s^2LC_2)\Big(\dfrac1R + sC_1\Big) + sC_2\Big] = 0\). Oscillation means \(V_{gs} \ne 0\): \(s^3LC_1C_2 + s^2\dfrac{LC_2}{R} + s(C_1 + C_2) + g_m + \dfrac1R = 0\).</p>
+    <p>4. \(s = j\omega\): \(\Big[g_m + \dfrac1R - \dfrac{\omega^2LC_2}{R}\Big] + j\big[\omega(C_1 + C_2) - \omega^3LC_1C_2\big] = 0\). Both parts vanish.</p>
+    <p>5. Imaginary: \(\omega_0^2 = \dfrac{C_1 + C_2}{LC_1C_2}\Rightarrow \omega_0 = \dfrac{1}{\sqrt{L\frac{C_1C_2}{C_1 + C_2}}}\). (Shown.)</p>
+    <p>6. Real: \(g_m + \dfrac1R = \dfrac{\omega_0^2LC_2}{R} = \dfrac{1}{R}\cdot\dfrac{C_1 + C_2}{C_1}\) \(\Rightarrow g_mR = \dfrac{C_2}{C_1}\). (Shown.) For start-up \(g_mR\) is made slightly larger than \(C_2/C_1\).</p>
+    <p>Note: the question bank prints \(C_1/C_2 = g_mR\); that only holds if \(C_1\) is the gate capacitor. State your labels.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2018–19 · Sec B · Q7(b) · 10⅔ marks</div>
+  <div class="exam-q"><p>Draw the equivalent circuit of a piezoelectric crystal. Qualitatively draw the crystal reactance versus frequency and identify the inductive and capacitive reactance regions.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>Figure 3 (left): series L, \(C_s\), r (mechanical resonance: mass, compliance, loss) in parallel with \(C_p\) (electrode capacitance), \(C_p \gg C_s\).</p>
+    <p>Neglecting r: \(Z = jX = \dfrac{1}{sC_p}\cdot\dfrac{s^2 + \omega_s^2}{s^2 + \omega_p^2}\), \(\omega_s = 1/\sqrt{LC_s}\), \(\omega_p = 1/\sqrt{L C_sC_p/(C_s + C_p)}\), with \(\omega_p\) slightly above \(\omega_s\).</p>
+    <p>Reactance plot (Figure 3, right): \(X &lt; 0\) (capacitive) for \(\omega &lt; \omega_s\), rising to 0 at \(\omega_s\); \(X &gt; 0\) (inductive) between \(\omega_s\) and \(\omega_p\), rising to \(+\infty\) at \(\omega_p\); \(X &lt; 0\) (capacitive) above \(\omega_p\), approaching 0 from below. The oscillator uses the narrow inductive band, giving very stable frequency (Q ~ \(10^4\)–\(10^6\)).</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2015–16 · Sec B · Q7(a) · 26 marks</div>
+  <div class="exam-q"><p>For the oscillator circuit given (op-amp with \(R_i\) = 20 kΩ to ground and \(R_f\) = 40 kΩ feedback, rails ±\(V_{bias}\); L from \(V_o\) to node m, \(R_1\) from m to ground, \(R_2\) from m to the + input, L from the + input to ground): (i) derive the expression for the oscillation frequency f₀; (ii) obtain the relationship between \(R_1\) and \(R_2\) for sustained oscillation; (iii) specify the bias conditions and values of L, \(R_1\), \(R_2\) to obtain a 20 V peak-to-peak, 500 kHz sinusoidal signal.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><b>(i)</b> + input draws no current: \(v_p = v_m\dfrac{sL}{R_2 + sL}\). KCL at m: \(\dfrac{v_o - v_m}{sL} = \dfrac{v_m}{R_1} + \dfrac{v_m}{R_2 + sL}\), so \(\dfrac{v_o}{v_m} = 1 + \dfrac{sL}{R_1} + \dfrac{sL}{R_2 + sL}\).</p>
+    <p>\(\dfrac{1}{\beta} = \dfrac{v_o}{v_p} = \Big(1 + \dfrac{R_2}{sL}\Big)\Big(1 + \dfrac{sL}{R_1}\Big) + 1 = 2 + \dfrac{R_2}{R_1} + \dfrac{sL}{R_1} + \dfrac{R_2}{sL}\).</p>
+    <p>At \(s = j\omega\): \(\dfrac1\beta = 2 + \dfrac{R_2}{R_1} + j\Big(\dfrac{\omega L}{R_1} - \dfrac{R_2}{\omega L}\Big)\). Non-inverting amplifier (0°), so Im = 0: \(\omega_0 = \dfrac{\sqrt{R_1R_2}}{L}\), \(f_0 = \dfrac{\sqrt{R_1R_2}}{2\pi L}\).</p>
+    <p><b>(ii)</b> \(\beta(\omega_0) = \dfrac{1}{2 + R_2/R_1}\); \(A = 1 + 40/20 = 3\). \(A\beta \ge 1\): \(3 \ge 2 + R_2/R_1 \Rightarrow R_1 \ge R_2\) (equal to sustain, \(R_1\) slightly larger to start).</p>
+    <p><b>(iii)</b> 20 V p-p = 10 V peak, so the op-amp must not saturate below 10 V: \(\pm V_{bias}\) ≈ ±12 V to ±15 V. With \(R_1 = R_2 = R\): \(\omega_0 = R/L = 2\pi\times500\) kHz. Choose L = 1 mH: \(R = 2\pi\times5\times10^5\times10^{-3} = 3.14\) kΩ. (In practice \(R_2\) slightly below \(R_1\), plus a limiter to hold 10 V peak.)</p>
+  </div></details>
+</div>
+
+<h3>Class test</h3>
+<div class="exam">
+  <div class="exam-src">Class test 2018 (CT3-B) · 6 marks · Sedra exercise</div>
+  <div class="exam-q"><p>A 4 MHz quartz crystal has L = 0.13 H, C = 0.012 pF and C′ = 4 pF. Find \(f_s\) and \(f_p\).</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>\(f_s = \dfrac{1}{2\pi\sqrt{0.13\times0.012\times10^{-12}}} = 4.0296\) MHz.</p>
+    <p>\(C_sC_p/(C_s + C_p) = 0.012\times4/4.012 = 0.011964\) pF; \(f_p = \dfrac{1}{2\pi\sqrt{0.13\times0.011964\times10^{-12}}} = 4.0356\) MHz. \(f_p - f_s = 6.04\) kHz (0.15%).</p>
+  </div></details>
+</div>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+
+<div class="key"><p><strong>Summary:</strong> Colpitts: \(\omega_0 = 1/\sqrt{LC_T}\), \(C_T = C_1C_2/(C_1 + C_2)\); gain ≥ (input capacitor)/(output capacitor): Sadat's op-amp \(R_2/R_1 \ge C_1/C_2\), Sedra's MOSFET \(g_mR = C_2/C_1\) from the two-node KCL (imaginary part → \(\omega_0\), real part → gain). Hartley: \(\omega_0 = 1/\sqrt{(L_1 + L_2)C}\), gain ≥ \(L_{out}/L_{in}\). Crystal: series L–\(C_s\)–r ∥ \(C_p\); \(f_s = 1/(2\pi\sqrt{LC_s})\), \(f_p\) with \(C_sC_p/(C_s + C_p)\); inductive only between them.</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/eee.js"></script>
+<script>
+const V = x => [1, { val: x }];
+$('#fig-opc').innerHTML = sch([
+  ['opamp', [300, 120]], ['W', [300, 136], [280, 136]], ['gnd', [280, 136]],
+  ['W', [200, 104], [200, 200]], ['dot', [200, 200]], ['R', [200, 104], [280, 104], 'R₁', ...V(1e4)], ['W', [280, 104], [300, 104]], ['dot', [290, 104]],
+  ['W', [290, 104], [290, 50]], ['R', [290, 50], [400, 50], 'R₂', ...V(2.2e4)], ['W', [400, 50], [400, 120], [380, 120]], ['dot', [400, 120]],
+  ['W', [400, 120], [400, 200]], ['dot', [400, 200]], ['L', [200, 200], [400, 200], 'L', ...V(0.01)],
+  ['C', [200, 200], [200, 270], 'C₁', ...V(1e-7)], ['gnd', [200, 270]], ['C', [400, 200], [400, 270], 'C₂', ...V(1e-7)], ['gnd', [400, 270]],
+  ['t', [192, 196], 'vf', 'end', 'sm'], ['t', [410, 116], 'vₒ', 'start'],
+], { w: 440, h: 290 });
+
+$('#fig-mos').innerHTML = sch([
+  ['C', [60, 60], [60, 160], 'C₂'], ['L', [60, 60], [180, 60], 'L'], ['W', [180, 60], [380, 60]],
+  ['I', [220, 60], [220, 160], 'gₘvgs'], ['C', [300, 60], [300, 160], 'C₁'], ['R', [380, 60], [380, 160], 'R'],
+  ['W', [60, 160], [380, 160]], ['gnd', [140, 160]], ['dot', [60, 60]], ['dot', [220, 60]], ['dot', [300, 60]], ['dot', [220, 160]], ['dot', [300, 160]],
+  ['t', [54, 52], 'G', 'end', 'sm'], ['t', [300, 46], 'D', 'middle', 'sm'], ['t', [146, 186], 'S', 'start', 'sm'],
+], { w: 440, h: 190, sim: false });
+
+$('#fig-xtal').innerHTML = sch([
+  ['W', [0, 75], [20, 75]], ['open', [0, 75], ''], ['W', [20, 40], [20, 110]], ['dot', [20, 75]],
+  ['W', [20, 40], [40, 40]], ['L', [40, 40], [110, 40], 'L'], ['C', [110, 40], [160, 40], 'Cs'], ['R', [160, 40], [230, 40], 'r'], ['W', [230, 40], [250, 40], [250, 110]],
+  ['W', [20, 110], [110, 110]], ['C', [110, 110], [160, 110], 'Cp', -1], ['W', [160, 110], [250, 110]], ['W', [250, 75], [270, 75]], ['open', [270, 75], ''], ['dot', [250, 75]],
+  ['W', [330, 10], [330, 160]], ['W', [330, 85], [600, 85]], ['t', [606, 89], 'ω', 'start'], ['t', [336, 18], 'X', 'start'],
+  ['W', [345, 160], [380, 125], [410, 105], [440, 85], [455, 70], [468, 50], [476, 30], [480, 10]],
+  ['W', [482, 160], [500, 120], [530, 100], [570, 92], [600, 88]], ['W', [481, 5], [481, 165]],
+  ['t', [440, 102], 'ωs', 'middle', 'sm'], ['t', [488, 78], 'ωp', 'start', 'sm'], ['t', [360, 70], 'capacitive', 'start', 'sm'], ['t', [420, 40], 'inductive', 'end', 'sm'], ['t', [520, 130], 'capacitive', 'start', 'sm'],
+], { w: 620, h: 170, sim: false });
+
+worked('#wk-col', {
+  given: 'MOSFET Colpitts: L = 10 µH, \\(C_1\\) (drain) = 1 nF, \\(C_2\\) (gate) = 4 nF, \\(g_m\\) = 10 mA/V. Find f₀ and the minimum R.',
+  steps: [
+    { t: '\\(C_T = \\dfrac{1\\times4}{1 + 4} = 0.8\\) nF', a: { l: 'C_T', v: 0.8e-9, u: 'nF' } },
+    { t: '\\(f_0 = \\dfrac{1}{2\\pi\\sqrt{10^{-5}\\times0.8\\times10^{-9}}} = 1.78\\) MHz', a: { l: 'f_0', v: 1.7794e6, u: 'kHz' } },
+    { t: '\\(g_mR \\ge C_2/C_1 = 4\\) (gate over drain)', a: { l: 'C_2/C_1', v: 4, u: '' } },
+    { t: '\\(R_{min} = 4/(10\\text{ mA/V}) = 0.4\\) kΩ', a: { l: 'R_{min}', v: 400, u: 'kΩ' } },
+  ] });
+
+drill('#dr-col', { id: 's03-colpitts', title: 'Colpitts: f0 and the minimum gain (transistor and op-amp forms)', gen(r) {
+  const L = r.pick([1, 2.2, 4.7, 10, 22, 47, 100, 220, 470, 1000]) * 1e-6;
+  const Ca = r.pick([0.1, 0.22, 0.47, 1, 2.2, 4.7, 10]) * 1e-9, Cb = r.pick([0.1, 0.22, 0.47, 1, 2.2, 4.7, 10]) * 1e-9;
+  const gm = r.pick([2, 4, 5, 10, 20]) * 1e-3, gateIsC1 = r() < 0.3; // which label sits at the gate
+  const C1 = Ca, C2 = Cb, Cg = gateIsC1 ? C1 : C2, Cd = gateIsC1 ? C2 : C1;
+  const CT = C1 * C2 / (C1 + C2), f0 = 1 / (2 * Math.PI * Math.sqrt(L * CT)), ratio = Cg / Cd, Rmin = ratio / gm;
+  if (f0 > 5e7 || f0 < 1e4 || ratio > 20 || ratio < 0.05) return null;
+  return {
+    given: `A MOSFET Colpitts oscillator has L = ${si(L, 'H')}, \\(C_1\\) = ${si(C1, 'F')} and \\(C_2\\) = ${si(C2, 'F')}, with <b>\\(${gateIsC1 ? 'C_1' : 'C_2'}\\) from gate to ground</b> and \\(${gateIsC1 ? 'C_2' : 'C_1'}\\) from drain to ground; \\(g_m\\) = ${si(gm, 'A')}/V. Find f₀, the minimum R at the drain, and the minimum \\(R_2/R_1\\) if the same tank is used with an inverting op-amp (gate side = op-amp input side).`,
+    ask: [{ l: 'f_0', v: f0, u: 'kHz' }, { l: 'R_{min}', v: Rmin, u: 'kΩ' }, { l: '(R_2/R_1)_{min}', v: ratio, u: '' }],
+    steps: [
+      { t: `\\(C_T = C_1C_2/(C_1 + C_2) = ${si(CT, 'F')}\\); \\(f_0 = 1/(2\\pi\\sqrt{${num(L)}\\times${num(CT)}}) = ${si(f0, 'Hz')}\\)`, a: { l: 'f_0', v: f0, u: 'kHz' } },
+      { t: `\\(g_mR \\ge C_{gate}/C_{drain} = ${num(Cg * 1e9)}/${num(Cd * 1e9)} = ${num(ratio)}\\), so \\(R_{min} = ${num(ratio)}/${num(gm * 1e3)}\\text{ mA/V} = ${si(Rmin, 'Ω')}\\)`, a: { l: 'R_{min}', v: Rmin, u: 'kΩ' } },
+      { t: `Op-amp: \\(R_2/R_1 \\ge C_{in}/C_{out} = ${num(ratio)}\\)`, a: { l: '(R_2/R_1)_{min}', v: ratio, u: '' } },
+    ] };
+} });
+
+drill('#dr-hart', { id: 's03-hartley', title: 'Hartley: f0 and minimum gain ratio', gen(r) {
+  const L1 = r.pick([1, 2.2, 4.7, 10, 22, 47, 100]) * 1e-6, L2 = r.pick([1, 2.2, 4.7, 10, 22, 47, 100]) * 1e-6, C = r.pick([0.1, 0.22, 0.47, 1, 2.2, 4.7, 10]) * 1e-9;
+  const f0 = 1 / (2 * Math.PI * Math.sqrt((L1 + L2) * C)), ratio = L2 / L1;
+  if (ratio > 20 || ratio < 0.05) return null;
+  return {
+    given: `An op-amp Hartley oscillator (Sadat's form) has \\(L_1\\) = ${si(L1, 'H')} from \\(v_f\\) (amplifier input) to ground, \\(L_2\\) = ${si(L2, 'H')} from \\(v_o\\) to ground, and C = ${si(C, 'F')} between \\(v_f\\) and \\(v_o\\). Find f₀ and the minimum \\(R_2/R_1\\).`,
+    ask: [{ l: 'f_0', v: f0, u: 'kHz' }, { l: '(R_2/R_1)_{min}', v: ratio, u: '' }],
+    steps: [
+      { t: `\\(f_0 = \\dfrac{1}{2\\pi\\sqrt{(L_1 + L_2)C}} = \\dfrac{1}{2\\pi\\sqrt{${num(L1 + L2)}\\times${num(C)}}} = ${si(f0, 'Hz')}\\)`, a: { l: 'f_0', v: f0, u: 'kHz' } },
+      { t: `\\(\\beta = -L_1/L_2\\), so \\(R_2/R_1 \\ge L_2/L_1 = ${num(ratio)}\\)`, a: { l: '(R_2/R_1)_{min}', v: ratio, u: '' } },
+    ] };
+} });
+
+drill('#dr-xtal', { id: 's04-crystal', title: 'Crystal: series and parallel resonance', gen(r) {
+  const L = r.pick([0.01, 0.02, 0.05, 0.1, 0.13, 0.2, 0.5, 1]), Cs = r.pick([0.005, 0.008, 0.01, 0.012, 0.02, 0.03, 0.05]) * 1e-12, Cp = r.pick([2, 3, 4, 5, 6, 8, 10]) * 1e-12;
+  const fs = 1 / (2 * Math.PI * Math.sqrt(L * Cs)), fp = 1 / (2 * Math.PI * Math.sqrt(L * Cs * Cp / (Cs + Cp)));
+  if (fs < 1e5 || fs > 5e7) return null;
+  return {
+    given: `A quartz crystal has L = ${num(L)} H, \\(C_s\\) = ${num(Cs * 1e12)} pF, \\(C_p\\) = ${num(Cp * 1e12)} pF. Find \\(f_s\\), \\(f_p\\) and \\(f_p - f_s\\).`,
+    ask: [{ l: 'f_s', v: fs, u: 'MHz', tol: 0.0005 }, { l: 'f_p', v: fp, u: 'MHz', tol: 0.0005 }, { l: 'f_p - f_s', v: fp - fs, u: 'kHz', tol: 0.03 }],
+    steps: [
+      { t: `\\(f_s = 1/(2\\pi\\sqrt{LC_s}) = ${num(fs / 1e6, 6)}\\) MHz`, a: { l: 'f_s', v: fs, u: 'MHz', tol: 0.0005 } },
+      { t: `\\(C_sC_p/(C_s + C_p) = ${num(Cs * Cp / (Cs + Cp) * 1e12, 5)}\\) pF; \\(f_p = ${num(fp / 1e6, 6)}\\) MHz`, a: { l: 'f_p', v: fp, u: 'MHz', tol: 0.0005 } },
+      { t: `\\(f_p - f_s = ${num((fp - fs) / 1e3)}\\) kHz (≈ \\(f_s C_s/(2C_p)\\) = ${num(fs * Cs / (2 * Cp) / 1e3)} kHz)`, a: { l: 'f_p - f_s', v: fp - fs, u: 'kHz', tol: 0.03 } },
+    ],
+    note: 'Tolerance on f_s and f_p is 0.05%: the two frequencies differ only in the third or fourth significant figure.' };
+} });
+
+drill('#dr-rl', { id: 's03-rl-ladder', title: 'RL ladder oscillator (2015-16 type): f0 and the R2/R1 limit', gen(r) {
+  const L = r.pick([0.1, 0.22, 0.47, 1, 2.2, 4.7, 10]) * 1e-3, R1 = r.pick([1, 2.2, 3.3, 4.7, 6.8, 10]) * 1e3, R2 = r.pick([1, 2.2, 3.3, 4.7, 6.8, 10]) * 1e3, A = r.pick([2.5, 3, 4]);
+  const f0 = Math.sqrt(R1 * R2) / (2 * Math.PI * L), b0 = 1 / (2 + R2 / R1); if (f0 < 1e3 || f0 > 5e7) return null;
+  return {
+    given: `2015–16 circuit with L = ${si(L, 'H')}, \\(R_1\\) = ${si(R1, 'Ω')}, \\(R_2\\) = ${si(R2, 'Ω')}, amplifier gain A = ${A}. Find f₀, β(ω₀), and the largest \\(R_2/R_1\\) for which it oscillates with this gain.`,
+    ask: [{ l: 'f_0', v: f0, u: 'kHz' }, { l: '\\beta(\\omega_0)', v: b0, u: 'V/V' }, { l: '(R_2/R_1)_{max}', v: A - 2, u: '' }],
+    steps: [
+      { t: `\\(f_0 = \\dfrac{\\sqrt{R_1R_2}}{2\\pi L} = ${si(f0, 'Hz')}\\)`, a: { l: 'f_0', v: f0, u: 'kHz' } },
+      { t: `\\(\\beta = 1/(2 + ${num(R2 / R1)}) = ${num(b0)}\\); \\(A\\beta = ${num(A * b0)}\\) ${A * b0 >= 1 ? '≥ 1: oscillates' : '&lt; 1: does not oscillate'}`, a: { l: '\\beta(\\omega_0)', v: b0, u: 'V/V' } },
+      { t: `\\(A \\ge 2 + R_2/R_1 \\Rightarrow R_2/R_1 \\le ${num(A - 2)}\\)`, a: { l: '(R_2/R_1)_{max}', v: A - 2, u: '' } },
+    ] };
+} });
+
+flashcards('#cards', [
+  { f: 'Colpitts ω₀', b: '1/√(L·C₁C₂/(C₁ + C₂)): capacitors in series.' },
+  { f: 'Colpitts gain rule (label-free)', b: '|A| ≥ C_input / C_output' },
+  { f: 'Sadat/Khairul op-amp Colpitts', b: 'C₁ at v_f, C₂ at v_o: β = −C₂/C₁, R₂/R₁ ≥ C₁/C₂' },
+  { f: 'Sedra MOSFET Colpitts', b: 'C₂ gate, C₁ drain: g_mR = C₂/C₁ (real part), ω₀ from imaginary part.' },
+  { f: 'Hartley', b: 'ω₀ = 1/√((L₁ + L₂)C); |A| ≥ L_output/L_input (Sadat: R₂/R₁ ≥ L₂/L₁).' },
+  { f: 'Crystal f_s, f_p', b: 'f_s = 1/(2π√(LC_s)); f_p uses C_sC_p/(C_s + C_p); f_p slightly above f_s.' },
+  { f: 'Crystal inductive region', b: 'Only between f_s and f_p.' },
+]);
+quiz('#quiz', [
+  { q: 'L = 100 µH, C₁ = C₂ = 2 nF. f₀ ≈', opts: ['356 kHz', '503 kHz', '252 kHz', '1.13 MHz'], a: 1, why: 'C_T = 1 nF; 1/(2π√(10⁻⁴·10⁻⁹)) = 503 kHz.' },
+  { q: 'MOSFET Colpitts with 1 nF at the gate and 4 nF at the drain needs g_mR ≥', opts: ['4', '0.25', '5', '1.25'], a: 1, why: 'Gate over drain = 1/4.' },
+  { q: 'Between f_s and f_p a crystal is', opts: ['capacitive', 'inductive', 'purely resistive', 'open circuit'], a: 1, why: 'The reactance is positive there; oscillators use this band.' },
+  { q: 'In the KCL derivation, ω₀ comes from', opts: ['the real part', 'the imaginary part', 'g_m', 'R'], a: 1, why: 'Imaginary: ω(C₁ + C₂) − ω³LC₁C₂ = 0.' },
+  { q: 'Sadat Hartley with L₁ = 10 µH (input side), L₂ = 40 µH (output side): R₂/R₁ ≥', opts: ['4', '0.25', '5', '50'], a: 0, why: 'L₂/L₁ = 4.' },
+]);
+</script>
+</body>
+</html>

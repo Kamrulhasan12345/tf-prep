@@ -1,0 +1,390 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Common-Source Amplifier · EEE 263 Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">MOSFET · Chapter 7 · Sedra §7.3.3–7.3.4, §7.5 · Khairul s.41–47 · Sadat L23, notes p.99–101 · types M-10, M-11</div>
+<h1>The Common-Source Amplifier</h1>
+<p class="lede">The single most reliable MOSFET question. A CS amplifier (this chapter or the feedback-biased version in chapter 8) has been set in every paper from 2019–20 to 2024–25, and the full version was a 35-mark question in 2024–25 (also 46⅔ marks in 2011–12). There are two kinds: <b>M-10</b> gives you the bias numbers and asks only the small-signal part (2023–24, 2021–22); <b>M-11</b> makes you solve the DC bias first, then the AC part, then a signal limit or a circuit change (2024–25, 2020–21, 2011–12). Sadat sir: "MOSFET → numerical problem important for exam", and for amplifiers he wants \(R_{in}\), \(R_o\), \(A_v\), \(G_v\) derived, not quoted.</p>
+
+<p>Units: mA, kΩ, V, mA/V, MΩ for gate resistors (keep \(R_{in}\) in kΩ when you combine it with \(R_{sig}\)). Sedra convention \(i_D = \tfrac12k_nV_{OV}^2\) unless the question writes Neamen's capital \(K_n\).</p>
+
+<h2>1. The circuit and the five-step procedure</h2>
+<figure class="wide"><div id="fig-cs"></div><figcaption><b>Figure 1.</b> The discrete CS amplifier of 2024–25 (and Sedra P7.33): gate divider \(R_{G1}\), \(R_{G2}\); \(R_D\); \(R_S\) bypassed by \(C_S\); coupling capacitors \(C_1\), \(C_2\); signal source \(v_{sig}\) with \(R_{sig}\); load \(R_L\). The simulator link runs it with \(V_t\) = 1 V, \(k_n\) = 4 mA/V² and a 50 mV, 1 kHz input.</figcaption></figure>
+<div class="method"><h4>Procedure (Sadat notes p.101) · any MOSFET amplifier</h4><ol>
+<li><b>DC analysis.</b> Capacitors open. Find \(I_D\), \(V_{OV}\), \(V_D\); check saturation (\(V_{DS} \ge V_{OV}\), i.e. \(V_D \ge V_G - V_t\)).</li>
+<li><b>DC sources off.</b> \(V_{DD}\) → ground. (DC current sources → open.)</li>
+<li><b>Capacitors short.</b> \(C_1\), \(C_2\) connect; \(C_S\) shorts \(R_S\), so the source is at signal ground.</li>
+<li><b>Small-signal model.</b> \(g_m = 2I_D/V_{OV}\), \(r_o = V_A/I_D\); hybrid-π when the source is grounded, T model when a resistance stays in the source.</li>
+<li><b>AC analysis.</b> \(R_{in}\), \(R_o\), \(A_{vo}\), \(A_v\), \(G_v\), signal limits.</li>
+</ol></div>
+
+<h2>2. Derivation of R<sub>in</sub>, R<sub>o</sub>, A<sub>vo</sub>, A<sub>v</sub>, G<sub>v</sub></h2>
+<p>This is the 2012–13 question (26⅔ marks) and the core of every numerical. After steps 2–4, Figure 1 becomes:</p>
+<figure class="wide"><div id="fig-cs-ss"></div><figcaption><b>Figure 2.</b> Small-signal equivalent of Figure 1 (hybrid-π, source at signal ground). \(R_G = R_{G1}\parallel R_{G2}\) because the top of \(R_{G1}\) is at AC ground.</figcaption></figure>
+<div class="worked" style="padding:1em 1.2em">
+<p><b>Input resistance.</b> The gate draws no current, so looking into the gate terminal we see only the bias network: \(R_{in} = R_{G1}\parallel R_{G2}\) (\(= \infty\) if the gate network is not given).</p>
+<p><b>Input divider.</b> \(v_i = v_{gs} = v_{sig}\dfrac{R_{in}}{R_{in}+R_{sig}}\).</p>
+<p><b>Open-circuit gain</b> (\(R_L\) removed). The current \(g_mv_{gs}\) flows down through \(r_o\parallel R_D\) from ground to the drain node, so \(v_o = -g_mv_{gs}(r_o\parallel R_D)\) and \(A_{vo} = \dfrac{v_o}{v_i}\Big|_{R_L=\infty} = -g_m(R_D\parallel r_o)\).</p>
+<p><b>Output resistance.</b> Set \(v_{sig} = 0\). Then \(v_{gs} = 0\), the dependent source is dead (open), and a test source at the output sees \(R_o = R_D\parallel r_o\).</p>
+<p><b>Gain with load.</b> \(v_o = -g_mv_{gs}(R_D\parallel r_o\parallel R_L)\), so \(A_v = \dfrac{v_o}{v_i} = -g_m(R_D\parallel r_o\parallel R_L) = A_{vo}\dfrac{R_L}{R_L+R_o}\).</p>
+<p><b>Overall gain.</b> \(G_v = \dfrac{v_o}{v_{sig}} = \dfrac{R_{in}}{R_{in}+R_{sig}}\,A_v = -\dfrac{R_{in}}{R_{in}+R_{sig}}\,g_m(R_D\parallel r_o\parallel R_L)\).</p>
+</div>
+<div class="formula">\[ R_{in} = R_{G1}\parallel R_{G2},\quad R_o = R_D\parallel r_o,\quad A_{vo} = -g_m(R_D\parallel r_o) \]\[ G_v = -\frac{R_{in}}{R_{in}+R_{sig}}\,g_m(R_D\parallel r_o\parallel R_L) \]</div>
+<p><b>Signal limits.</b> (a) Small-signal (linearity): \(\hat v_{gs} \le 0.1V_{OV}\) (or whatever fraction is stated), so \(\hat v_{sig,\max} = 0.1V_{OV}\,\dfrac{R_{in}+R_{sig}}{R_{in}}\). (b) Saturation (Sedra P7.118): at the negative output peak the drain must stay above \(v_G - V_t\): \(V_D - |A_v|\hat v_{g} \ge V_G + \hat v_{g} - V_t\), so \(\hat v_g \le \dfrac{V_D - V_G + V_t}{1+|A_v|}\) (source bypassed, \(v_g = v_{gs}\)). (c) Required input for a given output: \(\hat v_{sig} = \hat v_o/|G_v|\).</p>
+
+<h2>3. Type M-10: CS amplifier from given bias numbers</h2>
+<p>No DC solving: the question states \(I_D\) and \(V_{OV}\) (or \(\mu_nC_{ox}\), W/L and \(I_D\)) and asks the small-signal quantities. Often no circuit is drawn: assume the standard CS of Figure 2 with \(R_{in} = \infty\) unless a gate network is given.</p>
+<div class="method"><h4>Method · M-10 (8 lines)</h4><ol>
+<li>\(g_m = 2I_D/V_{OV}\), or \(g_m = \sqrt{2k_n'(W/L)I_D}\).</li>
+<li>\(r_o = V_A/I_D\) (∞ if no \(V_A\)).</li>
+<li>\(R_{in} = R_G\) (∞ if no gate network, then \(v_{gs} = v_{sig}\)).</li>
+<li>\(R_o = R_D\parallel r_o\).</li>
+<li>\(A_{vo} = -g_mR_o\) (no \(R_L\) here).</li>
+<li>\(A_v = -g_m(R_D\parallel r_o\parallel R_L) = A_{vo}R_L/(R_L+R_o)\).</li>
+<li>\(G_v = \dfrac{R_{in}}{R_{in}+R_{sig}}A_v\).</li>
+<li>Required \(\hat v_{sig} = \hat v_o/|G_v|\); linear limit \(\hat v_{gs} \le 0.1V_{OV}\).</li>
+</ol></div>
+<h3>Worked example: 2023–24 Sec B Q7(b)</h3>
+<div id="wk-m10"></div>
+<div id="dr-m10"></div>
+
+<h2>4. Type M-11: full CS amplifier (DC bias, then AC)</h2>
+<div class="method"><h4>Method · M-11</h4><ol>
+<li><b>DC</b> (caps open): \(V_G = V_{DD}\dfrac{R_{G2}}{R_{G1}+R_{G2}}\); \(V_{GS} = V_G - I_DR_S\); \(I_D = \tfrac12k_n(V_G - V_t - I_DR_S)^2\).</li>
+<li>Expand to a quadratic in \(I_D\): \(\tfrac12k_nR_S^2I_D^2 - (k_nR_SV_x + 1)I_D + \tfrac12k_nV_x^2 = 0\) with \(V_x = V_G - V_t\). Two roots: keep the one with \(V_{GS} &gt; V_t\); <b>write why the other is rejected</b>.</li>
+<li>\(V_{OV} = V_{GS} - V_t\), \(V_S = I_DR_S\), \(V_D = V_{DD} - I_DR_D\); saturation: \(V_{DS} \ge V_{OV}\).</li>
+<li>\(g_m = 2I_D/V_{OV}\) (= \(k_nV_{OV}\)); \(r_o = V_A/I_D\) (bias computed without λ).</li>
+<li><b>AC</b> (bypassed \(R_S\) → 0): \(R_{in} = R_{G1}\parallel R_{G2}\), \(R_o = R_D\parallel r_o\), \(A_v = -g_m(r_o\parallel R_D\parallel R_L)\), \(G_v = \dfrac{R_{in}}{R_{in}+R_{sig}}A_v\).</li>
+<li>Limit: \(\hat v_{sig,\max} = 0.1V_{OV}\dfrac{R_{in}+R_{sig}}{R_{in}}\).</li>
+<li>To raise that limit N times without moving the bias: leave \(R_s = (N-1)/g_m\) of \(R_S\) unbypassed (section 5).</li>
+</ol></div>
+<h3>Worked example: 2024–25 Sec A Q2 (35 marks), parts (i)–(iv)</h3>
+<div id="wk-m11"></div>
+<div id="dr-m11"></div>
+
+<h2>5. CS with a source resistance R<sub>s</sub> (source degeneration)</h2>
+<p>If part (or all) of the source resistance is not bypassed, use the T model (Khairul s.44–45). The resistance \(R_s\) is in series with \(1/g_m\):</p>
+<figure class="wide"><div id="fig-rs"></div><figcaption><b>Figure 3.</b> T-model equivalent with an unbypassed \(R_s\). The current \(i = g_mv_{gs}\) flows from the drain through the dependent source, then through \(1/g_m\) and \(R_s\) to ground. (\(r_o\) neglected.)</figcaption></figure>
+<div class="worked" style="padding:1em 1.2em">
+<p>Gate current is zero, so \(v_i\) appears across \(1/g_m + R_s\): \(i = \dfrac{v_i}{1/g_m + R_s} = \dfrac{g_m}{1+g_mR_s}v_i\).</p>
+<p>The part across \(1/g_m\) is \(v_{gs}\): \(v_{gs} = v_i\dfrac{1/g_m}{1/g_m + R_s} = \dfrac{v_i}{1+g_mR_s}\).</p>
+<p>The same \(i\) leaves the drain node: \(v_o = -i(R_D\parallel R_L)\). Hence</p>
+\[ A_{vo} = -\frac{g_mR_D}{1+g_mR_s},\qquad A_v = -\frac{g_m(R_D\parallel R_L)}{1+g_mR_s} = -\frac{R_D\parallel R_L}{1/g_m + R_s},\qquad R_{in} = R_G,\ \ R_o = R_D \]
+<p>Rule (Khairul s.44): <b>gain from gate to drain = −(total resistance in the drain) / (total resistance in the source)</b>.</p>
+</div>
+<p><b>Why do it?</b> The gain drops by \(1 + g_mR_s\), but \(v_{gs}\) is also divided by \(1 + g_mR_s\), so the input can be \((1 + g_mR_s)\) times larger before the small-signal limit is reached, and the gain becomes less sensitive to \(g_m\) (more predictable). Choosing \(R_s = 1/g_m\) doubles the allowed input and halves the gain. The DC bias does not change because the total DC source resistance stays \(R_S\): split \(R_S\) into \(R_s\) (unbypassed) + \(R_S - R_s\) (bypassed by \(C_S\)).</p>
+<div class="method"><h4>Method · CS with R<sub>s</sub></h4><ol>
+<li>DC exactly as before (all of \(R_S\) counts).</li>
+<li>\(A_v = -\dfrac{g_m(R_D\parallel R_L)}{1+g_mR_s}\) (neglect \(r_o\) unless told), \(G_v = \dfrac{R_{in}}{R_{in}+R_{sig}}A_v\).</li>
+<li>Linear limit: \(\hat v_{gs} = \hat v_i/(1+g_mR_s) \le 0.1V_{OV}\), so \(\hat v_{sig,\max} = 0.1V_{OV}(1+g_mR_s)\dfrac{R_{in}+R_{sig}}{R_{in}}\).</li>
+<li>For an N-times larger input: \(R_s = (N-1)/g_m\).</li>
+</ol></div>
+<div id="dr-rs"></div>
+
+<h2>6. The saturation (swing) limit</h2>
+<p>A different limit, asked in Sedra P7.118/P7.119 (highlighted by the teacher): the largest input for which the transistor <b>stays in saturation</b>. At the instant the gate is at its most positive, the drain is at its lowest. Condition \(v_D \ge v_G - V_t\):</p>
+<div class="formula">\[ V_D - |A_v|\hat v_g \;\ge\; V_G + \hat v_g - V_t \quad\Longrightarrow\quad \hat v_g \le \frac{V_D - V_G + V_t}{1+|A_v|} \]\[ \hat v_{sig} = \hat v_g\frac{R_{in}+R_{sig}}{R_{in}},\qquad \hat v_o = |A_v|\hat v_g \]</div>
+<p>(Source bypassed, so \(v_g = v_{gs}\). For a PMOS, the condition is \(v_D \le v_G + |V_{tp}|\).)</p>
+<div id="dr-swing"></div>
+
+<div class="trap"><h4>Traps (where marks go)</h4><ul>
+<li><b>Wrong quadratic root.</b> The larger \(I_D\) root makes \(V_{GS} = V_G - I_DR_S &lt; V_t\) (2024–25: 0.653 mA gives \(V_{GS}\) = 0.43 V). Reject it and say so.</li>
+<li><b>\(R_{in}\) = series sum.</b> \(R_{G1}\) goes to \(V_{DD}\), which is AC ground: \(R_{in} = R_{G1}\parallel R_{G2}\) (10 M ∥ 5 M = 3.33 MΩ, not 15 MΩ).</li>
+<li><b>Forgetting \(C_S\).</b> A bypassed \(R_S\) is zero for AC; an unbypassed one divides the gain by \(1 + g_mR_s\).</li>
+<li><b>\(R_L\) in \(A_{vo}\).</b> \(A_{vo}\) is the open-circuit gain; \(R_L\) enters only \(A_v\) and \(G_v\).</li>
+<li><b>Leaving out \(r_o\)</b> when \(V_A\) or λ is given (or putting λ into the bias when told to ignore it).</li>
+<li><b>Convention.</b> "\(k_n\) = 0.5 mA/V²" means \(i_D = \tfrac12k_nV_{OV}^2\); Neamen's \(K_n\) has no ½ (2020–21 gives −2.65 V/V vs −5.21 V/V). State which.</li>
+<li><b>Sign.</b> CS gains are negative (inverting). Write the minus sign on \(A_{vo}\), \(A_v\), \(G_v\).</li>
+</ul></div>
+
+<h2>Exam questions</h2>
+
+<div class="exam">
+  <div class="exam-src">2024–25 · Sec A · Q2(i)–(v) · 35 marks &nbsp;|&nbsp; = Sedra 7e P7.33 (highlighted by the teacher) plus parts (iv)–(v)</div>
+  <div class="exam-q"><p>The circuit in the figure is a common-source amplifier. All capacitors are open at DC and short at AC. \(V_t\) = 1 V, \(\mu_nC_{ox}(W/L)\) = 4 mA/V², \(V_A\) = 100 V. (i) Find DC \(V_D\) and \(I_D\) (ignore the Early effect for bias). (ii) Find \(g_m\), \(r_o\) and draw the small-signal equivalent. (iii) Determine expressions and values of \(R_{in}\), \(R_o\) and the overall gain \(v_o/v_{sig}\). (iv) Calculate the maximum peak \(v_{sig}\) while maintaining \(v_{gs} \le 0.1V_{OV}\). (v) Suggest a circuit modification that allows the maximum \(v_{sig}\) of (iv) to be doubled while keeping the small-signal approximation, without changing the DC bias point.</p><div id="fig-q2425"></div></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><b>(i) DC.</b> \(V_G = 15\times\dfrac{5}{10+5} = 5\) V. \(V_{GS} = 5 - 7I_D\), \(I_D = \tfrac12\times4\,(5 - 7I_D - 1)^2 = 2(4 - 7I_D)^2\).</p>
+    <p>\(98I_D^2 - 113I_D + 32 = 0 \Rightarrow I_D = 0.5\) mA or 0.653 mA. For 0.653 mA, \(V_{GS} = 5 - 4.57 = 0.43\text{ V} &lt; V_t\): the transistor would be off, contradiction, so reject. <b>\(I_D\) = 0.5 mA</b>, \(V_S\) = 3.5 V, \(V_{GS}\) = 1.5 V, \(V_{OV}\) = 0.5 V, <b>\(V_D = 15 - 0.5\times16 = 7\) V</b>. \(V_{DS} = 3.5\text{ V} &gt; V_{OV}\): saturated ✓.</p>
+    <p><b>(ii)</b> \(g_m = 2I_D/V_{OV} = 2\times0.5/0.5 = 2\) mA/V; \(r_o = V_A/I_D = 100/0.5 = 200\) kΩ. Small-signal circuit: Figure 2 with \(R_{sig}\) = 200 kΩ, \(R_G\) = 3.33 MΩ, \(g_mv_{gs}\), \(r_o\) = 200 kΩ, \(R_D\) = 16 kΩ, \(R_L\) = 16 kΩ; source grounded (\(C_3\) shorts the 7 kΩ).</p>
+    <p><b>(iii)</b> \(R_{in} = R_{G1}\parallel R_{G2} = 10\parallel5 = 3.33\) MΩ. \(R_o = R_D\parallel r_o = 16\parallel200 = 14.8\) kΩ.<br>
+    \(\dfrac{v_{gs}}{v_{sig}} = \dfrac{3333}{3333+200} = 0.943\); \(\dfrac{v_o}{v_{gs}} = -g_m(r_o\parallel R_D\parallel R_L) = -2\times(200\parallel16\parallel16) = -2\times7.69 = -15.4\) V/V;<br>
+    <b>\(G_v = 0.943\times(-15.4) = -14.5\) V/V</b>.</p>
+    <p><b>(iv)</b> \(\hat v_{gs} \le 0.1\times0.5 = 50\) mV, so \(\hat v_{sig} \le 50/0.943 = 53\) mV.</p>
+    <p><b>(v)</b> Split \(R_S\) = 7 kΩ into \(R_s\) = 0.5 kΩ (not bypassed) in series with 6.5 kΩ (bypassed by \(C_3\)). The DC source resistance is still 7 kΩ, so the bias is unchanged. Now \(v_{gs} = v_i/(1+g_mR_s) = v_i/(1 + 2\times0.5) = v_i/2\), so \(v_{sig}\) can be doubled to about 106 mV with \(v_{gs}\) still ≤ 50 mV. The price: the gain about halves, \(A_v \approx -g_m(R_D\parallel R_L)/(1+g_mR_s) = -2\times8/2 = -8\) V/V (\(r_o\) neglected), \(G_v \approx -7.5\) V/V. General rule: \(R_s = 1/g_m\).</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2023–24 · Sec B · Q7(b) · 15 marks</div>
+  <div class="exam-q"><p>A CS amplifier is connected to a source \(v_{sig}\) with resistance \(R_{sig}\) and uses a MOSFET with \(\mu_nC_{ox}\) = 400 µA/V², W/L = 10, \(V_A\) = 10 V. It is biased at \(I_D\) = 0.2 mA and uses \(R_D\) = 6 kΩ. Find \(R_{in}\), \(A_{vo}\) and \(R_o\). If a 10 kΩ load is connected, what is the overall voltage gain \(G_v\)? If a 0.2 V peak sine wave is required at the output, what must the peak amplitude of \(v_{sig}\) be?</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>No gate network is given, so \(R_{in} = \infty\) and \(v_{gs} = v_{sig}\) (\(R_{sig}\) carries no current).</p>
+    <p>\(k_n = 0.4\times10 = 4\) mA/V². \(g_m = \sqrt{2\times4\times0.2} = 1.265\) mA/V (\(V_{OV} = 2\times0.2/1.265 = 0.316\) V). \(r_o = 10/0.2 = 50\) kΩ.</p>
+    <p><b>\(R_{in} = \infty\)</b>. <b>\(R_o = R_D\parallel r_o = 6\parallel50 = 5.36\) kΩ</b>. <b>\(A_{vo} = -g_mR_o = -1.265\times5.357 = -6.78\) V/V</b>.</p>
+    <p>With \(R_L\) = 10 kΩ: \(G_v = A_v = -g_m(6\parallel50\parallel10) = -1.265\times3.488 = \) <b>−4.41 V/V</b> (check: \(A_{vo}R_L/(R_L+R_o) = -6.78\times10/15.36 = -4.41\)).</p>
+    <p>\(\hat v_{sig} = 0.2/4.41 = \) <b>45.3 mV</b>. (Note: that is \(0.14V_{OV}\); within Sedra's 0.2\(V_{OV}\) guideline, slightly above the 0.1\(V_{OV}\) rule.)</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2021–22 · Sec B · Q7(b) · 20 marks &nbsp;|&nbsp; Sedra exercise, also Khairul s.43</div>
+  <div class="exam-q"><p>A CS amplifier utilizes a MOSFET biased at \(I_D\) = 0.25 mA with \(V_{OV}\) = 0.25 V and \(R_D\) = 20 kΩ. The amplifier is fed with a signal source having \(R_{sig}\) = 100 kΩ, and a 20 kΩ load is connected to the output. Find \(R_{in}\), \(A_{vo}\), \(R_o\), \(A_v\) and \(G_v\).</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>\(g_m = 2I_D/V_{OV} = 2\times0.25/0.25 = 2\) mA/V. No \(V_A\): \(r_o = \infty\). No gate network: \(R_{in} = \infty\).</p>
+    <p><b>\(R_{in} = \infty\)</b>; <b>\(A_{vo} = -g_mR_D = -2\times20 = -40\) V/V</b>; <b>\(R_o = R_D = 20\) kΩ</b>; <b>\(A_v = -g_m(R_D\parallel R_L) = -2\times10 = -20\) V/V</b>; <b>\(G_v = A_v = -20\) V/V</b> (since \(R_{in} = \infty\), \(v_i = v_{sig}\)).</p>
+    <p>(Khairul's slide adds: if the input peak is limited to 10 % of \(2V_{OV}\) = 50 mV, the output peak is 20 × 0.05 = 1 V.)</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2020–21 · Sec B · Q7(b) · 26⅔ marks</div>
+  <div class="exam-q"><p>Determine the overall small-signal voltage gain of the common-source amplifier in the figure. Transistor parameters: \(V_t\) = 0.4 V, \(k_n\) = 0.5 mA/V², λ = 0.02 V⁻¹. (3.3 V supply, \(R_{G1}\) = 140 kΩ, \(R_{G2}\) = 60 kΩ, \(R_D\) = 10 kΩ, \(R_{sig}\) = 4 kΩ, source grounded, output taken at the drain with no load.)</p><div id="fig-q2021"></div></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><b>DC.</b> \(V_G = 3.3\times60/200 = 0.99\) V \(= V_{GS}\) (source grounded), \(V_{OV} = 0.59\) V.</p>
+    <p><b>Sedra reading</b> (\(k_n = k_n'W/L\), \(i_D = \tfrac12k_nV_{OV}^2\)): \(I_D = 0.5\times0.5\times0.59^2 = 0.0870\) mA; \(V_D = 3.3 - 0.87 = 2.43\text{ V} &gt; V_{OV}\) ✓. \(g_m = k_nV_{OV} = 0.295\) mA/V; \(r_o = 1/(\lambda I_D) = 1/(0.02\times0.087) = 575\) kΩ.<br>
+    \(R_{in} = 140\parallel60 = 42\) kΩ; \(v_{gs}/v_{sig} = 42/46 = 0.913\); \(A_v = -0.295\times(10\parallel575) = -2.90\) V/V; <b>\(G_v = 0.913\times(-2.90) = -2.65\) V/V</b>.</p>
+    <p><b>Neamen reading</b> (the figure is Neamen's example, where \(K_n\) has no ½): \(I_D = 0.5\times0.59^2 = 0.174\) mA, \(g_m = 2K_nV_{OV} = 0.59\) mA/V, \(r_o = 287\) kΩ, \(A_v = -5.70\), \(G_v = -5.21\) V/V. The printed lowercase \(k_n\) points to the Sedra reading; write one line saying which convention you used. (The senior analysis file and the question bank give −2.65 V/V.)</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2012–13 · Sec B · Q6(a) · 26⅔ marks</div>
+  <div class="exam-q"><p>For the CS amplifier, derive the expressions for input resistance (\(R_{in}\)), output resistance (\(R_{out}\)), open-circuit voltage gain (\(A_{vo}\)) and overall voltage gain (\(G_v\)).</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>Draw Figure 1 (discrete CS with divider bias and bypassed \(R_S\)); state: capacitors short for signals, \(V_{DD}\) at AC ground, transistor saturated with \(g_m = 2I_D/V_{OV}\), \(r_o = V_A/I_D\). Draw Figure 2.</p>
+    <p><b>\(R_{in}\):</b> \(i_g = 0\), so \(R_{in} = R_{G1}\parallel R_{G2} = R_G\).</p>
+    <p><b>\(A_{vo}\):</b> \(v_i = v_{gs}\). With the output open, \(g_mv_{gs}\) flows through \(R_D\parallel r_o\) into the drain node from ground: \(v_o = -g_mv_{gs}(R_D\parallel r_o)\), so \(A_{vo} = -g_m(R_D\parallel r_o)\).</p>
+    <p><b>\(R_{out}\):</b> with \(v_{sig} = 0\): \(v_{gs} = 0\), so \(g_mv_{gs} = 0\) (open). A test voltage \(v_x\) at the output drives \(i_x = v_x/R_D + v_x/r_o\), so \(R_{out} = R_D\parallel r_o\).</p>
+    <p><b>\(G_v\):</b> \(v_{gs} = v_{sig}\dfrac{R_G}{R_G+R_{sig}}\); with \(R_L\): \(v_o = -g_mv_{gs}(R_D\parallel r_o\parallel R_L)\). So</p>
+    \[ G_v = \frac{v_o}{v_{sig}} = -\frac{R_G}{R_G+R_{sig}}\,g_m(R_D\parallel r_o\parallel R_L) = \frac{R_{in}}{R_{in}+R_{sig}}\,A_{vo}\,\frac{R_L}{R_L+R_{out}} \]
+    <p>Comment: \(R_{in}\) is very high (MΩ), so \(G_v \approx A_v\); the gain is moderate because \(g_m\) of a MOSFET is small; the output resistance \(R_D\) is fairly high, so a low-resistance load reduces the gain.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">2011–12 · Sec A · Q4(a)(b)(c) · 46⅔ marks</div>
+  <div class="exam-q"><p>A common-source amplifier circuit is shown in the figure. (a) Prove that this circuit is operating in the saturation region. (b) Draw the small-signal equivalent circuit. (c) Find \(g_m\), \(R_{in}\), \(R_{out}\), \(A_v\) and \(G_v\). Assume \(V_t\) = 1 V, \(k_n'W/L\) = 2 mA/V², \(V_A\) = 100 V. (+15 V; \(R_{G1}\) = 10 MΩ, \(R_{G2}\) = 5 MΩ; \(R_D\) = 7.5 kΩ; \(R_S\) = 3 kΩ bypassed; \(R_{sig}\) = 100 kΩ; \(R_L\) = 10 kΩ.)</p><div id="fig-q1112"></div></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><b>(a)</b> \(V_G = 15\times5/15 = 5\) V. Assume saturation: \(I_D = \tfrac12\times2\,(5 - 3I_D - 1)^2 = (4 - 3I_D)^2 \Rightarrow 9I_D^2 - 25I_D + 16 = 0 \Rightarrow I_D = 1\) mA or 1.78 mA. 1.78 mA gives \(V_{GS} = 5 - 5.33 = -0.33\) V &lt; \(V_t\): reject. So \(I_D\) = 1 mA, \(V_S\) = 3 V, \(V_{GS}\) = 2 V, \(V_{OV}\) = 1 V, \(V_D = 15 - 7.5 = 7.5\) V. \(V_{DS} = 4.5\text{ V} &gt; V_{OV} = 1\) V, i.e. \(V_D = 7.5 &gt; V_G - V_t = 4\) V: <b>saturation confirmed</b>.</p>
+    <p><b>(b)</b> Figure 2 with \(R_G\) = 10 M ∥ 5 M, \(r_o\), \(R_D\) = 7.5 kΩ, \(R_L\) = 10 kΩ, source grounded.</p>
+    <p><b>(c)</b> \(g_m = 2\times1/1 = 2\) mA/V; \(r_o = 100/1 = 100\) kΩ. \(R_{in} = 10\parallel5 = 3.33\) MΩ. \(R_{out} = 7.5\parallel100 = 6.98\) kΩ. \(A_v = -2\times(100\parallel7.5\parallel10) = -2\times4.11 = -8.22\) V/V. \(G_v = \dfrac{3333}{3333+100}\times(-8.22) = -7.98\) V/V.</p>
+  </div></details>
+</div>
+
+<h3>Highlighted textbook problems</h3>
+
+<div class="exam">
+  <div class="exam-src">Sedra 7e P7.118 · highlighted by the teacher · also Khairul s.47 (statement only)</div>
+  <div class="exam-q"><p>The NMOS transistor in the CS amplifier (5 V supply; 300 kΩ/200 kΩ gate divider; \(R_D\) = 5 kΩ; \(R_S\) = 2 kΩ bypassed by \(C_S\); \(R_{sig}\) = 120 kΩ; \(R_L\) = 5 kΩ) has \(V_t\) = 0.7 V and \(V_A\) = 50 V. (a) Neglecting the Early effect, verify that the MOSFET is in saturation with \(I_D\) = 0.5 mA and \(V_{OV}\) = 0.3 V. What must \(k_n\) be? What is \(V_D\)? (b) Find \(R_{in}\) and \(G_v\). (c) Find the largest \(\hat v_{sig}\) for which the transistor stays in saturation, and the output amplitude. (d) What resistance \(R_s\) in series with \(C_S\) lets you double \(\hat v_{sig}\)? What output results?</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><b>(a)</b> \(V_G = 5\times200/500 = 2\) V. With 0.5 mA: \(V_S\) = 1 V, \(V_{GS}\) = 1 V, \(V_{OV}\) = 0.3 V ✓. \(k_n = 2I_D/V_{OV}^2 = 1/0.09 = 11.1\) mA/V². \(V_D = 5 - 2.5 = 2.5\) V; \(V_{DS} = 1.5 &gt; 0.3\) ✓ saturated.</p>
+    <p><b>(b)</b> \(R_{in} = 300\parallel200 = 120\) kΩ. \(g_m = 2\times0.5/0.3 = 3.33\) mA/V, \(r_o = 100\) kΩ. \(G_v = -\dfrac{120}{240}\times3.33\times(5\parallel5\parallel100) = -0.5\times3.33\times2.44 = -4.07\) V/V.</p>
+    <p><b>(c)</b> \(|A_v| = 8.13\). \(\hat v_g \le \dfrac{V_D - V_G + V_t}{1+|A_v|} = \dfrac{2.5 - 2 + 0.7}{9.13} = 0.131\) V, so \(\hat v_{sig} = 0.131/0.5 = 0.263\) V and \(\hat v_o = 8.13\times0.131 = 1.07\) V.</p>
+    <p><b>(d)</b> Manual's answer: keep \(v_{gs}\) as in (c) by making \(1 + g_mR_s = 2\): \(R_s = 1/g_m = 300\) Ω; the output stays about 1.07 V. A stricter check (the saturation condition with the doubled \(v_g\) and the reduced gain \(|A'| = 8.13/(1+g_mR_s)\)): \(0.263(1+|A'|) \le 1.2 \Rightarrow |A'| \le 3.56 \Rightarrow R_s \ge 0.385\) kΩ, and then \(\hat v_o = 3.56\times0.263 = 0.94\) V. Either is accepted if the reasoning is written.</p>
+  </div></details>
+</div>
+
+<div class="exam">
+  <div class="exam-src">Sedra 7e P7.119 · highlighted by the teacher</div>
+  <div class="exam-q"><p>A PMOS CS amplifier runs from ±2.5 V: source to +2.5 V through \(R_S\) (bypassed), drain to −2.5 V through \(R_D\), gate driven directly by \(v_{sig}\) (zero DC). \(V_{tp}\) = −0.7 V, \(V_A\) very large. (a) Select \(R_S\) for \(I_D\) = 0.3 mA and \(|V_{OV}|\) = 0.3 V. (b) Select \(R_D\) for \(G_v\) = −10 V/V. (c) Find the largest \(\hat v_{sig}\) for saturation and the output amplitude. (d) If \(\hat v_{sig}\) is limited to 50 mV, how large can \(R_D\) be made while staying saturated? What is the new \(G_v\)?</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><b>(a)</b> \(V_G = 0\); \(V_{SG} = 0.7 + 0.3 = 1\) V, so \(V_S = 1\) V and \(R_S = (2.5-1)/0.3 = 5\) kΩ.</p>
+    <p><b>(b)</b> \(g_m = 2\times0.3/0.3 = 2\) mA/V; \(G_v = -g_mR_D = -10 \Rightarrow R_D = 5\) kΩ; \(V_D = -2.5 + 0.3\times5 = -1\) V.</p>
+    <p><b>(c)</b> PMOS saturation: \(v_D \le v_G + |V_{tp}|\). When \(v_g\) swings to \(-\hat v\), \(v_d = +10\hat v\): \(-1 + 10\hat v \le -\hat v + 0.7 \Rightarrow \hat v \le 1.7/11 = 0.155\) V; \(\hat v_o = 1.55\) V.</p>
+    <p><b>(d)</b> With \(\hat v = 0.05\) V: \(V_D + g_mR_D\hat v \le -\hat v + 0.7\), \(V_D = -2.5 + 0.3R_D\): \(-2.5 + 0.3R_D + 0.1R_D \le 0.65 \Rightarrow R_D \le 7.875\) kΩ; \(G_v = -2\times7.875 = -15.75\) V/V.</p>
+  </div></details>
+</div>
+
+<h2>Practice</h2>
+<h3>Key terms</h3><div id="cards"></div>
+<h3>Quick check</h3><div id="quiz"></div>
+
+<div class="key"><p><strong>Summary:</strong> DC first (divider \(V_G\), quadratic in \(I_D\), reject the root with \(V_{GS} &lt; V_t\), check \(V_{DS} \ge V_{OV}\)), then \(g_m = 2I_D/V_{OV}\), \(r_o = V_A/I_D\). AC: \(R_{in} = R_{G1}\parallel R_{G2}\), \(R_o = R_D\parallel r_o\), \(A_{vo} = -g_m(R_D\parallel r_o)\), \(A_v = -g_m(R_D\parallel r_o\parallel R_L)\), \(G_v = \frac{R_{in}}{R_{in}+R_{sig}}A_v\). An unbypassed \(R_s\) divides gain and \(v_{gs}\) by \(1+g_mR_s\) (gain = −drain R / source R); \(R_s = 1/g_m\) doubles the allowed input without moving the bias. Small-signal limit \(\hat v_{gs} \le 0.1V_{OV}\); saturation limit \(\hat v_g \le (V_D - V_G + V_t)/(1+|A_v|)\).</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/eee.js"></script>
+<script>
+// move every point of a schematic right by dx (keeps labels inside the view box)
+const shiftX = (items, dx) => items.map(it => it.map(e => Array.isArray(e) && typeof e[0] === 'number' ? [e[0] + dx, e[1]] : e));
+const kO = v => v >= 1000 ? num(v / 1000, 3) + ' MΩ' : num(v, 3) + ' kΩ'; // kΩ number -> label
+// Discrete CS amplifier. Values in V, kΩ, mA/V². RS = 0: source grounded. RL = 0: no load (output at drain).
+// split: unbypassed part Rs1 (kΩ) of RS. vt/kn feed the simulator.
+function csFig({ VDD = 15, RG1 = 10000, RG2 = 5000, RD = 16, RS = 7, RL = 16, Rsig = 200, bypass = true, split = 0, vt = 1, kn = 4, sim = true, amp = 0.05 }) {
+  const g = 320, it = [
+    ['rail', [120, 20], `+${VDD} V`], ['R', [120, 20], [120, 180], 'R_G1 ' + kO(RG1), -1, { val: RG1 * 1e3 }], ['R', [120, 180], [120, g], 'R_G2 ' + kO(RG2), -1, { val: RG2 * 1e3 }],
+    ['dot', [120, 180]], ['W', [120, 180], [200, 180]], ['nmos', [200, 180], { vt, k: kn * 1e-3 }],
+    ['AC', [-30, 220], [-30, 300], 'v_sig', -1, { amp, f: 1000 }], ['W', [-30, 220], [-30, 180], [0, 180]], ['R', [0, 180], [70, 180], 'R_sig ' + kO(Rsig), 1, { val: Rsig * 1e3 }],
+    ['C', [70, 180], [120, 180], '', 1, { val: 1e-5 }], ['W', [-30, 300], [-30, g], [RL ? 410 : 350, g]], ['gnd', [180, g]], ['dot', [120, g]],
+    ['rail', [240, 20], `+${VDD} V`], ['R', [240, 20], [240, 110], 'R_D ' + kO(RD), 1, { val: RD * 1e3 }], ['W', [240, 110], [240, 140]], ['dot', [240, 110]],
+  ];
+  if (RL) it.push(['C', [240, 110], [320, 110], '', 1, { val: 1e-5 }], ['W', [320, 110], [410, 110]], ['R', [410, 110], [410, g], 'R_L ' + kO(RL), 1, { val: RL * 1e3 }], ['open', [410, 110], 'v_o'], ['dot', [410, g]]);
+  else it.push(['W', [240, 110], [300, 110]], ['open', [300, 110], 'v_o']);
+  if (!RS) it.push(['W', [240, 220], [240, g]], ['dot', [240, g]]);
+  else if (split) it.push(['R', [240, 220], [240, 260], 'R_s ' + kO(split), 1, { val: split * 1e3 }], ['R', [240, 260], [240, g], kO(RS - split), 1, { val: (RS - split) * 1e3 }],
+    ['W', [240, 260], [350, 260]], ['C', [350, 260], [350, g], 'C_S', 1, { val: 1e-4 }], ['dot', [240, 260]], ['dot', [240, g]], ['dot', [350, g]]);
+  else { it.push(['R', [240, 220], [240, g], 'R_S ' + kO(RS), 1, { val: RS * 1e3 }], ['dot', [240, g]]);
+    if (bypass) it.push(['W', [240, 220], [350, 220]], ['C', [350, 220], [350, g], 'C_S', 1, { val: 1e-4 }], ['dot', [240, 220]], ['dot', [350, g]]); }
+  return sch(shiftX(it, 70), { w: 570, h: 340, sim });
+}
+// small-signal (hybrid-pi) equivalent of the CS amplifier
+const csSS = (L = {}) => sch(shiftX([
+  ['AC', [0, 140], [0, 80], 'v_sig', -1], ['W', [0, 80], [0, 60], [10, 60]], ['R', [10, 60], [90, 60], L.rsig || 'R_sig'], ['W', [90, 60], [130, 60]], ['dot', [130, 60]],
+  ['R', [130, 60], [130, 160], L.rg || 'R_G'], ['t', [118, 82], '+', 'end'], ['t', [118, 116], 'v_gs', 'end'], ['t', [118, 150], '−', 'end'], ['t', [130, 40], 'G'],
+  ['I', [270, 60], [270, 160], 'gₘv_gs'], ['R', [350, 60], [350, 160], 'r_o'], ['R', [440, 60], [440, 160], L.rd || 'R_D'], ['R', [540, 60], [540, 160], L.rl || 'R_L'],
+  ['W', [270, 60], [540, 60]], ['W', [0, 140], [0, 160], [540, 160]], ['dot', [350, 60]], ['dot', [440, 60]], ['dot', [350, 160]], ['dot', [440, 160]], ['dot', [270, 160]], ['dot', [130, 160]],
+  ['t', [270, 40], 'D'], ['open', [540, 60], ''], ['t', [550, 50], 'v_o', 'start'], ['gnd', [200, 160]], ['t', [252, 180], 'S (signal ground)', 'start'],
+], 60), { w: 680, h: 190, sim: false });
+$('#fig-cs').innerHTML = csFig({});
+$('#fig-cs-ss').innerHTML = csSS({ rg: 'R_G1∥R_G2' });
+$('#fig-rs').innerHTML = sch([
+  ['open', [60, 140], ''], ['t', [56, 128], 'v_i (gate)', 'start'], ['W', [60, 140], [220, 140]], ['t', [130, 160], 'i_g = 0'], ['dot', [220, 140]],
+  ['I', [220, 40], [220, 140], 'i = gₘv_gs'], ['R', [220, 140], [220, 210], '1/gₘ'], ['R', [220, 210], [220, 290], 'R_s'], ['dot', [220, 210]], ['gnd', [220, 290]],
+  ['W', [220, 40], [340, 40]], ['R', [340, 40], [340, 290], 'R_D∥R_L'], ['gnd', [340, 290]], ['open', [340, 20], 'v_o'], ['W', [340, 40], [340, 20]], ['dot', [340, 40]],
+  ['t', [210, 165], '+', 'end'], ['t', [210, 180], 'v_gs', 'end'], ['t', [210, 202], '−', 'end'],
+], { w: 420, h: 310, sim: false });
+$('#fig-q2425').innerHTML = csFig({});
+$('#fig-q2021').innerHTML = csFig({ VDD: 3.3, RG1: 140, RG2: 60, RD: 10, RS: 0, RL: 0, Rsig: 4, vt: 0.4, kn: 0.5, amp: 0.01 });
+$('#fig-q1112').innerHTML = csFig({ RG1: 10000, RG2: 5000, RD: 7.5, RS: 3, RL: 10, Rsig: 100, vt: 1, kn: 2 });
+
+worked('#wk-m10', {
+  given: '\\(\\mu_nC_{ox}\\) = 400 µA/V², W/L = 10, \\(V_A\\) = 10 V, \\(I_D\\) = 0.2 mA, \\(R_D\\) = 6 kΩ, no gate network (\\(R_{in} = \\infty\\)). Find \\(A_{vo}\\), \\(R_o\\); then \\(G_v\\) with \\(R_L\\) = 10 kΩ and the \\(\\hat v_{sig}\\) for a 0.2 V peak output.',
+  fig: csSS({ rg: 'R_G → ∞' }),
+  steps: [
+    { t: '\\(k_n = 0.4\\times10 = 4\\) mA/V², \\(g_m = \\sqrt{2\\times4\\times0.2} = 1.265\\) mA/V', a: { l: 'g_m', v: 1.2649e-3, u: 'mA/V', mul: 1e-3 } },
+    { t: '\\(r_o = 10/0.2 = 50\\) kΩ', a: { l: 'r_o', v: 50e3, u: 'kΩ' } },
+    { t: '\\(R_o = 6\\parallel50 = 5.357\\) kΩ', a: { l: 'R_o', v: 5357, u: 'kΩ' } },
+    { t: '\\(A_{vo} = -1.265\\times5.357 = -6.78\\) V/V', a: { l: 'A_{vo}', v: -6.776, u: 'V/V' } },
+    { t: '\\(G_v = A_v = -1.265\\times(6\\parallel50\\parallel10) = -1.265\\times3.488 = -4.41\\) V/V', a: { l: 'G_v', v: -4.412, u: 'V/V' } },
+    { t: '\\(\\hat v_{sig} = 0.2/4.41 = 45.3\\) mV', a: { l: '\\hat v_{sig}', v: 0.04533, u: 'mV' } },
+  ] });
+
+drill('#dr-m10', { id: 'm10-cs-bias-numbers', title: 'CS amplifier from given bias numbers', gen(r) {
+  const pathA = r() < 0.5, VA = r.pick([0, 10, 20, 50, 100]), RD = r.E(2, 30), RL = r.pick([0, 5, 10, 20, 47]), Rsig = r.pick([0, 10, 100]), RG = r.pick([0, 1000, 4700, 10000]), vo = r.pick([0.1, 0.2, 0.5, 1]);
+  let I, Vov, gm, s1;
+  if (pathA) { I = r.pick([0.1, 0.2, 0.25, 0.5, 1, 2]); Vov = r.pick([0.15, 0.2, 0.25, 0.3, 0.4, 0.5, 0.6]); gm = 2 * I / Vov; s1 = `\\(g_m = 2I_D/V_{OV} = 2\\times${I}/${Vov} = ${num(gm)}\\) mA/V`; }
+  else { const kp = r.pick([100, 200, 400]), WL = r.pick([5, 10, 20, 50]); I = r.pick([0.1, 0.2, 0.5, 1]); const kn = kp * WL / 1000; gm = Math.sqrt(2 * kn * I); Vov = 2 * I / gm; s1 = `\\(k_n = ${kp}\\,\\mu\\text{A/V}^2\\times${WL} = ${num(kn)}\\) mA/V², \\(g_m = \\sqrt{2\\times${num(kn)}\\times${I}} = ${num(gm)}\\) mA/V`; var desc = `\\(\\mu_nC_{ox}\\) = ${kp} µA/V², W/L = ${WL}, biased at \\(I_D\\) = ${I} mA`; }
+  const ro = VA ? VA / I : Infinity, Ro = par(RD, ro), Avo = -gm * Ro, Av = RL ? -gm * par(RD, ro, RL) : Avo, Rin = RG || Infinity, f = RG ? RG / (RG + Rsig) : 1, Gv = f * Av, vs = vo / Math.abs(Gv);
+  const roT = VA ? `\\(r_o = ${VA}/${I} = ${num(ro)}\\) kΩ` : 'No \\(V_A\\) given: \\(r_o = \\infty\\)';
+  const given = `A CS amplifier uses a MOSFET ${pathA ? `biased at \\(I_D\\) = ${I} mA with \\(V_{OV}\\) = ${Vov} V` : desc}${VA ? `, \\(V_A\\) = ${VA} V` : ''}; \\(R_D\\) = ${RD} kΩ. ${RG ? `The gate bias network presents ${kO(RG)}.` : 'No gate network is given.'} The source has \\(R_{sig}\\) = ${Rsig} kΩ${RL ? ` and the load is ${RL} kΩ` : ' and there is no load'}. Find \\(g_m\\), \\(R_o\\), \\(A_{vo}\\), \\(G_v\\) and the peak \\(v_{sig}\\) for a ${vo} V peak output.`;
+  return { given, fig: csSS({ rg: RG ? 'R_G ' + kO(RG) : 'R_G → ∞', rl: RL ? 'R_L ' + RL + ' kΩ' : 'R_L → ∞', rd: 'R_D ' + RD + ' kΩ', rsig: 'R_sig ' + Rsig + ' kΩ' }),
+    ask: [{ l: 'g_m', v: gm * 1e-3, u: 'mA/V', mul: 1e-3 }, { l: 'R_o', v: Ro * 1e3, u: 'kΩ' }, { l: 'A_{vo}', v: Avo, u: 'V/V' }, { l: 'G_v', v: Gv, u: 'V/V' }, { l: '\\hat v_{sig}', v: vs, u: 'mV' }],
+    steps: [
+      { t: s1, a: { l: 'g_m', v: gm * 1e-3, u: 'mA/V', mul: 1e-3 } }, roT,
+      { t: `\\(R_o = R_D\\parallel r_o = ${VA ? `${RD}\\parallel${num(ro)}` : RD} = ${num(Ro)}\\) kΩ`, a: { l: 'R_o', v: Ro * 1e3, u: 'kΩ' } },
+      { t: `\\(A_{vo} = -g_mR_o = -${num(gm)}\\times${num(Ro)} = ${num(Avo)}\\) V/V`, a: { l: 'A_{vo}', v: Avo, u: 'V/V' } },
+      RL ? `\\(A_v = -g_m(R_D\\parallel r_o\\parallel R_L) = -${num(gm)}\\times${num(par(RD, ro, RL))} = ${num(Av)}\\) V/V` : 'No load: \\(A_v = A_{vo}\\).',
+      { t: RG ? `\\(R_{in} = ${kO(RG)}\\); \\(G_v = \\dfrac{${RG}}{${RG}+${Rsig}}\\times(${num(Av)}) = ${num(Gv)}\\) V/V` : `\\(R_{in} = \\infty\\), so \\(v_{gs} = v_{sig}\\) and \\(G_v = A_v = ${num(Gv)}\\) V/V`, a: { l: 'G_v', v: Gv, u: 'V/V' } },
+      { t: `\\(\\hat v_{sig} = ${vo}/${num(Math.abs(Gv))} = ${num(vs * 1000)}\\) mV`, a: { l: '\\hat v_{sig}', v: vs, u: 'mV' } },
+    ] };
+} });
+
+worked('#wk-m11', {
+  given: 'Figure 1: +15 V, \\(R_{G1}\\) = 10 MΩ, \\(R_{G2}\\) = 5 MΩ, \\(R_D\\) = 16 kΩ, \\(R_S\\) = 7 kΩ (bypassed), \\(R_L\\) = 16 kΩ, \\(R_{sig}\\) = 200 kΩ; \\(V_t\\) = 1 V, \\(k_n\\) = 4 mA/V², \\(V_A\\) = 100 V.',
+  steps: [
+    { t: '\\(V_G = 15\\times5/15 = 5\\) V', a: { l: 'V_G', v: 5, u: 'V' } },
+    '\\(I_D = \\tfrac12\\times4(5 - 7I_D - 1)^2 \\Rightarrow 98I_D^2 - 113I_D + 32 = 0 \\Rightarrow I_D = 0.5\\) or 0.653 mA',
+    { t: '0.653 mA gives \\(V_{GS} = 5 - 7\\times0.653 = 0.43\\text{ V} &lt; V_t\\): reject. \\(I_D = 0.5\\) mA', a: { l: 'I_D', v: 0.5e-3, u: 'mA' } },
+    { t: '\\(V_{GS} = 1.5\\) V, \\(V_{OV} = 0.5\\) V, \\(V_D = 15 - 0.5\\times16 = 7\\) V; \\(V_{DS} = 3.5 &gt; 0.5\\) ✓', a: { l: 'V_D', v: 7, u: 'V' } },
+    { t: '\\(g_m = 2\\times0.5/0.5 = 2\\) mA/V, \\(r_o = 100/0.5 = 200\\) kΩ', a: { l: 'g_m', v: 2e-3, u: 'mA/V', mul: 1e-3 } },
+    { t: '\\(R_{in} = 10\\parallel5 = 3.33\\) MΩ, \\(R_o = 16\\parallel200 = 14.8\\) kΩ', a: { l: 'R_o', v: 14815, u: 'kΩ' } },
+    { t: '\\(G_v = \\dfrac{3333}{3533}\\times[-2\\times(200\\parallel16\\parallel16)] = 0.943\\times(-15.4) = -14.5\\) V/V', a: { l: 'G_v', v: -14.51, u: 'V/V' } },
+    { t: '\\(\\hat v_{sig,\\max} = 0.1\\times0.5/0.943 = 53\\) mV', a: { l: '\\hat v_{sig}', v: 0.053, u: 'mV' } },
+  ] });
+
+// shared DC solve for the generated full CS amplifiers (mA, kΩ, V)
+function genCS(r) {
+  const VDD = r.pick([10, 12, 15, 20]), RG1 = r.pick([2000, 4700, 6800, 10000]), RG2 = r.pick([1000, 2000, 3300, 4700, 5000, 10000]), Vt = r.pick([0.5, 0.7, 1, 1.2, 1.5]), kn = r.pick([0.5, 1, 2, 4]);
+  const RS = r.step(0.5, 10, 0.5), RD = r.E(2, 20), RL = r.pick([0, 5, 10, 15, 20]), VA = r.pick([0, 50, 100]), Rsig = r.pick([0, 10, 100, 200]);
+  const VG = VDD * RG2 / (RG1 + RG2), Vx = VG - Vt; if (Vx < 0.3) return null;
+  const kR = kn * RS, sq = Math.sqrt(1 + 2 * kR * Vx), Vov = (-1 + sq) / kR, I = 0.5 * kn * Vov * Vov, Vov2 = (-1 - sq) / kR, I2 = 0.5 * kn * Vov2 * Vov2;
+  const VS = I * RS, VD = VDD - I * RD; if (VD - VS < Vov + 0.5 || Vov < 0.15) return null;
+  const a = 0.5 * kn * RS * RS, b = kR * Vx + 1, c = 0.5 * kn * Vx * Vx;
+  const gm = 2 * I / Vov, ro = VA ? VA / I : Infinity, Rin = par(RG1, RG2);
+  return { VDD, RG1, RG2, Vt, kn, RS, RD, RL, VA, Rsig, VG, Vx, Vov, I, I2, VS, VD, a, b, c, gm, ro, Rin };
+}
+const dcSteps = d => [
+  { t: `\\(V_G = ${d.VDD}\\times\\dfrac{${d.RG2}}{${d.RG1}+${d.RG2}} = ${num(d.VG)}\\) V`, a: { l: 'V_G', v: d.VG, u: 'V' } },
+  `\\(I_D = \\tfrac12\\times${d.kn}\\,(${num(d.Vx)} - ${d.RS}I_D)^2 \\Rightarrow ${num(d.a)}I_D^2 - ${num(d.b)}I_D + ${num(d.c)} = 0 \\Rightarrow I_D = ${num(d.I)}\\) or ${num(d.I2)} mA`,
+  { t: `${num(d.I2)} mA gives \\(V_{GS} = ${num(d.VG)} - ${d.RS}\\times${num(d.I2)} = ${num(d.VG - d.RS * d.I2, 3)}\\text{ V} &lt; V_t\\): reject. \\(I_D = ${num(d.I)}\\) mA`, a: { l: 'I_D', v: d.I * 1e-3, u: 'mA' } },
+  { t: `\\(V_{OV} = ${num(d.Vov)}\\) V, \\(V_S = ${num(d.VS)}\\) V, \\(V_D = ${d.VDD} - ${num(d.I)}\\times${d.RD} = ${num(d.VD)}\\) V; \\(V_{DS} = ${num(d.VD - d.VS)} &gt; V_{OV}\\) ✓ saturated`, a: { l: 'V_D', v: d.VD, u: 'V' } },
+  { t: `\\(g_m = 2I_D/V_{OV} = 2\\times${num(d.I)}/${num(d.Vov)} = ${num(d.gm)}\\) mA/V; ${d.VA ? `\\(r_o = ${d.VA}/${num(d.I)} = ${num(d.ro)}\\) kΩ` : '\\(r_o = \\infty\\) (no \\(V_A\\))'}`, a: { l: 'g_m', v: d.gm * 1e-3, u: 'mA/V', mul: 1e-3 } },
+];
+const csGiven = (d, extra) => `In the CS amplifier of the figure, \\(V_t\\) = ${d.Vt} V, \\(k_n'(W/L)\\) = ${d.kn} mA/V²${d.VA ? `, \\(V_A\\) = ${d.VA} V (ignore it for the bias)` : ', λ = 0'}. ${extra}`;
+
+drill('#dr-m11', { id: 'm11-full-cs', title: 'Full CS amplifier: DC bias, then gain and signal limit', gen(r) {
+  const d = genCS(r); if (!d) return null;
+  const Ro = par(d.RD, d.ro), Av = -d.gm * (d.RL ? par(d.ro, d.RD, d.RL) : Ro), f = d.Rin / (d.Rin + d.Rsig), Gv = f * Av, vmax = 0.1 * d.Vov / f;
+  return {
+    given: csGiven(d, `Find \\(I_D\\), \\(V_D\\), \\(g_m\\), \\(R_o\\), the overall gain \\(G_v = v_o/v_{sig}\\), and the largest peak \\(v_{sig}\\) that keeps \\(\\hat v_{gs} \\le 0.1V_{OV}\\).`),
+    fig: csFig({ VDD: d.VDD, RG1: d.RG1, RG2: d.RG2, RD: d.RD, RS: d.RS, RL: d.RL, Rsig: d.Rsig, vt: d.Vt, kn: d.kn, amp: 0.01 }),
+    ask: [{ l: 'I_D', v: d.I * 1e-3, u: 'mA' }, { l: 'V_D', v: d.VD, u: 'V' }, { l: 'g_m', v: d.gm * 1e-3, u: 'mA/V', mul: 1e-3 }, { l: 'R_o', v: Ro * 1e3, u: 'kΩ' }, { l: 'G_v', v: Gv, u: 'V/V' }, { l: '\\hat v_{sig,max}', v: vmax, u: 'mV' }],
+    steps: [...dcSteps(d),
+      { t: `AC (\\(R_S\\) bypassed): \\(R_{in} = ${kO(d.RG1)}\\parallel${kO(d.RG2)} = ${kO(d.Rin)}\\); \\(R_o = R_D\\parallel r_o = ${num(Ro)}\\) kΩ`, a: { l: 'R_o', v: Ro * 1e3, u: 'kΩ' } },
+      `\\(A_v = -g_m(${d.RL ? 'r_o\\parallel R_D\\parallel R_L' : 'r_o\\parallel R_D'}) = -${num(d.gm)}\\times${num(-Av / d.gm)} = ${num(Av)}\\) V/V${d.RL ? '' : ' (no load)'}`,
+      { t: `\\(G_v = \\dfrac{${num(d.Rin)}}{${num(d.Rin)}+${d.Rsig}}\\times(${num(Av)}) = ${num(f, 5)}\\times(${num(Av)}) = ${num(Gv)}\\) V/V`, a: { l: 'G_v', v: Gv, u: 'V/V' } },
+      { t: `\\(\\hat v_{gs} \\le 0.1\\times${num(d.Vov)} = ${num(100 * d.Vov)}\\) mV, so \\(\\hat v_{sig} \\le ${num(100 * d.Vov)}/${num(f, 5)} = ${num(vmax * 1000)}\\) mV`, a: { l: '\\hat v_{sig,max}', v: vmax, u: 'mV' } },
+    ] };
+} });
+
+drill('#dr-rs', { id: 'm11-cs-degeneration', title: 'CS with an unbypassed source resistance', gen(r) {
+  const I = r.pick([0.25, 0.5, 1, 2]), Vov = r.pick([0.2, 0.25, 0.4, 0.5, 1]), RD = r.E(4.7, 22), RL = r.pick([0, 10, 16, 20]), Rsig = r.pick([0, 50, 100, 200]), RG = r.pick([1000, 3333, 4700]);
+  const gm = 2 * I / Vov, Rs = r.pick([0.1, 0.2, 0.25, 0.5, 1]), N = r.pick([2, 3, 4]); if (gm * Rs < 0.2 || gm * Rs > 6) return null;
+  const Rp = RL ? par(RD, RL) : RD, Av = -gm * Rp / (1 + gm * Rs), f = RG / (RG + Rsig), Gv = f * Av, vmax = 0.1 * Vov * (1 + gm * Rs) / f, RsN = (N - 1) / gm;
+  return {
+    given: `A CS amplifier is biased at \\(I_D\\) = ${I} mA, \\(V_{OV}\\) = ${Vov} V, with \\(R_D\\) = ${RD} kΩ${RL ? `, \\(R_L\\) = ${RL} kΩ` : ' (no load)'}, \\(R_{in}\\) = ${kO(RG)}, \\(R_{sig}\\) = ${Rsig} kΩ. A resistance \\(R_s\\) = ${si(Rs * 1e3, 'Ω')} of the source resistor is left unbypassed (neglect \\(r_o\\)). Find \\(g_m\\), \\(A_v\\), \\(G_v\\), the largest peak \\(v_{sig}\\) with \\(\\hat v_{gs} \\le 0.1V_{OV}\\), and the unbypassed \\(R_s\\) that would make that limit ${N} times the fully-bypassed value.`,
+    ask: [{ l: 'g_m', v: gm * 1e-3, u: 'mA/V', mul: 1e-3 }, { l: 'A_v', v: Av, u: 'V/V' }, { l: 'G_v', v: Gv, u: 'V/V' }, { l: '\\hat v_{sig,max}', v: vmax, u: 'mV' }, { l: 'R_s(\\times' + N + ')', v: RsN * 1e3, u: 'kΩ' }],
+    steps: [
+      { t: `\\(g_m = 2\\times${I}/${Vov} = ${num(gm)}\\) mA/V, \\(1 + g_mR_s = 1 + ${num(gm)}\\times${Rs} = ${num(1 + gm * Rs)}\\)`, a: { l: 'g_m', v: gm * 1e-3, u: 'mA/V', mul: 1e-3 } },
+      { t: `\\(A_v = -\\dfrac{g_m(${RL ? 'R_D\\parallel R_L' : 'R_D'})}{1+g_mR_s} = -\\dfrac{${num(gm)}\\times${num(Rp)}}{${num(1 + gm * Rs)}} = ${num(Av)}\\) V/V (= −drain R / source R = \\(-${num(Rp)}/(${num(1 / gm)} + ${Rs})\\))`, a: { l: 'A_v', v: Av, u: 'V/V' } },
+      { t: `\\(G_v = \\dfrac{${RG}}{${RG}+${Rsig}}\\times(${num(Av)}) = ${num(Gv)}\\) V/V`, a: { l: 'G_v', v: Gv, u: 'V/V' } },
+      { t: `\\(\\hat v_{gs} = \\hat v_i/(1+g_mR_s) \\le ${num(0.1 * Vov)}\\) V, so \\(\\hat v_{sig} \\le ${num(0.1 * Vov)}\\times${num(1 + gm * Rs)}/${num(f, 5)} = ${num(vmax * 1000)}\\) mV`, a: { l: '\\hat v_{sig,max}', v: vmax, u: 'mV' } },
+      { t: `For ${N}×: \\(1 + g_mR_s = ${N} \\Rightarrow R_s = ${N - 1}/${num(gm)} = ${num(RsN)}\\) kΩ`, a: { l: 'R_s', v: RsN * 1e3, u: 'kΩ' } },
+    ] };
+} });
+
+drill('#dr-swing', { id: 'm11-saturation-swing', title: 'Largest input that keeps the MOSFET saturated', gen(r) {
+  const d = genCS(r); if (!d) return null;
+  const Av = -d.gm * (d.RL ? par(d.ro, d.RD, d.RL) : par(d.ro, d.RD)), f = d.Rin / (d.Rin + d.Rsig), vg = (d.VD - d.VG + d.Vt) / (1 - Av);
+  if (vg < 0.02) return null;
+  const vs = vg / f, vo = -Av * vg;
+  return {
+    given: csGiven(d, `Find \\(V_D\\), the gain \\(A_v = v_o/v_{gs}\\), and the largest peak \\(v_{sig}\\) for which the transistor stays in saturation, with the corresponding output peak.`),
+    fig: csFig({ VDD: d.VDD, RG1: d.RG1, RG2: d.RG2, RD: d.RD, RS: d.RS, RL: d.RL, Rsig: d.Rsig, vt: d.Vt, kn: d.kn, amp: 0.01 }),
+    ask: [{ l: 'V_D', v: d.VD, u: 'V' }, { l: 'A_v', v: Av, u: 'V/V' }, { l: '\\hat v_{sig}', v: vs, u: 'V' }, { l: '\\hat v_o', v: vo, u: 'V' }],
+    steps: [...dcSteps(d),
+      { t: `\\(A_v = ${num(Av)}\\) V/V`, a: { l: 'A_v', v: Av, u: 'V/V' } },
+      { t: `Saturation at the drain's lowest point: \\(\\hat v_g \\le \\dfrac{V_D - V_G + V_t}{1+|A_v|} = \\dfrac{${num(d.VD)} - ${num(d.VG)} + ${d.Vt}}{${num(1 - Av)}} = ${num(vg)}\\) V`, a: { l: '\\hat v_g', v: vg, u: 'V' } },
+      { t: `\\(\\hat v_{sig} = ${num(vg)}/${num(f, 5)} = ${num(vs)}\\) V`, a: { l: '\\hat v_{sig}', v: vs, u: 'V' } },
+      { t: `\\(\\hat v_o = ${num(-Av)}\\times${num(vg)} = ${num(vo)}\\) V`, a: { l: '\\hat v_o', v: vo, u: 'V' } },
+      `(This is the large-signal limit. The small-signal rule \\(\\hat v_{gs} \\le 0.1V_{OV} = ${num(100 * d.Vov)}\\) mV is usually tighter.)`,
+    ] };
+} });
+
+flashcards('#cards', [
+  { f: 'R_in of the CS amplifier', b: 'R_G1 ∥ R_G2 (gate draws no current); ∞ if no gate network.' },
+  { f: 'R_o', b: 'R_D ∥ r_o (v_sig = 0 kills g_m·v_gs).' },
+  { f: 'A_vo', b: '−g_m(R_D ∥ r_o), output open.' },
+  { f: 'G_v', b: '[R_in/(R_in + R_sig)]·(−g_m)(R_D ∥ r_o ∥ R_L)' },
+  { f: 'With unbypassed R_s', b: 'A_v = −g_m(R_D∥R_L)/(1 + g_mR_s) = −(drain R)/(1/g_m + R_s).' },
+  { f: 'Double the allowed input', b: 'Leave R_s = 1/g_m of R_S unbypassed; bias unchanged, gain halved.' },
+  { f: 'Small-signal input limit', b: 'v̂_sig ≤ 0.1V_OV·(R_in + R_sig)/R_in' },
+  { f: 'Saturation input limit', b: 'v̂_g ≤ (V_D − V_G + V_t)/(1 + |A_v|)' },
+]);
+quiz('#quiz', [
+  { q: 'R_G1 = 10 MΩ to V_DD, R_G2 = 5 MΩ to ground. R_in =', opts: ['15 MΩ', '3.33 MΩ', '5 MΩ', '10 MΩ'], a: 1, why: 'V_DD is AC ground, so the two are in parallel.' },
+  { q: 'g_m = 2 mA/V, R_D = 10 kΩ, R_L = 10 kΩ, r_o = ∞, R_in = ∞. G_v =', opts: ['−20', '−10', '−5', '+10'], a: 1, why: '−2 × (10 ∥ 10) = −10 V/V.' },
+  { q: 'Solving the bias quadratic gives I_D = 0.5 mA and 0.653 mA (V_G = 5 V, R_S = 7 kΩ, V_t = 1 V). Keep', opts: ['0.653 mA', '0.5 mA', 'both', 'the average'], a: 1, why: '0.653 mA gives V_GS = 0.43 V < V_t: impossible in saturation.' },
+  { q: 'An unbypassed R_s with g_m·R_s = 1 changes the gain by a factor', opts: ['2', '½', '1', '¼'], a: 1, why: 'A_v ÷ (1 + g_mR_s) = ÷2.' },
+  { q: 'Which quantity does NOT include R_L?', opts: ['A_v', 'G_v', 'A_vo', 'v_o for a given v_sig'], a: 2, why: 'A_vo is the open-circuit gain.' },
+  { q: 'Bypassing R_S with C_S affects', opts: ['the DC bias', 'only the AC gain', 'both', 'neither'], a: 1, why: 'A capacitor is open at DC: the bias is unchanged.' },
+]);
+</script>
+</body>
+</html>

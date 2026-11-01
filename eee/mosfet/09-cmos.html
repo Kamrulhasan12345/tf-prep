@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CMOS Inverter and Gates · EEE 263 Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">MOSFET · Chapter 9 · Sedra §14.1–14.3 · types M-08, M-09 · low priority</div>
+<h1>CMOS Inverter and Gates</h1>
+<p class="lede">CMOS logic was examined from 2013–14 to 2021–22 (gate synthesis, sizing, delay) and dropped with the other digital topics in 2022–23; the class covered only the DC behaviour of an NMOS–PMOS pair. Read this after the amplifier chapters. The inverter's DC analysis with a resistive load (2015–16) is in <a href="05-mirrors-and-pairs.html">Chapter 5</a>.</p>
+
+<h2>1. The CMOS inverter</h2>
+<p>A PMOS (source to \(V_{DD}\), drain to the output) and an NMOS (source to ground, drain to the output) share the gate (input); the two drains form the output. Input low: PMOS on (triode, \(v_{SD} \approx 0\)), NMOS off, output = \(V_{DD}\). Input high: the reverse, output = 0. In either steady state one transistor is off, so <b>no static current flows</b>, and the output swings rail to rail.</p>
+<p><b>Switching threshold</b> \(V_M\) (both saturated, equal currents): \(\tfrac12k_n(V_M - V_{tn})^2 = \tfrac12k_p(V_{DD} - V_M - |V_{tp}|)^2\):</p>
+<div class="formula">\[ V_M = \frac{r\,(V_{DD} - |V_{tp}|) + V_{tn}}{1 + r}, \qquad r = \sqrt{k_p/k_n} \]</div>
+<p>A matched inverter (\(k_p = k_n\), \(V_{tn} = |V_{tp}|\)) has \(V_M = V_{DD}/2\). Since \(\mu_n \approx 2\)–\(3\,\mu_p\), matching needs \((W/L)_p = (\mu_n/\mu_p)(W/L)_n\).</p>
+<div id="dr-vm"></div>
+
+<h2>2. Static CMOS gates (type M-08)</h2>
+<div class="method"><h4>Method · minimal static CMOS gate</h4><ol>
+<li>Simplify the function (Boolean algebra or K-map); check with a truth table.</li>
+<li>Write the output as a complement: \(Y = \overline{f}\).</li>
+<li><b>Pull-down network (NMOS)</b> realises f: AND → series, OR → parallel.</li>
+<li><b>Pull-up network (PMOS)</b> is the dual: series ↔ parallel, same inputs.</li>
+<li>Transistor count = 2 × number of literals in f (+2 for each inverter needed for a complemented input).</li>
+</ol></div>
+
+<h2>3. Sizing and delay (type M-09)</h2>
+<div class="method"><h4>Method · equal worst-case resistance to a unit inverter</h4><ol>
+<li>Unit inverter: \(W_n = 1\), \(W_p = r = \mu_n/\mu_p\). A device of width W has resistance \(R/W\) (×r for PMOS).</li>
+<li>For every series path in each network, k devices in series each get width k (×r for PMOS), so the path resistance is R.</li>
+<li>A device on paths of different lengths takes the width of its longest path; size the remaining devices so each path totals exactly R (e.g. \(1/W_A + 1/3 = 1 \Rightarrow W_A = 1.5\)).</li>
+<li>\(t_{p,max} = 0.69RC_L\). For \(t_{p,min}\), turn on every parallel branch and reduce to the smallest \(R_{eq}\) for rise and for fall.</li>
+</ol></div>
+<div id="dr-size"></div>
+
+<div class="trap"><h4>Traps</h4><ul>
+<li>The pull-up is the <i>dual</i> of the pull-down, not a copy.</li>
+<li>Static CMOS is inverting: implement \(\overline{f}\); an AND needs a NAND plus an inverter.</li>
+<li>PMOS widths carry the extra factor \(\mu_n/\mu_p\).</li>
+<li>Minimum delay must use input combinations that can actually occur together.</li>
+</ul></div>
+
+<h2>Exam questions</h2>
+<div class="exam">
+  <div class="exam-src">2020–21 · Sec B · Q5(a) · 20 marks</div>
+  <div class="exam-q"><p>A gate network: \(N_1 = \text{NOR}(B, C)\), \(N_2 = \text{NAND}(A, B)\), \(N_3 = \text{NOR}(C, N_2)\), \(N_4 = \text{NOR}(N_1, N_3)\), \(Y = \text{NAND}(A, N_4)\). Implement Y in CMOS with the minimum number of transistors.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p>\(\overline{N_3} = C + N_2 = C + \overline{AB}\), so \(N_4 = (B + C)(C + \overline{A} + \overline{B}) = C + B\overline{A}\). Then \(A\cdot N_4 = AC + AB\overline{A} = AC\), so \(Y = \overline{AC}\): a 2-input NAND of A and C, <b>4 transistors</b> (two series NMOS, two parallel PMOS).</p>
+  </div></details>
+</div>
+<div class="exam">
+  <div class="exam-src">2020–21 · Sec B · Q5(b) · 26⅔ marks</div>
+  <div class="exam-q"><p>A CMOS gate has pull-down network \((A \parallel (B\text{–}C))\) in series with D, i.e. \(Y = \overline{(A + BC)D}\); its pull-up is the dual \((A\text{–}(B\parallel C)) \parallel D\). With \(\mu_n = 3\mu_p\), size the transistors for the same worst-case resistance as a unit inverter (\(W_n = 1\), \(W_p = 3\)) and find the minimum and maximum propagation delays.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a">
+    <p><b>NMOS:</b> longest path B–C–D (3 in series): B = C = D = 3. Path A–D: \(1/W_A + 1/3 = 1 \Rightarrow W_A = 1.5\).</p>
+    <p><b>PMOS:</b> path A–(B or C) has 2 in series: A = B = C = 2 × 3 = 6; D alone: 3.</p>
+    <p><b>Delays:</b> \(t_{p,max} = 0.69RC_L\) (each worst path equals R). Fastest fall (all NMOS on): \((R/1.5 \parallel 2R/3) + R/3 = R/3 + R/3 = 2R/3\). Fastest rise (all PMOS on): \((R/2 + R/4) \parallel R = 3R/7\). So \(t_{p,min} = 0.69\times\tfrac37RC_L \approx 0.296RC_L\).</p>
+  </div></details>
+</div>
+<div class="exam">
+  <div class="exam-src">2013–14 · Sec B · Q5(b) · 15 marks</div>
+  <div class="exam-q"><p>A CMOS inverter on a 5 V supply is driven by a 0/5 V square wave (high 0–5 s, low 5–10 s, …). Sketch the output.</p></div>
+  <details><summary>Show worked answer</summary><div class="exam-a"><p>The output is the logical inverse: 0 V while the input is 5 V, 5 V while it is 0 V, rail to rail, with ideally no static current. Real transitions are not instantaneous: the edges take about \(0.69R_{on}C_L\).</p></div></details>
+</div>
+
+<h2>Practice</h2>
+<h3>Quick check</h3><div id="quiz"></div>
+<div class="key"><p><strong>Summary:</strong> CMOS inverter: rail-to-rail, no static current, \(V_M = \frac{r(V_{DD} - |V_{tp}|) + V_{tn}}{1 + r}\) with \(r = \sqrt{k_p/k_n}\). Gates: NMOS pull-down realises \(\overline{Y}\) (AND series, OR parallel), PMOS pull-up is its dual. Size every series path to the unit-inverter resistance; \(t_p = 0.69RC_L\).</p></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/eee.js"></script>
+<script>
+drill('#dr-vm', { id: 'm08-vm', title: 'CMOS inverter switching threshold', gen(r) {
+  const VDD = r.pick([3.3, 5, 10]), Vtn = r.pick([0.5, 0.7, 1]), Vtp = r.pick([0.5, 0.7, 1]), kn = r.pick([0.5, 1, 2, 4]), kp = r.pick([0.25, 0.5, 1, 2, 4]);
+  const rr = Math.sqrt(kp / kn), VM = (rr * (VDD - Vtp) + Vtn) / (1 + rr);
+  if (VM <= Vtn || VM >= VDD - Vtp) return null;
+  return {
+    given: `CMOS inverter: \\(V_{DD}\\) = ${VDD} V, \\(V_{tn}\\) = ${Vtn} V, \\(|V_{tp}|\\) = ${Vtp} V, \\(k_n\\) = ${kn} mA/V², \\(k_p\\) = ${kp} mA/V². Find the switching threshold \\(V_M\\).`,
+    ask: [{ l: 'V_M', v: VM, u: 'V' }],
+    steps: [
+      { t: `\\(r = \\sqrt{k_p/k_n} = \\sqrt{${kp}/${kn}} = ${num(rr)}\\)`, a: { l: 'r', v: rr, u: '' } },
+      { t: `\\(V_M = \\dfrac{${num(rr)}(${VDD} - ${Vtp}) + ${Vtn}}{1 + ${num(rr)}} = ${num(VM)}\\) V`, a: { l: 'V_M', v: VM, u: 'V' } },
+    ] };
+} });
+drill('#dr-size', { id: 'm09-sizing', title: 'Size a series stack and find its delay', gen(r) {
+  const k = r.pick([2, 3, 4]), mu = r.pick([2, 2.5, 3]), R = r.pick([5, 10, 20]), CL = r.pick([10, 20, 50, 100]); // kΩ, fF
+  const Wn = k, Wp = mu, tp = 0.69 * R * 1e3 * CL * 1e-15;
+  return {
+    given: `A NAND${k} gate (${k} NMOS in series, ${k} PMOS in parallel). \\(\\mu_n = ${mu}\\mu_p\\); a unit inverter has \\(W_n = 1\\), \\(W_p = ${mu}\\) and resistance R = ${R} kΩ. Size the gate for the same worst-case resistance and find \\(t_{p,max}\\) with \\(C_L\\) = ${CL} fF.`,
+    ask: [{ l: 'W_n', v: Wn, u: '', tol: 0.001 }, { l: 'W_p', v: Wp, u: '', tol: 0.001 }, { l: 't_{p,max}', v: tp, u: 'ps' }],
+    steps: [
+      { t: `${k} NMOS in series: each gets \\(W_n = ${k}\\), so the stack is \\(${k}\\times R/${k} = R\\)`, a: { l: 'W_n', v: Wn, u: '', tol: 0.001 } },
+      { t: `Pull-up: the PMOS are in parallel, and the worst case is one PMOS on alone, which must equal R by itself: \\(W_p = ${mu}\\) (same as the unit inverter). A NOR${k} would instead need \\(W_p = ${k}\\times${mu}\\).`, a: { l: 'W_p', v: Wp, u: '', tol: 0.001 } },
+      { t: `\\(t_{p,max} = 0.69RC_L = 0.69\\times${R}\\text{ kΩ}\\times${CL}\\text{ fF} = ${num(tp * 1e12)}\\) ps`, a: { l: 't_{p,max}', v: tp, u: 'ps' } },
+    ] };
+} });
+quiz('#quiz', [
+  { q: 'Static current of an ideal CMOS inverter in either logic state:', opts: ['V_DD/R_on', 'zero', 'k_n V_OV²/2', 'depends on load'], a: 1, why: 'One transistor is always off.' },
+  { q: 'For Y = (A + B)\' the NMOS pull-down is', opts: ['A and B in series', 'A and B in parallel', 'one transistor', 'A in series with B\''], a: 1, why: 'OR → parallel in the pull-down.' },
+  { q: 'Matched inverter, V_DD = 5 V, V_tn = |V_tp|, k_n = k_p. V_M =', opts: ['2.5 V', '1 V', '4 V', '5 V'], a: 0, why: 'Symmetric devices switch at V_DD/2.' },
+]);
+</script>
+</body>
+</html>
