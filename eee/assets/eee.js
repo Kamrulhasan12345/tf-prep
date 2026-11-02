@@ -198,6 +198,53 @@ function biasFig(o) {
   return sch(it, { w: (o.out ? 440 : o.bypass ? 400 : 320) + X, h: 290, sim: o.sim !== false });
 }
 
+
+// opFig({kind, ...}) draws the standard op-amp circuits with the problem's own labels (strings like 'R₁ 10 kΩ').
+//  kind 'inv' {r1, rf} | 'noninv' {r1, rf} | 'sum' {ins: [labels], rf} | 'diff' {r1, r2, r3, r4} | 'int' {r, c} | 'dif' {c, r}
+//  | 'lpf' {r1, rf, cf} | 'bpf' {r1, c1, r2, c2} (series R₁C₁ in, R₂∥C₂ feedback) | 'schmittInv' {r1, r2, ref} | 'schmittNon' {r1, r2, ref} | 'wien' {ra, ca, rb, cb, r1, r2}
+//  | 'colpitts' {e1, e2, es, r1, r2} (C₁ at the feedback node, C₂ at the output, L in series) | 'hartley' (L₁, L₂, C)
+//  vin: input label (default 'vᵢ'); vout: output label.
+function opFig(o) {
+  const it = [['opamp', [200, 150], { vmax: o.vmax }]], N = [170, 134], out = [300, 150], vin = o.vin || 'vᵢ';
+  const outW = () => it.push(['W', [280, 150], [340, 150]], ['dot', out], ['open', [340, 150], o.vout || 'vₒ']);
+  const plusGnd = () => it.push(['W', [200, 166], [188, 166], [188, 178]], ['gnd', [188, 178]]);
+  const fb = (el, lab, y = 80) => it.push(['W', N, [170, y]], [el, [170, y], [300, y], lab], ['W', [300, y], out], ['dot', N]);
+  const k = o.kind;
+  if (['inv', 'int', 'dif', 'lpf', 'bpf'].includes(k)) {
+    if (k === 'bpf') it.push(['open', [20, 134], vin], ['W', [20, 134], [30, 134]], ['R', [30, 134], [90, 134], o.r1], ['C', [90, 134], [130, 134], o.c1, -1], ['W', [130, 134], [200, 134]]);
+    else it.push(['open', [40, 134], vin], ['W', [40, 134], [60, 134]], [k === 'dif' ? 'C' : 'R', [60, 134], [140, 134], k === 'dif' ? o.c : (o.r1 || o.r)], ['W', [140, 134], [200, 134]]);
+    fb(k === 'int' ? 'C' : 'R', k === 'int' ? o.c : k === 'dif' ? o.r : (o.rf || o.r2));
+    if (k === 'lpf' || k === 'bpf') it.push(['W', [170, 80], [170, 40]], ['C', [170, 40], [300, 40], o.cf || o.c2], ['W', [300, 40], [300, 80]]);
+    plusGnd(); outW();
+  } else if (k === 'sum') {
+    const n = o.ins.length, ys = o.ins.map((_, i) => 134 - 40 * i);
+    o.ins.forEach((lab, i) => it.push(['open', [0, ys[i]], o.vins ? o.vins[i] : `v${'₁₂₃₄'[i]}`], ['W', [0, ys[i]], [60, ys[i]]], ['R', [60, ys[i]], [140, ys[i]], lab], ['W', [140, ys[i]], [170, ys[i]]], ['dot', [170, ys[i]]]));
+    it.push(['W', [170, ys[n - 1]], N], ['W', N, [200, 134]]); fb('R', o.rf, ys[n - 1] - 40); plusGnd(); outW();
+  } else if (k === 'diff') {
+    it.push(['open', [40, 134], 'v₁'], ['W', [40, 134], [60, 134]], ['R', [60, 134], [140, 134], o.r1], ['W', [140, 134], [200, 134]]); fb('R', o.r2);
+    it.push(['open', [40, 210], 'v₂'], ['W', [40, 210], [60, 210]], ['R', [60, 210], [140, 210], o.r3], ['W', [140, 210], [190, 210], [190, 166], [200, 166]],
+      ['dot', [190, 210]], ['R', [190, 210], [190, 280], o.r4], ['gnd', [190, 280]]); outW();
+  } else if (k === 'noninv' || k === 'wien') {
+    fb('R', o.r2 || o.rf); it.push(['W', N, [120, 134]], ['R', [120, 134], [120, 200], o.r1, -1], ['gnd', [120, 200]]);
+    if (k === 'noninv') it.push(['open', [60, 240], vin], ['W', [60, 240], [190, 240], [190, 166], [200, 166]]);
+    else it.push(['W', out, [300, 230]], ['R', [300, 230], [250, 230], o.ra], ['C', [250, 230], [220, 230], o.ca, -1], ['W', [220, 230], [190, 230], [190, 166], [200, 166]],
+      ['dot', [190, 230]], ['R', [190, 230], [190, 300], o.rb], ['gnd', [190, 300]], ['W', [190, 230], [150, 230]], ['C', [150, 230], [150, 300], o.cb, -1], ['gnd', [150, 300]]);
+    outW();
+  } else if (k === 'schmittInv') {
+    it.push(['open', [40, 134], vin], ['W', [40, 134], [200, 134]], ['W', [200, 166], [190, 166], [190, 210]], ['dot', [190, 210]],
+      ['R', [190, 210], [300, 210], o.r2], ['W', [300, 210], out], ['R', [190, 210], [190, 280], o.r1, -1], o.ref ? ['rail', [190, 280], o.ref, false] : ['gnd', [190, 280]]); outW();
+  } else if (k === 'schmittNon') {
+    it.push(['W', [200, 134], [184, 134]], o.ref ? ['rail', [184, 134], o.ref] : ['gnd', [184, 134]], ['open', [40, 166], vin], ['W', [40, 166], [60, 166]], ['R', [60, 166], [140, 166], o.r1],
+      ['W', [140, 166], [200, 166]], ['dot', [170, 166]], ['W', [170, 166], [170, 220]], ['R', [170, 220], [300, 220], o.r2], ['W', [300, 220], out]); outW();
+  } else if (k === 'colpitts' || k === 'hartley') {
+    const sh = k === 'colpitts' ? 'C' : 'L', se = k === 'colpitts' ? 'L' : 'C';
+    it.push(['W', [100, 134], [110, 134]], ['R', [110, 134], [160, 134], o.r1], ['W', [160, 134], [200, 134]]); fb('R', o.r2); plusGnd();
+    it.push(['W', out, [300, 240]], ['dot', [300, 240]], [sh, [300, 240], [300, 300], o.e2], ['gnd', [300, 300]], [se, [300, 240], [100, 240], o.es],
+      ['dot', [100, 240]], [sh, [100, 240], [100, 300], o.e1, -1], ['gnd', [100, 300]], ['W', [100, 240], [100, 134]], ['t', [92, 190], 'v_f', 'end']); outW();
+  }
+  return sch(it, { w: 380, h: 320, sim: o.sim !== false });
+}
+
 // ---------- export to the Falstad CircuitJS simulator ----------
 // Element formats and pin geometry follow circuitjs1's *Elm.java dump()/setPoints().
 // CircuitJS joins wires only at end points, so every wire is split wherever another pin lies on it.
