@@ -269,6 +269,7 @@ drill('#dr-basic', { id: 'b07-ce-given-ic', title: 'CE biased at a given collect
   const vs = vp * (rpi + Rs) / rpi, vo = Math.abs(Av) * vp;
   return {
     given: `A CE amplifier uses a BJT with β = ${b}${VA ? ` and \\(V_A\\) = ${VA} V` : ' (neglect the Early effect)'}, biased at \\(I_C\\) = ${IC} mA, with \\(R_C\\) = ${k(RC)} and no base bias resistor in the signal path. Find \\(R_{in}\\), \\(A_{vo}\\) and \\(R_o\\). With \\(R_{sig}\\) = ${k(Rs)} and \\(R_L\\) = ${k(RL)}, find \\(G_v\\). If \\(\\hat v_\\pi\\) is limited to ${vp} mV, find \\(\\hat v_{sig}\\).`,
+    fig: biasFig({ dev: 'npn', top: '+V_CC', rTop: `R_C ${RC} kΩ`, base: { none: true }, sig: { rs: `R_sig ${Rs} kΩ` }, out: { rl: `R_L ${RL} kΩ` }, sim: false }),
     ask: [{ l: 'R_{in}', v: rpi * 1e3, u: 'kΩ' }, { l: 'A_{vo}', v: Avo, u: 'V/V' }, { l: 'R_o', v: Ro * 1e3, u: 'kΩ' }, { l: 'G_v', v: Gv, u: 'V/V' }, { l: '\\hat v_{sig}', v: vs * 1e-3, u: 'mV' }],
     steps: [
       { t: `\\(g_m = ${IC}/0.025 = ${num(gm)}\\) mA/V, \\(R_{in} = r_\\pi = ${b}/${num(gm)} = ${num(rpi)}\\) kΩ${VA ? `, \\(r_o = ${VA}/${IC} = ${num(ro)}\\) kΩ` : ''}`, a: { l: 'R_{in}', v: rpi * 1e3, u: 'kΩ' } },
@@ -312,6 +313,7 @@ drill('#dr-vbb', { id: 'b07-ce-vbb', title: 'Base-resistor bias with the signal 
   const gm = IC / 0.025, rpi = b / gm, Av = -b * RC / (RBB + rpi), up = IC * RC, dn = VCE - 0.3, lim = Math.min(up, dn), vin = lim / Math.abs(Av);
   return {
     given: `\\(v_{in}\\) in series with \\(V_{BB}\\) = ${VBB} V drives the base through \\(R_{BB}\\) = ${k(RBB)}; \\(R_C\\) = ${k(RC)} to \\(V_{CC}\\) = ${VCC} V; emitter grounded; β = ${b}. Find \\(I_C\\), \\(V_{CE}\\), the gain \\(v_o/v_{in}\\), and the maximum input amplitude that keeps the transistor active (use \\(V_{CE} \\ge 0.3\\) V for the saturation side).`,
+    fig: biasFig({ dev: 'npn', top: `+${VCC} V`, rTop: `R_C ${RC} kΩ`, base: { vbb: `${VBB} V + v_in`, rb: `R_BB ${RBB} kΩ` }, beta: b }),
     ask: [{ l: 'I_C', v: IC * 1e-3, u: 'mA' }, { l: 'V_{CE}', v: VCE, u: 'V' }, { l: 'A_v', v: Av, u: 'V/V' }, { l: '\\hat v_{in}', v: vin, u: 'V' }],
     steps: [
       { t: `\\(I_B = (${VBB} - 0.7)/${RBB} = ${num(IB * 1000)}\\) µA, \\(I_C = ${b}I_B = ${num(IC)}\\) mA`, a: { l: 'I_C', v: IC * 1e-3, u: 'mA' } },
@@ -327,6 +329,7 @@ drill('#dr-early', { id: 'b12-early-gain', title: 'CE gain with and without the 
   const g0 = -(VCC - VCE) / 0.025, g1 = g0 / (1 + (VCC - VCE) / (VA + VCE)), drop = (1 - g1 / g0) * 100;
   return {
     given: `A basic CE stage (R<sub>C</sub> to V<sub>CC</sub>, emitter grounded) has \\(V_{CC}\\) = ${VCC} V and is biased at \\(V_{CE}\\) = ${num(VCE)} V. \\(V_A\\) = ${VA} V. Find the small-signal gain without and with the Early effect, and the percentage reduction.`,
+    fig: biasFig({ dev: 'npn', top: `+${VCC} V`, rTop: 'R_C', base: { fixed: 'V_BE + v_be' }, sim: false }),
     ask: [{ l: 'A_v\\ (\\text{no Early})', v: g0, u: 'V/V' }, { l: 'A_v\\ (\\text{Early})', v: g1, u: 'V/V' }, { l: '\\text{drop}', v: drop, u: '%', tol: 0.03 }],
     steps: [
       { t: `\\(I_CR_C = V_{CC} - V_{CE} = ${num(VCC - VCE)}\\) V; \\(A_v = -${num(VCC - VCE)}/0.025 = ${num(g0)}\\) V/V`, a: { l: 'A_v', v: g0, u: 'V/V' } },

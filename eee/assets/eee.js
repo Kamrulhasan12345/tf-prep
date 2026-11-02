@@ -154,6 +154,50 @@ function sch(items, { w = 360, h = 240, cls = '', pad = 34, sim = true } = {}) {
   return sim ? svg + `<a class="simbtn" href="${simURL(items)}" target="_blank" rel="noopener">Open in simulator ↗</a>` : svg;
 }
 
+
+// ---------- standard transistor bias / amplifier figures ----------
+// biasFig({dev, top, rTop, rBot, bot, base, sig, out, bypass, w}) draws a one-transistor circuit with
+// the problem's own values, so every BJT/MOSFET drill shows its circuit.
+//  dev: 'npn' | 'pnp' | 'nmos' | 'pmos'      top: top rail label ('+12 V'); bot: bottom rail ('−5 V') or omitted = ground
+//  rTop / rBot: labels of the resistors above / below the device (null = wire). For pnp/pmos the emitter/source is on top.
+//  base: {div: [R1, R2]} | {rb: R} (from the top rail) | {vbb: V, rb: R} | {fixed: 'V_G = 3 V'} | {rg: R, r2?: R} (collector/drain to base/gate)
+//        | {none: true} (nothing; use with sig) | {} (base/gate grounded)
+//  sig: {rs: label} adds a source, R_sig and a coupling capacitor; out: {rl: label} adds a coupling cap and R_L;
+//  bypass: true adds a capacitor across rBot.
+function biasFig(o) {
+  const X = o.sig ? 70 : 0, x = v => v + X, it = [], b = o.base || {};
+  const D = [x(200), 110], S = [x(200), 190], G = [x(160), 150];
+  it.push(['rail', [x(200), 30], o.top || '+V']);
+  if (o.rTop) it.push(['R', [x(200), 30], D, o.rTop]); else it.push(['W', [x(200), 30], D]);
+  it.push([o.dev || 'npn', G, { beta: o.beta, vt: o.vt, k: o.k }]);
+  const bottom = o.bot ? ['rail', [x(200), 270], o.bot, false] : ['gnd', [x(200), 270]];
+  if (o.rBot) it.push(['R', S, [x(200), 270], o.rBot]); else it.push(['W', S, [x(200), 270]]);
+  it.push(bottom);
+  if (b.div) {
+    it.push(['rail', [x(100), 30], o.top || '+V'], ['R', [x(100), 30], [x(100), 150], b.div[0], -1], ['R', [x(100), 150], [x(100), 270], b.div[1], -1],
+      o.bot ? ['rail', [x(100), 270], o.bot, false] : ['gnd', [x(100), 270]], ['W', [x(100), 150], G], ['dot', [x(100), 150]]);
+  } else if (b.rb && b.vbb === undefined) {
+    it.push(['rail', [x(100), 30], o.top || '+V'], ['R', [x(100), 30], [x(100), 150], b.rb, -1], ['W', [x(100), 150], G]);
+  } else if (b.vbb !== undefined) {
+    it.push(['V', [x(40), 170], [x(40), 250], b.vbb, -1], ['gnd', [x(40), 250]], ['W', [x(40), 170], [x(40), 150], [x(60), 150]]);
+    if (b.rb) it.push(['R', [x(60), 150], [x(140), 150], b.rb], ['W', [x(140), 150], G]); else it.push(['W', [x(60), 150], G]);
+  } else if (b.fixed) {
+    it.push(['W', [x(110), 150], G], ['open', [x(110), 150], ''], ['t', [x(104), 140], b.fixed, 'end']);
+  } else if (b.rg) {
+    it.push(['W', G, [x(140), 150], [x(140), 100]], ['R', [x(140), 100], [x(200), 100], b.rg, -1], ['dot', [x(200), 100]]);
+    if (b.r2) it.push(['dot', [x(140), 150]], ['R', [x(140), 150], [x(140), 270], b.r2, -1], ['gnd', [x(140), 270]]);
+  } else if (!b.none) it.push(['W', [x(130), 150], G], ['gnd', [x(130), 150]]);
+  if (o.sig) {
+    const node = b.div ? [x(100), 150] : b.rg ? [x(140), 150] : G;
+    it.push(['AC', [20, 190], [20, 250], 'v_sig'], ['gnd', [20, 250]], ['W', [20, 190], [20, 150]], ['R', [20, 150], [70, 150], o.sig.rs || 'R_sig'],
+      ['C', [70, 150], [90, 150], ''], ['W', [90, 150], node]);
+  }
+  if (o.out) it.push(['dot', D], ['W', D, [x(240), 110]], ['C', [x(240), 110], [x(270), 110], ''], ['W', [x(270), 110], [x(380), 110]],
+    ['R', [x(380), 110], [x(380), 270], o.out.rl || 'R_L'], ['gnd', [x(380), 270]], ['open', [x(380), 110], 'vₒ']);
+  if (o.bypass && o.rBot) it.push(['dot', S], ['W', S, [x(310), 190]], ['C', [x(310), 190], [x(310), 270], 'C_bypass'], ['W', [x(310), 270], [x(200), 270]]);
+  return sch(it, { w: (o.out ? 440 : o.bypass ? 400 : 320) + X, h: 290, sim: o.sim !== false });
+}
+
 // ---------- export to the Falstad CircuitJS simulator ----------
 // Element formats and pin geometry follow circuitjs1's *Elm.java dump()/setPoints().
 // CircuitJS joins wires only at end points, so every wire is split wherever another pin lies on it.

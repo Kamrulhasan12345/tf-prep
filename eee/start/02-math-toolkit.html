@@ -36,6 +36,8 @@
 <p>The one equation that solves almost every BJT bias question. Walk from the Thevenin source through \(R_{TH}\), across \(V_{BE}\), down through \(R_E\) to ground:</p>
 <div class="formula">\[ V_{TH} = I_B R_{TH} + V_{BE} + I_E R_E, \quad I_E = (\beta+1) I_B \;\Rightarrow\; I_E = \frac{V_{TH}-V_{BE}}{R_E + R_{TH}/(\beta+1)} \]</div>
 <p>Read it as: the base resistance, seen from the emitter, shrinks by \((\beta+1)\). The same "reflection" rule gives the input resistance of an emitter follower in the opposite direction: emitter resistance seen from the base grows by \((\beta+1)\).</p>
+<div id="dr-kvl"></div>
+<div id="dr-kvl-mos"></div>
 
 <h2>4. Exponentials and logs</h2>
 <p>The diode and BJT laws are exponential, \(I = I_S e^{V/V_T}\). Two forms come up again and again:</p>
@@ -106,6 +108,38 @@ drill('#dr-thev', { id: 'tk-thevenin', title: 'Thevenin of a bias divider', gen(
     steps: [
       { t: `\\(V_{TH} = ${V}\\times\\dfrac{${num(R2 / 1e3)}}{${num(R1 / 1e3)}+${num(R2 / 1e3)}} = ${num(Vth)}\\) V`, a: { l: 'V_{TH}', v: Vth, u: 'V' } },
       { t: `\\(R_{TH} = \\dfrac{${num(R1 / 1e3)}\\times${num(R2 / 1e3)}}{${num(R1 / 1e3)}+${num(R2 / 1e3)}} = ${num(Rth / 1e3)}\\) kΩ (work in kΩ, no powers of ten)`, a: { l: 'R_{TH}', v: Rth, u: 'kΩ' } },
+    ] };
+} });
+drill('#dr-kvl', { id: 'tk-kvl-bjt', title: 'KVL around a real BJT bias circuit', gen(r) {
+  const VCC = r.pick([9, 10, 12, 15]), R1 = r.E(10, 100), R2 = r.E(4.7, 47), RC = r.E(1, 10), RE = r.E(0.47, 4.7), b = r.pick([50, 100, 150, 200]);
+  const Vth = VCC * R2 / (R1 + R2), Rth = par(R1, R2); if (Vth < 1.2) return null;
+  const IE = (Vth - 0.7) / (RE + Rth / (b + 1)), IC = b / (b + 1) * IE, VCE = VCC - IC * RC - IE * RE;
+  if (VCE < 0.5) return null;
+  return {
+    given: `\\(V_{CC}\\) = ${VCC} V, \\(R_1\\) = ${R1} kΩ, \\(R_2\\) = ${R2} kΩ, \\(R_C\\) = ${RC} kΩ, \\(R_E\\) = ${RE} kΩ, β = ${b}, \\(V_{BE}\\) = 0.7 V. Find \\(V_{TH}\\), \\(I_E\\) and \\(V_{CE}\\); confirm the mode.`,
+    fig: biasFig({ dev: 'npn', top: `+${VCC} V`, rTop: `R_C ${RC} kΩ`, rBot: `R_E ${RE} kΩ`, base: { div: [`R₁ ${R1} kΩ`, `R₂ ${R2} kΩ`] }, beta: b }),
+    ask: [{ l: 'V_{TH}', v: Vth, u: 'V' }, { l: 'I_E', v: IE * 1e-3, u: 'mA' }, { l: 'V_{CE}', v: VCE, u: 'V' }],
+    steps: [
+      { t: `Thevenin the divider: \\(V_{TH} = ${VCC}\\times\\dfrac{${R2}}{${R1}+${R2}} = ${num(Vth)}\\) V, \\(R_{TH} = ${R1}\\parallel${R2} = ${num(Rth)}\\) kΩ`, a: { l: 'V_{TH}', v: Vth, u: 'V' } },
+      { t: `KVL base loop: \\(V_{TH} = I_BR_{TH} + 0.7 + I_ER_E\\), \\(I_B = I_E/(\\beta+1)\\): \\(I_E = \\dfrac{${num(Vth)} - 0.7}{${RE} + ${num(Rth)}/${b + 1}} = ${num(IE)}\\) mA`, a: { l: 'I_E', v: IE * 1e-3, u: 'mA' } },
+      { t: `KVL collector loop: \\(V_{CE} = ${VCC} - I_CR_C - I_ER_E = ${VCC} - ${num(IC)}\\times${RC} - ${num(IE)}\\times${RE} = ${num(VCE)}\\) V`, a: { l: 'V_{CE}', v: VCE, u: 'V' } },
+      `\\(V_{CE} = ${num(VCE)}\\) V \\(\\ge 0.3\\) V: active, as assumed (mA × kΩ = V throughout).`,
+    ] };
+} });
+drill('#dr-kvl-mos', { id: 'tk-kvl-mos', title: 'KVL around a real MOSFET bias circuit', gen(r) {
+  const VDD = r.pick([10, 12, 15]), RG1 = r.pick([2, 3, 4, 5, 6.8]), RG2 = r.pick([1, 2, 3, 4.7]), RD = r.E(1, 10), RS = r.E(0.47, 4.7), Vt = r.pick([0.5, 1, 1.5]), kn = r.pick([0.5, 1, 2, 4]);
+  const VG = VDD * RG2 / (RG1 + RG2), a = 0.5 * kn * RS, c = -(VG - Vt); if (c >= 0) return null;
+  const Vov = (-1 + Math.sqrt(1 + 4 * a * -c)) / (2 * a), ID = 0.5 * kn * Vov * Vov, VDS = VDD - ID * (RD + RS);
+  if (VDS < Vov + 0.1) return null;
+  return {
+    given: `\\(V_{DD}\\) = ${VDD} V, gate divider \\(R_{G1}\\) = ${RG1} MΩ, \\(R_{G2}\\) = ${RG2} MΩ, \\(R_D\\) = ${RD} kΩ, \\(R_S\\) = ${RS} kΩ, \\(V_t\\) = ${Vt} V, \\(k_n\\) = ${kn} mA/V², λ = 0. Find \\(V_G\\), \\(I_D\\) and \\(V_{DS}\\); confirm saturation.`,
+    fig: biasFig({ dev: 'nmos', top: `+${VDD} V`, rTop: `R_D ${RD} kΩ`, rBot: `R_S ${RS} kΩ`, base: { div: [`R_G1 ${RG1} MΩ`, `R_G2 ${RG2} MΩ`] }, vt: Vt, k: kn * 1e-3 }),
+    ask: [{ l: 'V_G', v: VG, u: 'V' }, { l: 'I_D', v: ID * 1e-3, u: 'mA' }, { l: 'V_{DS}', v: VDS, u: 'V' }],
+    steps: [
+      { t: `No gate current: \\(V_G = ${VDD}\\times\\dfrac{${RG2}}{${RG1}+${RG2}} = ${num(VG)}\\) V`, a: { l: 'V_G', v: VG, u: 'V' } },
+      `KVL gate→source: \\(V_G = V_t + V_{OV} + I_DR_S\\) with \\(I_D = \\tfrac12k_nV_{OV}^2\\): \\(${num(a)}V_{OV}^2 + V_{OV} - ${num(-c)} = 0\\)`,
+      { t: `Keep the positive root: \\(V_{OV} = ${num(Vov)}\\) V, \\(I_D = ${num(ID)}\\) mA`, a: { l: 'I_D', v: ID * 1e-3, u: 'mA' } },
+      { t: `KVL drain loop: \\(V_{DS} = ${VDD} - ${num(ID)}(${RD} + ${RS}) = ${num(VDS)}\\) V \\(\\ge V_{OV}\\): saturated ✓`, a: { l: 'V_{DS}', v: VDS, u: 'V' } },
     ] };
 } });
 drill('#dr-log', { id: 'tk-log', title: 'Diode voltage at a new current', gen(r) {
