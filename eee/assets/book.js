@@ -133,6 +133,39 @@ const $ = s => document.querySelector(s);
   main.replaceWith(shell);
   content.append(main);
 
+  // sidebar: hide/show (button or the \\ key) and drag the right edge to resize; both remembered in this browser
+  const nav = shell.querySelector('nav.toc'), KEY = 'eee263-sidebar';
+  let st = { w: 280, off: false };
+  try { Object.assign(st, JSON.parse(localStorage.getItem(KEY)) || {}); } catch {}
+  const save = () => { try { localStorage.setItem(KEY, JSON.stringify(st)); } catch {} };
+  const tg = document.createElement('button'), grip = document.createElement('div');
+  tg.type = 'button'; tg.className = 'toc-toggle';
+  grip.className = 'toc-grip'; grip.title = 'Drag to resize the contents · double-click to reset';
+  const apply = () => {
+    shell.style.setProperty('--toc-w', st.w + 'px');
+    shell.classList.toggle('toc-off', st.off);
+    tg.textContent = st.off ? '☰' : '«';
+    tg.title = (st.off ? 'Show contents' : 'Hide contents') + ' (shortcut: \\)';
+    tg.setAttribute('aria-label', tg.title); tg.setAttribute('aria-expanded', String(!st.off));
+  };
+  const flip = () => { st.off = !st.off; save(); apply(); };
+  tg.addEventListener('click', flip);
+  grip.addEventListener('pointerdown', e => {
+    e.preventDefault(); grip.setPointerCapture(e.pointerId); grip.classList.add('drag');
+    const move = ev => { st.w = Math.round(Math.max(180, Math.min(520, ev.clientX))); shell.style.setProperty('--toc-w', st.w + 'px'); };
+    const up = () => { grip.classList.remove('drag'); grip.removeEventListener('pointermove', move); grip.removeEventListener('pointerup', up); save(); };
+    grip.addEventListener('pointermove', move); grip.addEventListener('pointerup', up);
+  });
+  grip.addEventListener('dblclick', () => { st.w = 280; save(); apply(); });
+  document.addEventListener('keydown', e => {
+    if (e.key !== '\\' || e.ctrlKey || e.metaKey || e.altKey) return;
+    if (/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName || '')) return;
+    flip();
+  });
+  shell.prepend(tg); shell.append(grip); apply();
+  const cur = nav.querySelector('a.here'); // keep the open chapter in view inside the sidebar
+  if (cur) nav.scrollTop = cur.offsetTop - nav.clientHeight / 3;
+
   if (idx >= 0) {
     const prev = flat[idx - 1], next = flat[idx + 1];
     const pg = document.createElement('div');
