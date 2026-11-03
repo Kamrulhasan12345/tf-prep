@@ -48,10 +48,12 @@
 
 <h3>Fitting a PWL model to two points</h3>
 <div class="method"><h4>Method · PWL from two measured points</h4><ol>
-<li>\(r_D = \dfrac{V_2 - V_1}{I_2 - I_1}\).</li>
-<li>\(V_{D0} = V_1 - I_1r_D\) (extend the line to zero current).</li>
-<li>Use the PWL recipe above.</li>
+<li><b>Slope gives \(r_D\):</b> \(r_D = \dfrac{V_2 - V_1}{I_2 - I_1}\). Two points on a straight line fix its slope.</li>
+<li><b>Either point gives \(V_{D0}\):</b> the model \(V_D = V_{D0} + I_Dr_D\) must reproduce the measured voltage, so \(V_1 = V_{D0} + I_1r_D\), i.e. \(V_{D0} = V_1 - I_1r_D\). Geometrically: slide down the line from \((I_1, V_1)\) to zero current; you lose \(I_1r_D\) volts on the way.</li>
+<li><b>Check with the other point:</b> \(V_2 - I_2r_D\) must give the same \(V_{D0}\).</li>
+<li>Replace the diode by \(V_{D0}\) in series with \(r_D\) and use the PWL recipe above. The diode voltage is then \(V_{D0} + I_Dr_D\), not 0.7 V.</li>
 </ol></div>
+<figure><div id="fig-fit"></div><figcaption><b>Figure 2.</b> Sadat L3 #4: the measured points (1 mA, 0.8 V) and (2 mA, 0.9 V) lie on a line of slope 1/(100 Ω). Extended down to zero current it meets the voltage axis at \(V_{D0}\) = 0.7 V. (The redrawn circuit on notes p.7 labels the source "0.9 V"; it should be 0.7 V, as the calculation beside it uses.)</figcaption></figure>
 <div id="dr-fit"></div>
 
 <h2>4. A straight-line I–V graph is a PWL model (type D-12)</h2>
@@ -153,6 +155,21 @@ const loop = (V, R1, R2, d = 'D') => sch([
 ], { w: 380, h: 160 });
 $('#fig-1112').innerHTML = loop('5 V', '1 kΩ', '1 kΩ');
 
+$('#fig-fit').innerHTML = (() => {
+  const X = v => 50 + (v - 0.6) * 1000, Y = i => 210 - i * 70; // v in V, i in mA
+  const pt = (v, i, lab, dx = 8, a = 'start') => `<circle cx="${X(v)}" cy="${Y(i)}" r="4" style="fill:var(--accent)"/><text x="${X(v) + dx}" y="${Y(i) - 6}" text-anchor="${a}" style="fill:var(--fg);font:12px var(--mono)">${lab}</text>`;
+  return `<svg viewBox="0 0 420 250" style="max-width:420px;width:100%;display:block;margin:auto" role="img" aria-label="PWL fit through two points">
+    <line x1="50" y1="210" x2="400" y2="210" style="stroke:var(--fg)"/><line x1="50" y1="210" x2="50" y2="20" style="stroke:var(--fg)"/>
+    <text x="400" y="200" style="fill:var(--fg);font:12px var(--mono)" text-anchor="end">v_D (V)</text><text x="56" y="28" style="fill:var(--fg);font:12px var(--mono)">i_D (mA)</text>
+    ${[0.6, 0.7, 0.8, 0.9].map(v => `<line x1="${X(v)}" y1="207" x2="${X(v)}" y2="213" style="stroke:var(--fg)"/><text x="${X(v)}" y="226" text-anchor="middle" style="fill:var(--fg);font:11px var(--mono)">${v}</text>`).join('')}
+    ${[1, 2].map(i => `<line x1="47" y1="${Y(i)}" x2="53" y2="${Y(i)}" style="stroke:var(--fg)"/><text x="42" y="${Y(i) + 4}" text-anchor="end" style="fill:var(--fg);font:11px var(--mono)">${i}</text>`).join('')}
+    <line x1="${X(0.7)}" y1="${Y(0)}" x2="${X(0.95)}" y2="${Y(2.5)}" style="stroke:var(--accent);stroke-width:2"/>
+    <line x1="${X(0.7)}" y1="${Y(0)}" x2="${X(0.8)}" y2="${Y(1)}" style="stroke:var(--red);stroke-width:2.5;stroke-dasharray:5 4"/>
+    ${pt(0.8, 1, '(1 mA, 0.8 V)')}${pt(0.9, 2, '(2 mA, 0.9 V)', -10, 'end')}
+    <circle cx="${X(0.7)}" cy="${Y(0)}" r="4" style="fill:var(--red)"/><text x="${X(0.7) - 6}" y="${Y(0) - 10}" text-anchor="end" style="fill:var(--red);font:12px var(--mono)">V_D0 = 0.7 V</text>
+    <text x="${X(0.75) + 10}" y="${Y(0.5) + 18}" style="fill:var(--red);font:11px var(--mono)">−1 mA × 100 Ω = −0.1 V</text>
+  </svg>`;
+})();
 worked('#wk-sadat', {
   given: '5 V source, 3 kΩ and 2 kΩ in series with a diode to ground. Find I with (a) ideal, (b) CVD 0.7 V, (c) PWL using the measured points 0.8 V at 1 mA and 0.9 V at 2 mA. Also \\(V_o\\), the voltage at the 3k–2k junction, for (c). Work in mA, kΩ, V.',
   fig: sch([['V', [40, 50], [40, 130], '5 V'], ['W', [40, 50], [40, 30], [60, 30]], ['R', [60, 30], [140, 30], '3 kΩ'], ['R', [140, 30], [220, 30], '2 kΩ'], ['dot', [140, 30]], ['t', [140, 52], 'vₒ'], ['W', [220, 30], [260, 30]], ['D', [260, 30], [260, 130], 'D'], ['W', [260, 130], [40, 130]], ['gnd', [150, 130]]], { w: 320, h: 160 }),
@@ -160,7 +177,9 @@ worked('#wk-sadat', {
     'Without the diode the anode would sit at 5 V: forward biased in every model.',
     { t: '(a) Ideal: short, \\(I = 5/(3 + 2) = 1\\) mA', a: { l: 'I', v: 1e-3, u: 'mA' } },
     { t: '(b) CVD: \\(5 - 3I - 0.7 - 2I = 0\\) → \\(I = 4.3/5 = 0.86\\) mA', a: { l: 'I', v: 0.86e-3, u: 'mA' } },
-    { t: '(c) \\(R_{on} = (0.9 - 0.8)/(2 - 1) = 0.1\\) kΩ; \\(V_{D0} = 0.8 - 1\\times0.1 = 0.7\\) V', a: { l: 'R_{on}', v: 100, u: 'Ω' } },
+    '(c) PWL has two unknowns, \\(V_{D0}\\) and \\(R_{on}\\), in \\(V_D = V_{D0} + I_DR_{on}\\). The question gives two measured points, (1 mA, 0.8 V) and (2 mA, 0.9 V): two equations for two unknowns.',
+    { t: 'Slope between the points: \\(R_{on} = \\dfrac{\\Delta V_D}{\\Delta I_D} = \\dfrac{0.9 - 0.8}{2 - 1} = 0.1\\) kΩ = 100 Ω', a: { l: 'R_{on}', v: 100, u: 'Ω' } },
+    { t: 'The model must give the measured voltage at the first point: \\(0.8 = V_{D0} + (1\\text{ mA})(0.1\\text{ kΩ})\\), so \\(V_{D0} = 0.8 - 0.1 = 0.7\\) V. <b>This is where the "0.8" comes from: it is the measured voltage at 1 mA.</b> Check with the second point: \\(0.9 - (2)(0.1) = 0.7\\) V ✓.', a: { l: 'V_{D0}', v: 0.7, u: 'V', tol: 0.001 } },
     { t: '\\(I = (5 - 0.7)/(3 + 2 + 0.1) = 4.3/5.1 = 0.843\\) mA', a: { l: 'I', v: 0.8431e-3, u: 'mA' } },
     { t: '\\(V_o = 5 - 3\\times0.843 = 2.471\\) V; diode voltage \\(0.7 + 0.1\\times0.843 = 0.784\\) V', a: { l: 'V_o', v: 2.4706, u: 'V' } },
   ] });
