@@ -34,7 +34,7 @@
   <div class="exam-src">2024–25 · Sec A · Q1(a) · 18 marks · compulsory · CO3</div>
   <div class="exam-q"><p>With an appropriate circuit diagram, describe the operation of an op-amp based Colpitts oscillator. Derive the frequency of oscillation and explain how this circuit satisfies the conditions for sustained oscillation.</p></div>
   <details><summary>Answer key</summary><div class="exam-a">
-    <p><b>Circuit</b> (no figure is given: draw one). Non-inverting amplifier: \(R_1\) from the inverting input to ground, \(R_f\) from the output to the inverting input, gain \(A = 1 + R_f/R_1\). Feedback network: a series \(R\) from the op-amp output to node A, \(L\) from A to ground, and \(C_1\) from A to node B with \(C_2\) from B to ground; B drives the non-inverting input. (The other accepted drawing is an inverting amplifier with a π network: \(C_1\) at the output, \(L\) in series, \(C_2\) at the input; same \(\omega_0\), gain condition \(R_f/R_i \ge C_2/C_1\).)</p>
+    <p><b>Circuit</b> (no figure is given: draw one). Non-inverting amplifier: \(R_1\) from the inverting input to ground, \(R_f\) from the output to the inverting input, gain \(A = 1 + R_f/R_1\). Feedback network: a series \(R\) from the op-amp output to node A, \(L\) from A to ground, and \(C_1\) from A to node B with \(C_2\) from B to ground; B drives the non-inverting input. (The other accepted drawing is an inverting amplifier with a π network: \(C_1\) at the output, \(L\) in series, \(C_2\) at the input; same \(\omega_0\), gain condition \(R_f/R_i \ge C_2/C_1\).)</p><figure><div id="f-a1"></div><figcaption>Op-amp Colpitts oscillator: non-inverting amplifier with the R, L, \(C_1\), \(C_2\) feedback network.</figcaption></figure>
     <p><b>Loop gain:</b> with \(C_{eq} = C_1C_2/(C_1+C_2)\), the tank (L in parallel with \(C_1\) in series with \(C_2\)) gives
     \[ \beta(s) = \frac{V_B}{V_o} = \frac{sL}{R(1 + s^2LC_{eq}) + sL}\cdot\frac{C_1}{C_1 + C_2}. \]</p>
     <p><b>Frequency (phase condition):</b> \(\beta\) is real and positive when \(1 - \omega^2LC_{eq} = 0\):
@@ -61,7 +61,7 @@
     </ol>
     <p><b>Check:</b> the equation's roots are \(s = 0.75 \pm j1.20\) (from \(2s^2 - 3s + 4 = 0\)), so the solution is a growing oscillation about the particular value \(v = -1.25\) V; in practice the outputs grow until an op-amp saturates at about ±15 V. Mention this; it is not a design error. Any equivalent arrangement (e.g. a non-inverting summer, or integrators with different RC and compensating gains) earns full marks if the signs close the loop correctly.</p>
     <p class="recog">Full method: <a href="../opamp/05-analog-computer.html">Analog computer for differential equations</a></p>
-  </div></details>
+  <figure><div id="f-a1b"></div><figcaption>Analog computer: summer, two integrators; the solution v is at the second integrator.</figcaption></figure></div></details>
 </div>
 
 <h3>Question 2</h3>
@@ -386,6 +386,48 @@ $('#f-b8a').innerHTML = sch([
   ['dot', [220, 30]], ['Z', [220, 150], [220, 30], '6.8 V', 1, { vz: 6.7 }], ['R', [310, 30], [310, 150], 'RL 2 kΩ'],
   ['W', [310, 150], [40, 150]], ['dot', [220, 150]], ['gnd', [130, 150]], ['t', [318, 20], 'vₒ', 'start'],
 ], { w: 380, h: 180 });
+
+$('#f-a1').innerHTML = sch([
+  ['opamp', [200, 150]], ['dot', [170, 134]], ['W', [170, 134], [120, 134]], ['R', [120, 134], [120, 200], 'R₁', -1], ['gnd', [120, 200]],
+  ['W', [170, 134], [170, 80]], ['R', [170, 80], [300, 80], 'R_f'], ['W', [300, 80], [300, 150]], ['dot', [300, 150]],
+  ['W', [280, 150], [300, 150]], ['W', [300, 150], [400, 150]], ['dot', [340, 150]], ['open', [400, 150], 'vₒ'],
+  ['R', [340, 150], [340, 250], 'R'], ['dot', [340, 250]], ['L', [340, 250], [340, 330], 'L'], ['gnd', [340, 330]],
+  ['C', [190, 250], [340, 250], 'C₁'], ['dot', [190, 250]], ['C', [190, 250], [190, 330], 'C₂', -1], ['gnd', [190, 330]],
+  ['W', [200, 166], [190, 166], [190, 250]], ['t', [176, 244], 'B', 'end'], ['t', [352, 244], 'A', 'start'],
+], { w: 440, h: 350, sim: false });
+const stg = (ox, oy, ins, fbl, fbk = 'R') => {
+  const it = [['opamp', [ox, oy]]], pts = [];
+  const ys = ins.map((_, i) => oy - 16 - 40 * i), yf = ys[ys.length - 1] - 40;
+  ins.forEach((d, i) => { it.push([d[1] || 'R', [ox - 140, ys[i]], [ox - 60, ys[i]], d[0]], ['W', [ox - 60, ys[i]], [ox - 30, ys[i]]], ['dot', [ox - 30, ys[i]]]); pts.push([ox - 140, ys[i]]); });
+  it.push(['W', [ox - 30, yf], [ox - 30, oy - 16], [ox, oy - 16]], [fbk, [ox - 30, yf], [ox + 100, yf], fbl], ['W', [ox + 100, yf], [ox + 100, oy]], ['W', [ox + 80, oy], [ox + 100, oy]], ['dot', [ox + 100, oy]],
+    ['W', [ox, oy + 16], [ox - 12, oy + 16], [ox - 12, oy + 28]], ['gnd', [ox - 12, oy + 28]]);
+  return { it, pts, out: [ox + 100, oy] };
+};
+const lnk = (a, b, mx) => ['W', a, [mx, a[1]], [mx, b[1]], b];
+const comp2 = (y0, o) => {
+  const rows = o.rows, S = stg(200, y0, rows.map(r => [r.lab]), o.rf), I1 = stg(500, y0, [[o.int[0]]], o.int[1], 'C'), I2 = stg(800, y0, [[o.int[0]]], o.int[1], 'C');
+  const it = [...S.it, ...I1.it, ...I2.it, lnk(S.out, I1.pts[0], 330), lnk(I1.out, I2.pts[0], 630), ['W', I2.out, [960, y0]], ['open', [960, y0], o.vout || 'v']];
+  const needN1 = rows.some(r => r.sig === 'n1'), needN2 = rows.some(r => r.sig === 'n2') || o.sol;
+  const src = {};
+  if (needN1) {
+    const N1 = stg(500, y0 + 180, [[o.inv || 'R 10 kΩ']], o.inv || 'R 10 kΩ'); it.push(...N1.it, ['W', [600, y0], [600, y0 + 90], [330, y0 + 90], [330, y0 + 164], [360, y0 + 164]]); src.n1 = N1.out;
+  }
+  if (needN2) {
+    const N2 = stg(1100, y0 + 180, [[o.inv || 'R 10 kΩ']], o.inv || 'R 10 kΩ'); it.push(...N2.it, ['dot', [915, y0]], ['W', [915, y0], [915, y0 + 164], [960, y0 + 164]]); src.n2 = N2.out;
+    if (o.sol) it.push(['W', N2.out, [1260, y0 + 180]], ['open', [1260, y0 + 180], o.sol]);
+  }
+  src.s1 = [615, y0]; src.s2 = [915, y0];
+  const routed = rows.map((r, i) => [r, i]).filter(([r]) => r.sig !== 'ext' && r.sig !== 'none');
+  routed.forEach(([r, i], rank) => {
+    const rowy = S.pts[i][1], p = src[r.sig], yb = y0 + 240 + 20 * rank, xb = 50 - 10 * rank;
+    if (r.sig === 's1' || r.sig === 's2') it.push(['dot', p]);
+    it.push(['W', p, [p[0], yb], [xb, yb], [xb, rowy], S.pts[i]]);
+  });
+  rows.forEach((r, i) => { if (r.sig === 'ext') it.push(['open', [20, S.pts[i][1]], r.ext], ['W', [20, S.pts[i][1]], S.pts[i]]); });
+  return it;
+};
+
+$('#f-a1b').innerHTML = sch(comp2(150, { rf: 'Rf 100 kΩ', int: ['R 1 MΩ', 'C 1 µF'], vout: 'v', rows: [{ sig: 's1', lab: 'Ra 66.7 kΩ' }, { sig: 's2', lab: 'Rb 50 kΩ' }, { sig: 'ext', lab: 'Rc 600 kΩ', ext: '+15 V' }] }), { w: 1000, h: 400, sim: false });
 </script>
 </body>
 </html>
