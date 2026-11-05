@@ -76,6 +76,10 @@
 <li><b>Squaring</b> a sine with a diode multiplier needs a positive offset first (log of a negative number does not exist).</li>
 </ul>
 
+<h3>The complete doubler, drawn (2015–16 Sec B Q6(a) design)</h3>
+<p>\(\sin(4000\pi t) \to \sin(8000\pi t)\): rectify (the diode log amp needs a positive input), square with log → ×(−2) → antilog (\(R_f = I_SR^2\) = 10 kΩ gives \(-\sin^2\theta\)), add +0.5 V and integrate (\(RC = 1/(2\omega_2)\) = 19.9 µs) to cancel the DC and turn \(\cos2\theta\) into \(\sin2\theta\), then invert. Seven op-amps; the full calculation is in the <a href="../exam/2015-16.html">2015–16 paper's answer key</a>.</p>
+<figure><div id="f-b6a-rect"></div><figcaption><b>Precision full-wave rectifier.</b> For \(v &gt; 0\), D₁ conducts and \(v_h = -v\); for \(v &lt; 0\), D₂ clamps and \(v_h = 0\); the summer gives \(-(v + 2v_h) = |v|\).</figcaption></figure>
+<figure><div id="f-b6a-chain"></div><figcaption><b>Squarer, DC removal and 90° shift.</b> log → ×(−2) → antilog → summing integrator with +0.5 V → inverter.</figcaption></figure>
 <div class="trap"><h4>Traps (where marks go)</h4><ul>
 <li>Diode at the input is the <b>antilog</b>, diode in the feedback is the <b>log</b>. (Even the bank's solution first calls 2019–20's circuit a log amp.)</li>
 <li>Sign: both are inverting; the log amp needs \(v_I &gt; 0\).</li>
@@ -296,6 +300,35 @@ quiz('#quiz', [
   { q: 'In the 2017–18 circuit (R_D = 1 kΩ, I = 2 mA, V_OV = 2 V, V_0 = −2.7 V), V_DS is', opts: ['2.7 V', '0.7 V', '2 V', '4.7 V'], a: 1, why: 'V_D = −2 V, V_DS = −2 − (−2.7) = 0.7 V < V_OV: triode really.' },
   { q: 'An uncharged integrator (RC = 1/ω) fed sin ωt outputs', opts: ['cos ωt', '−cos ωt', 'cos ωt − 1', '1 − cos ωt'], a: 2, why: '−ω∫₀ᵗ sin ωτ dτ = cos ωt − 1.' },
 ]);
+// 2015-16 Q6(a) frequency doubler: rectifier, then log / x(-2) / antilog / integrator / inverter
+(() => {
+  const r = document.getElementById('f-b6a-rect'), c = document.getElementById('f-b6a-chain');
+  if (r) r.innerHTML = sch([
+    ['AC', [20, 140], [20, 200], 'sin 4000πt'], ['gnd', [20, 200]], ['W', [20, 140], [20, 100], [60, 100]], ['dot', [40, 100]],
+    ['R', [60, 100], [120, 100], '10 kΩ'], ['W', [120, 100], [160, 100]], ['dot', [140, 100]],
+    ['opamp', [160, 116]], ['W', [160, 132], [150, 132], [150, 142]], ['gnd', [150, 142]],
+    ['W', [140, 100], [140, 20]], ['dot', [140, 60]], ['D', [260, 60], [140, 60], 'D₂'], ['W', [240, 116], [300, 116]], ['W', [260, 116], [260, 60]], ['dot', [260, 116]],
+    ['R', [140, 20], [230, 20], '10 kΩ'], ['W', [230, 20], [340, 20]], ['dot', [300, 20]], ['D', [300, 20], [300, 116], 'D₁'], ['t', [306, 14], 'v_h', 'start'],
+    ['R', [340, 20], [340, 150], '10 kΩ'], ['W', [340, 150], [340, 214], [420, 214]], ['dot', [380, 214]],
+    ['W', [40, 100], [40, 280], [300, 280]], ['R', [300, 280], [370, 280], '20 kΩ'], ['W', [370, 280], [380, 280], [380, 214]],
+    ['opamp', [420, 230]], ['W', [420, 246], [400, 246], [400, 258]], ['gnd', [400, 258]],
+    ['W', [380, 214], [380, 170]], ['R', [380, 170], [510, 170], '20 kΩ'], ['W', [510, 170], [510, 230]], ['W', [500, 230], [540, 230]], ['dot', [510, 230]], ['open', [540, 230], '|sin θ|'],
+  ], { w: 600, h: 300, sim: false });
+  if (c) {
+    const it = [['open', [10, 104], ''], ['t', [10, 128], '|sin θ|', 'middle'], ['W', [10, 104], [30, 104]]];
+    const st = [[110, 'R', 'R 100 kΩ', 'D', 'D (I_S 1 µA)', 'log'], [300, 'R', '10 kΩ', 'R', '20 kΩ', '×(−2)'], [490, 'D', 'D', 'R', 'R_f 10 kΩ', 'antilog'],
+      [680, 'R', '19.9 kΩ', 'C', 'C 1 nF', 'summing integrator'], [870, 'R', '10 kΩ', 'R', '10 kΩ', 'inverter']];
+    st.forEach(([x, ie, il, fe, fl, name], k) => {
+      it.push([ie, [x - 80, 104], [x - 30, 104], il], ['W', [x - 30, 104], [x, 104]], ['dot', [x - 15, 104]], ['opamp', [x, 120]], ['W', [x, 136], [x, 150]], ['gnd', [x, 150]],
+        ['W', [x - 15, 104], [x - 15, 60]], [fe, [x - 15, 60], [x + 90, 60], fl], ['W', [x + 90, 60], [x + 90, 120]], ['W', [x + 80, 120], [x + 90, 120]], ['dot', [x + 90, 120]],
+        ['t', [x + 40, 200], name, 'middle']);
+      if (k < st.length - 1) it.push(['W', [x + 90, 120], [x + 100, 120], [x + 100, 104], [x + 110, 104]]);
+      else it.push(['W', [x + 90, 120], [x + 120, 120]], ['open', [x + 120, 120], 'V_out = sin 8000πt']);
+      if (name === 'summing integrator') it.push(['dot', [x - 30, 104]], ['R', [x - 30, 104], [x - 30, 170], '19.9 kΩ', -1], ['rail', [x - 30, 170], '+0.5 V', false]);
+    });
+    c.innerHTML = sch(it, { w: 1180, h: 220, sim: false });
+  }
+})();
 </script>
 </body>
 </html>
