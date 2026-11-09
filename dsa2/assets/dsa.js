@@ -267,4 +267,36 @@ function recall(sel, c) {
   };
   paint(); Must.sync();
 }
-document.addEventListener('DOMContentLoaded', () => { tex(); paintToc(); });
+// ---------- C/C++ implementations, added to a chapter automatically: page -> [[file, title], ...]. Files live in dsa2/code/ ----------
+const CODE = {
+  'graph/01-mst.html': [['kruskal.cpp', 'Kruskal with union-find'], ['prim.cpp', 'Prim with a priority queue']],
+  'graph/02-bellman-dag.html': [['bellman_ford.cpp', 'Bellman-Ford with negative-cycle check'], ['dag_sssp.cpp', 'Shortest paths in a DAG']],
+  'graph/03-dijkstra.html': [['dijkstra.cpp', 'Dijkstra with a binary heap']],
+  'graph/04-apsp.html': [['floyd_warshall.cpp', 'Floyd-Warshall with path reconstruction'], ['transitive_closure.cpp', 'Warshall transitive closure']],
+  'graph/05-johnson.html': [['johnson.cpp', "Johnson's algorithm"]],
+  'graph/06-flow.html': [['ford_fulkerson.cpp', 'Ford-Fulkerson (DFS) on a residual matrix']],
+  'graph/07-mincut-ek.html': [['edmonds_karp.cpp', 'Edmonds-Karp and the min cut']],
+  'graph/08-matching-modelling.html': [['bipartite_matching.cpp', 'Bipartite matching by augmenting paths']],
+  'tree/01-rotations-avl.html': [['avl.cpp', 'AVL insert and delete']],
+  'tree/03-rb-insert.html': [['red_black.cpp', 'Red-black tree: insert and delete (CLRS sentinel version)']],
+  'tree/04-rb-delete.html': [['red_black.cpp', 'Red-black tree: insert and delete (CLRS sentinel version)']],
+  'tree/06-splay.html': [['splay.cpp', 'Bottom-up splay tree']],
+  'heap/01-hashing.html': [['hashing.cpp', 'Chaining and open addressing']],
+  'heap/03-binomial-heap.html': [['binomial_heap.cpp', 'Binomial heap']],
+  'heap/04-fibonacci.html': [['fibonacci_heap.cpp', 'Fibonacci heap']],
+  'np/03-backtracking.html': [['sat_backtrack.cpp', 'Backtracking SAT']],
+  'np/04-branch-bound.html': [['knapsack_bb.cpp', '0/1 knapsack by branch and bound'], ['tsp_held_karp.cpp', 'Held-Karp TSP']],
+  'np/05-randomized.html': [['randomized_quicksort.cpp', 'Randomized quicksort'], ['karger.cpp', 'Karger min cut']],
+  'np/06-approximation.html': [['vertex_cover_approx.cpp', 'Vertex cover 2-approximation']],
+};
+function addCode() {
+  const list = CODE[PAGE]; if (!list) return;
+  const root = new URL('../code/', document.querySelector('script[src$="assets/dsa.js"]').src).href;
+  const wrap = document.createElement('section');
+  wrap.innerHTML = `<h2>Short C++ version</h2><p>Only the core of the algorithm, to read after the method makes sense. The exam asks for pseudocode, so do not memorise the syntax. The full programs are compiled and tested against the book's checked engine.</p>` +
+    list.map(([f, t]) => `<details class="must-model"><summary>${t} <code>${f}</code></summary><p class="tracer-hint"><a href="${root}${f}">Full runnable file</a></p><pre class="code" data-f="${f}">Loading…</pre></details>`).join('');
+  wrap.querySelectorAll('details').forEach(d => d.addEventListener('toggle', async () => { const pre = d.querySelector('pre'); if (!d.open || pre.dataset.ok) return; try { const r = await fetch(root + pre.dataset.f); if (!r.ok) throw 0; const src = await r.text(), core = [...src.matchAll(/\/\/ BEGIN CORE[^\n]*\n([\s\S]*?)\n?[ \t]*\/\/ END CORE/g)].map(m => m[1]); pre.textContent = core.length ? core.join('\n\n// ...\n\n') : src; pre.dataset.ok = 1; } catch { pre.textContent = 'Could not load the file. Use the link above.'; } }));
+  const must = [...document.querySelectorAll('main h2')].find(h => /mandatory/i.test(h.textContent));
+  if (must) must.before(wrap); else (document.querySelector('.gate') || document.querySelector('.pager') || document.querySelector('main').lastChild).before?.(wrap);
+}
+document.addEventListener('DOMContentLoaded', () => { tex(); paintToc(); addCode(); });

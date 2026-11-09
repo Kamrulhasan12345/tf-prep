@@ -103,6 +103,15 @@ RELAX(u, v, w)                            // O(1)
 </ol></div>
 <p>Cost \(O(VE)+O(V+E)=O(VE)\). A complete answer also says why Dijkstra cannot be used (chapter 3) and gives the pseudocode above.</p>
 
+<h3>The slide example: which vertices become minus infinity (slides 06 p.63-65, CLRS Figure 24.1)</h3>
+<p>Edges: s-a 3, s-c 5, s-e 2, a-b -4, b-g 4, c-d 6, d-c -3, d-g 8, e-f 3, f-e -6, f-g 7, h-i 2, i-j 3, j-h -8. The teacher's answer: \(\delta(s,s)=0\), a 3, b -1, c 5, d 11, then e, f, g are \(-\infty\) and h, i, j are \(+\infty\). Three kinds of cycle, three different outcomes:</p>
+<ul>
+<li>c-d: weight \(6-3=3\), positive. It is harmless, so c and d keep finite distances.</li>
+<li>e-f: weight \(3-6=-3\), negative and reachable from s. So e and f are \(-\infty\), and so is g, which is reachable from f.</li>
+<li>h-i-j: weight \(2+3-8=-3\), negative but <b>not reachable</b> from s. Those vertices are \(+\infty\) (no path), not \(-\infty\).</li>
+</ul>
+<p>Bellman-Ford does not print \(-\infty\). After \(|V|-1\) passes the extra pass still relaxes an edge, so it reports a negative cycle. The trace below ends with that report.</p>
+<div id="t4"></div>
 <h2>5. The currency exchange question (2023–24 Q8, 8+7)</h2>
 <p>Rates \(r_{ij}\): one unit of \(c_i\) buys \(r_{ij}\) units of \(c_j\). (i) Best way to convert \(s\) into \(t\). (ii) Detect an anomaly: a cycle with \(r_{i_1i_2}\cdots r_{i_ki_1}>1\).</p>
 <div class="method"><h4>Method · turn a product into a sum</h4><ol>
@@ -139,6 +148,7 @@ RELAX(u, v, w)                            // O(1)
 <div id="t3"></div>
 <div class="drawit"><b>On paper:</b> write the topological order as a row of boxes. Under each box write the vertex's final \(d\). Draw each relaxation as an arrow that goes left to right only, and bold the edges that end up in the shortest-path tree.</div>
 
+<p><b>Source in the middle of the order (notes p.14, Lec 7).</b> If \(s\) is not first in the topological order, every vertex before \(s\) is unreachable from \(s\). Their distances stay \(\infty\). Start the relaxing loop at \(s\) or let the loop pass over them, the result is the same.</p>
 <h2>7. Unit weights: BFS (2022–23 Q2a 8, 2017–18 Q8a 5)</h2>
 <div class="method"><h4>Method · all weights equal</h4><ol>
 <li>BFS from \(s\) with a queue. \(d[s]=0\). When you dequeue \(u\) and see an unvisited \(v\): \(d[v]=d[u]+1\), \(\pi[v]=u\), enqueue.</li>
@@ -173,7 +183,63 @@ RELAX(u, v, w)                            // O(1)
 <li><b>Which algorithm? (class test).</b> Unweighted all pairs: BFS from every vertex, \(O(V(V+E))\). One source, negative edges, undirected graph: an undirected negative edge can be walked back and forth, so it acts as a negative cycle and shortest walks are not defined; the expected answer is Bellman-Ford, \(O(VE)\), treating each edge as two directed edges, which reports the cycle. Directed sparse all pairs: Johnson (chapter 5).</li>
 </ol></div>
 
-<h2>10. Mandatory practice</h2>
+<h2>10. Where this comes from, and every past question</h2>
+<h3>Lectures</h3>
+<ul>
+<li><b>Monirul Islam sir, Lec 1 (Jun 21, 2026).</b> Notes p.1: SSSP for an unweighted graph is BFS, for a weighted graph it is Dijkstra, "BFS with a priority queue".</li>
+<li><b>Lec 4 (Jun 28), notes pp.7-8.</b> Shortest-path weight \(\delta(u,v)=\infty\) if not connected; the variations (single destination: reverse the edges and run SSSP; single pair; all pairs: SSSP from every vertex); optimal substructure theorem T1 and its proof (the chapter's section 1). p.8: negative edge, negative cycle, \(\delta=-\infty\); "a shortest path must be a simple path" because a negative cycle breaks the algorithm, a zero cycle changes nothing and a positive cycle only adds cost.</li>
+<li><b>Lec 5 (Jun 30), notes pp.9-12.</b> Predecessor subgraph and the shortest-path tree; generic algorithm (initialise O(V), relax O(1)); the six properties on p.10-11 (triangle inequality, upper bound, no path, convergence, path relaxation, predecessor subgraph); "Bellman-Ford can detect a negative cycle, DAG: weights may be negative but no cycle, Dijkstra: no negative edge"; Bellman-Ford relaxes all edges |V|-1 times in any order, complexity O(VE). The boxed pseudocode area on p.12 is blank.</li>
+<li><b>Lec 6 (Jul 1), p.13:</b> heading "Correctness of Bellman-Ford", the page is blank. <b>Lec 7 (Jul 5), p.14:</b> DAG SSSP (topologically sort, relax every edge of each vertex in that order), correctness (a vertex earlier in the order is already most relaxed), complexity O(V+E). He also notes that if the source is in the middle of the order, the vertices before it are not reachable.</li>
+<li><b>Slides, deck "06_ Bellman-Ford_s Algorithm":</b> 2-7 simulation, 8-14 cycle detection, 15-55 correctness (Lemma 24.2 on 16, Corollary 24.3 on 21, Theorem 24.4 on 31, proof of part B on 41-55), 56-57 complexity, 58-61 DAG, 63-65 the negative-weight example with minus-infinity vertices. <b>Deck "07_ SSSP for DAG":</b> 2-9 idea, 10-16 simulation, 17-24 correctness (Theorem 24.5), 25-26 complexity.</li>
+</ul>
+<h3>Book references</h3>
+<ul>
+<li><b>CLRS 3rd ed.:</b> &sect;22.2 "Breadth-first search" pp.594-602; &sect;22.4 "Topological sort" pp.612-614; chapter 24 introduction pp.643-650 (Lemma 24.1, subpaths of shortest paths, p.644); &sect;24.1 "The Bellman-Ford algorithm" pp.651-654 (Theorem 24.4, p.653); &sect;24.2 "Single-source shortest paths in directed acyclic graphs" pp.655-657 (Theorem 24.5, p.656); &sect;24.5 "Proofs of shortest-paths properties" pp.671-683 (Lemma 24.15 is the path-relaxation property).</li>
+<li><b>CLRS exercises and problems:</b> 24.1-1 (run Bellman-Ford), 24.1-3 (stop early), 24.1-4 (set d to minus infinity on negative-cycle vertices), 24.2-1, 24.2-4 (count paths in a DAG), 25.1-5 (SSSP as a matrix-vector product, this is 2019-20 Q6c), 25.1-10 (shortest negative cycle, this is 2019-20 Q7b), Problem 24-3 "Arbitrage" p.678 (this is the 2023-24 Q8 currency question).</li>
+<li><b>Kleinberg and Tardos:</b> &sect;6.8 "Shortest Paths in a Graph" pp.290-296 (Bellman-Ford as dynamic programming); &sect;6.9 "Shortest Paths and Distance Vector Protocols" pp.297-300 (the distributed Bellman-Ford, the CT-1 "centralised against distributed" question); &sect;6.10 "Negative Cycles in a Graph" pp.301-306.</li>
+<li><b>Dasgupta, Papadimitriou, Vazirani:</b> &sect;4.2 "Breadth-first search" p.116; &sect;4.3 "Lengths on edges" p.118 (Figure 4.6 breaks an edge of length l into l unit edges, the idea behind the weights-1-to-5 question); &sect;4.6 "Shortest paths in the presence of negative edges" pp.128-129 (4.6.2 negative cycles); &sect;4.7 "Shortest paths in dags" p.130.</li>
+</ul>
+<h3>Every past question on this topic</h3>
+<details><summary>All 34 past questions</summary>
+<ul>
+<li><b>2017–18 Q8a</b> (5): BFS adapted to single-source shortest paths with unequal weights (section 7; QB v1 and the CT bank say 5 marks, CSE207QBank says 8). <a href="../exam/2017-18.html">solved on the 2017–18 page</a>.</li>
+<li><b>2017–18 Q8b</b> (6+2): Intuitive idea of Bellman-Ford; detect a negative cycle (section 3). <a href="../exam/2017-18.html">solved on the 2017–18 page</a>.</li>
+<li><b>2019–20 Q5a</b> (13): Integer weights 1 to 5: reduce shortest weighted path to BFS (section 8). <a href="../exam/2019-20.html">solved on the 2019–20 page</a>.</li>
+<li><b>2019–20 Q5c</b> (10): Linear-time algorithm for the reverse graph in adjacency-list form. <a href="../exam/2019-20.html">solved on the 2019–20 page</a>.</li>
+<li><b>2019–20 Q6c</b> (10): Express SSSP as a product of matrices and a vector; link to Bellman-Ford (section 9). <a href="../exam/2019-20.html">solved on the 2019–20 page</a>.</li>
+<li><b>2019–20 Q7b (also 2018 CT2(B) Q2)</b> (10): Length (number of edges) of a minimum-length negative-weight cycle (section 9). <a href="../exam/2019-20.html">solved on the 2019–20 page</a>.</li>
+<li><b>2019–20 Q7c</b> (12): Strongly connected digraph, positive weights: all-pairs shortest paths that must pass through v0 (section 9). <a href="../exam/2019-20.html">solved on the 2019–20 page</a>.</li>
+<li><b>2020–21 Q1a</b> (8): Length of the longest path in a DAG (section 6). <a href="../exam/2020-21.html">solved on the 2020–21 page</a>.</li>
+<li><b>2020–21 Q2a</b> (12): Single-destination shortest paths with non-negative numbers on the vertices as well as the edges (section 9). <a href="../exam/2020-21.html">solved on the 2020–21 page</a>.</li>
+<li><b>2022–23 Q2a</b> (8): Shortest path in a graph where all edge weights are equal (section 7). <a href="../exam/2022-23.html">solved on the 2022–23 page</a>.</li>
+<li><b>2022–23 Q2b</b> (12): The same problem with unequal positive weights (chapter 3). <a href="../exam/2022-23.html">solved on the 2022–23 page</a>.</li>
+<li><b>2022–23 Q2c</b> (15): The same problem with negative weights and possible negative cycles (section 4). <a href="../exam/2022-23.html">solved on the 2022–23 page</a>.</li>
+<li><b>2023–24 Q8</b> (8+7): Currency exchange: best conversion sequence from s to t, and detecting an arbitrage cycle (section 5). <a href="../exam/2023-24.html">solved on the 2023–24 page</a>.</li>
+<li><b>2023–24 Q10a</b> (10, compulsory): Classify the edges of the figure (tree, forward, back, cross) after a DFS, alphabetical order. (DFS has no chapter here.) <a href="../exam/2023-24.html">solved on the 2023–24 page</a>.</li>
+<li><b>2023–24 Q10b</b> (12, compulsory): Batman suit-up: draw the dependency graph and give a valid order (topological sort, section 6). <a href="../exam/2023-24.html">solved on the 2023–24 page</a>.</li>
+<li><b>2022 CT1 Q1</b> (6): Which algorithm and runtime for (a) all-pairs in an unweighted graph, (b) one source with negative edges in an undirected graph, (c) all-pairs in a directed sparse graph. <a href="../exam/ct.html">solved on the class-test page</a>.</li>
+<li><b>2023 CT1 (AMR) Q3</b> (4): Explain in 25 words: Dijkstra is centralised but Bellman-Ford can be distributed. <a href="../exam/ct.html">solved on the class-test page</a>.</li>
+<li><b>2023 CT1 (AMR) Q4</b> (4): Edge weights only 1, 2, 3: faster than Dijkstra? Outline and complexity (section 8). <a href="../exam/ct.html">solved on the class-test page</a>.</li>
+<li><b>2018 CT1(A) Q3</b>: Positive distinct weights: can a shortest-path tree and an MST share no edge? (chapter 1, section 9). <a href="../exam/ct.html">solved on the class-test page</a>.</li>
+<li><b>2018 CT2(A) Q1</b>: Weights on vertices instead of edges: does the shortest-path problem make sense? Give a formal description. practise this.</li>
+<li><b>2018 CT2(A) Q2</b>: Directed graph with positive weights: print the shortest cycle through a node s. <a href="../exam/ct.html">solved on the class-test page</a>.</li>
+<li><b>2016–17 item</b> (15): Properties satisfied by shortest paths; show by example that Dijkstra fails with negative weights (section 2 and chapter 3). practise this.</li>
+<li><b>2016–17 item</b> (10): Prove that Bellman-Ford returns TRUE if no negative-weight cycle is reachable from the source (section 3). practise this.</li>
+<li><b>2015–16 item</b> (15): Linear-time algorithm to check whether an undirected graph has a cycle of odd length, with a short justification (BFS levels). practise this.</li>
+<li><b>2015–16 item</b> (15): Prerequisite digraph of n courses: linear-time algorithm for the minimum number of semesters (longest path in a DAG plus one, section 6). practise this.</li>
+<li><b>2014–15 item</b> (8): State and prove the convergence property of edge relaxation (section 2). practise this.</li>
+<li><b>2014–15 item</b> (10): Apply Bellman-Ford to the given 8-vertex graph, showing all relaxation steps (section 3). practise this.</li>
+<li><b>2014–15 item</b> (6): Show a topological sorting order of the given graph with discovery and finishing times (section 6). practise this.</li>
+<li><b>2012–13 item</b> (8): A BFS tree is already computed: print the vertices on a shortest path from s to v (section 7). practise this.</li>
+<li><b>2012–13 item</b> (12): State and prove the convergence property of shortest paths (section 2). practise this.</li>
+<li><b>2012–13 item</b> (20): Write Bellman-Ford; analyse its time complexity and correctness (section 3; listed twice in the 8-year bank). practise this.</li>
+<li><b>2012–13 item</b> (6+6): What does d[v] mean at the end of LongestPath-DAG on an unweighted DAG, and what is its running time? (section 6). practise this.</li>
+<li><b>2012–13 item</b> (6): Show the updated shortest-path estimates after relaxing the listed edges of the given figure (section 2). practise this.</li>
+<li><b>2006–07 item</b> (10): Find a topological order of the courses in the given prerequisite graph (section 6). practise this.</li>
+</ul>
+</details>
+
+<h2>11. Mandatory practice</h2>
 <p>Do these with pen and paper.</p>
 <div id="r1"></div>
 <div id="r2"></div>
@@ -196,6 +262,7 @@ recall('#r3', { id: 'r3', marks: 8, q: 'Design an efficient algorithm for the lo
 recall('#r4', { id: 'r4', marks: 13, q: 'Edge weights are integers from 1 to 5. Reduce the shortest weighted path to the unweighted problem and solve it with BFS. State the cost. (2019–20 Q5a)', points: ['Replace edge of weight w by a path of w unit edges (w-1 dummy vertices)', 'Path lengths are preserved exactly', 'Run BFS from s', 'Graph size V+4E vertices, 5E edges', 'Time O(V+E) since 5 is a constant'], model: '<p>Replace each edge \\((u,v)\\) of weight \\(w\\in\\{1,\\dots,5\\}\\) by a chain \\(u\\to x_1\\to\\cdots\\to x_{w-1}\\to v\\) of \\(w\\) unit edges. A weighted path of weight \\(L\\) maps to an unweighted path of exactly \\(L\\) edges and back, so the shortest ones correspond. BFS from \\(s\\) gives the distance to \\(t\\). The new graph has at most \\(V+4E\\) vertices and \\(5E\\) edges, so BFS takes \\(O(V+E)\\).</p>' });
 practice('#p1', { id: 'p1', kind: 'bellman', n: 2 });
 practice('#p2', { id: 'p2', kind: 'bellman', n: 1 });
+trace('#t4', { kind: 'bellman', input: 's>a 3, s>c 5, s>e 2, a>b -4, b>g 4, c>d 6, d>c -3, d>g 8, e>f 3, f>e -6, f>g 7, h>i 2, i>j 3, j>h -8', s: 's' });
 </script>
 </body>
 </html>

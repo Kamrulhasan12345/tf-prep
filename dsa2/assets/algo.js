@@ -202,7 +202,7 @@ class Binomial {
     while (n.p && this.before(n.k, n.p.k)) { const p = n.p, t = n.k; n.k = p.k; p.k = t; this.emit(`Heap order broken: exchange ${t} with parent ${n.k}.`, [t, n.k], 'bubble'); n = p; }
     this.emit('Heap order restored.', [], 'done');
   }
-  delete(k) { this.emit(`<b>Delete ${k}:</b> decrease it to −∞, then extract-min.`, [k], 'delete'); this.decrease(k, -1e9); this.extract(); }
+  delete(k) { if (!this.find(k)) { this.emit(`${k} is not in the heap.`, [], 'none'); return; } this.emit(`<b>Delete ${k}:</b> decrease it to −∞, then extract-min.`, [k], 'delete'); this.decrease(k, -1e9); this.extract(); }
 }
 
 // ===== Fibonacci heap (min). roots is display order. Follows CLRS; start of consolidate set by the root order =====
@@ -250,7 +250,7 @@ class Fib {
   }
   cut(x, y) { y.ch.splice(y.ch.indexOf(x), 1); y.deg--; x.p = null; x.mark = false; this.roots.push(x); this.emit(`Cut ${x.k} from parent ${y.k}; it joins the root list, unmarked.`, [x.k, y.k], 'cut'); }
   cascade(y) { const z = y.p; if (!z) return; if (!y.mark) { y.mark = true; this.emit(`${y.k} just lost its first child and is not a root: mark it. Stop.`, [y.k], 'mark'); } else { this.emit(`${y.k} is already marked and lost a second child: cascading cut.`, [y.k], 'cascade'); this.cut(y, z); this.cascade(z); } }
-  delete(k) { this.emit(`<b>Delete ${k}:</b> decrease to −∞, then extract-min.`, [k], 'delete'); this.decrease(k, -1e9); this.extract(); }
+  delete(k) { if (!this.find(k)) { this.emit(`${k} is not in the heap.`, [], 'none'); return; } this.emit(`<b>Delete ${k}:</b> decrease to −∞, then extract-min.`, [k], 'delete'); this.decrease(k, -1e9); this.extract(); }
 }
 
 // ===== Graph parsing: "A-B 1, A-C 3" undirected, "A>B 3" directed. Weight optional =====

@@ -54,6 +54,13 @@
 <li>If \(e\) is strictly the heaviest, \(w(g)<w(e)\), so \(w(T'')<w(T)\), contradicting that \(T\) is minimum. Hence no MST has \(e\). \(\blacksquare\)</li>
 </ol></div>
 
+<div class="key"><p><b>Corollary 23.2 (slides 02 p.23-24, CLRS p.629).</b> Let \(A\) be a subset of some MST. Let \(C\) be a connected component of the forest \(G_A=(V,A)\). Let \((u,v)\) be a light edge joining \(C\) to another component. Then \((u,v)\) is safe for \(A\). Proof (slide 24): the cut \((V_C, V-V_C)\) respects \(A\), and \((u,v)\) is a light edge for it, so Theorem 23.1 applies. This is the line Kruskal uses: every edge it accepts joins two components and is the lightest one that does so.</p></div>
+<div class="method"><h4>Loop invariant of GENERIC-MST (slides 01 p.38-42)</h4><ol>
+<li><b>Initialisation:</b> \(A=\varnothing\) is a subset of every MST.</li>
+<li><b>Maintenance:</b> if \(A\subseteq T\) for some MST \(T\), adding a safe edge keeps \(A\cup\{(u,v)\}\) inside some MST. That is the definition of safe.</li>
+<li><b>Termination:</b> when \(A\) is a spanning tree, it is inside an MST that has the same \(|V|-1\) edges, so it equals that MST.</li>
+</ol></div>
+<p><b>Applications on slide 01 p.29-33:</b> the MST models "minimum cable length for electricity supply" and the circuit-board wiring problem "interconnect n points with n-1 wires of minimum total length". The subset \(T\) must reach each vertex and have no cycle, so it is a tree.</p>
 <h2>4. Kruskal with union-find</h2>
 <p>Idea: sort the edges. Take the lightest edge that does not make a cycle. Each accepted edge is the light edge of the cut between its own component and the rest, so by the cut property it is safe.</p>
 <pre class="code">KRUSKAL(G, w)
@@ -89,6 +96,10 @@ UNION(u, v):                               // by size
 <li><b>Without DSU</b> (2023–24 Q11a): to test "is there already a path from \(u\) to \(v\)" run BFS or DFS on the current forest. The forest has at most \(V-1\) edges, so one test costs \(O(V)\). Total \(O(E\log E+VE)=O(VE)\).</li>
 </ol></div>
 
+<h3>The slide example (CLRS Figure 23.4, slides 01 p.25-36 and 02 p.33-51)</h3>
+<p>The teacher's 9-vertex graph: a-b 4, a-h 8, b-c 8, b-h 11, c-d 7, c-f 4, c-i 2, d-e 9, d-f 14, e-f 10, f-g 2, g-h 1, g-i 6, h-i 7. The MST has cost 37 (slide 01 p.36). Kruskal accepts g-h 1, c-i 2, f-g 2, a-b 4, c-f 4, c-d 7, a-h 8, d-e 9; it rejects g-i 6, h-i 7 and b-c 8 (each closes a cycle) and the heavier edges, which matches slides 02 p.40-51. The same graph is the one in the 2012–13 "fifth edge of Prim from a" question. The trace below takes a-b, b-c, c-i, c-f, f-g, g-h, c-d, d-e, so its fifth edge is f-g. There is a tie after a-b (a-h 8 and b-c 8) and the trace takes b-c; I did not trace the other choice, so in an exam state your tie rule.</p>
+<div id="t4"></div>
+<div id="t5"></div>
 <h2>5. Prim</h2>
 <p>Idea: grow one tree from a root. Always add the lightest edge leaving the tree. The cut is (tree, rest), which respects the tree, so the cut property applies.</p>
 <pre class="code">PRIM(G, w, r)
@@ -205,7 +216,71 @@ Every MST has \(V-1=5\) edges and must avoid these six, so it is exactly the fiv
   return M - kept</pre>
 <div class="drawit"><b>On paper:</b> draw 4 towns with a few roads, label each road with its type, circle the kept ones in the order: type 3 first, then 1, then 2. Show the two DSU states after each pass. Write "answer = M − kept".</div>
 
-<h2>11. Mandatory practice</h2>
+<h2>11. Where this comes from, and every past question</h2>
+<h3>Lectures</h3>
+<ul>
+<li><b>Monirul Islam sir, Lec 2 (Jun 23, 2026) and Lec 3 (Jun 24, 2026).</b> Notes pp.2-6. p.2 has the vocabulary box (thick edge, light edge, safe edge, respects, crossing edge). p.3 (Lec 2) has GENERIC-MST with "A will be acyclic, A may be a forest". p.4 has the Kruskal pseudocode and the heading "Kruskal DSU". p.5 has only "Complexity: 1. Edge sorting O(E lg E)". p.6 (Lec 3, Jun 24) has the heading "Prim's Algorithm". <b>Blank in the notes:</b> the proof of the generic algorithm (p.3 "Proof:"), the DSU version of Kruskal, steps 2 onward of the complexity, and all of Prim.</li>
+<li><b>Slides, deck "01_ MST Generic Algorithm":</b> slides 25-36 (applications: cable for electricity, circuit-board wiring with n-1 wires, a spanning tree of cost 67 against the MST of cost 37), 37-42 (greedy approach, loop invariant "A is a subset of some MST"), 43-50 (cut, respects, light edge, Theorem 23.1).</li>
+<li><b>Slides, deck "02_ Kruskal_s Algorithm":</b> slides 10-19 (proof of Theorem 23.1, step by step), 20-24 (A is a forest, Corollary 23.2), 25-27 (the two strategies), 28-32 (Kruskal, disjoint set for each tree), 33-51 (simulation on the 9-vertex graph), 52-58 (complexity), 59 (second strategy, which is Prim). The sources have no Prim slides and no DSU slides (decks 03-05 and 10 are not in the folder).</li>
+<li><b>What he stressed:</b> the exact CLRS words (thick, safe, light, respects) and Theorem 23.1 with its proof; Kruskal's cost split into sorting O(E lg E) plus set operations, and then the step E is less than V squared so lg E is O(lg V).</li>
+</ul>
+<h3>Book references</h3>
+<ul>
+<li><b>CLRS 3rd ed.:</b> &sect;23.1 "Growing a minimum spanning tree", pp.625-630 (Theorem 23.1 on p.626, Corollary 23.2 on p.629). &sect;23.2 "The algorithms of Kruskal and Prim", pp.631-637. &sect;21.1 "Disjoint-set operations" p.561 and &sect;21.3 "Disjoint-set forests" p.568 for union-find. CLRS 3e has no separate Prim chapter, it is in 23.2.</li>
+<li><b>Useful CLRS exercises:</b> 23.1-1 (a lightest edge is in some MST), 23.1-5 (heaviest edge on a cycle), 23.1-6 (unique light edge for every cut gives a unique MST), 23.1-7 (this is exactly 2019-20 Q5b), 23.1-10 (decrease one tree edge), 23.2-1 (this is exactly 2019-20 Q6b), 23.2-2 (Prim in O(V<sup>2</sup>)), 23.2-3 (Prim with a Fibonacci heap). Problems 23-1 (second-best MST) and 23-3 (bottleneck spanning tree), p.638-640.</li>
+<li><b>Kleinberg and Tardos:</b> &sect;4.5 "The Minimum Spanning Tree Problem", pp.142-150 (cut property, cycle property, Prim, Kruskal); &sect;4.6 "Implementing Kruskal's Algorithm: The Union-Find Data Structure", pp.151-156.</li>
+<li><b>Dasgupta, Papadimitriou, Vazirani:</b> &sect;5.1 "Minimum spanning trees", from p.139: 5.1.2 cut property, 5.1.3 Kruskal, 5.1.4 data structure for disjoint sets, 5.1.5 Prim.</li>
+</ul>
+<h3>Every past question on this topic</h3>
+<details><summary>All 43 past questions</summary>
+<ul>
+<li><b>2017–18 Q1a</b> (3+5+7): What is a spanning tree; write Kruskal; analyse the time with suitable data structures (section 4). <a href="../exam/2017-18.html">solved on the 2017–18 page</a>.</li>
+<li><b>2017–18 Q1b</b> (10): Find an MST of the figure by Prim, every step (section 5). <a href="../exam/2017-18.html">solved on the 2017–18 page</a>.</li>
+<li><b>2017–18 Q1c</b> (10): Partition V1, V2; e a lightest crossing edge; show some MST contains e (section 3). <a href="../exam/2017-18.html">solved on the 2017–18 page</a>.</li>
+<li><b>2018–19 Q1b</b> (15): Prove an optimal MST is made of optimal MST subtrees; draw an MST containing the edges x and z (sections 8, 9). <a href="../exam/2018-19.html">solved on the 2018–19 page</a>.</li>
+<li><b>2019–20 Q5b</b> (12): Positive weights: a minimum connecting edge set must be a tree; example for non-positive weights (section 9). <a href="../exam/2019-20.html">solved on the 2019–20 page</a>.</li>
+<li><b>2019–20 Q6b</b> (10): For every MST T there is a tie-break order that makes Kruskal return T (section 9). <a href="../exam/2019-20.html">solved on the 2019–20 page</a>.</li>
+<li><b>2019–20 Q8a</b> (12): TSP with triangle inequality: build a near-optimal tour from an MST (the approximation chapter). <a href="../exam/2019-20.html">solved on the 2019–20 page</a>.</li>
+<li><b>2020–21 Q1c</b> (15): Prim MST T of G, then a new vertex with edges is added: is the new MST T plus one new edge? (section 9). <a href="../exam/2020-21.html">solved on the 2020–21 page</a>.</li>
+<li><b>2020–21 Q3c</b> (15): Jack Straws: which pairs of straws are connected (a union-find or connected-components question). <a href="../exam/2020-21.html">solved on the 2020–21 page</a>.</li>
+<li><b>2021–22 Q1a</b> (8): Define and distinguish the two basic properties of a greedy algorithm (section 8). <a href="../exam/2021-22.html">solved on the 2021–22 page</a>.</li>
+<li><b>2021–22 Q1b</b> (12): Prove the optimal substructure property and the greedy choice property of MST (section 8). <a href="../exam/2021-22.html">solved on the 2021–22 page</a>.</li>
+<li><b>2021–22 Q1c</b> (15): MST by Kruskal with the array implementation of union-find (section 4). <a href="../exam/2021-22.html">solved on the 2021–22 page</a>.</li>
+<li><b>2022–23 Q1b</b> (23, compulsory): The peculiar city with three road types: graph model, algorithm, pseudocode (section 10). <a href="../exam/2022-23.html">solved on the 2022–23 page</a>.</li>
+<li><b>2023–24 Q11a</b> (8): Runtimes of Kruskal without DSU, Kruskal with DSU, Ford-Fulkerson, Edmonds-Karp (section 4; flow runtimes in chapters 6 and 7). <a href="../exam/2023-24.html">solved on the 2023–24 page</a>.</li>
+<li><b>2023–24 Q11b</b> (12): Draw the MST by Prim and by Kruskal, write the edge order, alphabetical ties (section 7). <a href="../exam/2023-24.html">solved on the 2023–24 page</a>.</li>
+<li><b>2024–25 Q7a</b> (20): Is the MST of this 6-vertex graph unique? Justify with the cut or cycle property (section 6). <a href="../exam/2024-25.html">solved on the 2024–25 page</a>.</li>
+<li><b>2018 CT1(A) Q1</b>: What is the cost of the MST of the given graph? (figure not in the sources) method only, figure missing: see <a href="../exam/ct.html">class-test page</a>.</li>
+<li><b>2018 CT1(B) Q1</b>: How many MSTs does the given graph have? (figure not in the sources) method only, figure missing: see <a href="../exam/ct.html">class-test page</a>.</li>
+<li><b>2018 CT1(C) Q1</b>: How many MSTs does the given graph have? (figure not in the sources) method only, figure missing: see <a href="../exam/ct.html">class-test page</a>.</li>
+<li><b>2018 CT1(D) Q1</b>: What is the cost of the MST of the given graph? (figure not in the sources) method only, figure missing: see <a href="../exam/ct.html">class-test page</a>.</li>
+<li><b>2018 CT1(A) Q2</b>: True or false: more than |V|-1 edges and a unique heaviest edge means it is in no MST (section 9). <a href="../exam/ct.html">solved on the class-test page</a>.</li>
+<li><b>2018 CT1(B) Q2</b>: True or false: an r-path from s to t in G means every MST has an r-path from s to t. <a href="../exam/ct.html">solved on the class-test page</a>.</li>
+<li><b>2018 CT1(C) Q2</b>: True or false: Prim works correctly when there are negative edges (section 9). <a href="../exam/ct.html">solved on the class-test page</a>.</li>
+<li><b>2018 CT1(D) Q2</b>: True or false: the shortest path between two nodes is part of some MST (section 9). <a href="../exam/ct.html">solved on the class-test page</a>.</li>
+<li><b>2018 CT1(A) Q3</b>: Positive distinct weights: can a shortest-path tree from s and an MST share no edge? (section 9). <a href="../exam/ct.html">solved on the class-test page</a>.</li>
+<li><b>2018 CT1(B) Q3</b>: Show how to find a maximum spanning tree (section 9). <a href="../exam/ct.html">solved on the class-test page</a>.</li>
+<li><b>2018 CT2(B) Q1</b>: Prove or disprove: Dijkstra and Prim add nodes to S in the same order (chapter 3, section 6). <a href="../exam/ct.html">solved on the class-test page</a>.</li>
+<li><b>2022 CT1 Q2</b> (5): Pseudocode to find the representative of a node in a DSU with path compression (section 4). practise this.</li>
+<li><b>2017–18 (CSE 203) item</b> (15): Algorithm for a minimum-cost arborescence of a digraph from root r; apply it to the digraph ra 7, rx 2, ax 1, xy 5, ya 3, xc 6, cb 4, bx 2, yb 2. practise this.</li>
+<li><b>2016–17 item</b> (15): Write Prim's algorithm and analyse its time complexity (section 5). practise this.</li>
+<li><b>2016–17 item</b> (10): Write the correctness proof of Kruskal's algorithm (sections 3 and 4). practise this.</li>
+<li><b>2015–16 item</b> (15): Find an MST by Kruskal and by Prim and show the order in which edges are selected (section 7). practise this.</li>
+<li><b>2015–16 item</b> (15): Which one new road from a list E' most reduces the s to t driving distance? (Dijkstra from s and from t: chapters 3 and 4). practise this.</li>
+<li><b>2014–15 item</b> (10): Let A be in some MST and (S, V-S) a cut respecting A with light edge (u,v): show (u,v) is safe (Theorem 23.1, section 3). practise this.</li>
+<li><b>2014–15 item</b> (12): Find the light and the respectful crossing edge for each step of Kruskal on the given graph. practise this.</li>
+<li><b>2014–15 item</b> (8): What is the cost of find and union of sets in Kruskal's method? (section 4). practise this.</li>
+<li><b>2014–15 item</b> (10): For the given graph show u, v.key and Q at each step of Prim (section 5). practise this.</li>
+<li><b>2014–15 item</b> (12): GreedyCell: fewest cell towers (range R) to cover n houses on a road. Greedy, not an MST question. practise this.</li>
+<li><b>2013–14 item</b> (10): Construct a minimum-cost arborescence rooted at A for AB 5, BC 2, AC 4, AD 6, CD 3, DB 1, DE 6, EB 3, EF 3, FB 4. practise this.</li>
+<li><b>2013–14 item</b> (15): Find an MST with Kruskal and with Prim (start at A) for the given edge list. practise this.</li>
+<li><b>2012–13 item</b> (10): Which is the fifth edge Prim adds when started at a (the 9-vertex slide graph)? See the trace at the end of section 4; note the tie after a-b. practise this.</li>
+<li><b>2011–12 item</b> (15): State and prove the cut property and the cycle property, and show how they are useful (section 3). practise this.</li>
+<li><b>2006–07 item</b> (5+5): How is the minimum-cost arborescence problem different from MST? Construct one. practise this.</li>
+</ul>
+</details>
+
+<h2>12. Mandatory practice</h2>
 <p>Do these with pen and paper. Kruskal and Prim each have a generated practice below.</p>
 <div id="r1"></div>
 <div id="r2"></div>
@@ -227,6 +302,8 @@ recall('#r2', { id: 'r2', marks: 15, q: 'Write Kruskal with a disjoint-set (pare
 recall('#r3', { id: 'r3', marks: 12, q: 'Prove (i) the optimal substructure property and (ii) the greedy-choice property of the MST problem. (2021–22 Q1b)', points: ['(i) Remove an edge e of an MST: two subtrees T1, T2 on V1, V2', 'Suppose a cheaper spanning tree T1* of G[V1] exists', 'T1* + T2 + e is a spanning tree of G, cheaper than T: contradiction', '(ii) Let e be a lightest edge of G, T any MST not containing e', 'T + e has a cycle; remove another edge f of it', 'w(e) <= w(f), so T - f + e is an MST containing e'], model: '<p><b>(i)</b> Let \\(T\\) be an MST and \\(e\\in T\\). \\(T-e\\) is two trees \\(T_1,T_2\\) spanning \\(V_1,V_2\\). If \\(G[V_1]\\) had a spanning tree \\(T_1^*\\) with \\(w(T_1^*)<w(T_1)\\), then \\(T_1^*\\cup T_2\\cup\\{e\\}\\) would be a spanning tree of \\(G\\) with weight \\(w(T)-w(T_1)+w(T_1^*)<w(T)\\). Contradiction. Same for \\(T_2\\).</p><p><b>(ii)</b> Let \\(e\\) be a lightest edge, \\(T\\) an MST with \\(e\\notin T\\). \\(T+e\\) contains a cycle; remove another edge \\(f\\) of the cycle. \\(w(e)\\le w(f)\\), so \\(T-f+e\\) is a spanning tree with \\(w\\le w(T)\\), hence an MST containing \\(e\\).</p>' });
 practice('#p1', { id: 'p1', kind: 'kruskal', n: 2 });
 practice('#p2', { id: 'p2', kind: 'prim', n: 2 });
+trace('#t4', { kind: 'kruskal', input: 'a-b 4, a-h 8, b-c 8, b-h 11, c-d 7, c-f 4, c-i 2, d-e 9, d-f 14, e-f 10, f-g 2, g-h 1, g-i 6, h-i 7' });
+trace('#t5', { kind: 'prim', input: 'a-b 4, a-h 8, b-c 8, b-h 11, c-d 7, c-f 4, c-i 2, d-e 9, d-f 14, e-f 10, f-g 2, g-h 1, g-i 6, h-i 7', s: 'a' });
 </script>
 </body>
 </html>
