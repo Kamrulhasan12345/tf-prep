@@ -15,7 +15,7 @@
 
 <h2>1. The idea</h2>
 <p>Dijkstra is BFS with a priority queue. Keep a set \(S\) of vertices whose distance is final. Repeatedly pick the vertex \(u\) outside \(S\) with the smallest estimate \(d[u]\), put it in \(S\), and relax all its outgoing edges. It is the same shape as Prim.</p>
-<div class="key"><p><b>Condition:</b> all edge weights must be <b>non-negative</b>. With a negative edge the proof breaks and the answer can be wrong (section 6).</p></div>
+<div class="key"><p><b>Condition:</b> all edge weights must be <b>non-negative</b>. With a negative edge the proof breaks and the answer can be wrong (section 5).</p></div>
 <pre class="code">DIJKSTRA(G, w, s)
   INITIALIZE-SINGLE-SOURCE(G, s)        // d[v] = ∞, π[v] = NIL, d[s] = 0
   S = {}
@@ -102,7 +102,7 @@
 <p>Edges S→A 3, S→B 2, A→B −2. The true distance to B is \(3-2=1\) via A. Dijkstra extracts B first (\(d=2\), the smallest), marks it final, and never revisits it.</p>
 <div id="t2"></div>
 <ol>
-<li>Dijkstra finishes with \(d[B]=2\), but \(\delta(S,B)=1\). Wrong.</li>
+<li>Dijkstra finishes with \(d[B]=2\), but \(\delta(S,B)=1\). Wrong. (This uses the test "v in Q" of the section 4 code and the trace. The unguarded RELAX of section 1 lowers \(d[B]\) to 1 after B is final, so this small graph happens to end right; add B→C 1 and it still gives \(d[C]=3\) while \(\delta(S,C)=2\).)</li>
 <li>In the proof, step 7 fails: \(\delta(s,y)\le\delta(s,u)\) needs non-negative weights on the rest of the path. Here \(y=A\), \(u=B\): \(\delta(S,A)=3>\delta(S,B)=1\).</li>
 <li>The "add a constant to every edge" fix does not work either, because paths with more edges are penalised more. Use Bellman-Ford (chapter 2) or Johnson (chapter 5).</li>
 </ol>
@@ -135,7 +135,7 @@
 </ol></div>
 <div class="method"><h4>Justify (the question says "justify your answer")</h4><ol>
 <li>Extending a path by an edge never <b>increases</b> its bottleneck: \(\min(b,w)\le b\). This plays the role of "non-negative weights".</li>
-<li>Run the same invariant proof: when \(u\) (largest \(b\) outside \(S\)) is extracted, take a best path \(p\) to \(u\), the first vertex \(y\) off \(S\) and its predecessor \(x\in S\). The bottleneck of \(p\) up to \(y\) is \(b[y]\) (convergence), the bottleneck of the whole of \(p\) is at most that of its prefix, so \(\beta(s,u)\le\beta(s,y)=b[y]\le b[u]\) (largest chosen) \(\le\beta(s,u)\) (every estimate is a real path). All equal.</li>
+<li>Run the same invariant proof: when \(u\) (largest \(b\) outside \(S\)) is extracted, take a best path \(p\) to \(u\), the first vertex \(y\) off \(S\) and its predecessor \(x\in S\). The bottleneck of \(p\) up to \(y\) is at most \(\min(\beta(s,x),w(x,y))=\min(b[x],w(x,y))\le b[y]\), because \(x\in S\) is final and \((x,y)\) was relaxed (a prefix of a best path need not be best, so do not claim equality). The bottleneck of the whole of \(p\) is at most that of its prefix, so \(\beta(s,u)\le b[y]\le b[u]\) (largest chosen) \(\le\beta(s,u)\) (every estimate is a real path). All equal.</li>
 <li>Alternative answer: a path inside a <b>maximum spanning tree</b> is a maximum-bandwidth path between its ends (the MST bottleneck property, chapter 1), so build the maximum spanning tree and read the tree path.</li>
 <li>Small check (undirected S-A 4, S-B 7, A-B 3, A-T 6, B-T 5): extract S (\(\infty\)), then B (7), then T (\(\min(7,5)=5\)), then A. Best bandwidth to T is 5 via S, B, T.</li>
 </ol></div>

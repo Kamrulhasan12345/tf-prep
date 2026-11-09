@@ -220,13 +220,49 @@ function practice(sel, c) {
   const canon = t => { const sort = ns => ns.map(n => ({ ...n, ch: sort(n.ch) })).sort((a, b) => a.k - b.k); return Algo.nestF(sort(Algo.parseFib(t).trees)); };
   fresh(seed); Must.sync();
 }
+// ---------- optional AI marking of a written answer (Amos: free, no key, called from the browser) ----------
+const AMOS = 'https://api.amos.scira.ai/v1/systemone';
+const plain = h => { const d = document.createElement('div'); d.innerHTML = h; return d.textContent.replace(/\s+/g, ' ').trim(); };
+const photoB64 = f => new Promise((ok, no) => { const u = URL.createObjectURL(f), im = new Image(); im.onload = () => { const k = Math.min(1, 1500 / Math.max(im.width, im.height)), c = document.createElement('canvas'); c.width = im.width * k; c.height = im.height * k; c.getContext('2d').drawImage(im, 0, 0, c.width, c.height); URL.revokeObjectURL(u); ok(c.toDataURL('image/jpeg', .85).split(',')[1]); }; im.onerror = () => no(new Error('That file could not be read as an image.')); im.src = u; });
+async function amosMark(c, text, image) {
+  const qs = {}, pts = c.points.map(plain), hand = 'the student_answer' + (image ? ' and the handwritten answer in the attached photo' : '');
+  pts.forEach((p, i) => { qs['kp_' + i] = { type: 'choice', instructions: `Key point: "${p}". How does ${hand} relate to this key point? Judge meaning, not wording; ignore spelling and notation differences.`, criteria: { established: 'The student states this point or something equivalent, correctly', partial: 'The student gestures at it but leaves out an essential part or is vague', contradicted: 'The student states something incompatible with this point', absent: 'The student does not address this point' } }; });
+  qs.on_topic = { type: 'noul', instructions: `There is a genuine attempt to answer the question in ${hand}.` };
+  const body = { model: 'amos-1-large', questions: qs, state: { question: plain(c.q), model_answer: plain(c.model || '').slice(0, 12000), student_answer: text.slice(0, 8000) || '(written by hand: read the attached photo)' } };
+  if (image) body.images = [image];
+  const json = JSON.stringify(body); let r;
+  for (let n = 0; n < 4; n++) { r = await fetch(AMOS, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: json }); if (![429, 503].includes(r.status) || n === 3) break; await new Promise(ok => setTimeout(ok, Math.min(+r.headers.get('Retry-After') || 2 ** (n + 1), 30) * 1000)); }
+  if (!r.ok) throw new Error('The AI service answered ' + r.status + '. Mark it yourself with the checklist.');
+  const a = (await r.json()).answers;
+  return { onTopic: a.on_topic?.noul ?? 1, st: pts.map((_, i) => { const pr = a['kp_' + i]?.probabilities || {}, e = pr.established || 0, m = pr.partial || 0; return (pr.contradicted || 0) >= .5 ? 'contradicted' : e >= .7 ? 'covered' : e + m <= .3 ? 'missing' : 'partly'; }) };
+}
+function aiBox(body, c, boxes) {
+  const box = document.createElement('details'); box.className = 'must-model';
+  box.innerHTML = `<summary>AI check (optional): photo or typed answer</summary><p class="tracer-hint">Marks your answer against this checklist. It is sent to Amos (scira.ai), which keeps requests to improve its models, so photograph only the answer, with no name or roll number.</p><textarea rows="4" style="width:100%;font:13px var(--mono);background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:4px;padding:6px" placeholder="Type your answer, or use a photo"></textarea><div class="must-f" style="margin-top:6px"><label class="must-b">📷 Choose photo <input type="file" accept="image/*" capture="environment" hidden></label><button class="must-b" type="button">Mark my answer</button></div><div class="must-r" aria-live="polite"></div>`;
+  const ta = box.querySelector('textarea'), file = box.querySelector('input[type=file]'), go = box.querySelector('button'), out = box.querySelector('.must-r'), cap = file.closest('label');
+  file.onchange = () => { cap.firstChild.textContent = file.files[0] ? '📷 Photo chosen ' : '📷 Choose photo '; };
+  go.onclick = async () => {
+    if (!ta.value.trim() && !file.files[0]) { out.className = 'must-r bad'; out.textContent = 'Type an answer or choose a photo first.'; return; }
+    go.disabled = true; out.className = 'must-r'; out.textContent = 'Marking, about 10 seconds…';
+    try {
+      const img = file.files[0] ? await photoB64(file.files[0]) : null, m = await amosMark(c, ta.value, img);
+      if (m.onTopic < .3) { out.className = 'must-r bad'; out.textContent = 'This does not look like an answer to the question. If it is a photo, retake it in good light.'; return; }
+      const mark = { covered: '✓ covered', partly: '~ partly', missing: '✗ missing', contradicted: '⚠ contradicts this' }; let n = 0;
+      m.st.forEach((s, i) => { const b = boxes[i], l = b.closest('label'); l.querySelector('.ai-st')?.remove(); l.insertAdjacentHTML('beforeend', ` <span class="tracer-hint ai-st">[AI: ${mark[s]}]</span>`); if (s === 'covered') { n++; b.checked = true; } });
+      body.dispatchEvent(new Event('change', { bubbles: true }));
+      out.className = 'must-r good'; out.textContent = `AI found ${n} of ${m.st.length} points fully covered${c.marks ? `, roughly ${Math.round(c.marks * n / m.st.length * 2) / 2} of ${c.marks} marks` : ''}. It can misread handwriting: check the list and tick or untick yourself.`;
+    } catch (e) { out.className = 'must-r bad'; out.textContent = e.message || 'Could not reach the AI service. Mark it yourself with the checklist.'; }
+    finally { go.disabled = false; }
+  };
+  body.append(box);
+}
 function recall(sel, c) {
   const host = $(sel); Must.reg(c.id, 1); host.classList.add('must');
   const paint = () => {
     const ok = Must.got(c.id) >= 1; host.classList.toggle('ok', ok);
     host.innerHTML = `<div class="must-h"><span>Mandatory · write it from memory${c.marks ? ` · ${c.marks} marks` : ''}</span><span>${ok ? 'done ✓' : ''}</span></div><div class="must-q">${c.q}</div><button class="must-b" type="button" data-r>I wrote my answer: show the marking</button><div class="must-body" hidden></div>`;
     const body = host.querySelector('.must-body');
-    host.querySelector('[data-r]').onclick = e => { e.target.remove(); body.hidden = false; body.innerHTML = `<p class="tracer-hint">Tick only what your written answer really has. All ticks = done.</p><ul class="pts">${c.points.map((p, i) => `<li><label><input type="checkbox" data-i="${i}"> ${p}</label></li>`).join('')}</ul>${c.model ? `<details class="must-model"><summary>Model answer</summary>${c.model}</details>` : ''}<div class="must-r" aria-live="polite"></div>`; tex(body); const boxes = body.querySelectorAll('input'); body.addEventListener('change', () => { if ([...boxes].every(b => b.checked) && Must.got(c.id) < 1) { Must.add(c.id); host.classList.add('ok'); host.querySelector('.must-h span:last-child').textContent = 'done ✓'; body.querySelector('.must-r').className = 'must-r good'; body.querySelector('.must-r').textContent = 'Complete.'; } }); };
+    host.querySelector('[data-r]').onclick = e => { e.target.remove(); body.hidden = false; body.innerHTML = `<p class="tracer-hint">Tick only what your written answer really has. All ticks = done.</p><ul class="pts">${c.points.map((p, i) => `<li><label><input type="checkbox" data-i="${i}"> ${p}</label></li>`).join('')}</ul>${c.model ? `<details class="must-model"><summary>Model answer</summary>${c.model}</details>` : ''}<div class="must-r" aria-live="polite"></div>`; tex(body); const boxes = body.querySelectorAll('.pts input'); aiBox(body, c, boxes); body.addEventListener('change', () => { if ([...boxes].every(b => b.checked) && Must.got(c.id) < 1) { Must.add(c.id); host.classList.add('ok'); host.querySelector('.must-h span:last-child').textContent = 'done ✓'; body.querySelector('.must-r').className = 'must-r good'; body.querySelector('.must-r').textContent = 'Complete.'; } }); };
     tex(host);
   };
   paint(); Must.sync();
