@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Red-Black Properties · CSE 207 Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Balanced trees · CLRS §13.1 · Monirul Islam sir L19, slides 19 · must-know</div>
+<h1>Red-Black Trees from Zero</h1>
+<p class="lede">Start here if you have never studied red-black trees. Asked: 2021–22 Q2(c), 15 marks (properties and the height bound h ≤ 2 lg(n+1)); 2018–19 Q4(a), 15 (why red, insert then delete, longest to shortest ratio); 2022–23 Q4(c), 15 (pseudocode and RB versus AVL); 2020–21 Q7(d), 5 (Mr X black insertion); 2017–18 Q5(c), 4 (one advantage each, AVL versus RB).</p>
+
+<h2>1. What a red-black tree is for</h2>
+<p>A red-black tree is a binary search tree where every node also has a colour, red or black. The colours are not decoration. They are a cheap bookkeeping trick: if the colours follow five rules, the tree can never become a long stick. The tree stays balanced without storing any heights.</p>
+<p>You will do three things with it: check that a tree is valid, insert (previous chapter), and delete (chapter 4). All of them are "keep the five rules true".</p>
+
+<h2>2. The five properties</h2>
+<ol>
+<li><b>Every node is red or black.</b></li>
+<li><b>The root is black.</b></li>
+<li><b>Every leaf (NIL) is black.</b></li>
+<li><b>A red node has two black children.</b> Equivalent: there are never two red nodes in a row on a path.</li>
+<li><b>Black height rule.</b> For each node, every path from that node down to a leaf has the <b>same number of black nodes</b>.</li>
+</ol>
+<div class="key"><p>Only rules 4 and 5 do real work. Rule 4 limits red, rule 5 forces equal black counts. Together they stop any path from being much longer than another.</p></div>
+
+<h3>NIL: the invisible leaves</h3>
+<p>Every missing child is a <b>NIL leaf</b>, and a NIL is black. In textbook figures the NILs are drawn as small black squares. In the exam you may draw them or leave them out, but you must <b>count</b> them as black when you check rule 5 and when you ask "is the uncle red or black?". A node with only one real child has one NIL child. In the trace tool, a NIL carrying an extra black is drawn as a box with a double ring.</p>
+
+<h3>Black height</h3>
+<p>The <b>black height bh(x)</b> of a node x is the number of black nodes on a path from x down to a leaf, <b>not counting x itself</b> (CLRS and the notes), counting the final NIL. Rule 5 says this number is the same for every downward path, so bh(x) is well defined.</p>
+<p>Fast rule: <code>bh(x) = bh(child)</code> if the child is red, and <code>bh(child) + 1</code> if the child is black. A NIL has bh = 0.</p>
+
+<h2>3. Valid and invalid trees</h2>
+<p>Learn to check a tree in this order: root colour, then red-red pairs, then count black nodes on every path to a NIL (include the NIL, include the root, be consistent).</p>
+<div class="figrow">
+<div><div class="figlabel">Valid. Every path to NIL: 20, X, NIL = 3 blacks</div><div id="v1"></div></div>
+<div><div class="figlabel">Valid. Two reds under black root</div><div id="v2"></div></div>
+<div><div class="figlabel">Valid. Root-to-NIL has 3 blacks everywhere</div><div id="v3"></div></div>
+</div>
+<p>Check the first one: path 20 → 10 → 5 → NIL has blacks 20, 5, NIL = 3. Path 20 → 10 → 15 → NIL: 20, 15, NIL = 3. Path 20 → 30 → NIL: 20, 30, NIL = 3. Red 10 contributes nothing. All equal, so valid.</p>
+<div class="figrow">
+<div><div class="figlabel">Invalid: root is red (rule 2)</div><div id="i1"></div></div>
+<div><div class="figlabel">Invalid: 5 is red under red 10 (rule 4)</div><div id="i2"></div></div>
+<div><div class="figlabel">Invalid: all black, black counts differ (rule 5)</div><div id="i3"></div></div>
+</div>
+<ul>
+<li><b>Red root.</b> 10 is red. Fix: colour it black. That never breaks anything else, it adds one black to every path.</li>
+<li><b>Red under red.</b> Node 10 and its child 5 are both red. Paths are fine on black count (every path to NIL has 20 plus NIL, 2 blacks), but rule 4 is broken.</li>
+<li><b>Black counts differ.</b> No red at all, root black, but path 20 → 10 → NIL has 3 blacks and path 20 → 30 → 25 → NIL has 4. Rule 5 fails. A tree with only black nodes is valid only if it is perfectly balanced (all NIL at the same depth).</li>
+</ul>
+<div class="trap"><h4>Where marks go</h4><ul>
+<li>Forgetting that NIL is black and counts toward the black height. Be consistent: count NIL on every path, or on none.</li>
+<li>Checking rule 5 on one path only. It must hold for <b>every</b> node, not just the root.</li>
+<li>Saying "red-black means half red". No. A tree of only black nodes is possible if it is perfectly balanced.</li>
+</ul></div>
+
+<h2>4. Path lengths: longest at most twice the shortest</h2>
+<p>Asked as 2018–19 Q4(a)(iii): <i>"What is the ratio between the lengths of the longest and shortest path in a red-black tree?"</i> Answer: <b>at most 2</b> (so the longest path is never more than twice the shortest, from the root to a leaf).</p>
+<div class="method"><h4>Method · why at most 2</h4><ol>
+<li>Every path from the root to a leaf has the same number of black nodes, say b (rule 5).</li>
+<li>The <b>shortest</b> path can be all black: it has at least b nodes.</li>
+<li>The <b>longest</b> path can alternate black, red, black, red. Reds cannot be adjacent (rule 4), so at most one red per black: it has at most 2b nodes.</li>
+<li>So longest / shortest ≤ 2b / b = 2.</li>
+</ol></div>
+<p>The same argument works from any node, not just the root: from any node x, no downward path to a leaf is more than twice as long as another one.</p>
+
+<h2>5. Height proof: h ≤ 2 lg(n+1)</h2>
+<p>Asked in full in 2021–22 Q2(c) (properties, then derive the bound), 15 marks. Here n is the number of <b>internal</b> nodes (real keys), NIL leaves are not counted. h is the height of the tree.</p>
+<div class="method"><h4>Method · exam-ready proof in two steps</h4><ol>
+<li><b>Claim.</b> The subtree rooted at any node x has at least \( 2^{bh(x)} - 1 \) internal nodes.</li>
+<li><b>Proof by induction on the height of x.</b> Base: x is a NIL. bh(x) = 0 and the subtree has 0 internal nodes, and \( 2^0 - 1 = 0 \). True.</li>
+<li><b>Step.</b> x is an internal node with two children. Each child has black height bh(x) (if the child is red) or bh(x) − 1 (if the child is black). In both cases at least bh(x) − 1. By the hypothesis, each child's subtree has at least \( 2^{bh(x)-1} - 1 \) internal nodes.</li>
+<li>So the subtree of x has at least \[ 2\left(2^{bh(x)-1} - 1\right) + 1 = 2^{bh(x)} - 1 \] internal nodes (the +1 is x itself). The claim holds.</li>
+<li><b>From the claim to the height.</b> Let h be the tree height. By rule 4, a red node has black children, so on any root-to-leaf path at least half of the nodes (not counting the root) are black. Therefore \( bh(root) \ge h/2 \).</li>
+<li>Apply the claim to the root: \[ n \ge 2^{bh(root)} - 1 \ge 2^{h/2} - 1. \]</li>
+<li>Rearrange: \( n + 1 \ge 2^{h/2} \). Take log base 2: \( \lg(n+1) \ge h/2 \). Hence \[ h \le 2\lg(n+1). \]</li>
+</ol></div>
+<p>So search, insert and delete, which cost O(h), are all O(log n).</p>
+<div class="drawit"><b>On paper:</b> list the five properties numbered, say what NIL is, define bh(x) in one line, then write the claim and the two induction parts with the formula in a box. Examiners tick: claim, base case, step with the 2·(…)+1 count, "at least half black" for bh ≥ h/2, final inequality.</div>
+
+<h2>6. AVL versus red-black</h2>
+<p>Asked in 2022–23 Q4(c) ("briefly compare") and 2017–18 Q5(c) ("one advantage of each", 4 marks).</p>
+<table class="mat"><tr><th></th><th>AVL tree</th><th>Red-black tree</th></tr>
+<tr><td>Balance rule</td><td>sibling heights differ by at most 1 (strict)</td><td>colour rules; longest path at most 2 times shortest (loose)</td></tr>
+<tr><td>Height</td><td>about 1.44 lg n</td><td>at most 2 lg(n+1)</td></tr>
+<tr><td>Extra data per node</td><td>height or balance factor</td><td>one colour bit</td></tr>
+<tr><td>Search</td><td>faster (shallower tree)</td><td>slightly slower</td></tr>
+<tr><td>Insert rotations</td><td>at most 1 (single or double)</td><td>at most 2</td></tr>
+<tr><td>Delete rotations</td><td>up to O(log n)</td><td>at most 3</td></tr>
+<tr><td>Best when</td><td>many lookups, few updates</td><td>many inserts and deletes</td></tr></table>
+<div class="key"><p><b>Two-line answer for the 4-mark question.</b> AVL advantage: stricter balance gives a shorter tree, so lookups are faster. Red-black advantage: updates are cheaper, fewer rotations (deletion needs at most 3 rotations, AVL deletion may need O(log n)).</p></div>
+
+<h2>7. "Why insert red, not black?" (2018–19 Q4(a)(i))</h2>
+<p>The full answer is in <a href="03-rb-insert.html">the insertion chapter</a>. Short version: a new <b>red</b> leaf adds no black to any path, so rule 5 stays true. It can only break rule 4 (red under red) and that is a local problem near the new node. A new <b>black</b> leaf adds one black to every path through it, breaking rule 5 for the whole tree.</p>
+
+<h2>8. Mr X: "colour the new node black by default" (2020–21 Q7(d), 5 marks)</h2>
+<p>Discuss advantages and disadvantages against the normal red insertion.</p>
+<div class="figrow"><div><div class="figlabel">Valid tree</div><div id="x1"></div></div><div><div class="figlabel">After inserting 3 as BLACK</div><div id="x2"></div></div></div>
+<p>Path 10 → 5 → 3 → NIL has 4 blacks, path 10 → 15 → NIL has 3. Rule 5 is broken.</p>
+<div class="method"><h4>Method · what to write</h4><ol>
+<li><b>Advantage.</b> A black node can never create a red-red conflict (rule 4), and the root rule (2) is also safe if it is the first node. The red-red fix-up cases 1, 2, 3 would not be needed. The code to detect the problem is trivial.</li>
+<li><b>Disadvantage 1.</b> A black insert <b>always</b> breaks rule 5 (except into an empty tree): every path through the new node has one more black than the paths that avoid it. Red insert breaks something only when the parent is red.</li>
+<li><b>Disadvantage 2.</b> The repair is global. A single extra black cannot be removed locally. You need the same machinery as deletion (push the extra black up, recolour, rotate), possibly up to the root, so more recolouring and more rotations on average. Red insertion needs at most 2 rotations.</li>
+<li><b>Conclusion.</b> Worse on every insertion, so the standard algorithm colours new nodes red.</li>
+</ol></div>
+
+<h2>9. Insert then immediately delete the same node (2018–19 Q4(a)(ii))</h2>
+<p><i>"Would inserting a new node and then immediately deleting it change the tree?"</i> Answer: <b>it can.</b> The tree is restored exactly only when the insertion needed no fix-up (the new red leaf had a black parent). If the insertion fix-up recolours or rotates, deleting the red leaf afterwards does not undo that.</p>
+<div class="figrow">
+<div><div class="figlabel">Start</div><div id="e0"></div></div>
+<div><div class="figlabel">insert 3 (case 1, recolour)</div><div id="e1"></div></div>
+<div><div class="figlabel">then delete 3: colours differ</div><div id="e2"></div></div>
+</div>
+<div class="figrow">
+<div><div class="figlabel">Start</div><div id="e3"></div></div>
+<div><div class="figlabel">insert 3 (case 3, rotate)</div><div id="e4"></div></div>
+<div><div class="figlabel">then delete 3: shape differs</div><div id="e5"></div></div>
+</div>
+<p>Why the delete changes nothing more: 3 is a red leaf. Removing a red node never breaks a rule. So the tree after delete is the tree after the insert fix-up, minus the key 3. Watch the first example.</p>
+<div id="t1"></div>
+<div class="drawit"><b>On paper:</b> draw the start tree, the tree after insert (with colours and the case name), the tree after delete, and circle what changed (a colour or a shape).</div>
+
+<h2>10. Mandatory practice</h2>
+<div id="q1"></div>
+<div id="r1"></div>
+<div id="r2"></div>
+<div id="p1"></div>
+<p class="drawit">Next: <a href="03-rb-insert.html">insertion</a>, then <a href="04-rb-delete.html">deletion</a>.</p>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/algo.js"></script>
+<script src="../assets/dsa.js"></script>
+<script>
+treeFig('#v1', '20B(10R(5B,15B),30B)');
+treeFig('#v2', '10B(5R,15R)');
+treeFig('#v3', '40B(20R(10B,30B),60B)');
+treeFig('#i1', '10R(5B,15B)');
+treeFig('#i2', '20B(10R(5R,),30R)');
+treeFig('#i3', '20B(10B,30B(25B,))');
+treeFig('#x1', '10B(5B,15B)');
+treeFig('#x2', '10B(5B(3B,),15B)');
+treeFig('#e0', '10B(5R,15R)'); treeFig('#e1', '10B(5B(3R,),15B)'); treeFig('#e2', '10B(5B,15B)');
+treeFig('#e3', '10B(5R,)'); treeFig('#e4', '5B(3R,10R)'); treeFig('#e5', '5B(,10R)');
+trace('#t1', { kind: 'rb', input: '10B(5R,15R) ; 3 del 3' });
+quiz('#q1', [
+ { q: 'Is 8B(4R(2B,6B),12B) a valid red-black tree?', opts: ['Yes', 'No: root', 'No: red-red', 'No: black counts'], a: 0, why: 'Root black, 4 is red with black children, every path to NIL has 8, 2/6/12, NIL = 3 blacks.' },
+ { q: 'Is 8B(4R(2R,),12B) valid?', opts: ['Yes', 'No: root', 'No: red-red (and black counts)', 'No: only black counts'], a: 2, why: '2 is red under red 4. Also path 8-12-NIL has 3 blacks and 8-4-2-NIL has 2.' },
+ { q: 'Is 8B(4B,12B(10B,)) valid?', opts: ['Yes', 'No: root', 'No: red-red', 'No: black counts'], a: 3, why: 'Path 8-4-NIL has 3 blacks, path 8-12-10-NIL has 4.' },
+ { q: 'A path from the root has 5 black nodes (root excluded). What is the largest possible number of nodes on a root-to-leaf path?', opts: ['5', '8', '10', '11'], a: 2, why: 'At most one red per black: 5 blacks and 5 reds = 10 nodes below the root.' }
+]);
+recall('#r1', { id: 'r1', marks: 15, q: 'What are the properties of a red-black tree? Derive that a tree with n keys has height h ≤ 2 lg(n+1). (2021–22 Q2c)', points: ['Five properties listed (red/black, root black, NIL black, red has black children, equal black count on every path)', 'Black height defined', 'Claim: subtree of x has at least 2^{bh(x)} − 1 internal nodes', 'Induction: base case and step with children of black height bh or bh−1', 'bh(root) ≥ h/2 from the no-two-reds rule', 'n ≥ 2^{h/2} − 1 then h ≤ 2 lg(n+1)'], model: 'Properties: (1) every node is red or black; (2) the root is black; (3) every NIL leaf is black; (4) a red node has only black children; (5) every path from a node down to a leaf has the same number of black nodes. Let bh(x) be the number of black nodes on a path from x to a leaf, excluding x. <br><b>Claim:</b> the subtree at x has at least 2^{bh(x)} − 1 internal nodes. Induction on height. If x is NIL, bh = 0 and 2^0 − 1 = 0. Otherwise each child has black height bh(x) or bh(x) − 1, so by hypothesis has at least 2^{bh(x)−1} − 1 internal nodes, and the subtree of x has at least 2(2^{bh(x)−1} − 1) + 1 = 2^{bh(x)} − 1. <br>By property 4 at least half of the nodes on a root-to-leaf path are black, so bh(root) ≥ h/2. Hence n ≥ 2^{h/2} − 1, so n + 1 ≥ 2^{h/2} and h ≤ 2 lg(n+1).' });
+recall('#r2', { id: 'r2', marks: 15, q: 'Why is a new node coloured red in red-black insertion? Would inserting a node and immediately deleting it change the tree? Explain with an example. What is the ratio between the longest and shortest path? (2018–19 Q4a)', points: ['Red adds no black to any path, so black-height rule stays true', 'Only red-red can break, a local problem; black would break the black count everywhere', 'Insert then delete can change the tree', 'Example with a case 1 recolour or case 3 rotation, with the trees drawn', 'Red-leaf deletion does not undo the fix-up', 'Ratio at most 2, with the b versus 2b argument'], model: 'A new red node adds no black to any path, so rule 5 stays true; only rule 4 can fail, and only locally (red parent). A black node would add one black to every path through it, breaking rule 5 for a whole branch. <br>Insert then delete can change the tree. Take 10B(5R,15R). Insert 3: parent 5 and uncle 15 are red, case 1, recolour 5 and 15 black and 10 red then root black: 10B(5B(3R),15B). Delete 3: it is a red leaf, removing it needs no fix: 10B(5B,15B). Colours of 5 and 15 changed. With a black uncle, case 3 rotates and the shape changes as well. If the parent was black, no fix-up happens and the tree is restored. <br>Ratio: every root-to-leaf path has b blacks. The shortest has at least b nodes, the longest at most 2b because no two reds are adjacent. So longest : shortest ≤ 2.' });
+practice('#p1', { id: 'p1', kind: 'rb-insert', n: 1 });
+</script>
+</body>
+</html>

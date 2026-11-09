@@ -1,0 +1,388 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Term Final 2023–24 · CSE 207 Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Past papers · L-2/T-1 CSE 207 · term final 2023–24 · paper dated 01/09/2025</div>
+<h1>Term Final 2023–24, solved</h1>
+<p class="lede">Full marks 210, time 3 hours. Section A: nine questions, answer any SEVEN (Q1 to Q9, 15 marks each). Section B: four questions (Q10 to Q13), answer THREE in total, and Q10 is <b>mandatory</b>. Try each part on paper first, then open the answer. Every tree, table and trace is produced by the book's engine, not worked by hand.</p>
+
+<div class="key"><p><b>Known errors in the circulating student solutions</b> ("DSA 23-24 solve"), corrected below: Q12(c) rotates the wrong node in the AVL double rotation; Q8(i) uses Dijkstra with max-product, which is only valid if every rate is at most 1; Q6 gives 95 as the bound after picking A, it is 105; Q5 miscounts the breakpoints of its example and never proves the "2 reversals per breakpoint" step; Q3 ends with "set cover is NP" (it must say NP-complete); Q1 and Q10(c) have loose steps. Each is flagged where it appears.</p></div>
+
+<h2>Section A · any seven</h2>
+
+<div class="exam"><div class="exam-src">2023–24 · Q1 · 8 + 7 marks</div>
+<div class="exam-q"><p>(i) Show that the expected time for a successful search in a hash table implemented using chaining is \(O(1+\alpha)\), where \(\alpha\) is the load factor. (8)<br>(ii) Explain how you can handle collisions in a hash table using the double hashing method. (7)</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p>Chapter: <a href="../heap/01-hashing.html">Chaining and open addressing</a>.</p>
+<p><b>(i)</b> Assumption: simple uniform hashing (each key goes to each of the \(m\) slots with probability \(1/m\), independently). \(n\) keys, \(\alpha = n/m\). Keys are inserted at the <b>tail</b> of the chain, in the order \(x_1,\dots,x_n\).</p>
+<ol>
+<li>A successful search for \(x_i\) examines \(x_i\) itself plus all keys that were inserted <em>before</em> it in the same chain, so the cost is \(1 + \#\{j<i : h(x_j)=h(x_i)\}\) (with head insertion it is the keys inserted after; the average is the same).</li>
+<li>For a fixed \(j<i\), \(\Pr[h(x_j)=h(x_i)] = 1/m\). By linearity, \(E[\text{cost of } x_i] = 1 + \frac{i-1}{m}\).</li>
+<li>The searched key is any of the \(n\) keys with probability \(1/n\). So the expected cost is \[\frac1n\sum_{i=1}^{n}\left(1+\frac{i-1}{m}\right) = 1+\frac{1}{nm}\cdot\frac{n(n-1)}{2} = 1+\frac{n-1}{2m} = 1+\frac{\alpha}{2}-\frac{\alpha}{2n}.\]</li>
+<li>Add \(O(1)\) for computing \(h\) and reaching the slot. Total \(\Theta(2+\alpha/2-\alpha/2n)=O(1+\alpha)\). ∎</li>
+</ol>
+<div class="trap"><h4>Where marks go</h4><ul><li>The exact figure is \(1+\alpha/2-\alpha/2n\). One circulating solution sets the chain length equal to \(\alpha\) and gets \((u+1)/2\), which is loose. Use the sum over \(i\) above.</li></ul></div>
+<p><b>(ii) Double hashing.</b> Use two hash functions. The probe sequence is \(h(k,i) = (h_1(k) + i\cdot h_2(k)) \bmod m\) for \(i=0,1,2,\dots\) The first probe is \(h_1(k)\); on a collision step by \(h_2(k)\) and repeat until an empty slot. Conditions: \(h_2(k)\) must never be 0 and must be relatively prime to \(m\) (take \(m\) prime, \(h_2(k) = r-(k \bmod r)\) with \(r<m\) prime). Then the sequence visits all \(m\) slots. Different keys get different step sizes, so there is no primary or secondary clustering. Example: \(m=11\), \(h_1=k\bmod 11\), \(h_2=7-(k\bmod 7)\).</p>
+</div></details></div>
+
+<div class="exam"><div class="exam-src">2023–24 · Q2 · 15 marks</div>
+<div class="exam-q"><p>Illustrate step by step what happens if the Extract Min operation is executed on the Fibonacci heap in the figure. Figure Q2: root list 6, 2, 1 with min = 1. Children: 2 has child 5; 1 has children 3, 4, 7; 7 has child 8; 8 has child 9. Marked nodes: 4 and 7.</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p>Chapter: <a href="../heap/04-fibonacci.html">Fibonacci heap</a>. Rule: children of the min go to the root list (marks cleared), min removed, consolidate with the degree table.</p>
+<div id="t2"></div>
+<p><b>Result:</b> roots \(2(5,\ 3(6)),\ 4,\ 7(8(9))\), min \(=2\). Degrees 2, 0, 1.</p>
+<div id="f2"></div>
+<p class="drawit"><b>On paper:</b> (1) the heap after removing 1, five roots in a row: 6, 2(5), 3, 4, 7(8(9)), marks removed; (2) table \(A[0..2]\) at each step; (3) link 6 under 3 (degree 0), link 3(6) under 2 (degree 1), end with roots 2, 4, 7 and a min arrow on 2.</p>
+</div></details></div>
+
+<div class="exam"><div class="exam-src">2023–24 · Q3 · 15 marks</div>
+<div class="exam-q"><p>Set Cover (decision): given a universe \(U\), subsets \(S_1,\dots,S_m\subseteq U\) and an integer \(k\), is there a sub-collection of size \(\le k\) whose union is \(U\)? Prove that set cover is NP-complete. Hint: vertex cover is NP-complete.</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p>Chapter: <a href="../np/02-reductions.html">Reductions, with proof templates</a>.</p>
+<ol>
+<li><b>In NP.</b> Certificate: the chosen sub-collection \(C\). Check \(|C|\le k\) and that the union of its sets equals \(U\): poly time.</li>
+<li><b>NP-hard: VERTEX COVER \(\le_p\) SET COVER.</b> Given \((G=(V,E),k)\), build \(U=E\) and, for each vertex \(v\), the set \(S_v\) = the edges incident on \(v\). Keep the same \(k\). This takes \(O(|V|+|E|)\).</li>
+<li><b>Forward.</b> If \(V'\) is a vertex cover with \(|V'|\le k\), then \(\{S_v : v\in V'\}\) has at most \(k\) sets, and every edge is incident to some \(v\in V'\), so the union is \(E=U\).</li>
+<li><b>Backward.</b> If \(\{S_v : v\in V'\}\) with \(|V'|\le k\) covers \(U=E\), every edge lies in some \(S_v\), i.e. has endpoint \(v\in V'\). So \(V'\) is a vertex cover of size at most \(k\).</li>
+<li>Steps 1 to 4: set cover is in NP and NP-hard, so it is <b>NP-complete</b>. ∎</li>
+</ol>
+<p><b>Example for the answer sheet.</b> Triangle A-B-C with \(k=2\): \(U=\{AB,BC,AC\}\), \(S_A=\{AB,AC\}\), \(S_B=\{AB,BC\}\), \(S_C=\{BC,AC\}\). Any two of the sets cover \(U\), as any two vertices cover the triangle.</p>
+<div class="trap"><h4>Where marks go</h4><ul><li>A circulating solution ends with "Set Cover is an NP problem". The conclusion must be NP-complete.</li><li>Write both directions of the iff.</li></ul></div>
+</div></details></div>
+
+<div class="exam"><div class="exam-src">2023–24 · Q4 · 9 + 6 marks</div>
+<div class="exam-q"><p>(a) Define the classes of problems P, NP, and NP-complete. Draw a Venn diagram showing the widely believed relationship among these classes. (9)<br>(b) What are some approaches to deal with an NP-complete problem? (6)</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p>Chapter: <a href="../np/01-classes.html">P, NP, co-NP, NP-complete</a>.</p>
+<p><b>(a) Definitions.</b></p>
+<ul>
+<li><b>P:</b> decision problems solvable by a deterministic algorithm in polynomial time.</li>
+<li><b>NP:</b> decision problems whose "yes" answers can be <em>verified</em> in polynomial time given a certificate (equivalently, solved in poly time by a non-deterministic machine).</li>
+<li><b>NP-complete:</b> problems that are in NP and NP-hard, where NP-hard means every problem in NP reduces to it in polynomial time.</li>
+</ul>
+<p><b>Venn diagram</b> (assuming \(P\ne NP\), the widely believed case). P sits inside NP. NP-complete is the overlap of NP and NP-hard. NP-hard also reaches outside NP.</p>
+<svg viewBox="0 0 400 210" width="100%" style="max-width:420px" role="img" aria-label="Venn diagram: P inside NP, NP-complete is the overlap of NP and NP-hard" fill="none" stroke="currentColor" stroke-width="1.6">
+<ellipse cx="150" cy="105" rx="135" ry="88"/><ellipse cx="260" cy="105" rx="125" ry="88"/><ellipse cx="85" cy="108" rx="48" ry="46"/>
+<g fill="currentColor" stroke="none" font-size="13" font-family="IBM Plex Mono, monospace" text-anchor="middle">
+<text x="85" y="112">P</text><text x="95" y="26">NP</text><text x="318" y="26">NP-hard</text><text x="205" y="100">NP-</text><text x="205" y="116">complete</text></g></svg>
+<p><b>(b) Approaches.</b></p>
+<ol>
+<li><b>Approximation algorithms</b> with a proven ratio (vertex cover 2-approximation, TSP with triangle inequality).</li>
+<li><b>Branch and bound / backtracking:</b> exact, exponential worst case, but pruning makes typical inputs fast.</li>
+<li><b>Dynamic programming in exponential time</b> that beats brute force (Held-Karp \(O(n^22^n)\)).</li>
+<li><b>Randomized and heuristic methods</b> (Monte Carlo, local search) with no worst-case guarantee.</li>
+<li><b>Special cases:</b> solve restricted inputs in poly time (trees, small parameter).</li>
+</ol>
+</div></details></div>
+
+<div class="exam"><div class="exam-src">2023–24 · Q5 · 15 marks</div>
+<div class="exam-q"><p>Sorting by reversals: a reversal \((i,j)\) reverses \(\pi_i\dots\pi_j\). Extend the permutation with \(\pi_0=0\) and \(\pi_{n+1}=n+1\). A breakpoint is between \(\pi_i\) and \(\pi_{i+1}\) if they are not consecutive. Example: \([4\ 1\ 2\ 3]\) becomes \([0\ 4\ 1\ 2\ 3\ 5]\) with three breakpoints. (i) Give a lower bound on the number of reversals in terms of the number of breakpoints. (ii) Design an approximation algorithm with ratio at most 4. (Hint: maximal runs of contiguously increasing and decreasing elements.)</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p>Chapter: none in the book (topic is outside the notes; circulating solution A is the only source). Both parts are short.</p>
+<p><b>(i) Lower bound: at least \(b/2\) reversals</b>, where \(b\) is the number of breakpoints.</p>
+<ol>
+<li>The identity (extended) has 0 breakpoints. So the goal is to bring \(b\) down to 0.</li>
+<li>A reversal \((i,j)\) only changes the two adjacencies at its ends, \((\pi_{i-1},\pi_i)\) and \((\pi_j,\pi_{j+1})\). Inside the reversed block, adjacent pairs stay adjacent (in reverse order), so consecutive stays consecutive.</li>
+<li>So one reversal removes at most 2 breakpoints.</li>
+<li>Therefore at least \(\lceil b/2\rceil\) reversals are needed. Example \([4\,1\,2\,3]\): \(b=3\), bound \(\lceil 3/2\rceil=2\). The question's own two reversals are optimal.</li>
+</ol>
+<p><b>(ii) 4-approximation.</b> A <em>strip</em> is a maximal run between breakpoints. It is increasing or decreasing (a single element counts as increasing, except that 0 and \(n+1\) stay put).</p>
+<pre class="code">APPROX-REVERSALS(pi)
+  while pi has a breakpoint
+     if pi has a decreasing strip of length &gt;= 2
+         reverse a decreasing strip chosen so that some breakpoint is removed
+         (Kececioglu-Sankoff: take the decreasing strip containing the
+          smallest element k, and reverse the block that puts k-1 next to k)
+     else
+         reverse any increasing strip with a breakpoint on both sides
+         (this makes a decreasing strip, and does not add breakpoints)</pre>
+<ol>
+<li>When a decreasing strip of length \(\ge 2\) exists, one reversal removes at least one breakpoint (Kececioglu and Sankoff's lemma).</li>
+<li>If there is none, one reversal of an increasing strip creates a decreasing strip of length \(\ge 2\) without adding breakpoints, then the next reversal removes one. So at worst 2 reversals per breakpoint removed.</li>
+<li>Cost of the algorithm \(\le 2b\). Optimum \(\ge b/2\) by part (i).</li>
+<li>Ratio \(\le 2b / (b/2) = 4\). ∎</li>
+</ol>
+<p>Run on \([4\,1\,2\,3]\): no decreasing strip of length 2 (4 is single, 1 2 3 increasing), so reverse \([1\,2\,3]\) to get \([4\,3\,2\,1]\), now a decreasing strip: reverse the whole block to get \([1\,2\,3\,4]\). Two reversals.</p>
+<div class="trap"><h4>Where marks go</h4><ul><li>The circulating solution's example \([5\ 1\ 2\ 3\ 4\ 8\ 6\ 7]\) is labelled \(b=3\). With 0 and 9 added it is \(0\,|\,5\,|\,1\,2\,3\,4\,|\,8\,|\,6\,7\,|\,9\): the pairs (0,5), (5,1), (4,8), (8,6), (7,9) are breakpoints, so \(b=5\), not 3.</li><li>That solution asserts, but does not prove, that two reversals always remove a breakpoint. Write the strip argument (steps 1 and 2).</li></ul></div>
+<p class="tracer-hint">Doubt: the exact choice of block in the decreasing-strip step is from the literature and is not in the lecture notes. If short of time, give part (i) fully and steps 2 to 4 of part (ii).</p>
+</div></details></div>
+
+<div class="exam"><div class="exam-src">2023–24 · Q6 · 15 marks</div>
+<div class="exam-q"><p>Explain branch-and-bound algorithms with an illustrative example.</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p>Chapter: <a href="../np/04-branch-bound.html">Branch and bound; TSP by DP</a>.</p>
+<ol>
+<li><b>Idea.</b> Search the tree of all choices (take or skip each item) but keep, for every node, an <b>upper bound</b> on the best value any completion can reach (for a maximisation problem). Keep the best complete solution found so far. <b>Prune</b> any node whose bound is \(\le\) that best: it cannot improve it.</li>
+<li><b>Bound for 0/1 knapsack:</b> value so far plus the <em>fractional</em> knapsack value of the remaining items (items sorted by value/weight). It is an overestimate because fractions are allowed.</li>
+<li><b>Order:</b> best-first, expand the open node with the largest bound.</li>
+</ol>
+<p><b>Example.</b> Capacity 10; items A (w5, v25), B (w4, v40), C (w3, v60). Ratios C 20, B 10, A 5.</p>
+<div id="t6"></div>
+<p><b>Answer:</b> take B and C: weight 7, value 100. Root bound \(60+40+\tfrac35\cdot25=115\).</p>
+<div class="trap"><h4>Where marks go</h4><ul><li>A circulating solution writes the bound after "pick A" (in its unsorted order A, B, C) as 95. It is <b>105</b>: capacity 5 is left, take C (3, 60) and 2/4 of B (20), giving \(25+60+20=105\). With 105 that node cannot be pruned against best 100; it has to be explored (it gives A+C = 85 and A+B = 65, so the optimum 100 stays).</li><li>The pruning rule is "bound \(\le\) best", not anything with probability.</li></ul></div>
+</div></details></div>
+
+<div class="exam"><div class="exam-src">2023–24 · Q7 · 8 + 7 marks</div>
+<div class="exam-q"><p>Construct the prefix function using the Knuth-Morris-Pratt algorithm for the pattern ABABC. Explain how you can use it to search for this pattern in the text ABABABABC. (8 + 7)</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p>No chapter in the book (both circulating solutions marked this "out of syllabus" and gave no answer). It is short, learn it only if time is left.</p>
+<p><b>Prefix function</b> \(\pi[q]\) = length of the longest proper prefix of \(P[1..q]\) that is also a suffix of it.</p>
+<table class="mat"><tr><th>q</th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th></tr>
+<tr><th>P[q]</th><td>A</td><td>B</td><td>A</td><td>B</td><td>C</td></tr>
+<tr><th>π[q]</th><td>0</td><td>0</td><td>1</td><td>2</td><td>0</td></tr></table>
+<p>Reasons: "A" no proper prefix, 0. "AB" no match, 0. "ABA": prefix "A" is a suffix, 1. "ABAB": prefix "AB" is a suffix, 2. "ABABC": ends in C, no prefix ends in C, 0.</p>
+<p><b>Search.</b> Keep \(q\) = number of pattern characters matched. For each text character: while \(q>0\) and \(P[q+1]\ne T[i]\), set \(q=\pi[q]\) (fall back, never move left in the text). If \(P[q+1]=T[i]\), \(q{+}{+}\). If \(q=5\) report a match and set \(q=\pi[5]\).</p>
+<table class="mat"><tr><th>i</th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th><th>7</th><th>8</th><th>9</th></tr>
+<tr><th>T[i]</th><td>A</td><td>B</td><td>A</td><td>B</td><td>A</td><td>B</td><td>A</td><td>B</td><td>C</td></tr>
+<tr><th>q after</th><td>1</td><td>2</td><td>3</td><td>4</td><td>3</td><td>4</td><td>3</td><td>4</td><td>5</td></tr></table>
+<p>At \(i=5\): \(q=4\), \(P[5]=C\ne A\), fall back \(q=\pi[4]=2\), then \(P[3]=A\) matches, so \(q=3\). Same at \(i=7\). At \(i=9\), \(q=5\): <b>match ending at position 9, shift \(s=4\)</b> (the pattern occupies positions 5 to 9). Time \(O(m+n)\).</p>
+</div></details></div>
+
+<div class="exam"><div class="exam-src">2023–24 · Q8 · 8 + 7 marks</div>
+<div class="exam-q"><p>Currencies \(c_1,\dots,c_n\) with exchange rates \(r_{i,j}\) (one unit of \(c_i\) buys \(r_{i,j}\) units of \(c_j\)). Usually \(r_{i,j}r_{j,i}<1\). (i) Design an efficient algorithm: given the rates and two currencies \(s,t\), find the most advantageous sequence of exchanges converting \(s\) into \(t\). (ii) Sometimes there is a cycle with \(r_{i_1,i_2}\cdots r_{i_k,i_1}>1\). Give an efficient algorithm to detect such an anomaly. Hint: use a graph.</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p>Chapters: <a href="../graph/02-bellman-dag.html">Relaxation, Bellman-Ford, DAG</a>, <a href="../graph/04-apsp.html">Floyd-Warshall</a>.</p>
+<p><b>Model.</b> Vertex per currency, directed edge \(i\to j\) for every rate \(r_{i,j}>0\). A sequence of exchanges is a path, and its gain is the <em>product</em> of rates. Maximising a product of positive numbers equals minimising the sum of \(-\log r\).</p>
+<ol>
+<li>Give edge \(i\to j\) the weight \(w(i,j)=-\ln r_{i,j}\). Then \(\prod r = e^{-\sum w}\), so the best sequence is the <b>shortest path</b> from \(s\) to \(t\).</li>
+<li>Weights can be negative (any rate above 1 gives \(w<0\)), so use <b>Bellman-Ford</b> from \(s\): \(V-1\) rounds of relaxing all edges, record parents, read the path back from \(t\). Time \(O(VE)\). If there is no negative cycle reachable, the answer is correct.</li>
+<li><b>(ii) Anomaly = negative cycle.</b> A cycle has product \(>1\) iff \(\sum -\ln r<0\). Run Bellman-Ford with a virtual source joined to every vertex (or start every distance at 0). After \(V-1\) rounds do one more round: if any edge still relaxes, a negative cycle exists. \(O(VE)\).</li>
+<li>Alternative for all pairs: Floyd-Warshall on \(w\), a negative diagonal entry \(d[i][i]<0\) means \(i\) is on an anomaly. \(O(V^3)\).</li>
+</ol>
+<div class="trap"><h4>Where marks go: the Dijkstra trap</h4><ul><li>A circulating solution runs Dijkstra with "relax by max of \(d[u]\cdot r(u,v)\)". That is only valid when every rate is \(\le1\) (equivalent to every weight \(\ge 0\)). The question only says \(r_{ij}r_{ji}<1\), so single rates can exceed 1 and longer cycles can give profit. Dijkstra can then be wrong. Use \(-\log r\) and Bellman-Ford.</li><li>For floating point, compare with a tolerance.</li></ul></div>
+</div></details></div>
+
+<div class="exam"><div class="exam-src">2023–24 · Q9 · 10 + 5 marks</div>
+<div class="exam-q"><p>Explain the Floyd-Warshall algorithm for the all-pairs shortest paths problem. In what context is Johnson's algorithm preferable to Floyd-Warshall?</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p>Chapters: <a href="../graph/04-apsp.html">Matrix squaring, Floyd-Warshall, closure</a>, <a href="../graph/05-johnson.html">Johnson's algorithm</a>.</p>
+<ol>
+<li><b>Subproblem.</b> \(d_{ij}^{(k)}\) = shortest path length from \(i\) to \(j\) using only vertices \(1..k\) as intermediates.</li>
+<li><b>Recurrence.</b> \(d^{(0)}_{ij}=w_{ij}\) (0 on the diagonal, \(\infty\) if no edge); \(d^{(k)}_{ij}=\min\bigl(d^{(k-1)}_{ij},\ d^{(k-1)}_{ik}+d^{(k-1)}_{kj}\bigr)\). Either the best path avoids \(k\), or it goes \(i\to k\to j\) using lower vertices only.</li>
+<li><b>Code.</b> Three nested loops, \(k\) outermost. Time \(\Theta(V^3)\), space \(\Theta(V^2)\) (update in place). Keep a predecessor matrix to rebuild paths. A negative diagonal after the run means a negative cycle.</li>
+<li><b>Johnson's algorithm.</b> Add a source \(s\) with 0-weight edges to all vertices, run Bellman-Ford from \(s\) (negative cycle: stop), set \(h(v)=\delta(s,v)\), reweight \(w'(u,v)=w(u,v)+h(u)-h(v)\ge 0\), run Dijkstra from every vertex, correct with \(d(u,v)=d'(u,v)-h(u)+h(v)\). Time \(O(VE+V\cdot E\log V)\) (or \(O(V^2\log V+VE)\) with Fibonacci heaps).</li>
+<li><b>Prefer Johnson for sparse graphs.</b> With \(E\approx V\), Johnson is \(O(V^2\log V)\), much below \(V^3\). For dense graphs (\(E\approx V^2\)) Floyd-Warshall's \(V^3\) is as good and much simpler.</li>
+</ol>
+</div></details></div>
+
+<h2>Section B · Q10 mandatory, plus two more</h2>
+
+<h3>Question 10 · mandatory</h3>
+
+<div class="exam comp"><span class="comp-badge">MANDATORY</span><div class="exam-src">2023–24 · Q10(a) · 10 marks</div>
+<div class="exam-q"><p>Classify the edges of the directed graph in Figure Q10(a) after a Depth-First Search. Always choose the node that comes first alphabetically; start from node a. Classes: tree, forward, back, cross. Edges: b→a, b→c, c→a, a→d, d→c, e→d, e→f. Vertices a to f.</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p>Chapter: <a href="../start/01-exam-map.html">Exam map</a> (DFS is first-year material; no dedicated chapter). Rule: when DFS looks at edge \((u,v)\): \(v\) white = tree edge; \(v\) grey (on the stack) = back edge; \(v\) black and \(d[u]<d[v]\) = forward; \(v\) black and \(d[u]>d[v]\) = cross.</p>
+<div id="g10a"></div>
+<ol>
+<li>Start at a. a's only edge is a→d: d white, <b>tree</b>. d→c: c white, <b>tree</b>. c→a: a is grey, <b>back</b>. c finishes, d finishes, a finishes.</li>
+<li>Restart from the next white vertex in alphabetical order: b. b→a: a is black and \(d[b]>d[a]\), <b>cross</b>. b→c: c black, <b>cross</b>. b finishes.</li>
+<li>Next white vertex: e. e→d: d black, \(d[e]>d[d]\), <b>cross</b>. e→f: f white, <b>tree</b>. f finishes, e finishes.</li>
+</ol>
+<table class="mat"><tr><th>vertex</th><th>a</th><th>d</th><th>c</th><th>b</th><th>e</th><th>f</th></tr>
+<tr><th>discover/finish</th><td>1/6</td><td>2/5</td><td>3/4</td><td>7/8</td><td>9/12</td><td>10/11</td></tr></table>
+<table class="mat"><tr><th>Class</th><th>Edges</th></tr>
+<tr><td>Tree</td><td>a→d, d→c, e→f</td></tr><tr><td>Back</td><td>c→a</td></tr><tr><td>Forward</td><td>none</td></tr><tr><td>Cross</td><td>b→a, b→c, e→d</td></tr></table>
+</div></details></div>
+
+<div class="exam comp"><span class="comp-badge">MANDATORY</span><div class="exam-src">2023–24 · Q10(b) · 12 marks</div>
+<div class="exam-q"><p>Batman must suit up: (i) bodysuit first; (ii) utility belt and armor plate in any order on top of the bodysuit; (iii) grappling gun and smoke bombs only after the utility belt; (iv) the cape on top of the armor plate; (v) the glider wing attached to both the armor plate and the utility belt. Draw the dependency graph and recommend a valid ordering.</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p>Chapter: <a href="../graph/02-bellman-dag.html">Relaxation, Bellman-Ford, DAG</a> (topological order). Edge \(x\to y\) means "x must come before y".</p>
+<div id="g10b"></div>
+<p>Edges: Bodysuit→Belt, Bodysuit→Armor, Belt→Gun, Belt→Bombs, Armor→Cape, Armor→Glider, Belt→Glider. It has no cycle, so it is a DAG and a topological order exists.</p>
+<ol>
+<li>Kahn's method: start with items of in-degree 0: Bodysuit. Remove it; Belt and Armor become free.</li>
+<li>Take Belt (frees Gun and Bombs; Glider still waits for Armor). Take Armor (frees Cape and Glider). Then Gun, Bombs, Cape, Glider in any order.</li>
+</ol>
+<p><b>Valid ordering:</b> Bodysuit, Utility belt, Armor plate, Grappling gun, Smoke bombs, Cape, Glider wing. (Another valid one: Bodysuit, Armor plate, Cape, Utility belt, Glider wing, Grappling gun, Smoke bombs.) Check each edge goes left to right.</p>
+</div></details></div>
+
+<div class="exam comp"><span class="comp-badge">MANDATORY</span><div class="exam-src">2023–24 · Q10(c) · 13 marks</div>
+<div class="exam-q"><p>Formulate a proof on the correctness of Dijkstra's algorithm.</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p>Chapter: <a href="../graph/03-dijkstra.html">Dijkstra: trace, proof, variants</a>.</p>
+<p><b>Theorem.</b> With non-negative weights, when Dijkstra adds vertex \(u\) to the finished set \(S\), \(d[u]=\delta(s,u)\), and it stays so.</p>
+<ol>
+<li><b>Upper-bound property.</b> Always \(d[v]\ge\delta(s,v)\): initially true (\(\infty\) and \(d[s]=0\)), and a relaxation sets \(d[v]=d[x]+w(x,v)\ge\delta(s,x)+w(x,v)\ge\delta(s,v)\) by the triangle inequality.</li>
+<li><b>Induction on the order in which vertices join \(S\).</b> Base: \(s\) joins with \(d[s]=0=\delta(s,s)\).</li>
+<li><b>Step, by contradiction.</b> Let \(u\) be the first vertex that joins \(S\) with \(d[u]\ne\delta(s,u)\). By step 1, \(d[u]>\delta(s,u)\). \(u\ne s\), and a path from \(s\) to \(u\) exists (otherwise \(\delta=\infty=d[u]\)).</li>
+<li>Take a shortest path \(p\) from \(s\) to \(u\). Let \(y\) be the first vertex on \(p\) not in \(S\), and \(x\) its predecessor, \(x\in S\).</li>
+<li>\(x\) joined \(S\) correctly: \(d[x]=\delta(s,x)\). When \(x\) joined, edge \((x,y)\) was relaxed, so \(d[y]\le d[x]+w(x,y)=\delta(s,y)\) (prefix of a shortest path is shortest). With step 1, \(d[y]=\delta(s,y)\).</li>
+<li><b>Uses non-negative weights:</b> \(y\) comes before or equal to \(u\) on \(p\), so \(\delta(s,y)\le\delta(s,u)\).</li>
+<li><b>Uses the min-choice:</b> \(u\) was chosen with the smallest \(d\) among vertices outside \(S\), and \(y\notin S\), so \(d[u]\le d[y]\).</li>
+<li>Chain: \(d[u]\le d[y]=\delta(s,y)\le\delta(s,u)\le d[u]\). So all are equal and \(d[u]=\delta(s,u)\), contradicting step 3.</li>
+<li>At the end every vertex is in \(S\), so all distances are correct. ∎</li>
+</ol>
+<div class="trap"><h4>Where marks go</h4><ul><li>Steps 6 and 7 are the two places the algorithm's assumptions are used: non-negative weights, and choosing the minimum. A circulating solution draws the picture but never writes the chain in step 8. Write the chain.</li><li>With a negative edge, step 6 fails: this is why Dijkstra needs non-negative weights.</li></ul></div>
+</div></details></div>
+
+<h3>Question 11 (35)</h3>
+
+<div class="exam"><div class="exam-src">2023–24 · Q11(a) · 4 × 2 = 8 marks</div>
+<div class="exam-q"><p>Mention the runtimes of: i) Kruskal's without disjoint-set union (DSU); ii) Kruskal's with DSU; iii) Ford-Fulkerson; iv) Edmonds-Karp.</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p>Chapters: <a href="../graph/01-mst.html">MST</a>, <a href="../graph/06-flow.html">Flow</a>, <a href="../graph/07-mincut-ek.html">Edmonds-Karp</a>.</p>
+<table class="mat"><tr><th>Algorithm</th><th>Time</th><th>Why</th></tr>
+<tr><td>Kruskal, no DSU</td><td>\(O(E\log E + EV)=O(EV)\)</td><td>sort edges, then a graph search (\(O(V)\)) per edge to test for a cycle</td></tr>
+<tr><td>Kruskal, with DSU</td><td>\(O(E\log E)=O(E\log V)\)</td><td>sort dominates; find/union are almost constant</td></tr>
+<tr><td>Ford-Fulkerson</td><td>\(O(E\cdot|f^*|)\)</td><td>each augmenting path costs \(O(E)\) and adds at least 1 unit (integer capacities)</td></tr>
+<tr><td>Edmonds-Karp</td><td>\(O(VE^2)\)</td><td>BFS shortest augmenting paths, \(O(VE)\) augmentations, \(O(E)\) each</td></tr></table>
+<p>Both circulating solutions agree up to the form \(O(VE)\) versus \(O(E\log E+VE)\); both are acceptable.</p>
+</div></details></div>
+
+<div class="exam"><div class="exam-src">2023–24 · Q11(b) · 6 × 2 = 12 marks</div>
+<div class="exam-q"><p>Draw an MST of the graph in Figure Q11(b) using (i) Prim's and (ii) Kruskal's. Write the order of edges in each case (use alphabetical ordering for ties). Graph, undirected, vertices a to g: a-b 2, a-c 8, b-c 9, b-d 5, b-e 6, c-d 4, c-f 3, d-e 4, d-f 4, e-f 3, e-g 6, f-g 5.</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p>Chapter: <a href="../graph/01-mst.html">Cut property, Kruskal, Prim, uniqueness</a>.</p>
+<div id="g11b"></div>
+<p><b>(i) Prim from a:</b> edge order <b>a-b, b-d, d-c, c-f, f-e, f-g</b>, total 22.</p>
+<div id="t11p"></div>
+<p><b>(ii) Kruskal:</b> sorted with ties alphabetical: ab2, cf3, ef3, cd4, de4, df4, bd5, fg5, be6, eg6, ac8, bc9. Edge order <b>a-b, c-f, e-f, c-d, b-d, f-g</b>, total 22; de, df, be, eg, ac, bc are rejected (cycles).</p>
+<div id="t11k"></div>
+<p>Both give the same six edges \(\{ab, bd, cd, cf, ef, fg\}\), total 22. Note the MST is <b>not unique</b> here: after ab, cf, ef the edges cd, de and df (all weight 4) each join d to the rest, so any one of them gives an MST of weight 22. The alphabetical rule picks c-d.</p>
+<p class="drawit"><b>On paper:</b> draw the graph, then redraw it with the six chosen edges thick and the others dotted. Number the thick edges in the order added. Write the total.</p>
+</div></details></div>
+
+<div class="exam"><div class="exam-src">2023–24 · Q11(c) · 15 marks</div>
+<div class="exam-q"><p>Derive a proof for the max-flow min-cut theorem.</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p>Chapter: <a href="../graph/07-mincut-ek.html">Max-flow min-cut, Edmonds-Karp</a>.</p>
+<p><b>Theorem.</b> For a flow \(f\) the following are equivalent: (1) \(f\) is a maximum flow; (2) the residual network \(G_f\) has no augmenting path \(s\leadsto t\); (3) \(|f| = c(S,T)\) for some cut \((S,T)\).</p>
+<ol>
+<li><b>Lemma: flow across any cut.</b> For any cut \((S,T)\), \(|f| = f(S,T)-f(T,S)\le f(S,T)\le c(S,T)\). (Sum flow conservation over the vertices of \(S\); internal edges cancel, \(s\in S\) contributes \(|f|\).) So every flow is at most every cut capacity, hence \(\max|f|\le\min c(S,T)\).</li>
+<li><b>(1) ⇒ (2).</b> If there was an augmenting path, pushing its bottleneck (> 0) gives a bigger flow, contradicting maximality.</li>
+<li><b>(2) ⇒ (3).</b> Assume no augmenting path. Let \(S\) = vertices reachable from \(s\) in \(G_f\), \(T=V\setminus S\). \(t\in T\), so \((S,T)\) is a cut. For an edge \((u,v)\) with \(u\in S,v\in T\): if \(f(u,v)<c(u,v)\), the residual edge \(u\to v\) exists and \(v\) would be reachable. So \(f(u,v)=c(u,v)\) (saturated). For an edge \((v,u)\) from \(T\) to \(S\): if \(f(v,u)>0\), the residual edge \(u\to v\) exists, again \(v\) reachable. So \(f(v,u)=0\). Then \(|f|=f(S,T)-f(T,S)=c(S,T)-0=c(S,T)\).</li>
+<li><b>(3) ⇒ (1).</b> By the lemma every flow \(f'\) has \(|f'|\le c(S,T)=|f|\). So \(f\) is maximum.</li>
+<li>Combining (1) ⇔ (2) ⇔ (3): the value of a maximum flow equals the capacity of a minimum cut. ∎</li>
+</ol>
+<div class="trap"><h4>Where marks go</h4><ul><li>Say explicitly: edges from \(S\) to \(T\) are saturated and edges from \(T\) to \(S\) carry zero flow (step 3). One circulating solution omits it.</li></ul></div>
+</div></details></div>
+
+<h3>Question 12 (35)</h3>
+
+<div class="exam"><div class="exam-src">2023–24 · Q12(a) · 10 marks</div>
+<div class="exam-q"><p>Prove that the height of an AVL tree with \(n\) elements is \(O(\log n)\).</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p>Chapter: <a href="../tree/01-rotations-avl.html">Rotations and AVL trees</a>. Height of a leaf is 0 (teacher's convention).</p>
+<ol>
+<li>Let \(N(h)\) be the fewest nodes in an AVL tree of height \(h\).</li>
+<li>The root has subtrees of heights \(h-1\) and, at the fewest, \(h-2\) (balance factor ±1). So \(N(h)=N(h-1)+N(h-2)+1\), \(N(0)=1\), \(N(1)=2\). Values 1, 2, 4, 7, 12, 20.</li>
+<li>Since \(N(h-1)\ge N(h-2)\): \(N(h) > 2N(h-2)\). Unrolling, \(N(h) \ge 2^{\lfloor h/2\rfloor}\) (bases \(N(0)=1,N(1)=2\)).</li>
+<li>A tree of height \(h\) has \(n\ge N(h)\ge 2^{(h-1)/2}\) nodes. Taking logs, \(h \le 2\log_2 n + 1 = O(\log n)\).</li>
+<li>Sharper: \(N(h)=F_{h+3}-1\ge\varphi^{h+3}/\sqrt5-2\), so \(h\le 1.44\log_2 n\). ∎</li>
+</ol>
+</div></details></div>
+
+<div class="exam"><div class="exam-src">2023–24 · Q12(b) · 10 marks</div>
+<div class="exam-q"><p>Delete the node 50 from the red-black tree in Figure Q12(b). Doubly circled nodes are red. Tree: 30 (black) with left child 20 (black) and right child 45 (red). 45 has left child 40 (black) and right child 50 (black). 40 has left child 35 (red) and right child 42 (red).</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p>Chapter: <a href="../tree/04-rb-delete.html">RB deletion: the 4 cases</a>.</p>
+<div id="f12b0"></div>
+<ol>
+<li>50 is a black leaf: remove it, so the NIL in its place carries an <b>extra black</b>.</li>
+<li>Sibling of the extra-black NIL is 40 (black). Its <b>far</b> child (the one on the outer side from the double-black) is 35 (red).</li>
+<li><b>Case 4:</b> sibling takes the parent's colour (45 was red, so 40 becomes red); parent 45 and far child 35 become black; rotate right at 45. The extra black is absorbed, stop.</li>
+</ol>
+<div id="t12b"></div>
+<p><b>Result:</b> 30B(20B, 40R(35B, 45B(42R, –))).</p>
+<div id="f12b"></div>
+<p>Black heights check: every path from 30 to a NIL passes 2 blacks (30 and 20; 30, 35; 30, 45, then 42 red then NIL). All good.</p>
+<p class="tracer-hint">Doubt: colours in the circulating solutions are partly unreadable in the scan, but their shape matches the result above.</p>
+</div></details></div>
+
+<div class="exam"><div class="exam-src">2023–24 · Q12(c) · 15 marks</div>
+<div class="exam-q"><p>Perform on an initially empty AVL tree, showing intermediate trees after each step: (i) insert 15 (ii) insert 22 (iii) insert 24 (iv) insert 7 (v) insert 9 (vi) delete 24.</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p>Chapter: <a href="../tree/01-rotations-avl.html">Rotations and AVL trees</a>. Balance factor = height(left) minus height(right).</p>
+<div id="t12c"></div>
+<table class="mat"><tr><th>Step</th><th>Tree after</th><th>What happened</th></tr>
+<tr><td>(i) 15</td><td>15</td><td>root</td></tr>
+<tr><td>(ii) 22</td><td>15(–,22)</td><td>fine</td></tr>
+<tr><td>(iii) 24</td><td>22(15,24)</td><td>15 has bf −2, child 22 has −1: RR, left-rotate at 15</td></tr>
+<tr><td>(iv) 7</td><td>22(15(7),24)</td><td>fine</td></tr>
+<tr><td>(v) 9</td><td>22(9(7,15),24)</td><td>15 has bf +2, child 7 has bf −1: LR. Left-rotate at 7, then right-rotate at 15</td></tr>
+<tr><td>(vi) delete 24</td><td>9(7, 22(15,–))</td><td>22 has bf +2, child 9 has bf 0 (not −1): LL, single right rotation at 22</td></tr></table>
+<div id="f12c"></div>
+<div class="trap"><h4>Where marks go: a wrong double rotation in a circulating solution</h4><ul><li>After inserting 9, the lowest unbalanced node is <b>15</b> (bf +2), not the root. The double rotation is done at 7 then at 15. The circulating solution "A" draws a root of 15 with 9(7) on the left and 22(–,24) on the right, which is not what the algorithm produces; its final tree 15(9(7),22) is wrong. The correct final tree is the one in the table (root 9). The other circulating solution (B) matches.</li><li>When deleting 24: the child 9 has balance 0, which is the single-rotation case (LL). Do not do a double rotation.</li></ul></div>
+</div></details></div>
+
+<h3>Question 13 (35)</h3>
+
+<div class="exam"><div class="exam-src">2023–24 · Q13(a) · 5 × 3 = 15 marks</div>
+<div class="exam-q"><p>Prove the following for a binomial tree \(B_k\) of order \(k\): i) the number of nodes is \(2^k\); ii) the height is \(k\); iii) the degree of the root is \(k\).</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p>Chapter: <a href="../heap/02-binomial-trees.html">Binomial trees and their proofs</a>. Definition: \(B_0\) is a single node. \(B_k\) is two copies of \(B_{k-1}\) with the root of one made the leftmost child of the root of the other. Induction on \(k\).</p>
+<ol>
+<li><b>Nodes.</b> \(k=0\): \(2^0=1\). Step: \(B_k\) has two copies of \(B_{k-1}\): \(2\cdot2^{k-1}=2^k\). ∎</li>
+<li><b>Height.</b> \(k=0\): one node, height 0. Step: the height of \(B_k\) is 1 (the new edge) plus the height of the child tree \(B_{k-1}\), \(=1+(k-1)=k\) (the other copy, containing the root, is no taller than the root plus the child tree). ∎</li>
+<li><b>Root degree.</b> \(k=0\): degree 0. Step: the root of \(B_k\) is the root of one copy of \(B_{k-1}\) (degree \(k-1\)) with one more child, so \(k-1+1=k\). ∎</li>
+</ol>
+</div></details></div>
+
+<div class="exam"><div class="exam-src">2023–24 · Q13(b) · 13 marks</div>
+<div class="exam-q"><p>Complete these operations on the splay tree in Figure Q13(b): i) insert 30; ii) delete 35. Tree: root 13, left child 7, right child 26. 26 has left child 17 and right child 45. 45 has left child 40. 40 has left child 35.</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p>Chapter: <a href="../tree/06-splay.html">Splay trees</a>. <b>Low priority:</b> splay trees are not in the available notes or slides and were not asked in 2024–25. Both circulating solutions wrote "out of syllabus"; the engine result below is the answer.</p>
+<div id="f13b0"></div>
+<div id="t13b"></div>
+<p><b>(i) After insert 30:</b> insert as a leaf under 35, then splay: zig-zig (rotate at grandparent 40, then parent 35), zig-zag (parent 45, grandparent 26), zig (root 13). Tree: <b>30(13(7, 26(17,–)), 45(35(–,40),–))</b>.</p>
+<p><b>(ii) After delete 35:</b> splay 35 to the root (zig-zag at 45 and 30), remove it, join: splay the largest key of the left subtree (it is 30, already the root of that part) and attach the right subtree. Tree: <b>30(13(7, 26(17,–)), 45(40,–))</b>.</p>
+<div id="f13b"></div>
+</div></details></div>
+
+<div class="exam"><div class="exam-src">2023–24 · Q13(c) · 10 marks</div>
+<div class="exam-q"><p>Perform the union of two binomial min-heaps with six and seven nodes respectively. You can use any valid values in the nodes.</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p>Chapter: <a href="../heap/03-binomial-heap.html">Binomial heap operations</a>. Method: merge the root lists by degree, then link equal degrees (smaller root on top, new child goes leftmost). If three trees have the same degree, leave the first and link the other two.</p>
+<p><b>Choose values.</b> \(6=110_2\): trees \(B_1\), \(B_2\). \(7=111_2\): trees \(B_0\), \(B_1\), \(B_2\).</p>
+<p>Heap 1: \(B_1\)=5(10), \(B_2\)=7(12(14), 16). Heap 2: \(B_0\)=3, \(B_1\)=13(15), \(B_2\)=9(21(34), 18).</p>
+<div id="f13c1"></div>
+<div id="f13c2"></div>
+<ol>
+<li><b>Merge root lists by degree:</b> 3 (B0), 5 (B1), 13 (B1), 7 (B2), 9 (B2).</li>
+<li><b>Two \(B_1\):</b> 5 and 13, 5 is smaller, 13(15) becomes the leftmost child of 5: \(B_2\) = 5(13(15), 10).</li>
+<li>Now three \(B_2\) trees: 5, 7, 9. Skip the first. Link 7 and 9: 7 is smaller, 9's tree becomes the leftmost child of 7: \(B_3\) = 7(9(21(34), 18), 12(14), 16).</li>
+<li>Result roots by increasing degree: 3 (B0), 5 (B2), 7 (B3). \(1+4+8=13\) nodes, and \(13=1101_2\) matches.</li>
+</ol>
+<div id="f13c3"></div>
+</div></details></div>
+
+<h2>Mandatory</h2>
+<p>Q10 was the one mandatory question. Time yourself.</p>
+<div id="r1"></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/algo.js"></script>
+<script src="../assets/dsa.js"></script>
+<script>
+trace('#t2', { kind: 'fib', input: '6 2(5) 1(3 4* 7*(8(9))) min=1 ; ext' });
+forestFig('#f2', '2(5 3(6)) 4 7(8(9)) min=2');
+trace('#t6', { kind: 'knapsack', input: '5:25 4:40 3:60 ; 10' });
+graphFig('#g10a', 'b>a 1, b>c 1, c>a 1, a>d 1, d>c 1, e>d 1, e>f 1');
+graphFig('#g10b', 'Bodysuit>Belt 1, Bodysuit>Armor 1, Belt>Gun 1, Belt>Bombs 1, Armor>Cape 1, Armor>Glider 1, Belt>Glider 1');
+graphFig('#g11b', 'a-b 2, a-c 8, b-c 9, b-d 5, b-e 6, c-d 4, c-f 3, d-e 4, d-f 4, e-f 3, e-g 6, f-g 5');
+trace('#t11p', { kind: 'prim', input: 'a-b 2, a-c 8, b-c 9, b-d 5, b-e 6, c-d 4, c-f 3, d-e 4, d-f 4, e-f 3, e-g 6, f-g 5', s: 'a' });
+trace('#t11k', { kind: 'kruskal', input: 'a-b 2, a-c 8, b-c 9, b-d 5, b-e 6, c-d 4, c-f 3, d-e 4, d-f 4, e-f 3, e-g 6, f-g 5' });
+treeFig('#f12b0', '30B(20B,45R(40B(35R,42R),50B))');
+trace('#t12b', { kind: 'rb', input: '30B(20B,45R(40B(35R,42R),50B)) ; del 50' });
+treeFig('#f12b', '30B(20B,40R(35B,45B(42R,)))');
+trace('#t12c', { kind: 'avl', input: '15 22 24 7 9 del 24' });
+treeFig('#f12c', '9(7,22(15,))');
+treeFig('#f13b0', '13(7,26(17,45(40(35))))');
+trace('#t13b', { kind: 'splay', input: '13(7,26(17,45(40(35)))) ; 30 del 35' });
+treeFig('#f13b', '30(13(7,26(17,)),45(40,))');
+forestFig('#f13c1', '5(10) 7(12(14) 16)');
+forestFig('#f13c2', '3 13(15) 9(21(34) 18)');
+forestFig('#f13c3', '3 5(13(15) 10) 7(9(21(34) 18) 12(14) 16)');
+recall('#r1', { id: 'r1', marks: 35, q: 'Attempt this paper\'s compulsory question (Q10) in the time limit (about 40 minutes), then mark it. (a) DFS edge classification of the digraph b→a, b→c, c→a, a→d, d→c, e→d, e→f starting at a. (b) Batman dependency graph and an ordering. (c) Proof of correctness of Dijkstra.', points: ['DFS: discover/finish times a 1/6, d 2/5, c 3/4, b 7/8, e 9/12, f 10/11', 'Tree edges a→d, d→c, e→f; back edge c→a; cross edges b→a, b→c, e→d; no forward edge', 'Rule stated: white = tree, grey = back, black with smaller discovery = forward, larger = cross', 'Batman graph has 7 edges, is acyclic, and the order starts with the bodysuit', 'Order is a valid topological order (every edge left to right)', 'Dijkstra proof: upper-bound property d[v] ≥ δ(s,v)', 'Proof by contradiction on the first wrong vertex u, with y the first vertex outside S on a shortest path', 'The chain d[u] ≤ d[y] = δ(s,y) ≤ δ(s,u) ≤ d[u], naming where non-negative weights and the min-choice are used'], model: '<p>DFS: tree a→d, d→c, e→f; back c→a; cross b→a, b→c, e→d. Batman: Bodysuit, Belt, Armor, Gun, Bombs, Cape, Glider. Dijkstra: take the first wrong vertex u, shortest path p, y the first vertex outside S, x its predecessor. d[y] = δ(s,y) since x was correct and (x,y) was relaxed. Then d[u] ≤ d[y] (u chosen as minimum) = δ(s,y) ≤ δ(s,u) (non-negative weights) ≤ d[u] (upper bound), a contradiction.</p>' });
+</script>
+</body>
+</html>

@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Branch and Bound, TSP · CSE 207 Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Coping with NP-completeness · Bayzid sir L14 · TSP by Held-Karp is not in his notes · must-know</div>
+<h1>Branch and Bound, and TSP</h1>
+<p class="lede">Knapsack branch and bound is asked almost every year with a tree: 2024–25 Q3(b) (15), 2022–23 Q7(b) (15), 2019–20 Q3(c) (15), 2017–18 Q3(b) (10), and "explain branch and bound with an example" in 2023–24 Q6 (15). TSP: 2022–23 Q7(a) asks for an \(O(n^2 2^n)\) algorithm and the optimal tour for a 4-city matrix (20). 2021–22 Q7(b) asks for the optimal tour of a 6-city matrix with branch and bound (20). 2020–21 Q5(d) asks whether an MST-based bound is correct (5).</p>
+<div class="trap"><h4>Syllabus honesty</h4><ul>
+<li>Bayzid sir's notes cover branch and bound <b>only for knapsack</b>. TSP branch and bound and Held-Karp are not in the notes or slides, but both were asked, so they are taught here.</li>
+<li>The notes' "Simulation" page for knapsack has no numbers in the scan. The example in the slides (values 10, 40, 30, 50; weights 5, 4, 6, 3; capacity 10) is traced below.</li>
+</ul></div>
+
+<h2>1. The idea</h2>
+<p>Branch and bound is backtracking for <b>optimization</b>. We build a tree of partial solutions. At every node we compute a <b>bound</b>: a number that no solution below this node can beat.</p>
+<ul>
+<li><b>Maximisation</b> (knapsack): the bound is an <b>upper bound</b> on the best value reachable from the node.</li>
+<li><b>Minimisation</b> (TSP): the bound is a <b>lower bound</b> on the cost reachable from the node.</li>
+</ul>
+<p>Keep the best complete solution found so far. <b>Prune</b> a node when its bound cannot beat the best (upper bound ≤ best for maximisation, lower bound ≥ best for minimisation). Explore the most promising node first (largest upper bound or smallest lower bound), so a good solution is found early and more nodes are pruned.</p>
+
+<h2>2. 0/1 knapsack with the fractional bound</h2>
+<p>Items have weight w and value v. Capacity W. Take each item whole or not at all, maximise the total value.</p>
+<p><b>Fractional knapsack</b> lets you take part of an item, and a greedy algorithm solves it (sort by v/w, take whole items in that order, then a fraction of the next). It always gives at least as much as 0/1 knapsack, because 0/1 is a special case. So the fractional value is a valid <b>upper bound</b> on any 0/1 completion of a node.</p>
+<div class="method"><h4>Method · knapsack branch and bound (Bayzid sir)</h4><ol>
+<li>Sort items by value/weight, largest first. Number them 1..n in this order. Level i of the tree decides item i.</li>
+<li>Root: weight W = 0, value V = 0. Its upper bound is the <b>fractional knapsack value</b> of the whole instance.</li>
+<li>Each node has two children: <b>take</b> item i (weight and value increase) and <b>skip</b> item i. If taking breaks capacity, the child is infeasible: cross it out.</li>
+<li>Bound of a child = value so far + fractional knapsack value of the <b>remaining items</b> in the <b>remaining capacity</b>.</li>
+<li>Always expand the open node with the <b>largest upper bound</b>. Each time a feasible child has a value above the best, record it as the new best.</li>
+<li>Prune every node whose upper bound is ≤ the best value. Stop when no open node can beat the best.</li>
+</ol></div>
+<pre class="code">BNB-KNAPSACK(items sorted by v/w, W)
+  best = 0;  open = { root(i=0, w=0, v=0) }
+  while open not empty
+    n = node in open with largest upper bound
+    if n.ub <= best: prune n; continue
+    for choice in { take item n.i+1, skip item n.i+1 }
+       c = child(n, choice)
+       if c.w > W: mark infeasible; continue
+       c.ub = c.v + FRACTIONAL(items n.i+2..m, W - c.w)
+       if c.v > best: best = c.v
+       if c.ub > best and c is not a leaf: add c to open
+  return best</pre>
+<div class="key"><p><b>What goes in each node of your drawing:</b> the weight so far, the value so far, and the upper bound. Write the item and "take" or "skip" on the edge. Mark pruned nodes with a cross and the reason ("ub 135 ≤ best 135"). Mark the best leaf. This is what the examiner marks.</p></div>
+
+<h2>3. 2024–25 Q3(b): capacity 10, items (weight, value) = (4, 40), (3, 50), (5, 70), (3, 45)</h2>
+<p>Sort by value/weight: item 2 (16.67), item 4 (15), item 3 (14), item 1 (10). The root bound is 50 + 45 + (4/5) of item 3 = 151. Step through. The best value found is 135 with items 1, 2, 4 (weight 4 + 3 + 3 = 10), the same 135 written in the margin of the paper.</p>
+<div id="t1"></div>
+<div class="drawit"><b>On paper:</b> a tree four levels deep in the sorted order (2, 4, 3, 1). In the tree above, after item 2 and item 4 are taken (W = 6, V = 95), taking item 3 makes W = 11, which is infeasible. Then "skip item 3" has bound 135 and taking item 1 gives W = 10, V = 135, the new best. After that every open node has bound ≤ 135 and is pruned. Write the answer: "maximum value 135, items 1, 2 and 4".</div>
+
+<h2>4. 2022–23 Q7(b): capacity 60, (value, weight) = (120,15), (110,10), (95,25), (135,35), (80,20), (150,30)</h2>
+<p>Ratios: item 2 (11), item 1 (8), item 6 (5), item 5 (4), item 4 (3.86), item 3 (3.8). Root bound 400 = 110 + 120 + 150 + (5/20) of item 5 (80). Best is 380 with items 1, 2, 6 (weight 55).</p>
+<div id="t2"></div>
+<p>Note that the "skip" chain after the best is found still has bounds 399.286 and 399, which are above 380, so you must walk it down to a leaf with bound 380. Only then is the node pruned or closed. Do not stop early because 380 "looks optimal".</p>
+
+<h2>5. Bayzid sir's slide example: capacity 10, (value, weight) = (10,5), (40,4), (30,6), (50,3)</h2>
+<p>Root bound: the items 4 and 2 fit whole (weight 3 + 4 = 7), and 3 units of room remain, which is half of item 3 (weight 6). In his words: <code>50 + 40 + 30/2 = 105</code>. The slide branches on items in the <b>original order 1, 2, 3, 4</b> and still uses the ratio order to compute bounds. The tree below branches in ratio order (4, 2, 3, 1), which prunes faster. The optimum is the same, 90 with items 2 and 4 (weight 7). Both trees are accepted if each node shows its bound.</p>
+<div id="t3"></div>
+
+<h2>6. 2023–24 Q6: "explain branch and bound with an illustrative example"</h2>
+<p>An easy illustration that fits in half a page: capacity 10, items A (weight 5, value 25), B (weight 4, value 40), C (weight 3, value 60). Ratios: C 20, B 10, A 5. Root bound: C and B fit whole (weight 7, value 100), and 3 units of room remain, which is 3/5 of A: 60 + 40 + 15 = 115.</p>
+<div id="t4"></div>
+<p>The one student solution for this question writes the bound for "pick A" as 95. It should be <b>105</b> (25 for A, 60 for C, and 2 units of B at 10 each = 20). The final answer 100 (items B and C) is still right. In your explanation say: bound, prune, best-first, and give this tree.</p>
+<div class="trap"><h4>Where marks go</h4><ul>
+<li>Computing the bound from the <i>unsorted</i> items. The fractional bound only makes sense in ratio order.</li>
+<li>Forgetting the <b>remaining capacity</b>: the bound of a child counts only the remaining items in the leftover capacity.</li>
+<li>Pruning when the bound is greater than the best. Prune when the bound is ≤ the best.</li>
+<li>Calling a node infeasible when the weight is exactly W. W = capacity is feasible.</li>
+<li>Not writing the final answer (value and chosen items).</li>
+</ul></div>
+
+<h2>7. TSP by dynamic programming: Held-Karp (2022–23 Q7(a))</h2>
+<p><b>TSP:</b> given cities and a cost matrix \(c[i][j]\) (may be asymmetric), find the cheapest tour that visits every city once and returns to the start. Trying every order costs \((n-1)!\). Held-Karp does it in \(O(n^2 2^n)\).</p>
+<dl class="def"><dt>g(i, S)</dt><dd>the cheapest cost to start at city i, visit every city in S exactly once, and finish at city 1 (the start). S never contains 1 or i.</dd></dl>
+<div class="formula">g(i, ∅) = c[i][1]  ·  g(i, S) = min over j ∈ S of ( c[i][j] + g(j, S − {j}) )</div>
+<p>The answer is \(g(1, \{2,\dots,n\})\). To recover the tour, remember which j gave each minimum and follow them from the full set.</p>
+<div class="method"><h4>Method · Held-Karp by hand</h4><ol>
+<li>Fill g(i, ∅) for every i ≠ 1: the cost of going straight back to 1.</li>
+<li>Fill all sets S of size 1, then size 2, ..., up to size n − 2. For every i not in S (and i ≠ 1) write g(i, S) as a <b>min</b> over j ∈ S, showing every candidate sum.</li>
+<li>Finally compute g(1, all others) the same way. That is the optimal cost.</li>
+<li>Trace the argmins to read off the tour.</li>
+</ol></div>
+<pre class="code">HELD-KARP(c, n)
+  for i = 2..n:  g[i][{}] = c[i][1]
+  for size = 1..n-2:
+    for each subset S of {2..n} with |S| = size:
+      for each i in {2..n} not in S:
+        g[i][S] = min over j in S of  c[i][j] + g[j][S - {j}]
+  return min over j in {2..n} of  c[1][j] + g[j][{2..n} - {j}]</pre>
+<p><b>Time.</b> There are \(n \cdot 2^{n-1}\) states (g(i, S)), and each takes a min over at most n choices, so \(O(n^2 2^n)\). Memory \(O(n 2^n)\). It is still exponential, but much better than \(n!\).</p>
+<p><b>2022–23 Q7(a)</b> matrix (rows = from, columns = to): row 1: 0 10 15 20; row 2: 5 0 12 18; row 3: 8 9 0 17; row 4: 11 14 16 0. The table is below; the answer is <b>50</b>, tour <b>1 → 2 → 3 → 4 → 1</b>. The tour 1 → 4 → 3 → 2 → 1 also costs 50, so a tie.</p>
+<div id="t5"></div>
+<div class="drawit"><b>On paper:</b> three columns (state, candidates, value) or, more neatly, one table per subset size. Show the candidate sums inside every min, e.g. <code>g(4,{2,3}) = min(14 + 20, 16 + 14) = 30</code>. Circle the minimum in each. End with the tour and its cost.</div>
+
+<h2>8. TSP by branch and bound (2021–22 Q7(b), 20 marks)</h2>
+<p>The bound is a <b>lower bound</b> on the cost of any tour that extends a partial tour. The classical choice is the <b>reduced cost matrix</b>.</p>
+<div class="method"><h4>Method · reduced cost matrix</h4><ol>
+<li>Write the cost matrix with the diagonal as ∞.</li>
+<li><b>Row reduction:</b> subtract each row's minimum from that row. Add all these minima. <b>Column reduction:</b> then subtract each column's minimum from that column, and add them. The total is the <b>lower bound of the root</b> (every tour leaves each city once and enters each city once, so it pays at least these amounts).</li>
+<li>To extend a partial tour by the edge i → j: bound of child = bound of parent + (reduced cost of i → j) + the new reduction cost after you set row i and column j to ∞ and set the entry j → 1 (the edge that would close the tour early) to ∞ and reduce again.</li>
+<li>Expand the node with the <b>smallest</b> lower bound first. The first complete tour you finish gives the first upper bound (best). Prune every node whose lower bound is ≥ best.</li>
+<li>Stop when all open nodes are pruned. The best tour is optimal.</li>
+</ol></div>
+<h3>Small example: the 4-city matrix of section 7</h3>
+<p>Row minima 10, 5, 8, 11 (sum 34). After subtracting, the column minima are 0, 0, 5, 9 (sum 14). Root lower bound 34 + 14 = <b>48</b>. The reduced matrix:</p>
+<div class="tbl"><table class="rec">
+<tr><th></th><th>1</th><th>2</th><th>3</th><th>4</th></tr>
+<tr><td class="lab">1</td><td>∞</td><td>0</td><td>0</td><td>1</td></tr>
+<tr><td class="lab">2</td><td>0</td><td>∞</td><td>2</td><td>4</td></tr>
+<tr><td class="lab">3</td><td>0</td><td>1</td><td>∞</td><td>0</td></tr>
+<tr><td class="lab">4</td><td>0</td><td>3</td><td>0</td><td>∞</td></tr>
+</table></div>
+<div class="tbl"><table>
+<tr><th>Step</th><th>Node (path)</th><th>Lower bound</th><th>What happens</th></tr>
+<tr><td>0</td><td>1</td><td>48</td><td>root, expand</td></tr>
+<tr><td>1</td><td>1-2 / 1-3 / 1-4</td><td>50 / 49 / 50</td><td>expand the smallest, 1-3 (49)</td></tr>
+<tr><td>2</td><td>1-3-2 / 1-3-4</td><td>53 / 51</td><td>next smallest open is 1-2 (50), expand it</td></tr>
+<tr><td>3</td><td>1-2-3 / 1-2-4</td><td>50 / 52</td><td>expand 1-2-3 (50)</td></tr>
+<tr><td>4</td><td>1-2-3-4-1</td><td>cost 50</td><td>first complete tour: best = 50</td></tr>
+<tr><td>5</td><td>1-4 (50), 1-3-4 (51), 1-2-4 (52), 1-3-2 (53)</td><td>all ≥ 50</td><td>pruned. Optimal tour cost 50, same as Held-Karp.</td></tr>
+</table></div>
+<h3>The exam instance: 6 cities (2021–22 Q7(b))</h3>
+<p>Matrix (rows from, columns to): 1: 0 10 15 20 25 30 · 2: 5 0 12 18 24 29 · 3: 8 9 0 17 22 28 · 4: 11 14 16 0 21 27 · 5: 13 19 23 26 0 31 · 6: 28 27 25 24 22 0.</p>
+<p>Row minima 10, 5, 8, 11, 13, 22 (sum 69). Column minima 0, 0, 3, 2, 0, 16 (sum 21). <b>Root lower bound 90.</b> Reduced matrix:</p>
+<div class="tbl"><table class="rec">
+<tr><th></th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th></tr>
+<tr><td class="lab">1</td><td>∞</td><td>0</td><td>2</td><td>8</td><td>15</td><td>4</td></tr>
+<tr><td class="lab">2</td><td>0</td><td>∞</td><td>4</td><td>11</td><td>19</td><td>8</td></tr>
+<tr><td class="lab">3</td><td>0</td><td>1</td><td>∞</td><td>7</td><td>14</td><td>4</td></tr>
+<tr><td class="lab">4</td><td>0</td><td>3</td><td>2</td><td>∞</td><td>10</td><td>0</td></tr>
+<tr><td class="lab">5</td><td>0</td><td>6</td><td>7</td><td>11</td><td>∞</td><td>2</td></tr>
+<tr><td class="lab">6</td><td>6</td><td>5</td><td>0</td><td>0</td><td>0</td><td>∞</td></tr>
+</table></div>
+<p>Bounds from a computer run of this exact method, best node first (ties broken by deeper path). Your tree may expand ties in a different order, but it must end at the same cost.</p>
+<div class="tbl"><table>
+<tr><th>Level</th><th>Nodes (path: lower bound)</th></tr>
+<tr><td>1</td><td>1-2: 94 · 1-3: 93 · 1-4: 99 · 1-5: 108 · 1-6: 95</td></tr>
+<tr><td>Expanded in order</td><td>root 90, then 1-3 (93), 1-2 (94), 1-6 (95), 1-2-3 (98), 1-2-3-6 (98), 1-2-6 (98), 1-3-6 (99), 1-4 (99), 1-4-6 (99), 1-2-3-4 (101), 1-2-3-4-6 (101)</td></tr>
+<tr><td>Complete tour</td><td>1-2-3-4-6-5-1 with cost <b>101</b>: best = 101</td></tr>
+<tr><td>After that</td><td>every remaining open node has bound ≥ 101 (26 nodes in all pruned, such as 1-3-2: 101, 1-2-4: 101, 1-3-4: 102, 1-4-3: 103, 1-6-4: 105)</td></tr>
+</table></div>
+<p><b>Optimal tour 1 → 2 → 3 → 4 → 6 → 5 → 1, cost 101</b>: 10 + 12 + 17 + 27 + 22 + 13 = 101. I checked this against Held-Karp and against trying all 120 tours: the next best tour costs 104.</p>
+<div class="drawit"><b>On paper:</b> the reduced matrix with the row and column amounts written beside it (this shows how 90 arises). Then a tree: each node holds the path and its bound. Cross out pruned nodes and write "≥ 101". If a full matrix at every node is too slow, write the bound with a one-line computation and show matrices only for the first two levels.</div>
+
+<h2>9. 2020–21 Q5(d): is the MST bound correct?</h2>
+<p>"In one approach, the lower bound for completing a partial tour is the cost of the minimum spanning tree of the remaining nodes. Will this bound give a correct answer all the time? Is there a better bound?"</p>
+<div class="method"><h4>Answer</h4><ol>
+<li>Let the partial tour end at u, start at s, with remaining cities R. A completion is a path u → r₁ → ... → r<sub>k</sub> → s through every city of R.</li>
+<li>Delete the first and last edge of that path. What is left is a path through all of R, which is a spanning tree of R, so its cost is at least MST(R). So <b>completion cost ≥ MST(R)</b>.</li>
+<li>So the bound never overestimates (for symmetric costs, or after taking the cheaper direction of each pair). Pruning with it never throws away an optimal tour: <b>it is correct, but weak</b>.</li>
+<li><b>Better:</b> add the cheapest edge from u into R and the cheapest edge from R back to s: MST(R) + min c(u, R) + min c(R, s), which is still a valid lower bound. The reduced-cost-matrix bound of section 8 is the other standard improvement.</li>
+</ol></div>
+
+<h2>10. Mandatory practice</h2>
+<p>Do these with pen and paper first. The practice boxes give a fresh instance and check your final value.</p>
+<div id="r1"></div>
+<div id="r2"></div>
+<div id="r3"></div>
+<div id="p1"></div>
+<div id="p2"></div>
+<div id="p3"></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/algo.js"></script>
+<script src="../assets/dsa.js"></script>
+<script>
+trace('#t1', { kind: 'knapsack', input: '4:40 3:50 5:70 3:45 ; 10' });
+trace('#t2', { kind: 'knapsack', input: '15:120 10:110 25:95 35:135 20:80 30:150 ; 60' });
+trace('#t3', { kind: 'knapsack', input: '5:10 4:40 6:30 3:50 ; 10' });
+trace('#t4', { kind: 'knapsack', input: '5:25 4:40 3:60 ; 10' });
+trace('#t5', { kind: 'tsp', input: '0 10 15 20 ; 5 0 12 18 ; 8 9 0 17 ; 11 14 16 0' });
+recall('#r1', { id: 'r1', marks: 15, q: 'Explain branch-and-bound algorithms with an illustrative example. (2023–24 Q6)', points: ['Backtracking generalised to optimization', 'Bound = guarantee on what any solution below the node can achieve (upper for max, lower for min)', 'Prune when the bound cannot beat the best solution so far', 'Explore the most promising node first', 'Knapsack: upper bound is the fractional knapsack value in ratio order', 'Example tree with W, V, ub in each node and pruned nodes marked', 'State the final answer'], model: '<p>Branch and bound explores a tree of partial solutions like backtracking, but for optimization. Every node gets a bound that no solution in its subtree can exceed (upper bound, for maximisation) or go below (lower bound, for minimisation). A node whose bound cannot beat the best complete solution found so far is pruned. Expanding the node with the best bound first finds good solutions early.</p><p>Example, 0/1 knapsack, capacity 10, items (w, v): A (5, 25), B (4, 40), C (3, 60). Order by v/w: C, B, A. The bound of a node is its value plus the fractional knapsack value of the remaining items in the remaining capacity. Root bound 60 + 40 + 15 = 115. Take C (W 3, V 60, ub 115); take B (W 7, V 100, ub 115); taking A makes W 12, infeasible; skipping A gives 100: best = 100. Skip B: bound 85 ≤ 100, prune. Skip C: bound 65 ≤ 100, prune. Optimum 100 with items B and C.</p>' });
+recall('#r2', { id: 'r2', marks: 20, q: 'Give an O(n²2ⁿ) algorithm for TSP (Held-Karp): define the subproblem, the recurrence, the base case, the answer, and the running time. (2022–23 Q7(a))', points: ['g(i, S) = cheapest path from i through all of S ending at city 1', 'Base g(i, empty) = c[i][1]', 'Recurrence g(i, S) = min over j in S of c[i][j] + g(j, S minus j)', 'Answer g(1, all other cities), recover tour by argmins', 'n·2^(n−1) states, each O(n), total O(n² 2ⁿ)', 'Table filled by subset size, candidates shown in each min'], model: '<p>Let g(i, S) be the minimum cost of starting at i, visiting every city of S once (S does not contain i or the start 1) and ending at 1. Base case g(i, ∅) = c[i][1]. For S ≠ ∅: g(i, S) = min over j ∈ S of c[i][j] + g(j, S − {j}). The optimal tour costs g(1, {2..n}); remember the minimising j at each state and follow them to list the tour.</p><p>There are n·2<sup>n−1</sup> states, each computed with a min over at most n choices, so O(n²2<sup>n</sup>) time and O(n2<sup>n</sup>) space. For the 4-city matrix the answer is 50 with tour 1 → 2 → 3 → 4 → 1.</p>' });
+recall('#r3', { id: 'r3', marks: 5, q: 'A partial-tour lower bound for TSP branch and bound uses the MST of the remaining cities. Is it correct all the time? Is there a better one? (2020–21 Q5(d))', points: ['A completion is a path through all remaining cities', 'Dropping its end edges leaves a spanning tree of the remaining cities, so cost ≥ MST', 'Valid lower bound, so no optimal tour is pruned: correct but weak', 'Better: add cheapest edges from current city into R and from R to start, or reduced cost matrix'], model: '<p>The rest of the tour is a path from the current city u through all remaining cities R back to the start s. Removing its first and last edges leaves a path through R, which is a spanning tree of R, so it costs at least MST(R). The bound is therefore always a valid lower bound and never prunes an optimal tour, although it is loose. A better bound adds the cheapest edge from u to R and the cheapest edge from R to s, or uses the reduced cost matrix.</p>' });
+practice('#p1', { id: 'p1', kind: 'knapsack', n: 2 });
+practice('#p2', { id: 'p2', kind: 'knapsack', n: 1 });
+practice('#p3', { id: 'p3', kind: 'tsp', n: 1 });
+</script>
+</body>
+</html>

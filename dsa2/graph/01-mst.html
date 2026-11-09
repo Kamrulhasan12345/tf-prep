@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Minimum Spanning Trees · CSE 207 Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Graph algorithms · CLRS §21, §23 · Monirul Islam sir L2–L3, slides 01–02 · must-know</div>
+<h1>Minimum Spanning Trees</h1>
+<p class="lede">Asked in 2024–25 (Q7a, 20 marks: is the MST unique), 2023–24 (Q11b, 12 marks: Prim and Kruskal edge order, and Q11a runtimes), 2022–23 (Q1b, 23 marks, compulsory: the road-types city), 2021–22 (Q1: greedy properties 8, optimal substructure and greedy choice 12, Kruskal with array union-find 15), 2019–20 (Q5b 12, Q6b 10), 2018–19 (Q1b 15), 2017–18 (Q1: Kruskal 3+5+7, Prim 10, cut property 10). This is the most repeated topic in the graph part.</p>
+
+<div class="key"><p><b>Syllabus note.</b> Monirul sir's notes have the headings for the safe-edge proof, Prim and Kruskal-DSU, but the pages are blank. Everything below is the standard CLRS version, which is what the papers ask for.</p></div>
+
+<h2>1. What is being asked</h2>
+<p>A <b>spanning tree</b> of a connected undirected graph \(G=(V,E)\) is a subset of edges that connects all vertices and has no cycle. It has exactly \(|V|-1\) edges. A <b>minimum spanning tree</b> (MST) is a spanning tree of least total weight. There can be several MSTs of the same weight.</p>
+<p>The vocabulary the generic proof uses (same words as the lecture):</p>
+<ul>
+<li><b>Cut</b> \((S, V\setminus S)\): a split of the vertices into two non-empty parts.</li>
+<li><b>Crossing edge</b>: one end in \(S\), the other in \(V\setminus S\).</li>
+<li><b>Respects</b>: a cut respects an edge set \(A\) if no edge of \(A\) crosses it.</li>
+<li><b>Light edge</b>: a crossing edge of minimum weight.</li>
+<li><b>Safe edge</b> for \(A\): an edge \((u,v)\) such that \(A\cup\{(u,v)\}\) is still inside some MST.</li>
+</ul>
+
+<h2>2. The generic algorithm</h2>
+<pre class="code">GENERIC-MST(G, w)
+  A = {}                       // always a subset of some MST
+  while A is not a spanning tree
+      find an edge (u,v) that is safe for A
+      A = A ∪ {(u,v)}
+  return A</pre>
+<p>\(A\) is a forest all the time (it may be disconnected). Kruskal and Prim are two ways to find a safe edge. The cut property below is what makes them correct.</p>
+
+<h2>3. The two properties you must be able to prove</h2>
+<div class="key"><p><b>Cut property (safe-edge theorem).</b> Let \(A\) be a subset of some MST. Let \((S,V\setminus S)\) be a cut that respects \(A\). Let \(e\) be a light edge crossing it. Then \(e\) is safe for \(A\). The 2017–18 form: "e has minimum weight among edges between \(V_1\) and \(V_2\); show some MST contains \(e\)" is the same statement with \(A=\varnothing\).</p></div>
+<div class="method"><h4>Proof of the cut property (exam-ready, 10 marks in 2017–18)</h4><ol>
+<li>Let \(T\) be an MST that contains \(A\). If \(e\in T\), we are done. Assume \(e=(u,v)\notin T\), with \(u\in S\), \(v\in V\setminus S\).</li>
+<li>\(T\) is a tree, so it has a unique path \(p\) from \(u\) to \(v\). Together with \(e\) it forms a cycle \(p+e\).</li>
+<li>\(u\) and \(v\) are on opposite sides of the cut, so \(p\) must cross the cut at some edge \(f=(x,y)\) with \(f\in T\).</li>
+<li>The cut respects \(A\), so \(f\notin A\). Also \(f\ne e\) because \(e\notin T\).</li>
+<li>Remove \(f\) from \(T\): \(T\) splits into two components. Adding \(e\) reconnects them, so \(T'=T-\{f\}+\{e\}\) is a spanning tree.</li>
+<li>\(e\) is light and \(f\) crosses the same cut, so \(w(e)\le w(f)\). Then \(w(T')=w(T)-w(f)+w(e)\le w(T)\).</li>
+<li>\(T\) is minimum, so \(w(T')=w(T)\) and \(T'\) is also an MST. It contains \(A\cup\{e\}\) (we removed \(f\notin A\)). So \(e\) is safe for \(A\). \(\blacksquare\)</li>
+</ol></div>
+<div class="key"><p><b>Cycle property.</b> If \(e\) is a heaviest edge on some cycle, there is an MST that does not contain \(e\). If \(e\) is the <i>unique</i> heaviest edge on a cycle, <i>no</i> MST contains \(e\).</p></div>
+<div class="method"><h4>Proof of the cycle property</h4><ol>
+<li>Let \(C\) be a cycle and \(e\in C\) with \(w(e)\ge w(g)\) for every \(g\in C\). Let \(T\) be an MST containing \(e\).</li>
+<li>Remove \(e\) from \(T\): two components \(X\) and \(Y\). The rest of the cycle \(C-e\) is a path joining the two ends of \(e\), so it contains an edge \(g\) with one end in \(X\) and one in \(Y\).</li>
+<li>\(T''=T-e+g\) is a spanning tree and \(w(T'')=w(T)-w(e)+w(g)\le w(T)\). So \(T''\) is an MST without \(e\).</li>
+<li>If \(e\) is strictly the heaviest, \(w(g)<w(e)\), so \(w(T'')<w(T)\), contradicting that \(T\) is minimum. Hence no MST has \(e\). \(\blacksquare\)</li>
+</ol></div>
+
+<h2>4. Kruskal with union-find</h2>
+<p>Idea: sort the edges. Take the lightest edge that does not make a cycle. Each accepted edge is the light edge of the cut between its own component and the rest, so by the cut property it is safe.</p>
+<pre class="code">KRUSKAL(G, w)
+  A = {}
+  for each v in V:  MAKE-SET(v)
+  sort E by weight, non-decreasing
+  for each (u,v) in E in that order
+      if FIND-SET(u) != FIND-SET(v)      // different components: no cycle
+          A = A ∪ {(u,v)}
+          UNION(u, v)
+  return A</pre>
+<h3>Array implementation of disjoint sets (2021–22 Q1c, 15 marks)</h3>
+<p>Keep two arrays of size \(n\): <code>parent[v]</code> (the parent of \(v\) in its tree, a root points to itself) and <code>size[v]</code> (valid for roots). The set is named by its root.</p>
+<pre class="code">MAKE-SET(v):   parent[v] = v;  size[v] = 1
+
+FIND(v):                                   // with path compression
+    if parent[v] != v
+        parent[v] = FIND(parent[v])        // point straight at the root
+    return parent[v]
+
+UNION(u, v):                               // by size
+    a = FIND(u);  b = FIND(v)
+    if a == b: return
+    if size[a] < size[b]: swap(a, b)
+    parent[b] = a                          // small tree under big tree
+    size[a] = size[a] + size[b]</pre>
+<p>Simpler array version some students write: <code>id[v]</code> = set name; FIND is \(O(1)\), UNION relabels the smaller set: \(O(n)\) per union, but only \(O(\log n)\) times per element when you always relabel the smaller one, so \(O(V\log V)\) over the whole run. Write the parent-array version, it is the one the lecture means.</p>
+<div class="method"><h4>Method · Kruskal complexity</h4><ol>
+<li>Sort the edges: \(O(E\log E)\). Since \(E\le V^2\), \(\log E\le 2\log V\), so this is \(O(E\log V)\).</li>
+<li>\(V\) MAKE-SETs: \(O(V)\).</li>
+<li>At most \(2E\) FINDs and \(V-1\) UNIONs. With union by size and path compression the total is \(O((V+E)\,\alpha(V))\), where \(\alpha\) is the inverse Ackermann function (at most 4 in practice).</li>
+<li>Sorting dominates: <b>\(O(E\log E)=O(E\log V)\)</b>.</li>
+<li><b>Without DSU</b> (2023–24 Q11a): to test "is there already a path from \(u\) to \(v\)" run BFS or DFS on the current forest. The forest has at most \(V-1\) edges, so one test costs \(O(V)\). Total \(O(E\log E+VE)=O(VE)\).</li>
+</ol></div>
+
+<h2>5. Prim</h2>
+<p>Idea: grow one tree from a root. Always add the lightest edge leaving the tree. The cut is (tree, rest), which respects the tree, so the cut property applies.</p>
+<pre class="code">PRIM(G, w, r)
+  for each v in V:  key[v] = ∞;  parent[v] = NIL
+  key[r] = 0
+  Q = V                               // priority queue keyed by key[]
+  while Q is not empty
+      u = EXTRACT-MIN(Q)              // u joins the tree via edge (parent[u], u)
+      for each v in Adj[u]
+          if v in Q and w(u,v) < key[v]
+              parent[v] = u
+              key[v] = w(u,v)         // DECREASE-KEY</pre>
+<div class="method"><h4>Method · Prim complexity</h4><ol>
+<li>Build the queue: \(O(V)\). \(V\) extractions, \(E\) decrease-keys (each edge examined twice, once from each end).</li>
+<li><b>Array</b>: extract-min \(O(V)\), decrease-key \(O(1)\): \(O(V^2+E)=O(V^2)\). Best for dense graphs.</li>
+<li><b>Binary heap</b>: extract \(O(\log V)\), decrease-key \(O(\log V)\): \(O((V+E)\log V)=O(E\log V)\).</li>
+<li><b>Fibonacci heap</b>: extract \(O(\log V)\) amortised, decrease-key \(O(1)\) amortised: \(O(E+V\log V)\).</li>
+</ol></div>
+<p>Dijkstra and Prim share this skeleton. The only difference is the key: Dijkstra uses \(d[u]+w(u,v)\) (distance from the source), Prim uses \(w(u,v)\) alone (the edge). Chapter 3 has the example showing they can add vertices in different orders.</p>
+
+<h2>6. The 2024–25 question: is this MST unique? (Q7a, 20 marks)</h2>
+<p>Vertices A to F. Edges: A-B 1, A-C 3, A-D 4, B-C 2, B-D 6, C-D 5, C-E 7, D-E 8, E-F 9, D-F 10, C-F 11.</p>
+<div id="f1"></div>
+<p>First find the MST with Kruskal, then prove it is the only one. Step through both:</p>
+<div id="t1"></div>
+<div id="t2"></div>
+<p>The tree is {A-B, B-C, A-D, C-E, E-F}, weight \(1+2+4+7+9=23\). Prim from A gives the same edges in the order A-B, B-C, A-D, C-E, E-F.</p>
+<div class="method"><h4>Method · prove uniqueness (three arguments, give at least two)</h4><ol>
+<li><b>Distinct weights.</b> All 11 weights \(1,2,3,4,5,6,7,8,9,10,11\) are different. Theorem: if all edge weights are distinct, the MST is unique. Proof: suppose \(T_1\ne T_2\) are both MSTs. Let \(e\) be the lightest edge in the symmetric difference \(T_1\triangle T_2\), say \(e\in T_1\setminus T_2\). \(T_2+e\) has exactly one cycle. That cycle cannot lie wholly in \(T_1\) (a tree), so it has an edge \(f\in T_2\setminus T_1\). Then \(f\) is also in the symmetric difference, so \(w(f)>w(e)\) (distinct, and \(e\) is the lightest). Now \(T_2-f+e\) is a spanning tree of smaller weight than \(T_2\): contradiction.</li>
+<li><b>Cycle property on every non-tree edge.</b> Each of the six edges not in the tree is the strict maximum of a cycle made of tree edges, so no MST can contain it:
+<table class="tbl"><tr><th>Edge left out</th><th>Cycle</th><th>Other weights</th><th>Strictly heaviest?</th></tr>
+<tr><td>A-C (3)</td><td>A-B-C</td><td>1, 2</td><td>yes</td></tr>
+<tr><td>C-D (5)</td><td>C-B-A-D</td><td>2, 1, 4</td><td>yes</td></tr>
+<tr><td>B-D (6)</td><td>B-A-D</td><td>1, 4</td><td>yes</td></tr>
+<tr><td>D-E (8)</td><td>D-A-B-C-E</td><td>4, 1, 2, 7</td><td>yes</td></tr>
+<tr><td>D-F (10)</td><td>D-A-B-C-E-F</td><td>4, 1, 2, 7, 9</td><td>yes</td></tr>
+<tr><td>C-F (11)</td><td>C-E-F</td><td>7, 9</td><td>yes</td></tr></table>
+Every MST has \(V-1=5\) edges and must avoid these six, so it is exactly the five tree edges.</li>
+<li><b>Cut property on every tree edge.</b> A-B is the unique lightest edge at A, B. Each tree edge is the unique lightest edge crossing some cut: A-B: cut \(\{A\}\) vs rest (A's edges 1,3,4); B-C: cut \(\{A,B\}\) vs rest (edges 3,2,4,6: B-C is 2); A-D: cut \(\{A,B,C\}\) vs rest (4,6,5,7,11: A-D is 4); C-E: cut \(\{A,B,C,D\}\) vs \(\{E,F\}\) (7,8,10,11: C-E is 7); E-F: cut \(\{F\}\) vs rest (9,10,11). A unique light edge must be in every MST.</li>
+</ol></div>
+<div class="drawit"><b>On paper:</b> redraw the graph and write the weights. Bold the five tree edges and write the total 23. Write the Kruskal order next to the graph (AB1, BC2, AC3 rejected, AD4, CD5 rejected, BD6 rejected, CE7, DE8 rejected, EF9). State clearly: "weights are all distinct, so the MST is unique", then give the theorem proof or the cycle table. The question says "rigorously", so one line is not enough.</div>
+
+<h2>7. Edge-order questions (2023–24 Q11b)</h2>
+<p>"Draw the MST using Prim and Kruskal, write the order of edges, use alphabetical order for ties." The figure was transcribed from the scan (one possible edge, c-e, was not visible and is left out), so check it against your paper. Edges as transcribed: ab2 ac8 bc9 bd5 be6 cd4 cf3 de4 df4 ef3 eg6 fg5; both methods give total 22, with Prim from a: ab, bd, dc, cf, fe, fg and Kruskal: ab, cf, ef, cd, bd, fg. The widget below runs Prim from a on this graph.</p>
+<div id="t3"></div>
+<div class="trap"><h4>Where marks go</h4><ul>
+<li>Prim needs a start vertex: say it (the paper starts from a).</li>
+<li>Write the edge order, not just the final tree. That is the thing asked.</li>
+<li>Kruskal: list rejected edges and say why ("forms a cycle").</li>
+<li>Tie in Prim: pick the alphabetically smaller <i>vertex</i>. Tie in Kruskal: the question's rule, otherwise say your rule.</li>
+</ul></div>
+
+<h2>8. Greedy properties and the two MST proofs (2021–22 Q1a 8, Q1b 12; 2018–19 Q1b 15)</h2>
+<p><b>Define and distinguish (8 marks).</b></p>
+<ul>
+<li><b>Greedy-choice property:</b> some optimal solution contains the locally best first choice. So we can commit to that choice without looking ahead.</li>
+<li><b>Optimal substructure:</b> after the choice is made, an optimal solution of the remaining subproblem, combined with the choice, is an optimal solution of the whole.</li>
+<li>Distinction: dynamic programming needs optimal substructure only and tries all choices. A greedy algorithm needs <i>both</i>, and that is why it can make one choice and never revisit it.</li>
+</ul>
+<div class="method"><h4>Proof (i): optimal substructure, "an optimal MST is made of optimal MST subtrees"</h4><ol>
+<li>Let \(T\) be an MST of \(G\) and \(e=(u,v)\in T\). Removing \(e\) splits \(T\) into trees \(T_1\) on vertex set \(V_1\) and \(T_2\) on \(V_2\).</li>
+<li>Claim: \(T_1\) is an MST of the subgraph \(G[V_1]\) induced by \(V_1\) (and \(T_2\) of \(G[V_2]\)). \(T_1\) spans \(V_1\) and is a tree, so \(G[V_1]\) is connected and the claim makes sense.</li>
+<li>Suppose not: some spanning tree \(T_1'\) of \(G[V_1]\) has \(w(T_1')<w(T_1)\).</li>
+<li>Then \(T'=T_1'\cup T_2\cup\{e\}\) is a spanning tree of \(G\): it is connected through \(e\) and has \(|V_1|-1+|V_2|-1+1=|V|-1\) edges.</li>
+<li>\(w(T')=w(T)-w(T_1)+w(T_1')<w(T)\). This contradicts that \(T\) is minimum. So \(T_1\) is minimal. The same for \(T_2\). \(\blacksquare\)</li>
+</ol>
+<p>Contraction form (also accepted): if \(e\) belongs to some MST \(T\) of \(G\), then \(T-e\) is an MST of the graph \(G/e\) where \(u,v\) are merged. Proof is the same cut-and-paste.</p></div>
+<div class="method"><h4>Proof (ii): greedy choice, "the lightest edge is in some MST"</h4><ol>
+<li>Let \(e=(u,v)\) be a minimum-weight edge of \(G\). Take any MST \(T\). If \(e\in T\), done.</li>
+<li>Otherwise \(T+e\) has a cycle. Remove any other edge \(f\) of that cycle. \(T'=T-f+e\) is a spanning tree.</li>
+<li>\(w(e)\le w(f)\) because \(e\) is lightest in \(G\). So \(w(T')\le w(T)\), and \(T'\) is an MST containing \(e\). \(\blacksquare\)</li>
+<li>This is the cut property with the cut \((\{u\},V\setminus\{u\})\) when \(e\) is also lightest at \(u\); the general safe-edge theorem in section 3 covers every later step.</li>
+</ol></div>
+
+<h2>9. The "modify" and "prove or disprove" questions</h2>
+<p>These come from CT papers and past terminals. Each one is two lines if you know the trick.</p>
+<div class="method"><h4>Method · each answer</h4><ol>
+<li><b>MST containing two forced edges (2018–19 Q1b ii, 15 marks together with the proof).</b> The figure shows weights as letters \(x\) and \(z\) and is unreadable in the scan. Method: put the forced edges into \(A\) first (check they form no cycle), union their endpoints in the DSU, then continue Kruskal on the rest. The result is the cheapest spanning tree containing them. Draw it and mark the two forced edges.</li>
+<li><b>Maximum spanning tree.</b> Sort descending in Kruskal (or negate all weights and run MST). Negative weights cause no problem for either algorithm.</li>
+<li><b>New vertex added (2020–21 Q1c, 15 marks).</b> "Can you get the MST of \(G_{new}\) by adding one new edge to the old MST \(T\)?" <b>No.</b> Counterexample: G is the single edge a-b of weight 10, \(T=\{ab\}\). Add c with edges c-a 1 and c-b 1. The new MST is {ca, cb}, which does not contain ab. Correct method: the new MST lies inside \(T\cup\{\text{new edges}\}\) (an old non-tree edge is the heaviest on a cycle of old edges, and that cycle is still there). So run Kruskal on those \(|V|-1+k\) edges: \(O((V+k)\log(V+k))\).</li>
+<li><b>Positive weights imply a tree (2019–20 Q5b, 12).</b> Let \(S\) be a minimum-weight set of edges that connects all vertices. If \(S\) has a cycle, delete one cycle edge: still connected, weight smaller by a positive amount. Contradiction, so \(S\) has no cycle and is a tree. With nonpositive weights this fails: a triangle with all weights \(-1\). Taking all 3 edges costs \(-3\), any tree costs \(-2\), so the minimum connecting set contains a cycle.</li>
+<li><b>Any MST can be the Kruskal output (2019–20 Q6b, 10).</b> Given MST \(T\), sort by weight and break ties by putting edges of \(T\) before edges not in \(T\). Claim Kruskal returns \(T\). Suppose it rejects \(e=(u,v)\in T\). Then earlier accepted edges contain a path \(P\) from \(u\) to \(v\), all of weight \(\le w(e)\). Removing \(e\) from \(T\) splits \(T\) in two; \(P\) must cross that split by an edge \(f\ne e\), and \(f\notin T\) (no \(T\) edge other than \(e\) crosses). \(f\) came before \(e\), so by our tie rule \(w(f)<w(e)\). Then \(T-e+f\) is lighter than \(T\), a contradiction. So Kruskal accepts every edge of \(T\). It has \(|V|-1\) accepted edges, no cycle, and contains \(T\), so it is \(T\).</li>
+<li><b>Prim works with negative edges? Yes.</b> The cut property never used the sign of weights.</li>
+<li><b>"Unique heaviest edge, more than \(V-1\) edges, so it is not in any MST": false.</b> If the heaviest edge is a bridge (no cycle contains it), every spanning tree needs it. Example: a triangle plus a pendant edge, the pendant being heaviest.</li>
+<li><b>"The shortest path between two nodes is part of some MST": false.</b> Triangle A-B 1, B-C 1, A-C 1.5. The shortest A to C path is the edge A-C, which is the unique heaviest edge of the cycle, so it is in no MST.</li>
+<li><b>Shortest-path tree and MST share an edge (distinct positive weights).</b> They always do. Let \(e=(s,v)\) be the lightest edge at \(s\). It is in the MST (cut property for \(\{s\}\)). It is in the shortest-path tree because any other path to \(v\) starts with an edge at \(s\) strictly heavier than \(w(e)\).</li>
+</ol></div>
+
+<h2>10. The city with three road types (2022–23 Q1b, 23 marks)</h2>
+<p>\(N\) towns, \(M\) bidirectional roads of types 1, 2, 3. Men use types 1 and 3. Women use types 2 and 3. Find the maximum number of roads that can be closed so both men and women can still travel between every pair of towns.</p>
+<div class="method"><h4>Method · answer in the three parts the question asks</h4><ol>
+<li><b>(i) Formulate.</b> Vertices are towns. Keep a set \(K\) of roads. Men's graph is \(K\) restricted to types 1,3; women's graph is \(K\) restricted to types 2,3. Both must be connected (each contains a spanning tree). Maximise closed roads \(=M-|K|\), so minimise \(|K|\). This is a "union of two spanning trees, sharing type-3 edges" problem. Type-3 roads are useful twice, so use them first.</li>
+<li><b>(ii) Algorithm.</b> Greedy with two DSUs, one for men, one for women.
+<ul>
+<li>Pass 1: for each type-3 road \((u,v)\): if it joins different components in the men's DSU (the women's DSU is identical at this stage), union in both and count it as kept.</li>
+<li>Pass 2: for each type-1 road: if it joins different components in the men's DSU, union and keep.</li>
+<li>Pass 3: for each type-2 road: same with the women's DSU.</li>
+<li>If either DSU has more than one component at the end, the city cannot be connected for both: answer \(-1\) (or "impossible"). Otherwise answer \(=M-\text{kept}\).</li>
+</ul></li>
+<li><b>(iii) Pseudo-code.</b> Below.</li>
+<li><b>Why it is optimal.</b> Let \(F_3\) be the type-3 forest from pass 1, \(|F_3|=f\). Kept \(=f+(N-1-f)+(N-1-f)=2(N-1)-f\). Any valid \(K\) needs \(x_1+x_3\ge N-1\) and \(x_2+x_3\ge N-1\), so \(|K|\ge 2(N-1)-x_3\). We may assume the type-3 roads of \(K\) are acyclic (a cycle edge is redundant for both graphs), so \(x_3\le f\). Hence \(|K|\ge 2(N-1)-f\), which the greedy meets.</li>
+<li><b>Complexity.</b> Each road is looked at once with FIND and UNION: \(O(M\,\alpha(N))\), essentially \(O(M+N)\). No sorting needed because we only count edges, not weights.</li>
+</ol></div>
+<pre class="code">MAX-CLOSED-ROADS(N, roads)
+  men = new DSU(N);  women = new DSU(N);  kept = 0
+  for (u,v,t) in roads where t == 3
+      if men.find(u) != men.find(v)
+          men.union(u,v);  women.union(u,v);  kept++
+  for (u,v,t) in roads where t == 1
+      if men.find(u) != men.find(v):   men.union(u,v);   kept++
+  for (u,v,t) in roads where t == 2
+      if women.find(u) != women.find(v):  women.union(u,v);  kept++
+  if men.components > 1 or women.components > 1:  return -1
+  return M - kept</pre>
+<div class="drawit"><b>On paper:</b> draw 4 towns with a few roads, label each road with its type, circle the kept ones in the order: type 3 first, then 1, then 2. Show the two DSU states after each pass. Write "answer = M − kept".</div>
+
+<h2>11. Mandatory practice</h2>
+<p>Do these with pen and paper. Kruskal and Prim each have a generated practice below.</p>
+<div id="r1"></div>
+<div id="r2"></div>
+<div id="r3"></div>
+<div id="p1"></div>
+<div id="p2"></div>
+<p class="drawit"><b>If you got one wrong:</b> open the steps and find the first edge where your choice differs. That edge is either a cycle you missed (Kruskal) or an edge that did not leave the tree (Prim).</p>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/algo.js"></script>
+<script src="../assets/dsa.js"></script>
+<script>
+graphFig('#f1', 'A-B 1, A-C 3, A-D 4, B-C 2, B-D 6, C-D 5, C-E 7, D-E 8, E-F 9, D-F 10, C-F 11');
+trace('#t1', { kind: 'kruskal', input: 'A-B 1, A-C 3, A-D 4, B-C 2, B-D 6, C-D 5, C-E 7, D-E 8, E-F 9, D-F 10, C-F 11' });
+trace('#t2', { kind: 'prim', input: 'A-B 1, A-C 3, A-D 4, B-C 2, B-D 6, C-D 5, C-E 7, D-E 8, E-F 9, D-F 10, C-F 11', s: 'A' });
+trace('#t3', { kind: 'prim', input: 'a-b 2, a-c 8, b-c 9, b-d 5, b-e 6, c-d 4, c-f 3, d-e 4, d-f 4, e-f 3, e-g 6, f-g 5', s: 'a' });
+recall('#r1', { id: 'r1', marks: 10, q: 'Let G be a weighted connected graph and let V1, V2 partition its vertices. Let e be a minimum-weight edge between V1 and V2. Show that some MST contains e. (2017–18 Q1c)', points: ['Take an MST T; if e is in T, done', 'Otherwise T + e has a cycle; the tree path from u to v crosses the cut at an edge f', 'Remove f, add e: still a spanning tree', 'w(e) <= w(f) because e is light for this cut', 'So the new tree is no heavier, hence also an MST, and it contains e'], model: '<p>Let \\(T\\) be an MST. If \\(e=(u,v)\\in T\\) we are done. Otherwise the tree path from \\(u\\) to \\(v\\) together with \\(e\\) makes a cycle. \\(u\\in V_1\\), \\(v\\in V_2\\), so the path has an edge \\(f\\) crossing between \\(V_1\\) and \\(V_2\\). \\(T-f+e\\) is a spanning tree (removing \\(f\\) splits \\(T\\) in two, \\(e\\) joins the halves). Since \\(e\\) is a minimum crossing edge, \\(w(e)\\le w(f)\\), so \\(w(T-f+e)\\le w(T)\\). \\(T\\) is minimum, so equality holds and \\(T-f+e\\) is an MST containing \\(e\\).</p>' });
+recall('#r2', { id: 'r2', marks: 15, q: 'Write Kruskal with a disjoint-set (parent array, path compression, union by size) and analyse the time. Then state the runtime without DSU. (2017–18 Q1a, 2021–22 Q1c, 2023–24 Q11a)', points: ['MAKE-SET, FIND with path compression, UNION by size using parent[] and size[]', 'Sort edges; accept an edge only if FIND(u) != FIND(v)', 'Sorting O(E log E) = O(E log V)', 'DSU operations O((V+E) alpha(V)), dominated by sorting', 'Total O(E log V)', 'Without DSU: cycle check by BFS/DFS O(V) per edge, O(VE) total'], model: '<p>Pseudocode as in section 4. Sorting costs \\(O(E\\log E)=O(E\\log V)\\). There are \\(V\\) MAKE-SETs, at most \\(2E\\) FINDs and \\(V-1\\) UNIONs; with union by size and path compression these take \\(O((V+E)\\alpha(V))\\). Total \\(O(E\\log V)\\). Without DSU each edge needs a graph search on the forest, \\(O(V)\\), so \\(O(E\\log E+VE)=O(VE)\\).</p>' });
+recall('#r3', { id: 'r3', marks: 12, q: 'Prove (i) the optimal substructure property and (ii) the greedy-choice property of the MST problem. (2021–22 Q1b)', points: ['(i) Remove an edge e of an MST: two subtrees T1, T2 on V1, V2', 'Suppose a cheaper spanning tree T1* of G[V1] exists', 'T1* + T2 + e is a spanning tree of G, cheaper than T: contradiction', '(ii) Let e be a lightest edge of G, T any MST not containing e', 'T + e has a cycle; remove another edge f of it', 'w(e) <= w(f), so T - f + e is an MST containing e'], model: '<p><b>(i)</b> Let \\(T\\) be an MST and \\(e\\in T\\). \\(T-e\\) is two trees \\(T_1,T_2\\) spanning \\(V_1,V_2\\). If \\(G[V_1]\\) had a spanning tree \\(T_1^*\\) with \\(w(T_1^*)<w(T_1)\\), then \\(T_1^*\\cup T_2\\cup\\{e\\}\\) would be a spanning tree of \\(G\\) with weight \\(w(T)-w(T_1)+w(T_1^*)<w(T)\\). Contradiction. Same for \\(T_2\\).</p><p><b>(ii)</b> Let \\(e\\) be a lightest edge, \\(T\\) an MST with \\(e\\notin T\\). \\(T+e\\) contains a cycle; remove another edge \\(f\\) of the cycle. \\(w(e)\\le w(f)\\), so \\(T-f+e\\) is a spanning tree with \\(w\\le w(T)\\), hence an MST containing \\(e\\).</p>' });
+practice('#p1', { id: 'p1', kind: 'kruskal', n: 2 });
+practice('#p2', { id: 'p2', kind: 'prim', n: 2 });
+</script>
+</body>
+</html>

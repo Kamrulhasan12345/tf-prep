@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Amortized Analysis · CSE 207 Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Advanced heaps · amortized analysis · CLRS ch. 17 and §19.2–19.4 · Bayzid sir L8</div>
+<h1>Potential Method and Damaged Trees</h1>
+<p class="lede">Asked in 2024–25 Q4(b) (draw the maximally damaged tree from B<sub>6</sub>, 8 marks), 2022–23 Q5(c) (RAHSUT-DELETE, 12), 2021–22 Q5(a) and 2022–23 Q8(b) (potential argument, in chapter 3), 2019–20 Q2(c) (f6, 8), 2017–18 Q7(a) (damaged tree of order 5, 4+6) and the running-time tables every year. <b>Syllabus note:</b> Bayzid sir's notes have a blank page headed "Amortized time complexity in Fibonacci heap" and no potential function, yet 2021–22 and 2022–23 both ask for the potential method. Learn it.</p>
+
+<h2>1. What "amortized" means</h2>
+<p>The worst case of one extract-min in a Fibonacci heap is O(n), but it can only be that slow after many cheap operations built a long root list. <b>Amortized cost</b> is the average cost per operation over a worst-case sequence. It is a guarantee about whole sequences, not about luck. There are three standard methods.</p>
+<div class="tbl"><table>
+<tr><th>Method</th><th>Idea</th><th>Example</th></tr>
+<tr><td>Aggregate</td><td>Bound the total cost T(n) of n operations, then divide: T(n)/n.</td><td>n increments of a binary counter flip at most 2n bits, so 2 per increment.</td></tr>
+<tr><td>Accounting</td><td>Charge each operation a fixed price. Cheap operations are overcharged and the extra is stored as credit that pays for later expensive ones.</td><td>Binary counter: charge 2 to set a bit to 1, 1 of it stays on the bit to pay for resetting it later.</td></tr>
+<tr><td>Potential</td><td>Define a potential \(\Phi\) of the data structure (stored "work"). Amortized cost = actual cost + \(\Phi(\text{after}) - \Phi(\text{before})\).</td><td>Binomial heap insert: \(\Phi\) = number of trees.</td></tr>
+</table></div>
+<div class="key"><p><b>Potential method in four lines.</b> Choose \(\Phi \ge 0\) with \(\Phi(\text{start}) = 0\). For each operation write \(\hat c = c + \Delta\Phi\). Then \(\sum \hat c = \sum c + \Phi_{\text{end}} - \Phi_{\text{start}} \ge \sum c\), so the amortized total bounds the actual total. Pick \(\Phi\) so that expensive operations make \(\Delta\Phi\) very negative.</p></div>
+
+<h2>2. The Fibonacci heap potential</h2>
+<p>\(\Phi(H) = t(H) + 2\,m(H)\), where t is the number of trees in the root list and m is the number of marked nodes. Why these two? A long root list is the work that the next extract-min must do, so every root stores 1 unit of potential. A marked node is a node that may soon be cascaded, and each cascading cut will create a root and cost a unit, so a mark stores 2 units. When the cut happens it removes the mark (−2) and adds a root (+1), and the net −1 pays for the cut itself.</p>
+<p>Let D(n) be the maximum degree of any node in an n-node heap. Section 3 shows \(D(n) \le \lfloor\log_\varphi n\rfloor = O(\log n)\).</p>
+<div class="tbl"><table>
+<tr><th>Operation</th><th>Actual cost</th><th>\(\Delta\Phi\)</th><th>Amortized</th></tr>
+<tr><td>Insert</td><td>1</td><td>+1 (one new tree)</td><td>2 = O(1)</td></tr>
+<tr><td>Union</td><td>1</td><td>0 (\(\Phi(H) = \Phi(H_1)+\Phi(H_2)\))</td><td>1 = O(1)</td></tr>
+<tr><td>Extract-min</td><td>\(O(D(n) + t(H))\)</td><td>\(\le D(n) + 1 - t(H)\)</td><td>O(D(n)) = O(log n)</td></tr>
+<tr><td>Decrease-key</td><td>O(c)</td><td>\(\le 4 - c\)</td><td>O(1)</td></tr>
+<tr><td>Delete</td><td>decrease-key + extract-min</td><td></td><td>O(log n)</td></tr>
+</table></div>
+
+<div class="method"><h4>Proof · amortized costs (write one line per operation)</h4><ol>
+<li><b>Insert.</b> The new node is a new root: t rises by 1, m unchanged. \(\hat c = 1 + 1 = 2\).</li>
+<li><b>Union.</b> Splice the lists: cost 1. Trees and marks just add up, so \(\Delta\Phi = 0\) and \(\hat c = 1\).</li>
+<li><b>Extract-min.</b> The min's at most D(n) children join the root list (cost O(D(n))). Consolidate then walks a root list of at most \(D(n) + t(H) - 1\) roots, and each step is a link or a store, O(1). Actual cost \(O(D(n) + t(H))\).</li>
+<li>After consolidation all root degrees differ and are at most D(n), so \(t(H') \le D(n)+1\). No mark is added (children lose their marks if anything), so \(m(H') \le m(H)\). Hence \(\Delta\Phi \le (D(n)+1) - t(H)\).</li>
+<li>\(\hat c = O(D(n)+t(H)) + D(n) + 1 - t(H)\). Scale the unit of potential up so that the \(-t(H)\) term cancels the \(O(t(H))\) in the actual cost. Then \(\hat c = O(D(n)) = O(\log n)\).</li>
+<li><b>Decrease-key.</b> Let c be the number of calls to CASCADING-CUT (the first is the call after the first CUT). That is one CUT for x plus \(c-1\) cascading cuts: actual cost O(c).</li>
+<li>Trees: x and each of the \(c-1\) cut ancestors become roots, so \(t(H') = t(H) + c\). Marks: each of the \(c-1\) cascading cuts clears a mark, and the last call marks at most one node, so \(m(H') \le m(H) - (c-1) + 1 = m(H) - c + 2\).</li>
+<li>\(\Delta\Phi \le c + 2(2 - c) = 4 - c\). \(\hat c = O(c) + 4 - c = O(1)\) after scaling. ∎</li>
+<li><b>Delete</b> is decrease-key to \(-\infty\) (O(1)) plus extract-min (O(log n)): O(log n).</li>
+</ol></div>
+<p>A worked check on the heaps from chapter 4. 2024–25 Q4(d) extract-min: before, 5 roots and no marks, \(\Phi = 5\). After, 3 roots, \(\Phi = 3\). \(\Delta\Phi = -2\): 3 children were added (+3), the removed min took away 1, and 4 links removed 4. The decrease-key example (30 to 2, with 18 and 21 marked): before \(t = 3\), \(m = 2\), \(\Phi = 7\); after \(t = 6\), \(m = 0\), \(\Phi = 6\), with \(c = 3\) calls (cut 21, cut 18, stop at root 7). \(\Delta\Phi = -1 \le 4 - c = 1\). ✓</p>
+<div id="t1"></div>
+
+<h2>3. Why D(n) = O(log n): the Fibonacci numbers</h2>
+<p>Notation: \(F_0 = 0\), \(F_1 = 1\), \(F_{k+2} = F_{k+1} + F_k\). So 0, 1, 1, 2, 3, 5, 8, 13, 21, ... <b>Lemma:</b> any node x of degree k in a Fibonacci heap has at least \(F_{k+2}\) nodes in its subtree. Then \(n \ge F_{k+2} \ge \varphi^k\) gives \(k \le \log_\varphi n\).</p>
+<div class="method"><h4>Proof · size of a node of degree k</h4><ol>
+<li>Let \(y_1, \dots, y_k\) be the children of x in the order they were linked to x.</li>
+<li>When \(y_i\) was linked to x, x already had the \(i-1\) children \(y_1..y_{i-1}\). Linking only joins roots of <b>equal degree</b>, so \(y_i\) had degree at least \(i-1\) then.</li>
+<li>Since then \(y_i\) has lost at most one child (a second loss would have cut \(y_i\) away from x). So \(\deg y_i \ge i-2\), for \(i \ge 2\); and \(\deg y_1 \ge 0\).</li>
+<li>Let \(s_k\) be the minimum size of a subtree whose root has degree k. Then \(s_0 = 1\), \(s_1 = 2\), and \[ s_k \ge 2 + \sum_{i=2}^{k} s_{i-2} \] (1 for x itself, 1 for \(y_1\), and at least \(s_{i-2}\) for each \(y_i\) with \(i\ge2\)).</li>
+<li>Claim \(s_k \ge F_{k+2}\), by strong induction. Base: \(s_0 = 1 = F_2\), \(s_1 = 2 = F_3\). Step: \[ s_k \ge 2 + \sum_{i=2}^{k} F_i = 1 + \sum_{i=0}^{k} F_i = F_{k+2}, \] using \(F_0 + F_1 = 1\) and the identity \(F_{k+2} = 1 + \sum_{i=0}^{k} F_i\) (provable by induction: \(F_{k+2} = F_{k+1} + F_k = 1 + \sum_{i=0}^{k-1}F_i + F_k\)).</li>
+<li>\(F_{k+2} \ge \varphi^k\) where \(\varphi = (1+\sqrt5)/2\) satisfies \(\varphi^2 = \varphi + 1\). Base: \(F_2 = 1 \ge \varphi^0\), \(F_3 = 2 \ge \varphi\). Step: \(F_{k+2} = F_{k+1} + F_k \ge \varphi^{k-1} + \varphi^{k-2} = \varphi^{k-2}(\varphi+1) = \varphi^k\).</li>
+<li>So \(n \ge \varphi^k\), i.e. \(D(n) \le \lfloor\log_\varphi n\rfloor = O(\log n)\). ∎</li>
+</ol></div>
+<p>Bayzid sir's notes say the same through "f<sub>k</sub> has f<sub>k−1</sub> and f<sub>k−2</sub> as subtrees, so the size is a Fibonacci number, at least \(c^k\) with c the golden ratio", and conclude the root list has length \(O(\log_c n)\). His notes write f<sub>0</sub> = f<sub>1</sub> = 1; with the tree size counted as above, the sizes are 1, 2, 3, 5, 8, 13, 21 for degree 0, 1, 2, ... (\(F_{k+2}\)). The growth is the same, so the conclusion is the same.</p>
+
+<h2>4. The maximally damaged tree</h2>
+<p><b>Definition (2017–18 Q7(a), 4 marks).</b> A <b>maximally damaged tree of degree k</b> is the smallest tree that a Fibonacci heap can contain with a root of degree k: start from a binomial tree B<sub>k</sub> and cut off as many nodes as the mark rule allows, keeping the root's degree k. Every non-root node may have lost at most one child (a node that lost two would itself have been cut). Its size is \(F_{k+2}\), so it is the tree that makes the bound of section 3 tight.</p>
+<div class="method"><h4>Method · draw the maximally damaged tree from B<sub>k</sub> (2024–25 Q4(b); 2019–20 Q2(c); 2017–18 Q7(a))</h4><ol>
+<li>Draw (or imagine) B<sub>k</sub>. Its root has children B<sub>0</sub>, B<sub>1</sub>, ..., B<sub>k−1</sub>. The <b>root keeps all k children</b>: otherwise its degree would drop.</li>
+<li>Each child B<sub>j</sub> (j ≥ 1) may lose <b>one</b> child, and you remove its <b>largest</b> one, B<sub>j−1</sub>. B<sub>0</sub> has nothing to lose and stays.</li>
+<li>The children B<sub>j</sub> had left, B<sub>0</sub> ... B<sub>j−2</sub>, are now damaged the same way, recursively (each loses its largest child, down to the leaves).</li>
+<li>Mark every non-root node that lost a child. Count the nodes: for degree k you must get \(F_{k+2}\).</li>
+</ol></div>
+<p>In the same shape: the damaged tree D<sub>k</sub> is a root with children D<sub>0</sub>, D<sub>0</sub>, D<sub>1</sub>, D<sub>2</sub>, ..., D<sub>k−2</sub>. The same thing says D<sub>k</sub> = D<sub>k−1</sub> with a D<sub>k−2</sub> hung from its root (Bayzid sir's "f<sub>k</sub> has subtrees f<sub>k−1</sub> and f<sub>k−2</sub>"). Marked nodes carry a star. Sizes are 3, 5, 8, 13, 21.</p>
+<div class="figrow">
+<div><div class="figlabel">degree 2 (3 nodes)</div><div id="g2"></div></div>
+<div><div class="figlabel">degree 3 (5 nodes)</div><div id="g3"></div></div>
+<div><div class="figlabel">degree 4 (8 nodes)</div><div id="g4"></div></div>
+</div>
+<div class="figlabel">Degree 5 (13 nodes): the answer to 2017–18 Q7(a)</div>
+<div id="g5"></div>
+<div class="figlabel">Degree 6 (21 nodes): the answer to 2024–25 Q4(b) and 2019–20 Q2(c). The root's children keep 1, 1, 2, 3, 5, 8 of the 1, 2, 4, 8, 16, 32 nodes they had in B<sub>6</sub>. 64 nodes become 21.</div>
+<div id="g6"></div>
+<div class="tbl"><table>
+<tr><th>Child of the root in B<sub>6</sub></th><th>B<sub>0</sub></th><th>B<sub>1</sub></th><th>B<sub>2</sub></th><th>B<sub>3</sub></th><th>B<sub>4</sub></th><th>B<sub>5</sub></th></tr>
+<tr><td>Nodes before</td><td>1</td><td>2</td><td>4</td><td>8</td><td>16</td><td>32</td></tr>
+<tr><td>Degree after</td><td>0</td><td>0</td><td>1</td><td>2</td><td>3</td><td>4</td></tr>
+<tr><td>Nodes after</td><td>1</td><td>1</td><td>2</td><td>3</td><td>5</td><td>8</td></tr>
+</table></div>
+<p>Total: 1 (root) + 1 + 1 + 2 + 3 + 5 + 8 = 21 = \(F_8\). ✓ A node of degree j keeps \(j-1\) children (it lost one), so those children are the damaged B<sub>0</sub>, ..., B<sub>j−2</sub>.</p>
+<div class="drawit"><b>On paper:</b> draw B<sub>6</sub> as the root with a row of six boxes labelled B<sub>0</sub> to B<sub>5</sub> under it (you cannot draw 64 nodes). Under each box draw the damaged tree that remains (sizes 1, 1, 2, 3, 5, 8), starring the marked nodes, and write the node count below each. Cross out what was cut. Write "21 = F<sub>8</sub>" and "root degree is still 6". If the question says "draw f6" draw only the 21-node tree.</div>
+
+<h2>5. 2022–23 Q5(c): RAHSUT-DELETE (12 marks)</h2>
+<p>Professor Rahsut proposes this variant of FIB-HEAP-DELETE:</p>
+<pre class="code">RAHSUT-DELETE(H, x)
+  if x == H.min
+    FIB-HEAP-EXTRACT-MIN(H)
+  else
+    y = x.p
+    if y != NIL
+      CUT(H, x, y)               // cut x from its parent y, x becomes a root
+      CASCADING-CUT(H, y)        // recursively mark and cut parents if needed
+    add x's child list to the root list of H
+    remove x from the root list of H</pre>
+<p>This is CLRS Problem 19-4. It avoids the full extract-min but the saving is not real. Let c be the number of calls to CASCADING-CUT.</p>
+<div class="method"><h4>(i) Upper bound on the actual time when x is not H.min</h4><ol>
+<li>CUT(x, y): O(1).</li>
+<li>CASCADING-CUT: c calls, each O(1) (a mark test and possibly a cut): O(c).</li>
+<li>Adding x's children to the root list, one at a time: O(x.degree).</li>
+<li>Removing x from the root list: O(1).</li>
+<li>Actual time \(= O(x.\text{degree} + c)\).</li>
+</ol></div>
+<div class="method"><h4>(ii) The potential of H' (x not a root)</h4><ol>
+<li>Trees: x and each of the \(c-1\) cascade-cut ancestors become roots, so \(t(H)+c\). x's children join the root list: \(+ x.\text{degree}\). x is removed: \(-1\). So \(t(H') = t(H) + c + x.\text{degree} - 1\).</li>
+<li>Marks: the \(c-1\) cascading cuts clear marks and the last call marks at most one node. So \(m(H') \le m(H) - (c-1) + 1 = m(H) - c + 2\). (If x itself was marked, removing it only lowers this.)</li>
+<li>\(\Phi(H') = t(H') + 2m(H') \le t(H) + c + x.\text{degree} - 1 + 2m(H) - 2c + 4\).</li>
+<li>\[ \Phi(H') \le t(H) + 2m(H) + x.\text{degree} - c + 3. \]</li>
+</ol></div>
+<div class="method"><h4>(iii) Amortized time: the professor's claim is wrong</h4><ol>
+<li>\(\hat c = \text{actual} + \Phi(H') - \Phi(H) \le O(x.\text{degree} + c) + x.\text{degree} - c + 3\).</li>
+<li>Scale the potential so that \(-c\) cancels the \(O(c)\). What is left is \(O(x.\text{degree})\).</li>
+<li>x.degree can be \(\Theta(\log n)\), for example x = a child of the root of a large binomial-like tree B<sub>k</sub> (its child B<sub>k−1</sub> has degree k−1). Deleting it does \(\Theta(k)\) work and creates k−1 new roots, so \(\Phi\) rises by \(\Theta(k)\): amortized \(\Theta(\log n)\), not O(1).</li>
+<li>FIB-HEAP-DELETE is O(D(n)) = O(log n) amortized too. So RAHSUT-DELETE is asymptotically no better.</li>
+</ol></div>
+<div class="trap"><h4>Where marks go</h4><ul>
+<li>Not defining c. Say "c is the number of calls to CASCADING-CUT" before using it.</li>
+<li>Forgetting that x's children enter the root list: they add x.degree to the actual cost and to t.</li>
+<li>Writing the potential without \(t(H) + 2m(H)\) in it. The whole answer is in those two terms.</li>
+<li>Concluding O(1). The result has an x.degree term, and x.degree is not constant.</li>
+<li>Counting the trees as \(t(H) + c\) and forgetting that x is removed: that is \(-1\).</li>
+</ul></div>
+
+<h2>6. Mandatory practice</h2>
+<p>These four are all "write it out" questions. The model answers use the same shapes as above.</p>
+<div id="r1"></div>
+<div id="r2"></div>
+<div id="r3"></div>
+<div id="r4"></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/algo.js"></script>
+<script src="../assets/dsa.js"></script>
+<script>
+forestFig('#g2', '1(2 3*)');
+forestFig('#g3', '1(2 3* 4*(5))');
+forestFig('#g4', '1(2 3* 4*(5) 6*(7 8*))');
+forestFig('#g5', '1(2 3* 4*(5) 6*(7 8*) 9*(10 11* 12*(13)))');
+forestFig('#g6', '1(2 3* 4*(5) 6*(7 8*) 9*(10 11* 12*(13)) 14*(15 16* 17*(18) 19*(20 21*)))');
+trace('#t1', { kind: 'fib', input: '7(18*(21*(30) 25) 38) 3 12 min=3 ; dec 30 2' });
+recall('#r1', { id: 'r1', marks: 12, q: 'Using the potential function \\(\\Phi(H) = t(H) + 2m(H)\\), find the amortized cost of insert, union, extract-min and decrease-key in a Fibonacci heap. State D(n) and why it is O(log n).', points: ['Insert: actual 1, ΔΦ = +1, amortized 2', 'Union: actual 1, ΔΦ = 0, amortized 1', 'Extract-min: actual O(D(n) + t), t(H\') ≤ D(n) + 1, ΔΦ ≤ D(n) + 1 − t, amortized O(D(n))', 'Decrease-key with c cascading-cut calls: actual O(c), t rises by c, m falls by at least c − 2, ΔΦ ≤ 4 − c, amortized O(1)', 'Scale the potential units so the −c and −t terms cancel the hidden constants', 'D(n) ≤ log_φ n because a node of degree k has at least F(k+2) ≥ φ^k descendants'], model: `<ol><li>Insert: one new root, \\(\\Delta\\Phi = +1\\), \\(\\hat c = 1+1 = 2\\).</li><li>Union: \\(\\Phi(H)=\\Phi(H_1)+\\Phi(H_2)\\), \\(\\Delta\\Phi = 0\\), \\(\\hat c = 1\\).</li><li>Extract-min: actual cost \\(O(D(n)+t(H))\\). After consolidation the roots have distinct degrees at most D(n), so \\(t(H')\\le D(n)+1\\); marks do not increase. \\(\\Delta\\Phi\\le D(n)+1-t(H)\\). Scale the potential so the \\(-t(H)\\) pays for the O(t(H)): \\(\\hat c = O(D(n))\\).</li><li>Decrease-key with c calls of cascading cut: actual O(c). Trees \\(t(H)+c\\). Marks \\(\\le m(H)-(c-1)+1\\). \\(\\Delta\\Phi\\le c+2(2-c) = 4-c\\). \\(\\hat c = O(c)+4-c = O(1)\\).</li><li>\\(D(n)\\le\\log_\\varphi n\\): a node of degree k has at least \\(F_{k+2}\\ge\\varphi^k\\) nodes below it (its i-th child has degree at least i−2), and the total is at most n. So \\(D(n) = O(\\log n)\\) and extract-min is \\(O(\\log n)\\) amortized.</li></ol>` });
+recall('#r2', { id: 'r2', marks: 12, q: 'RAHSUT-DELETE(H, x) (figure in the paper): if x is the min, extract-min; otherwise cut x from its parent, run CASCADING-CUT on the parent, add x\'s children to the root list and remove x from the root list. (i) Bound the actual time in terms of x.degree and c, the number of calls to CASCADING-CUT. (ii) Give the potential of the resulting heap H\'. (2022–23 Q5(c))', points: ['Actual time O(x.degree + c): CUT O(1), c cascading calls, x.degree children moved', 't(H\') = t(H) + c + x.degree − 1', 'm(H\') ≤ m(H) − c + 2', 'Φ(H\') ≤ t(H) + 2m(H) + x.degree − c + 3', 'Amortized cost O(x.degree), which can be Θ(log n), so no better than FIB-HEAP-DELETE'], model: `<ol><li>Actual time: CUT is O(1); CASCADING-CUT is called c times, O(1) each; moving x's children to the root list costs \\(O(x.\\text{degree})\\). Total \\(O(x.\\text{degree}+c)\\).</li><li>Trees: x and the \\(c-1\\) cut ancestors become roots (\\(+c\\)), x's children join the root list (\\(+x.\\text{degree}\\)), x is removed (\\(-1\\)): \\(t(H')=t(H)+c+x.\\text{degree}-1\\).</li><li>Marks: \\(c-1\\) are cleared, at most one is set: \\(m(H')\\le m(H)-c+2\\).</li><li>\\(\\Phi(H') = t(H')+2m(H')\\le t(H)+2m(H)+x.\\text{degree}-c+3\\).</li><li>Amortized \\(= O(x.\\text{degree}+c)+x.\\text{degree}-c+3 = O(x.\\text{degree})\\) after scaling. Since \\(x.\\text{degree}\\) can be \\(\\Theta(\\log n)\\), this is not O(1) and is no better than FIB-HEAP-DELETE.</li></ol>` });
+recall('#r3', { id: 'r3', marks: 10, q: 'Prove that a node of degree k in a Fibonacci heap has at least \\(F_{k+2}\\) nodes in its subtree, and conclude that the maximum degree is \\(O(\\log n)\\).', points: ['Order the children by linking time y1..yk', 'Child yi had degree ≥ i−1 when linked, and has lost at most one child since: degree ≥ i−2', 's_k ≥ 2 + sum_{i=2..k} s_{i−2}', 'Induction: s_k ≥ F_(k+2), using 1 + sum_{i=0..k} F_i = F_(k+2)', 'F_(k+2) ≥ φ^k', 'n ≥ φ^k so k ≤ log_φ n'], model: `<ol><li>Let \\(y_1,\\dots,y_k\\) be the children of x in the order they were linked to x.</li><li>When \\(y_i\\) was linked, x had \\(i-1\\) children, and linking joins roots of equal degree, so \\(\\deg y_i\\ge i-1\\). Since then \\(y_i\\) lost at most one child, so \\(\\deg y_i\\ge i-2\\).</li><li>Let \\(s_k\\) be the least subtree size at degree k: \\(s_0=1,\\ s_1=2,\\ s_k\\ge 2+\\sum_{i=2}^k s_{i-2}\\).</li><li>Induction: \\(s_k\\ge 2+\\sum_{i=2}^kF_i = 1+\\sum_{i=0}^kF_i = F_{k+2}\\).</li><li>\\(F_{k+2}\\ge\\varphi^k\\) by induction using \\(\\varphi^2=\\varphi+1\\).</li><li>So \\(n\\ge\\varphi^k\\) and \\(k\\le\\log_\\varphi n = O(\\log n)\\).</li></ol>` });
+recall('#r4', { id: 'r4', marks: 8, q: 'What is a maximally damaged tree in a Fibonacci heap? Draw the maximally damaged tree that results from the binomial tree B<sub>6</sub> (root degree 6), and give its number of nodes. (2024–25 Q4(b), 2019–20 Q2(c), 2017–18 Q7(a))', points: ['Definition: smallest tree with root degree k, each non-root node lost at most one child', 'Root keeps all 6 children', 'Children B0..B5 become sizes 1, 1, 2, 3, 5, 8', 'Each damaged node has lost its largest child and its other children are damaged the same way', 'Marked nodes starred', 'Total 21 = F8 nodes; D6 = D5 plus D4 under the root'], model: `<p>A maximally damaged tree of degree k is the smallest tree a Fibonacci heap can hold with a root of degree k. Every non-root node has lost at most one child (a second loss would have cut it). From B<sub>6</sub>: the root keeps its six children B<sub>0</sub>, ..., B<sub>5</sub>. B<sub>0</sub> stays. Each B<sub>j</sub> (j ≥ 1) loses its largest child B<sub>j−1</sub> and its remaining children are damaged the same way. The six subtrees end with 1, 1, 2, 3, 5, 8 nodes, so the tree has \\(1+1+1+2+3+5+8 = 21 = F_8\\) nodes.</p><p>As nested text, with marked nodes starred: <code>1(2 3* 4*(5) 6*(7 8*) 9*(10 11* 12*(13)) 14*(15 16* 17*(18) 19*(20 21*)))</code>. Equivalently, D<sub>6</sub> is D<sub>5</sub> (13 nodes) with a D<sub>4</sub> (8 nodes) hung from its root.</p>` });
+</script>
+</body>
+</html>

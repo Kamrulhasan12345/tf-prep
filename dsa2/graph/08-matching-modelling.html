@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Matching and Flow Modelling · CSE 207 Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Maximum flow applications · CLRS §26.3 · Monirul Islam sir L18, slide 18 · must-know</div>
+<h1>Bipartite Matching and Modelling Problems as Flow</h1>
+<p class="lede">Asked as a modelling question in nearly every paper. 2024–25 Q8(a) (relief warehouse, 20). 2022–23 Q3(b)(c) (formulate bipartite matching, two real-life examples 6+6; solve it, 10; Edmonds-Karp 5). 2021–22 Q4(b) (car parking, 12 + 15). 2020–21 3(a) (which single edge to enlarge) and 4(a) (edge connectivity by max flow). 2019–20 Q8(b) (backup sets, 10+7+6).</p>
+<div class="key"><p><b>Syllabus note.</b> Bayzid sir's notes say "reduction will not come" (boxed for the class test). Term finals ask reductions nearly every year, and four of the papers above are pure modelling. Learn this chapter.</p></div>
+
+<h2>1. Maximum bipartite matching</h2>
+<dl class="def">
+<dt>Bipartite graph</dt><dd>\(G=(L\cup R,E)\): vertices split into a left set L and a right set R. Every edge joins one vertex of L to one vertex of R.</dd>
+<dt>Matching</dt><dd>A set of edges \(M\subseteq E\) in which no two edges share a vertex. Each vertex is used at most once.</dd>
+<dt>Maximum matching</dt><dd>A matching with the most edges.</dd>
+</dl>
+<h3>1.1 Real-life examples (2022–23 Q3(b), two needed)</h3>
+<ul>
+<li><b>Jobs and applicants.</b> L = applicants, R = jobs, an edge when the applicant is qualified for the job. A matching gives each person at most one job and each job at most one person. Maximum matching = most jobs filled.</li>
+<li><b>Exam rooms and exams.</b> L = exams in one time slot, R = rooms, an edge when the room is big enough. Maximum matching = most exams that can run at once.</li>
+<li><b>Cars and parking spots</b> (section 3.5), <b>students and project supervisors</b>, <b>donors and recipients</b>: same shape.</li>
+</ul>
+<h3>1.2 The reduction to max flow</h3>
+<div class="method"><h4>Method · build the flow network G'</h4><ol>
+<li>Add a source s and a sink t.</li>
+<li>Direct every edge of G from L to R, capacity <b>1</b>.</li>
+<li>Add an edge s→l with capacity 1 for every l in L.</li>
+<li>Add an edge r→t with capacity 1 for every r in R.</li>
+<li>Run Ford-Fulkerson. <b>Max matching size = max flow value.</b> The matching is the set of L→R edges with flow 1.</li>
+</ol></div>
+<p>Example: left vertices x1, x2, x3; right vertices y1, y2, y3. Edges x1–y1, x1–y2, x2–y1, x3–y1. (y3 has no edges.)</p>
+<div id="f1"></div>
+<p>Watch the second augmentation. The first path matches x1 with y1. The second path goes s, x2, y1, then <b>backward</b> to x1 (the residual edge y1→x1, "cancel x1–y1"), then x1 to y2. Result: x1–y2 and x2–y1. A backward edge in the residual network means "undo an earlier match". The slides call such a path an alternating path.</p>
+<div id="t1"></div>
+<div class="drawit"><b>On paper:</b> draw the left column, the right column, then s and t with the capacity-1 edges. Label every edge 1. After the run, circle the middle edges with flow 1 and write "matching = {x1–y2, x2–y1}, size 2". Also state: x3 stays unmatched because its only neighbour y1 is taken (the min cut shows it: S = {s, x3, x2, y1} has capacity 2).</div>
+
+<h3>1.3 Why it is correct (7 marks in 2019–20 had the same proof shape)</h3>
+<p>Claim: the size of a maximum matching in G equals the value of a max flow in G'.</p>
+<ol>
+<li><b>Matching ⇒ flow.</b> Given a matching M, send one unit along s→l→r→t for each (l,r) in M. Capacities hold (every edge carries 0 or 1, and each vertex is in at most one edge of M, so s→l and r→t carry at most 1). Conservation holds on every l and r. The value is |M|.</li>
+<li><b>Flow ⇒ matching.</b> Capacities are integers, so Ford-Fulkerson returns an <b>integer</b> max flow f (integrality, chapter 07). Every edge then carries 0 or 1.</li>
+<li>Each l receives at most 1 unit from s, so by conservation at most one edge out of l has flow 1. Each r sends at most 1 unit to t, so at most one edge into r has flow 1. So the middle edges with flow 1 form a matching M.</li>
+<li>\(|M|\) = flow across the cut \((\{s\}\cup L,\ R\cup\{t\})\) = |f|.</li>
+<li>So max matching ≥ max flow (step 4) and max flow ≥ max matching (step 1). They are equal. \(\blacksquare\)</li>
+</ol>
+<h3>1.4 Runtime</h3>
+<p>The flow value is at most \(\min(|L|,|R|)\le V\), so Ford-Fulkerson takes at most V augmentations, each \(O(E)\) (G' has \(E+V\) edges). <b>Total \(O(VE)\).</b> Edmonds-Karp would give the weaker bound \(O(VE^2)\); for 2022–23 Q3(c) say: "the Edmonds-Karp idea is to pick the shortest augmenting path by BFS, giving \(O(VE^2)\) for any capacities (chapter 07). Here the flow is at most V, so plain FF is already \(O(VE)\)."</p>
+<div class="trap"><h4>Where marks go</h4><ul>
+<li>Forgetting the direction: edges go s → L → R → t, never back.</li>
+<li>Forgetting that all capacities are 1 (the middle ones too; otherwise one vertex may be matched twice).</li>
+<li>Skipping the integrality argument. Without it a fractional flow does not give a matching.</li>
+<li>Not saying how to read the matching: the middle edges that carry flow 1.</li>
+</ul></div>
+
+<h2>2. How to model any word problem as flow</h2>
+<div class="method"><h4>Method · the six steps</h4><ol>
+<li><b>What moves?</b> Name one unit of flow (a package, a person, a job).</li>
+<li><b>Source and sink.</b> The place the units start; the place they must reach. If there are several, add a super source and super sink (chapter 06).</li>
+<li><b>Intermediate nodes.</b> One node per thing that can be used up: depots, zones, devices, rooms.</li>
+<li><b>Edges.</b> One edge for every allowed move, from where it starts to where it ends.</li>
+<li><b>Capacities.</b> Every limit in the text becomes a capacity. A limit on a vertex goes on the edge from s into it, on the edge from it to t, or is a split \(v_{in}\to v_{out}\). If a route has no limit, use \(\infty\) (9999).</li>
+<li><b>Answer.</b> Run Ford-Fulkerson. Say what the value means in the story, and read the assignment from the edges that carry flow.</li>
+</ol></div>
+
+<h2>3. The exam problems</h2>
+<h3>3.1 Relief warehouse (2024–25 Q8(a), 20 marks)</h3>
+<p><b>Problem.</b> A warehouse (unlimited supply) feeds depots D1, D2, D3 with daily sending capacities 15, 20, 10. Zones Z1 to Z4 can receive at most 10, 15, 10, 10. Routes: D1 to {Z1, Z2}; D2 to {Z1, Z3, Z4}; D3 to {Z2, Z4}. Find the maximum packages per day.</p>
+<p><b>Model.</b></p>
+<ul>
+<li>Source = the warehouse W. Sink = a new vertex T (all zones deliver to T).</li>
+<li>Intermediate nodes = the depots D1, D2, D3 and the zones Z1 to Z4.</li>
+<li>W→Di with capacity = the depot's sending capacity: 15, 20, 10. (The warehouse itself is unlimited, so the depot limit sits on this edge.)</li>
+<li>Di→Zj for each allowed route, capacity \(\infty\) (the text gives no limit on a route; use 9999 in the engine).</li>
+<li>Zj→T with capacity = the zone's receiving limit: 10, 15, 10, 10.</li>
+</ul>
+<div id="f2"></div>
+<p><b>Apply Ford-Fulkerson.</b> The engine below explores in alphabetical order. Step through it: five augmenting paths. Paths 3 and 5 use backward edges (they re-route packages already sent, for example path 3 takes 10 units away from D1 to Z1 and sends them from D2 instead).</p>
+<div id="t2"></div>
+<p><b>Result from the trace.</b></p>
+<div class="tbl"><table class="mat">
+<tr><th>Augmenting path</th><th>Bottleneck</th><th>Total</th></tr>
+<tr><td>W D1 Z1 T</td><td>10</td><td>10</td></tr>
+<tr><td>W D1 Z2 T</td><td>5</td><td>15</td></tr>
+<tr><td>W D2 Z1 D1 Z2 T</td><td>10</td><td>25</td></tr>
+<tr><td>W D2 Z3 T</td><td>10</td><td>35</td></tr>
+<tr><td>W D3 Z2 D1 Z1 D2 Z4 T</td><td>10</td><td>45</td></tr>
+</table></div>
+<p>Final flow on the depot-to-zone edges: D1→Z1 10, D1→Z2 5, D2→Z3 10, D2→Z4 10, D3→Z2 10 (D2→Z1 and D3→Z4 carry 0). Check each depot: D1 sends 15, D2 20, D3 10. Check each zone: Z1 gets 10, Z2 15, Z3 10, Z4 10.</p>
+<div class="key"><p><b>Answer: 45 packages per day.</b> Check with a cut: total depot capacity is 15 + 20 + 10 = 45 and total zone limit is 10 + 15 + 10 + 10 = 45, so 45 is an upper bound, and the flow reaches it. The residual network reaches only W, so the min cut is the three edges out of W, capacity 45.</p></div>
+<div class="drawit"><b>On paper:</b> first the network with all capacities (9999 or the infinity sign on the middle edges). Then, for each augmentation, the residual network and the path. Finally the flow network with flow/capacity on every edge, the value 45 and the min cut. State in words what 45 means. A different order of paths is fine; the value must be 45.</div>
+
+<h3>3.2 Backup sets in an ad-hoc network (2019–20 Q8(b), 10+7+6)</h3>
+<p><b>Problem.</b> n devices, distances d[i,j]. Each device i needs a backup set of exactly k devices within distance D. No device may be in more than b backup sets. Decide whether this is possible.</p>
+<p><b>(i) Reduction (10).</b> Vertices: s, t, a left vertex \(x_i\) for every device (as the one that needs backups), a right vertex \(y_j\) for every device (as a possible backup).</p>
+<ul>
+<li>\(s\to x_i\) with capacity <b>k</b> (device i needs k backups).</li>
+<li>\(x_i\to y_j\) with capacity <b>1</b> whenever \(i\ne j\) and \(d[i,j]\le D\) (j can back up i, at most once).</li>
+<li>\(y_j\to t\) with capacity <b>b</b> (j may serve at most b devices).</li>
+</ul>
+<p>A good collection of backup sets exists <b>if and only if the max flow has value nk</b>.</p>
+<p><b>(ii) Correctness (7).</b></p>
+<ol>
+<li><b>Collection ⇒ flow.</b> Given a good collection, send 1 unit along \(s\to x_i\to y_j\to t\) for every j in the backup set of i. Edge \(s\to x_i\) carries k (its capacity), each middle edge carries 1, edge \(y_j\to t\) carries the number of sets containing j, which is at most b. Conservation holds. The value is nk.</li>
+<li><b>Flow ⇒ collection.</b> Suppose the max flow has value nk. All capacities are integers, so there is an integer max flow. The edges out of s have total capacity nk, so all are saturated: \(x_i\) receives exactly k units. Each middle edge carries 0 or 1, so \(x_i\) sends flow on exactly k distinct edges \(x_i\to y_j\). Put j in the backup set of i for each of them. Every j is within D of i (edges exist only then), the sets have size k, and j is in at most b sets because \(y_j\to t\) carries at most b.</li>
+<li>No flow can exceed nk, because the cut \(\{s\}\) has capacity nk. So if the max flow is below nk, no good collection exists (step 1 would give a flow of value nk). \(\blacksquare\)</li>
+</ol>
+<p><b>(iii) Algorithm and time (6).</b> Build the network in \(O(n^2)\) and run Ford-Fulkerson. The network has \(2n+2\) vertices and at most \(n^2+2n\) edges, and the flow value is at most nk. Each augmentation is \(O(E)=O(n^2)\). Total \(O(n^2\cdot nk)=O(kn^3)\). Compare the max flow with nk, and if equal read the sets from the middle edges.</p>
+
+<h3>3.3 Edge connectivity by max flow (2020–21 4(a), 15 marks)</h3>
+<p><b>Problem.</b> The edge connectivity of an undirected graph is the smallest number of edges whose removal disconnects it. Compute it with max-flow runs on at most |V| networks of size O(V) vertices and O(E) edges.</p>
+<div class="method"><h4>Method</h4><ol>
+<li>Replace each undirected edge {u,v} by two directed edges u→v and v→u, each with capacity <b>1</b>.</li>
+<li>Fix any vertex \(v_0\) as the source.</li>
+<li>For every other vertex t (that is \(|V|-1\) choices), compute the max flow from \(v_0\) to t.</li>
+<li>The edge connectivity is the <b>smallest</b> of these \(|V|-1\) values.</li>
+</ol></div>
+<p><b>Why it works.</b></p>
+<ol>
+<li>For fixed \(v_0,t\): a cut \((S,T)\) of the directed network has capacity equal to the number of undirected edges with one end in S and the other in T, because each such edge contributes exactly one directed edge from S to T. Removing those edges disconnects \(v_0\) from t. So max flow \(v_0\)–t = min number of edges separating \(v_0\) from t, by max-flow min-cut. Call it \(\lambda(v_0,t)\).</li>
+<li>Every \(\lambda(v_0,t)\) is at least the edge connectivity \(\lambda\), because the separating edge set also disconnects the graph.</li>
+<li>Let C be a smallest disconnecting set, \(|C|=\lambda\). Removing C leaves two sides; \(v_0\) is on one of them, and the other side has some vertex t. Then \(\lambda(v_0,t)\le|C|\).</li>
+<li>So the smallest \(\lambda(v_0,t)\) over t equals \(\lambda\). \(\blacksquare\)</li>
+</ol>
+<p>Each network has |V| vertices and 2|E| edges. Each flow value is at most |V| − 1 (the degree of \(v_0\) is at most that), so each run of Ford-Fulkerson is \(O(VE)\) and the total is \(O(V^2E)\).</p>
+
+<h3>3.4 Which single edge should I enlarge? (2020–21 3(a), 10 marks)</h3>
+<p><b>Problem.</b> You may raise the capacity of only one edge. Which edge raises the max flow, and what is the running time?</p>
+<p><b>Idea.</b> Raising the capacity of an edge e raises the max flow only if e belongs to <b>every</b> min cut. (If some min cut avoids e, that cut keeps its capacity and the max flow stays. If e is in every min cut, every min cut gets bigger and the value rises, at least for a small increase.) After max flow, such edges are easy to spot in the residual network.</p>
+<pre class="code">BEST-EDGE(G, s, t)
+ compute max flow f and the residual network G_f
+ A = vertices reachable from s in G_f          // BFS from s
+ B = vertices that can reach t in G_f          // BFS from t on reversed G_f
+ return every edge (u,v) of G with u in A and v in B
+   (if there is none, no single edge helps)</pre>
+<p><b>Why such an edge is in every min cut.</b> Let (S,T) be any min cut. By the proof in chapter 07 no residual edge goes from S to T. A vertex reachable from s cannot leave S, so \(u\in S\). A vertex that can reach t cannot lie in S, so \(v\in T\). So (u,v) crosses every min cut from S to T. Such an edge is saturated, since otherwise v would be reachable from s. <b>Conversely</b>, if u is not reachable from s, the cut S = reachable set is a min cut with u in T, so e is not in it. If v cannot reach t, use T = vertices that can reach t.</p>
+<p><b>Running time:</b> one max-flow computation plus two BFS runs, \(O(E)\) extra. So it costs the same as computing the max flow. If the question asks for the best amount of gain, run max flow again with e's capacity set to infinity for each candidate, which is one more max flow per candidate.</p>
+
+<h3>3.5 Car parking (2021–22 Q4(b), 12 + 15 marks)</h3>
+<p><b>Problem.</b> Cars A and parking spots B lie on a road graph G. The cost for car a to use spot b is the shortest distance in G (infinity if unreachable). (i) Formulate with max-flow. (ii) Match every car so that the total cost is minimum.</p>
+<p><b>(i) Formulation (12).</b> This is bipartite matching (section 1) with cars on the left and spots on the right.</p>
+<ul>
+<li>s→a with capacity 1 for each car a.</li>
+<li>a→b with capacity 1 for every spot b the car can reach (finite cost). Unreachable pairs get no edge.</li>
+<li>b→t with capacity 1 for each spot b.</li>
+</ul>
+<p>The max flow equals the largest number of cars that can be parked. Every car can be parked if and only if the max flow is |A| (this needs \(|B|\ge|A|\)). By max-flow min-cut, if it is less than |A| the min cut shows the cars that cannot be placed.</p>
+<p><b>(ii) Minimum total cost (15).</b> The notes do not teach min-cost flow; the question bank expects the following. Put a <b>cost</b> on each edge: cost(a→b) = shortest distance from a to b in G, all other edges cost 0. Find a flow of value |A| with smallest total cost.</p>
+<div class="method"><h4>Method · min-cost flow by successive shortest paths</h4><ol>
+<li>Compute the costs: run Dijkstra on G from every car's location. This gives all distances d(a,b).</li>
+<li>Build the flow network above, with those costs.</li>
+<li>Check that the max flow is |A| (otherwise some car cannot be parked: report it).</li>
+<li>Start with flow 0. Repeat |A| times: in the residual network find the s→t path of <b>smallest total cost</b>, where a forward edge has its cost and a backward edge has the <b>negative</b> of its cost. Push 1 unit along it.</li>
+<li>Because backward edges have negative costs, find the path with Bellman-Ford (it also accepts negative edges).</li>
+<li>The cars matched by the final flow, a→b with flow 1, are the answer.</li>
+</ol></div>
+<p><b>Why it is right.</b> A flow has the minimum cost among all flows of its value exactly when its residual network has no negative-cost cycle (a negative cycle could be pushed around to lower the cost). Start: flow 0 has no negative cycle. Pushing along a shortest (cheapest) path keeps the property. After |A| rounds the flow has value |A| and minimum cost.</p>
+<p><b>Time.</b> Dijkstra phase: |A| runs, each \(O(E_G+V_G\log V_G)\). Flow phase: |A| rounds of Bellman-Ford on a network with \(|A|+|B|+2\) vertices and \(|A||B|+|A|+|B|\) edges: \(O(|A|\cdot VE)\) with those V, E. (The Hungarian algorithm does the same assignment in \(O(n^3)\); it is not in the notes, so only mention it.)</p>
+
+<h2>4. Mandatory practice</h2>
+<p>Write each answer out. Modelling is marked on the structure of the network first, so practise stating source, sink, nodes, edges and capacities in that order.</p>
+<div id="r1"></div>
+<div id="r2"></div>
+<div id="r3"></div>
+<div id="r4"></div>
+<div id="r5"></div>
+<div id="p1"></div>
+<p class="drawit"><b>If you got one wrong:</b> compare your network with the model: usually a capacity is missing (a depot or zone limit, or a capacity 1 on a matching edge).</p>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/algo.js"></script>
+<script src="../assets/dsa.js"></script>
+<script>
+const MATCH = 's>x1 1, s>x2 1, s>x3 1, x1>y1 1, x1>y2 1, x2>y1 1, x3>y1 1, y1>t 1, y2>t 1, y3>t 1';
+const WH = 'W>D1 15, W>D2 20, W>D3 10, D1>Z1 9999, D1>Z2 9999, D2>Z1 9999, D2>Z3 9999, D2>Z4 9999, D3>Z2 9999, D3>Z4 9999, Z1>T 10, Z2>T 15, Z3>T 10, Z4>T 10';
+graphFig('#f1', MATCH, { layer: true });
+graphFig('#f2', WH, { layer: true });
+trace('#t1', { kind: 'ff', input: MATCH, s: 's', t: 't' });
+trace('#t2', { kind: 'ff', input: WH, s: 'W', t: 'T' });
+recall('#r1', { id: 'r1', marks: 15, q: 'Formulate the maximum bipartite matching problem and give two real-life examples. Develop a solution, prove it correct, and state the running time. What is the Edmonds-Karp optimisation? (2022–23 Q3(b)(c))', points: ['Matching: edges with no shared vertex; maximum matching', 'Example 1 with left set, right set and edge meaning', 'Example 2 with left set, right set and edge meaning', 'Network: s to every l, L to R edges, every r to t, all capacity 1', 'Max matching = max flow', 'Matching to flow: one unit per matched edge', 'Flow to matching: integrality gives 0/1 flow; conservation limits each vertex to one edge', 'Time O(VE) since flow at most V', 'Edmonds-Karp: shortest augmenting path by BFS, O(VE^2)'], model: '<p>A matching is a set of edges, no two sharing a vertex. Examples: applicants and jobs (edge = qualified); exams and rooms (edge = room big enough).</p><p><b>Reduction.</b> Add s and t, edges s→l (l in L), l→r for each edge of G, r→t (r in R), all with capacity 1. Max matching = max flow.</p><p><b>Proof.</b> A matching M gives a flow of value |M| (one unit on s→l→r→t per edge). Conversely FF gives an integer max flow, so every edge carries 0 or 1; each l gets at most 1 unit so at most one outgoing edge has flow, and each r sends at most 1 unit, so the flow-1 middle edges form a matching of size |f|.</p><p><b>Time.</b> |f| ≤ min(|L|,|R|) ≤ V augmentations of O(E): O(VE). Edmonds-Karp picks the shortest augmenting path by BFS, O(VE²) for any capacities.</p>' });
+recall('#r2', { id: 'r2', marks: 20, q: 'A central warehouse (unlimited supply) feeds depots D1, D2, D3 with sending capacities 15, 20, 10. Zones Z1..Z4 have receiving limits 10, 15, 10, 10. Routes: D1 to Z1, Z2; D2 to Z1, Z3, Z4; D3 to Z2, Z4. Find the maximum packages per day with a flow network and Ford-Fulkerson. (2024–25 Q8(a))', points: ['Source = warehouse, sink = new vertex T', 'Intermediate nodes = depots and zones', 'W to Di with capacities 15, 20, 10', 'Di to Zj on each allowed route with infinite capacity', 'Zj to T with capacities 10, 15, 10, 10', 'Augmenting paths shown with bottlenecks and residual networks', 'Backward edges used where needed', 'Final flow labelled on every edge', 'Answer 45, with a cut or the bound 45 = 45 as check'], model: '<p>Source W, sink T. Edges W→D1 (15), W→D2 (20), W→D3 (10); D1→Z1, D1→Z2, D2→Z1, D2→Z3, D2→Z4, D3→Z2, D3→Z4 all with capacity ∞; Z1→T (10), Z2→T (15), Z3→T (10), Z4→T (10).</p><p>Augmenting paths: W D1 Z1 T (10); W D1 Z2 T (5); W D2 Z1 D1 Z2 T (10, uses the backward edge Z1→D1); W D2 Z3 T (10); W D3 Z2 D1 Z1 D2 Z4 T (10, uses backward edges Z2→D1 and Z1→D2). Total 45.</p><p>No residual path remains; the vertices reachable from W are only {W}, so the min cut is the three edges out of W with capacity 15+20+10 = 45. Flows: D1→Z1 10, D1→Z2 5, D2→Z3 10, D2→Z4 10, D3→Z2 10. <b>Max = 45 packages per day.</b></p>' });
+recall('#r3', { id: 'r3', marks: 23, q: 'Reduce the backup-set problem (n devices, backup sets of size k within distance D, no device in more than b sets) to max flow, prove the reduction correct and give the running time. (2019–20 Q8(b))', points: ['Vertices: s, t, x_i and y_j for each device', 's to x_i capacity k', 'x_i to y_j capacity 1 when i != j and d[i,j] <= D', 'y_j to t capacity b', 'Good collection exists iff max flow = nk', 'Collection to flow of value nk', 'Flow to collection: integer flow, s edges saturated, k distinct middle edges per x_i, y_j at most b', 'nk is an upper bound (cut {s})', 'Time O(E nk) = O(k n^3)'], model: '<p>Network: s→x_i (k), x_i→y_j (1) if i≠j and d[i,j]≤D, y_j→t (b). A good collection exists iff max flow = nk.</p><p>(⇒) Send a unit on s→x_i→y_j→t for each j in the backup set of i; capacities hold since each set has size k and j is in at most b sets. Value nk.</p><p>(⇐) The max flow can be taken integer. All s-edges are saturated, so each x_i sends k units on k distinct capacity-1 edges; those j form the backup set of i, within distance D. Edge y_j→t carries at most b, so j is in at most b sets. The cut {s} has capacity nk, so the value cannot exceed nk; if it is less, no collection exists.</p><p>Time: 2n+2 vertices, at most n²+2n edges, flow at most nk, so FF is O(n²·nk) = O(kn³).</p>' });
+recall('#r4', { id: 'r4', marks: 15, q: 'Show how to compute the edge connectivity of an undirected graph with at most |V| max-flow computations, and justify it. (2020–21 4(a))', points: ['Each undirected edge becomes two directed edges of capacity 1', 'Fix a source v0', 'Compute max flow v0 to t for every other vertex t', 'Answer is the minimum of these values', 'A cut of the network has capacity = number of undirected edges crossing it', 'Each value >= connectivity (separating set disconnects the graph)', 'A minimum disconnecting set separates v0 from some t, so the minimum is reached', 'Time O(V^2 E)'], model: '<p>Replace each edge {u,v} by u→v and v→u with capacity 1. Fix \\(v_0\\). For every other t compute the max flow \\(\\lambda(v_0,t)\\); output the minimum.</p><p>A cut (S,T) has capacity equal to the number of undirected edges between S and T, so by max-flow min-cut \\(\\lambda(v_0,t)\\) is the least number of edges separating \\(v_0\\) from t, hence at least the edge connectivity \\(\\lambda\\). Take a smallest disconnecting set C; \\(v_0\\) is on one side and some t is on the other, so \\(\\lambda(v_0,t)\\le|C|\\). Thus the minimum equals \\(\\lambda\\).</p><p>|V|−1 networks with |V| vertices and 2|E| edges; each flow value ≤ |V|−1 so each run is O(VE); total O(V²E).</p>' });
+recall('#r5', { id: 'r5', marks: 10, q: 'You may enlarge the capacity of only one edge. How do you find an edge that increases the max flow? Give pseudocode and the running time. (2020–21 3(a))', points: ['Only an edge in every min cut can help', 'Compute max flow and residual network', 'A = reachable from s in the residual network', 'B = vertices that can reach t in the residual network', 'Answer: edges (u,v) with u in A and v in B; none means no edge helps', 'Reason: such an edge crosses every min cut', 'Time: one max flow plus O(E)'], model: '<p>Raising e increases the max flow iff e lies in every min cut. After max flow f, let A = vertices reachable from s in \\(G_f\\) and B = vertices that can reach t in \\(G_f\\). Return all edges (u,v) with \\(u\\in A,v\\in B\\).</p><p>For any min cut (S,T) no residual edge leaves S, so \\(A\\subseteq S\\) and \\(B\\subseteq T\\): the edge crosses every min cut. If u∉A or v∉B, a min cut (S = A, or T = B) avoids the edge. Time: one max flow plus two BFS, O(E) extra.</p>' });
+practice('#p1', { id: 'p1', kind: 'flow', n: 1 });
+</script>
+</body>
+</html>

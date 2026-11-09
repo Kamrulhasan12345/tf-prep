@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Backtracking · CSE 207 Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Coping with NP-completeness · Bayzid sir L14 (slides "Coping with NP-completeness") · easy marks</div>
+<h1>Backtracking: SAT Trees and Hamiltonian Circuit</h1>
+<p class="lede">Asked as "use backtracking to decide whether this formula is satisfiable, show the tree" in 2024–25 Q3(c) (10), 2020–21 Q8(b) (find all satisfying assignments, 10) and 2018–19 Q8(c) (10). Asked as "backtracking for a Hamiltonian circuit, show the state-space tree" in 2017–18 Q3(c) (10). Also in the 2023–24 Q4(b) list of coping approaches. This chapter is mechanical: once you know the rules, every tree is the same drill.</p>
+
+<h2>1. The idea</h2>
+<p>An NP-complete problem has an exponential search space. For SAT with n variables there are \(2^n\) assignments. <b>Backtracking</b> grows a tree of partial solutions and <b>rejects a partial solution as soon as a small part of it is already bad</b>, so whole subtrees are never visited. Slide example: if the formula has the clause \((x_1 \vee x_2)\), every assignment with \(x_1 = x_2 = 0\) can be thrown away at once, which prunes a quarter of the space.</p>
+<p>At every node the algorithm classifies the sub-problem into one of three kinds:</p>
+<div class="tbl"><table>
+<tr><th>Class</th><th>For SAT it means</th><th>Action</th></tr>
+<tr><td><b>Failure</b></td><td>some clause has all its literals false (it became the empty clause)</td><td>stop here and backtrack. Do not branch on the remaining variables.</td></tr>
+<tr><td><b>Success</b></td><td>every clause is already satisfied</td><td>stop. Answer is YES. (To find all solutions, record it and continue.)</td></tr>
+<tr><td><b>Uncertain</b></td><td>neither of the above</td><td>branch on the next variable (0 and 1) and recurse.</td></tr>
+</table></div>
+<div class="key"><p><b>The node label is the residual formula.</b> After setting a variable, delete every clause that is now true, and delete the false literal from every other clause. What remains is written in the node. Bayzid sir's slide writes it as <code>(y'), (y ∨ z)</code>. An empty clause is written <code>()</code> and means Failure. An empty formula means Success.</p></div>
+<p>Backtracking is mostly for decision problems. The worst case is still exponential. It is fast on most real inputs because failures are found high up in the tree.</p>
+
+<h2>2. Method · backtracking for SAT</h2>
+<div class="method"><h4>Method · draw the tree</h4><ol>
+<li>Fix a variable order (alphabetical: x, y, z) and the order of the two branches (0 first, then 1). Write them down; the examiner accepts any fixed order if the tree is consistent.</li>
+<li>Root: write the whole formula.</li>
+<li>For a node, set the next variable to 0 (left child) and to 1 (right child). Label each edge <code>x=0</code> or <code>x=1</code>.</li>
+<li>Compute each child's residual formula: drop satisfied clauses, drop false literals from the rest.</li>
+<li>Residual contains <code>()</code>: write FAILURE and stop. Residual is empty: write SUCCESS and stop. Otherwise it is UNCERTAIN: branch on the next variable.</li>
+<li>If a child is a Success, the formula is satisfiable and the assignment is the edge labels on the path. If every leaf is Failure, it is unsatisfiable.</li>
+</ol></div>
+<pre class="code">BACKTRACK-SAT(F, i)               // variables x_1 .. x_n, 0 first
+  if F contains an empty clause: return FAIL
+  if F has no clauses:           return SUCCESS
+  for b in {0, 1}:
+     F' = F with x_i = b          // delete true clauses, delete false literals
+     if BACKTRACK-SAT(F', i+1) == SUCCESS: return SUCCESS
+  return FAIL</pre>
+
+<h2>3. 2024–25 Q3(c): (x′∨y′) ∧ (x′∨y) ∧ (x∨y′∨z) ∧ (x∨y∨z)</h2>
+<p>Press Next and name the class (Failure / Uncertain / Success) before reading the caption. The first run stops at the first success, which is what the question asks ("decide whether this is satisfiable").</p>
+<div id="t1"></div>
+<p>The same formula with the <b>whole</b> tree drawn (both successes shown). Use this form if you want to be safe, or if the question says "find all assignments".</p>
+<div id="t2"></div>
+<div class="drawit"><b>On paper:</b> a binary tree three levels deep. Put the residual formula inside each node, the assignment on each edge, and write FAILURE or SUCCESS under each leaf. Note that after x = 1 the residual is (y′)(y), which fails on both branches without ever branching on z. Finish with one sentence: "Satisfiable, for example x = 0, y = 0, z = 1." The handwritten note in the paper margin (z = 1, y = 0/1, x = 0) agrees with the tree: both y values work when x = 0, z = 1.</div>
+
+<h2>4. Bayzid sir's slide example and the other past formulas</h2>
+<p><b>Slide formula:</b> (x′∨y′) ∧ (x∨y′) ∧ (x′∨y) ∧ (x∨y∨z). The notes write the answer "satisfiable with x = 0, y = 0, z = 1".</p>
+<div id="t3"></div>
+<p><b>2020–21 Q8(b): find all assignments.</b> The formula is (x∨y′) ∧ (x′∨w) ∧ (x∨y∨z′) ∧ (x′∨w∨z). Variable order here is alphabetical in the engine: w, x, y, z. The tree ends in three Success leaves. The leaf w = 1, x = 1 stops early with y and z still free, so it stands for 4 assignments. Total: 1 + 1 + 4 = 6 satisfying assignments (checked by brute force).</p>
+<div id="t4"></div>
+<p><b>2018–19 Q8(c):</b> (x′∨y′) ∧ (x∨y′) ∧ (x′∨y) ∧ (x∨y∨z′) ∧ (x∨y∨z). Every branch fails, so the formula is <b>unsatisfiable</b>. Writing "UNSATISFIABLE" under the tree is part of the answer.</p>
+<div id="t5"></div>
+<div class="trap"><h4>Where marks go</h4><ul>
+<li>Branching on z under a node that already failed. Stop at the empty clause.</li>
+<li>Not simplifying the clauses at each node. The examiner checks the residual formulas.</li>
+<li>In "find all" questions, stopping at the first success. In "decide" questions it is fine to stop.</li>
+<li>When a success leaf still has unassigned variables (like w = 1, x = 1 above), say "y, z free" instead of silently choosing values.</li>
+<li>Forgetting the final one-line verdict: SAT with the assignment, or UNSAT.</li>
+</ul></div>
+
+<h2>5. Backtracking for a Hamiltonian circuit (2017–18 Q3(c))</h2>
+<p>A <b>Hamiltonian circuit</b> visits every vertex exactly once and returns to the start. The state-space tree here is a tree of <b>partial paths</b>.</p>
+<div class="method"><h4>Method · Hamiltonian circuit by backtracking</h4><ol>
+<li>Fix the start vertex (any vertex works, since a circuit passes through all of them) and an order for the neighbours (alphabetical). The root is the path <code>a</code>.</li>
+<li>A node is a path from a. Its children extend the path by one <b>unvisited neighbour</b> of the last vertex, in the chosen order.</li>
+<li><b>Dead end:</b> the last vertex has no unvisited neighbour while vertices remain. Cross it out and backtrack.</li>
+<li>When the path contains all n vertices, check whether the last vertex is adjacent to the start. If yes, the path plus that edge is a Hamiltonian circuit: <b>success</b>. If no, it is a failure.</li>
+</ol></div>
+<p>The 2017–18 figure is a cube-like graph with eight vertices. I read its edges from the scan as: a–b, a–d, a–f, b–c, b–g, c–d, c–h, d–e, e–f, e–h, f–g, g–h (every vertex has degree 3). If your copy differs, the method is unchanged.</p>
+<figure class="figrow">
+<div>
+<div class="figlabel">The graph</div>
+<svg viewBox="0 0 240 190" width="240" role="img" aria-label="Eight vertex cube graph">
+<g class="s-fg">
+<line x1="40" y1="30" x2="200" y2="30"/><line x1="200" y1="30" x2="200" y2="160"/><line x1="200" y1="160" x2="40" y2="160"/><line x1="40" y1="160" x2="40" y2="30"/>
+<line x1="85" y1="70" x2="155" y2="70"/><line x1="155" y1="70" x2="155" y2="125"/><line x1="155" y1="125" x2="85" y2="125"/><line x1="85" y1="125" x2="85" y2="70"/>
+<line x1="40" y1="30" x2="85" y2="70"/><line x1="200" y1="30" x2="155" y2="70"/><line x1="200" y1="160" x2="155" y2="125"/><line x1="40" y1="160" x2="85" y2="125"/>
+</g>
+<g>
+<circle cx="40" cy="30" r="13" class="cell-plain"/><text x="40" y="34" text-anchor="middle">a</text>
+<circle cx="200" cy="30" r="13" class="cell-plain"/><text x="200" y="34" text-anchor="middle">b</text>
+<circle cx="200" cy="160" r="13" class="cell-plain"/><text x="200" y="164" text-anchor="middle">c</text>
+<circle cx="40" cy="160" r="13" class="cell-plain"/><text x="40" y="164" text-anchor="middle">d</text>
+<circle cx="85" cy="125" r="13" class="cell-plain"/><text x="85" y="129" text-anchor="middle">e</text>
+<circle cx="85" cy="70" r="13" class="cell-plain"/><text x="85" y="74" text-anchor="middle">f</text>
+<circle cx="155" cy="70" r="13" class="cell-plain"/><text x="155" y="74" text-anchor="middle">g</text>
+<circle cx="155" cy="125" r="13" class="cell-plain"/><text x="155" y="129" text-anchor="middle">h</text>
+</g>
+</svg>
+</div>
+<div>
+<div class="figlabel">State-space tree up to the first circuit</div>
+<svg viewBox="0 0 400 480" width="400" role="img" aria-label="State space tree for Hamiltonian circuit" style="max-width:100%">
+<g class="s-fg">
+<line x1="190" y1="26" x2="190" y2="76"/><line x1="190" y1="94" x2="190" y2="136"/><line x1="190" y1="154" x2="190" y2="196"/><line x1="190" y1="214" x2="190" y2="256"/>
+<line x1="190" y1="274" x2="110" y2="316"/><line x1="190" y1="274" x2="290" y2="316"/>
+<line x1="110" y1="334" x2="110" y2="376"/><line x1="110" y1="394" x2="110" y2="436"/>
+<line x1="290" y1="334" x2="290" y2="376"/><line x1="290" y1="394" x2="290" y2="436"/>
+</g>
+<g>
+<circle cx="190" cy="14" r="14" class="cell-hl"/><text x="190" y="18" text-anchor="middle">a</text>
+<circle cx="190" cy="84" r="14" class="cell-plain"/><text x="190" y="88" text-anchor="middle">b</text>
+<circle cx="190" cy="144" r="14" class="cell-plain"/><text x="190" y="148" text-anchor="middle">c</text>
+<circle cx="190" cy="204" r="14" class="cell-plain"/><text x="190" y="208" text-anchor="middle">d</text>
+<circle cx="190" cy="264" r="14" class="cell-plain"/><text x="190" y="268" text-anchor="middle">e</text>
+<circle cx="110" cy="324" r="14" class="cell-plain"/><text x="110" y="328" text-anchor="middle">f</text>
+<circle cx="110" cy="384" r="14" class="cell-plain"/><text x="110" y="388" text-anchor="middle">g</text>
+<circle cx="110" cy="444" r="14" class="cell-del"/><text x="110" y="448" text-anchor="middle">h</text>
+<circle cx="290" cy="324" r="14" class="cell-plain"/><text x="290" y="328" text-anchor="middle">h</text>
+<circle cx="290" cy="384" r="14" class="cell-plain"/><text x="290" y="388" text-anchor="middle">g</text>
+<circle cx="290" cy="444" r="14" class="cell-new"/><text x="290" y="448" text-anchor="middle">f</text>
+</g>
+<text x="214" y="88" class="lbl">ab</text>
+<text x="214" y="148" class="lbl">abc</text>
+<text x="214" y="208" class="lbl">abcd</text>
+<text x="214" y="268" class="lbl">abcde: children f, h</text>
+<text x="124" y="328" class="lbl">abcdef</text><text x="124" y="388" class="lbl">abcdefg</text>
+<text x="304" y="328" class="lbl">abcdeh</text><text x="304" y="388" class="lbl">abcdehg</text>
+<text x="110" y="472" text-anchor="middle" class="lbl red">h–a not an edge: FAIL</text>
+<text x="290" y="472" text-anchor="middle" class="lbl grn">f–a is an edge: circuit</text>
+</svg>
+</div>
+</figure>
+<p>Reading the tree. From <code>abcde</code> the first child is f (alphabetical). Then g, then h, and the path <code>abcdefgh</code> has all 8 vertices but h is not adjacent to a: <b>failure, backtrack</b> all the way to e. The next child is h, then g, then f, and f is adjacent to a: the circuit <b>a b c d e h g f a</b> is found. (Running the whole search without stopping, the engine finds 12 directed Hamiltonian circuits, 6 up to direction, 112 nodes visited.) Stop at the first circuit unless the question asks for all.</p>
+<div class="drawit"><b>On paper:</b> the graph, then the tree with the path written in each node (a, ab, abc, ...). Mark each failure with a cross and the reason ("no unvisited neighbour" or "h not adjacent to a"). Mark the circuit and write it out with the return to a. Do not draw the branches you never visited.</div>
+
+<h2>6. Mandatory practice</h2>
+<p>Draw the trees on paper. The random generator below gives a new three-variable formula each time.</p>
+<div id="r1"></div>
+<div id="r2"></div>
+<div id="p1"></div>
+<div id="p2"></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/algo.js"></script>
+<script src="../assets/dsa.js"></script>
+<script>
+trace('#t1', { kind: 'sat', input: "(x' v y') (x' v y) (x v y' v z) (x v y v z)" });
+trace('#t2', { kind: 'sat', input: "(x' v y') (x' v y) (x v y' v z) (x v y v z)", opts: { all: true } });
+trace('#t3', { kind: 'sat', input: "(x' v y') (x v y') (x' v y) (x v y v z)" });
+trace('#t4', { kind: 'sat', input: "(x v y') (x' v w) (x v y v z') (x' v w v z)", opts: { all: true } });
+trace('#t5', { kind: 'sat', input: "(x' v y') (x v y') (x' v y) (x v y v z') (x v y v z)", opts: { all: true } });
+recall('#r1', { id: 'r1', marks: 10, q: 'Use a backtracking algorithm to decide whether (x′∨y′) ∧ (x′∨y) ∧ (x∨y′∨z) ∧ (x∨y∨z) is satisfiable. Show the backtracking tree. (2024–25 Q3(c)) Write the three node classes and the pseudocode too.', points: ['Define Failure (empty clause), Success (no clauses left), Uncertain (otherwise)', 'Variable order x, y, z with 0 branch then 1 branch, edges labelled', 'Residual formula in every node', 'x = 1 branch: (y′)(y) fails on both y values without branching on z', 'x = 0 branch: (y′∨z)(y∨z); y = 0 then z = 1 succeeds', 'Verdict: satisfiable, x = 0, y = 0, z = 1 (also y = 1, z = 1)'], model: '<p>Classes: Failure = a clause is empty; Success = all clauses satisfied; Uncertain = otherwise, so branch on the next variable.</p><p>Root: (x′∨y′)(x′∨y)(x∨y′∨z)(x∨y∨z). x = 0: (y′∨z)(y∨z), uncertain. x = 1: (y′)(y), uncertain. Under x = 1: y = 0 gives () failure; y = 1 gives () failure. Under x = 0: y = 0 gives (z), uncertain, and z = 0 fails, z = 1 succeeds. y = 1 gives (z): z = 0 fails, z = 1 succeeds.</p><p>Satisfiable, for example x = 0, y = 0, z = 1.</p>' });
+recall('#r2', { id: 'r2', marks: 10, q: 'Apply backtracking to find a Hamiltonian circuit in a graph and show the state-space tree. State the method. (2017–18 Q3(c))', points: ['Fix start vertex and neighbour order', 'Node is a path; children add one unvisited neighbour', 'Dead end when no unvisited neighbour remains', 'Complete path of n vertices: check last vertex is adjacent to start', 'Mark failures and the reason, mark the circuit found', 'Backtrack to the nearest node with an untried child'], model: '<p>Start at a fixed vertex a. Each node of the tree is a simple path from a; its children extend it by an unvisited neighbour of the last vertex, taken in alphabetical order. A node with no unvisited neighbour is a dead end: backtrack to the closest ancestor with an untried child. A node whose path has all n vertices is a leaf: if the last vertex is adjacent to a we have a Hamiltonian circuit (path plus the closing edge); otherwise it is a failure and we backtrack. Draw the tree, cross out failures with their reasons, and write the circuit found.</p>' });
+practice('#p1', { id: 'p1', kind: 'sat', n: 2 });
+practice('#p2', { id: 'p2', kind: 'sat', n: 2 });
+</script>
+</body>
+</html>

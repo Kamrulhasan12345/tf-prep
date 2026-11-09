@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reductions · CSE 207 Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">NP-completeness proofs · CLRS §34.3–34.5 · Bayzid sir L13 · must-know</div>
+<h1>Reductions and NP-completeness Proofs</h1>
+<p class="lede">Asked almost every year. 2024–25 Q1(c): clique is as hard as independent set (15). 2023–24 Q3: set cover is NP-complete (15). 2022–23 Q5(b): the task-scheduling word problem (17, compulsory). 2021–22 Q7(a): the social platform problem, using 3-SAT (10 in the bank, 5 + 10 in the paper). 2019–20 Q3(b): set cover at least as hard as vertex cover (12). 2018–19 Q7(c): vertex cover at least as hard as independent set (12). 2017–18 Q4(a), Q4(b): VC ≤ set cover, 3-SAT → independent set (3+7 each). 2020-21 Q8(c): explain NP-completeness of an optimization problem (5).</p>
+<div class="trap"><h4>Syllabus honesty</h4><ul>
+<li>Bayzid sir's notes (p.41) have a box "CT syllabus: computational complexity: definition only. Reduction will not come." That was for the class test. <b>Term finals ask reductions nearly every year</b>, so learn them.</li>
+<li>His notes show only 3-SAT → independent set and independent set → vertex cover. Everything else here (clique, set cover, dominating set) comes from the question bank and past papers.</li>
+</ul></div>
+
+<h2>1. Which way does the arrow go?</h2>
+<p><b>A ≤<sub>p</sub> B</b> reads "A reduces to B": we can solve A by using a solver for B. Convert an instance of A into an instance of B (function f, polynomial time), run B's algorithm, and convert the answer back if needed (function h).</p>
+<figure>
+<svg viewBox="0 0 600 220" role="img" aria-label="Reduction pipeline A to B" width="600">
+<defs><marker id="ar" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" style="fill:var(--fg)"/></marker></defs>
+<rect x="10" y="30" width="110" height="46" rx="6" class="cell"/>
+<text x="65" y="50" text-anchor="middle" class="big">instance I</text><text x="65" y="66" text-anchor="middle" class="lbl">of A (known hard)</text>
+<line x1="120" y1="53" x2="182" y2="53" class="s-fg" marker-end="url(#ar)"/>
+<text x="151" y="44" text-anchor="middle" class="big">f</text>
+<rect x="184" y="30" width="110" height="46" rx="6" class="cell-hl"/>
+<text x="239" y="50" text-anchor="middle" class="big">f(I)</text><text x="239" y="66" text-anchor="middle" class="lbl">instance of B</text>
+<line x1="294" y1="53" x2="352" y2="53" class="s-fg" marker-end="url(#ar)"/>
+<rect x="354" y="30" width="236" height="46" rx="6" class="cell-plain"/>
+<text x="472" y="50" text-anchor="middle" class="big">algorithm for B</text><text x="472" y="66" text-anchor="middle" class="lbl">(new problem, we want to show it hard)</text>
+<text x="300" y="104" text-anchor="middle" class="lbl">YES for I  if and only if  YES for f(I)</text>
+<line x1="440" y1="150" x2="150" y2="150" class="s-acc" marker-end="url(#ar)"/>
+<text x="295" y="142" text-anchor="middle" class="big acc">easy flows from B back to A</text>
+<line x1="150" y1="188" x2="440" y2="188" class="s-red" marker-end="url(#ar)"/>
+<text x="295" y="208" text-anchor="middle" class="big red">hard flows from A forward to B</text>
+</svg>
+<figcaption><b>Picture to remember.</b> The arrow of ≤<sub>p</sub> points at the problem you are proving hard. Rule: <b>reduce FROM the known-hard problem TO the new one.</b> If B were easy, A would be easy too, but A is hard, so B is hard.</figcaption>
+</figure>
+<div class="key"><p><b>Words for A ≤<sub>p</sub> B.</b> "B is at least as hard as A." "A is no harder than B." Bayzid sir marks "A is at least as hard as B" as <b>wrong</b>. The exam phrase "prove that the clique problem is as hard as independent set" means: show <b>IS ≤<sub>p</sub> Clique</b>. The one you know goes on the left. The question's wording "X is at least as hard as Y" means Y ≤<sub>p</sub> X.</p></div>
+
+<h2>2. The template for "prove X is NP-complete"</h2>
+<div class="method"><h4>Method · four parts, always in this order</h4><ol>
+<li><b>X ∈ NP.</b> Name the certificate and the polynomial check (chapter 1 method).</li>
+<li><b>Choose a known NP-complete problem Y</b> to reduce from (3-SAT, independent set, vertex cover, ...). Write "Y ≤<sub>p</sub> X".</li>
+<li><b>Construction.</b> Describe how to turn any instance of Y into an instance f(Y) of X. Say it takes polynomial time and give the sizes.</li>
+<li><b>Correctness, both directions.</b> (⇒) Y is a YES instance ⇒ f(Y) is a YES instance. (⇐) f(Y) is a YES instance ⇒ Y is a YES instance.</li>
+<li>Conclude: X is in NP and NP-hard, so NP-complete.</li>
+</ol></div>
+<p>Bayzid sir's recap box has the same three core steps: <i>Construction, Reduction (⇒), Reduction (⇐)</i>.</p>
+<div class="trap"><h4>Where marks go</h4><ul>
+<li><b>Reducing the wrong way.</b> Never start from the new problem and map to a known one. That proves the new problem is <i>easy</i> if the known one is.</li>
+<li>Proving only one direction of the iff. Both directions are required; one direction proves nothing.</li>
+<li>Forgetting "X ∈ NP". For "prove NP-hard" or "at least as hard as" you can skip it. For "prove NP-complete" you cannot.</li>
+<li>Forgetting that the instance size must stay polynomial (say how many vertices and edges you create).</li>
+</ul></div>
+
+<h2>3. 3-SAT ≤<sub>p</sub> Independent Set (2017–18 Q4(b); Bayzid sir's example)</h2>
+<p><b>3-SAT:</b> a CNF formula where every clause has exactly 3 literals. Is it satisfiable? <b>Independent set (IS):</b> in graph G, is there a set of at least k vertices with no edge between any two of them?</p>
+<div class="method"><h4>Construction</h4><ol>
+<li>Let the formula have m clauses.</li>
+<li>For each clause draw a <b>triangle</b>, one vertex per literal in the clause (a literal that appears in several clauses gets a separate vertex in each).</li>
+<li>Add a <b>conflict edge</b> between every pair of vertices that are a variable and its negation, in different triangles (x in one clause, x′ in another).</li>
+<li>Set k = m.</li>
+</ol></div>
+<p>Size: 3m vertices, at most 3m triangle edges plus \(O(m^2)\) conflict edges. Polynomial.</p>
+<p>Bayzid sir's example formula: \((x \vee y \vee z') \wedge (x' \vee y' \vee p) \wedge (y \vee z' \vee p')\). The graph is below. The three green vertices form an independent set of size 3 and give the assignment x = 0, y = 1, p = 0 (z is free).</p>
+<figure>
+<svg viewBox="0 0 560 250" role="img" aria-label="Three clause triangles with conflict edges" width="560">
+<g class="s-fg">
+<line x1="140" y1="60" x2="140" y2="140"/><line x1="140" y1="60" x2="60" y2="100"/><line x1="140" y1="140" x2="60" y2="100"/>
+<line x1="230" y1="60" x2="230" y2="140"/><line x1="230" y1="60" x2="310" y2="100"/><line x1="230" y1="140" x2="310" y2="100"/>
+<line x1="400" y1="60" x2="400" y2="140"/><line x1="400" y1="60" x2="480" y2="100"/><line x1="400" y1="140" x2="480" y2="100"/>
+</g>
+<g class="s-red dash">
+<line x1="156" y1="60" x2="214" y2="60"/><line x1="156" y1="140" x2="214" y2="140"/><line x1="246" y1="140" x2="384" y2="140"/><line x1="326" y1="100" x2="384" y2="60"/>
+</g>
+<g>
+<circle cx="140" cy="60" r="16" class="cell-plain"/><text x="140" y="64" text-anchor="middle">x</text>
+<circle cx="140" cy="140" r="16" class="cell-new"/><text x="140" y="144" text-anchor="middle">y</text>
+<circle cx="60" cy="100" r="16" class="cell-plain"/><text x="60" y="104" text-anchor="middle">z'</text>
+<circle cx="230" cy="60" r="16" class="cell-new"/><text x="230" y="64" text-anchor="middle">x'</text>
+<circle cx="230" cy="140" r="16" class="cell-plain"/><text x="230" y="144" text-anchor="middle">y'</text>
+<circle cx="310" cy="100" r="16" class="cell-plain"/><text x="310" y="104" text-anchor="middle">p</text>
+<circle cx="400" cy="60" r="16" class="cell-plain"/><text x="400" y="64" text-anchor="middle">p'</text>
+<circle cx="400" cy="140" r="16" class="cell-new"/><text x="400" y="144" text-anchor="middle">y</text>
+<circle cx="480" cy="100" r="16" class="cell-plain"/><text x="480" y="104" text-anchor="middle">z'</text>
+</g>
+<text x="100" y="185" text-anchor="middle" class="lbl">clause 1</text><text x="100" y="200" text-anchor="middle" class="lbl">(x ∨ y ∨ z')</text>
+<text x="270" y="185" text-anchor="middle" class="lbl">clause 2</text><text x="270" y="200" text-anchor="middle" class="lbl">(x' ∨ y' ∨ p)</text>
+<text x="440" y="185" text-anchor="middle" class="lbl">clause 3</text><text x="440" y="200" text-anchor="middle" class="lbl">(y ∨ z' ∨ p')</text>
+<text x="280" y="236" text-anchor="middle" class="lbl">solid = triangle edges · dashed red = conflict edges (x with x', y with y', p with p') · green = chosen independent set</text>
+</svg>
+<figcaption><b>The triangle gadget.</b> Four conflict edges: x–x′, y–y′ (clause 1 to 2), y′–y (clause 2 to 3), p–p′ (clause 2 to 3). The z′ vertices are not joined, since both are z′ and never conflict.</figcaption>
+</figure>
+<div class="method"><h4>Proof of correctness</h4><ol>
+<li><b>(⇒) Formula satisfiable ⇒ IS of size m.</b> Take a satisfying assignment. In each clause pick <b>one</b> literal that is true. That gives one vertex per triangle, m in all.</li>
+<li>No two picked vertices are adjacent: two vertices in the same triangle are never both picked (only one per triangle), and a conflict edge joins x and x′, which cannot both be true. So the set is independent, size m = k.</li>
+<li><b>(⇐) IS of size m ⇒ formula satisfiable.</b> A triangle can contribute at most one vertex to an independent set (any two of its vertices are adjacent). There are m triangles and m vertices, so <b>exactly one per triangle</b>.</li>
+<li>Set each chosen literal to true. This is consistent: x and x′ are joined by a conflict edge, so both cannot be chosen. Variables not mentioned get any value.</li>
+<li>Every clause has a chosen literal that is true, so the formula is satisfied. ∎</li>
+<li>IS ∈ NP (certificate: the vertex set; check size and that no edge has both ends in it). With 3-SAT NP-complete, IS is NP-complete.</li>
+</ol></div>
+<div class="drawit"><b>On paper:</b> draw the triangles in a row, label each vertex with its literal, then add the conflict edges in a different style. Write "k = number of clauses = m" next to the graph. Mark the IS vertices to show the example works. The drawing is worth most of the marks for this question.</div>
+
+<h2>4. Independent Set ↔ Vertex Cover, both ways (2018–19 Q7(c))</h2>
+<p>A <b>vertex cover</b> is a vertex set touching every edge. An <b>independent set</b> is a vertex set with no edges inside it.</p>
+<div class="key"><p><b>S is an independent set of G if and only if V − S is a vertex cover of G.</b></p></div>
+<div class="method"><h4>Proof</h4><ol>
+<li>S is independent ⇔ no edge has both endpoints in S.</li>
+<li>⇔ every edge has at least one endpoint outside S.</li>
+<li>⇔ V − S contains at least one endpoint of every edge, so V − S is a vertex cover. Each step is an "iff", so it holds in both directions.</li>
+<li><b>Sizes:</b> |S| ≥ k ⇔ |V − S| ≤ |V| − k. So G has an IS of size ≥ k iff G has a vertex cover of size ≤ n − k.</li>
+</ol></div>
+<ul>
+<li><b>IS ≤<sub>p</sub> VC</b> (this proves "vertex cover is at least as hard as independent set", and so VC is NP-hard): given (G, k) output (G, n − k). Same graph, linear time.</li>
+<li><b>VC ≤<sub>p</sub> IS</b> (the other way, so they are equally hard): given (G, k) output (G, n − k). The identical map works.</li>
+<li>VC ∈ NP: certificate is the vertex set, check size ≤ k and every edge is touched, O(|E|).</li>
+</ul>
+
+<h2>5. Independent Set ≤<sub>p</sub> Clique, by complement (2024–25 Q1(c), 15 marks)</h2>
+<p><b>Clique:</b> does G have a set of k vertices where every two are adjacent?</p>
+<div class="method"><h4>Construction and proof</h4><ol>
+<li>Given an IS instance (G, k) build the <b>complement graph</b> \(\bar G\): same vertices, and u–v is an edge in \(\bar G\) exactly when u–v is <b>not</b> an edge in G. Keep k. Time \(O(n^2)\).</li>
+<li><b>Claim:</b> S is an independent set in G ⇔ S is a clique in \(\bar G\).</li>
+<li>(⇒) S independent in G: every pair in S is a non-edge in G, so an edge in \(\bar G\). So S is a clique in \(\bar G\).</li>
+<li>(⇐) S a clique in \(\bar G\): every pair in S is an edge in \(\bar G\), so a non-edge in G. So S is independent in G.</li>
+<li>Therefore G has an independent set of size ≥ k iff \(\bar G\) has a clique of size ≥ k. ∎ So clique is as hard as independent set; it is NP-hard.</li>
+<li>For NP-completeness add: clique ∈ NP (certificate: k vertices, check every pair is an edge, \(O(k^2)\)).</li>
+</ol></div>
+<div class="trap"><h4>Where marks go</h4><ul>
+<li>The question gives "IS is NP-complete" as a given. So reduce <b>from IS to Clique</b>, not from Clique to IS.</li>
+<li>The size parameter stays k, not n − k (that is the vertex cover version).</li>
+</ul></div>
+
+<h2>6. Vertex Cover ≤<sub>p</sub> Set Cover, so Set Cover is NP-complete (2023–24 Q3; 2019–20 Q3(b); 2017–18 Q4(a))</h2>
+<p><b>Set cover:</b> universe U, subsets S₁...S<sub>m</sub> of U, number k. Are there at most k subsets whose union is U?</p>
+<div class="method"><h4>Construction</h4><ol>
+<li>Given a vertex-cover instance (G = (V, E), k).</li>
+<li>Let the universe be the <b>edges</b>: U = E.</li>
+<li>For every vertex v make a subset \(S_v\) = the set of edges incident to v.</li>
+<li>Keep the same k. Size: |V| subsets of E. Polynomial.</li>
+</ol></div>
+<div class="method"><h4>Correctness</h4><ol>
+<li><b>(⇒)</b> If C ⊆ V is a vertex cover with |C| ≤ k, take the subsets \(\{S_v : v \in C\}\). Every edge has an endpoint in C, so every edge lies in some chosen \(S_v\). The union is E = U, using ≤ k subsets.</li>
+<li><b>(⇐)</b> If subsets \(S_v\), v ∈ C, with |C| ≤ k, cover U = E, then each edge e lies in some \(S_v\), meaning e is incident to v ∈ C. So C is a vertex cover of size ≤ k. ∎</li>
+<li><b>Set cover ∈ NP:</b> certificate is k subsets; check the count and that their union equals U, in time polynomial in the input size.</li>
+<li>VC is NP-complete, so Set Cover is NP-hard; with membership in NP, <b>Set Cover is NP-complete</b>.</li>
+</ol></div>
+<div class="trap"><h4>Where marks go</h4><ul>
+<li>"At least as hard as" (2019–20) needs only the reduction. "Prove NP-complete" (2023–24) also needs "∈ NP". One student solution ends with "Set Cover is an NP problem": that is not enough, say NP-complete.</li>
+<li>Edges are the universe and vertices are the sets, not the other way round. If you swap them the proof breaks.</li>
+<li>Both directions of the iff, again.</li>
+</ul></div>
+
+<h2>7. Word problems in disguise</h2>
+<p>These questions never say "independent set" or "dominating set". You must recognise the problem. Two have appeared.</p>
+
+<h3>7.1 Scheduling with conflicts (2022–23 Q5(b), 17 marks, compulsory)</h3>
+<p>Tasks, some pairs cannot run at the same time. Maximise the number of tasks scheduled so that no two conflicting tasks are both chosen. The friend says it maps to a popular NP-complete problem and is NP-hard by reduction.</p>
+<div class="method"><h4>Answer in three parts</h4><ol>
+<li><b>Map to Independent Set.</b> Vertex = task. Edge between two tasks that conflict. A set of tasks with no conflicting pair = a set of vertices with no edge between them = an independent set. Maximum tasks = maximum independent set. Decision form: "can we schedule at least k tasks?" = "does G have an IS of size ≥ k?".</li>
+<li><b>Membership in NP.</b> Certificate: the chosen tasks. Check |S| ≥ k and no conflict pair inside S, \(O(|E|)\).</li>
+<li><b>Reduce a known NP-complete problem to it.</b> The question says "reducing it to another known NP-complete problem". Use 3-SAT ≤<sub>p</sub> IS from section 3: triangles per clause, conflict edges between x and x′, k = m. Give the proof (⇒, ⇐).</li>
+<li>Conclude: scheduling is NP-hard, and in NP, so NP-complete. The optimization version (maximise tasks) is NP-hard.</li>
+</ol></div>
+<p>Reading note: the paper's wording is loose ("same team member simultaneously"). The standard reading is a pairwise conflict relation, which is a graph. State your reading in one line at the top of the answer.</p>
+
+<h3>7.2 Social platform (2021–22 Q7(a), 10 marks in the bank; 5 for the mapping, 10 for the proof)</h3>
+<p>Find the smallest set of users who can reach all other users through their connections.</p>
+<div class="method"><h4>(i) Map to Dominating Set (5 marks)</h4><ol>
+<li>Vertex = user, edge = connection. The chosen users must reach every other user directly through their connections: every user is either chosen or adjacent to a chosen user.</li>
+<li>That is the <b>Dominating Set</b> problem: a vertex set D such that every vertex is in D or has a neighbour in D. Decision form: is there a dominating set of size ≤ k?</li>
+<li>Reading note: "reach" must mean one hop. If friends-of-friends counted, one user in any connected network would reach everyone and there would be nothing to compute.</li>
+</ol></div>
+<div class="method"><h4>(ii) 3-SAT ≤<sub>p</sub> Dominating Set (10 marks)</h4><ol>
+<li><b>In NP.</b> Certificate D. Check |D| ≤ k and every vertex is in D or adjacent to a member, \(O(n^2)\).</li>
+<li><b>Construction.</b> Formula with variables \(x_1..x_n\) and clauses \(C_1..C_m\).</li>
+<li>For each variable \(x_i\): a <b>triangle</b> on three vertices \(x_i\), \(\bar x_i\), \(d_i\).</li>
+<li>For each clause \(C_j\): one <b>clause vertex</b> \(c_j\), joined to the (three) literal vertices that appear in \(C_j\).</li>
+<li>Set k = n. Size: 3n + m vertices, \(O(n+m)\) edges. Polynomial.</li>
+<li><b>(⇒)</b> Satisfying assignment. Put into D the literal vertex that is true for each variable (n vertices). In each triangle the chosen vertex dominates the other two. Each clause vertex \(c_j\) has a true literal, which is in D, so \(c_j\) is dominated. D has n vertices and dominates everything.</li>
+<li><b>(⇐)</b> Dominating set D of size n. The dummy vertex \(d_i\) has neighbours only inside its triangle, so D contains at least one of \(x_i, \bar x_i, d_i\) for each i. There are n triangles and |D| = n, so <b>exactly one vertex per triangle</b>, and no clause vertex is in D.</li>
+<li>If a triangle's chosen vertex is \(d_i\), swap it for \(x_i\): the triangle is still dominated, and no clause vertex loses anything (they were not dominated by \(d_i\)). So every chosen vertex is a literal.</li>
+<li>Set the chosen literals to true. Each triangle gives one literal, so the assignment is consistent. Each clause vertex \(c_j\) is not in D, so some neighbour (a literal of \(C_j\)) is in D, meaning that literal is true and \(C_j\) is satisfied. ∎</li>
+</ol></div>
+<figure>
+<svg viewBox="0 0 520 240" role="img" aria-label="Dominating set gadget for 3 variables and one clause" width="520">
+<g class="s-fg">
+<line x1="60" y1="140" x2="120" y2="140"/><line x1="60" y1="140" x2="90" y2="195"/><line x1="120" y1="140" x2="90" y2="195"/>
+<line x1="230" y1="140" x2="290" y2="140"/><line x1="230" y1="140" x2="260" y2="195"/><line x1="290" y1="140" x2="260" y2="195"/>
+<line x1="400" y1="140" x2="460" y2="140"/><line x1="400" y1="140" x2="430" y2="195"/><line x1="460" y1="140" x2="430" y2="195"/>
+</g>
+<g class="s-red dash"><line x1="260" y1="40" x2="60" y2="140"/><line x1="260" y1="40" x2="290" y2="140"/><line x1="260" y1="40" x2="400" y2="140"/></g>
+<g>
+<circle cx="260" cy="40" r="17" class="cell-hl"/><text x="260" y="44" text-anchor="middle">c1</text>
+<circle cx="60" cy="140" r="16" class="cell-new"/><text x="60" y="144" text-anchor="middle">x1</text>
+<circle cx="120" cy="140" r="16" class="cell-plain"/><text x="120" y="144" text-anchor="middle" style="font-size:11px">¬x1</text>
+<circle cx="90" cy="195" r="14" class="cell-plain"/><text x="90" y="199" text-anchor="middle">d1</text>
+<circle cx="230" cy="140" r="16" class="cell-plain"/><text x="230" y="144" text-anchor="middle">x2</text>
+<circle cx="290" cy="140" r="16" class="cell-new"/><text x="290" y="144" text-anchor="middle" style="font-size:11px">¬x2</text>
+<circle cx="260" cy="195" r="14" class="cell-plain"/><text x="260" y="199" text-anchor="middle">d2</text>
+<circle cx="400" cy="140" r="16" class="cell-new"/><text x="400" y="144" text-anchor="middle">x3</text>
+<circle cx="460" cy="140" r="16" class="cell-plain"/><text x="460" y="144" text-anchor="middle" style="font-size:11px">¬x3</text>
+<circle cx="430" cy="195" r="14" class="cell-plain"/><text x="430" y="199" text-anchor="middle">d3</text>
+</g>
+<text x="260" y="232" text-anchor="middle" class="lbl">clause c1 = (x1 ∨ ¬x2 ∨ x3), k = 3 · green = D for x1 = 1, x2 = 0, x3 = 1</text>
+</svg>
+<figcaption><b>Dominating-set gadget.</b> One triangle per variable, one clause vertex per clause. The dummy d<sub>i</sub> forces one pick inside every triangle; the clause vertex is dominated only if one of its literals was picked.</figcaption>
+</figure>
+<div class="drawit"><b>On paper:</b> draw all variable triangles in a row with the clause vertices above, dashed lines from each clause vertex to its three literals. Write k = n. State the two facts that carry the proof: "d<sub>i</sub> forces one vertex per triangle" and "the clause vertex needs a true literal".</div>
+
+<h2>8. Optimization problems are NP-hard, not NP-complete (2020–21 Q8(c), 5 marks)</h2>
+<div class="method"><h4>Answer</h4><ol>
+<li>NP and NP-complete contain only decision problems. An optimization problem ("find the smallest vertex cover") has no YES/NO answer, so it is <b>not in NP</b> and cannot be NP-complete.</li>
+<li>Make its decision version with a bound: "is there a vertex cover of size ≤ k?". Prove <b>that</b> NP-complete with the template of section 2.</li>
+<li>The optimization problem is then <b>NP-hard</b>: a polynomial algorithm for it would solve the decision version, because we compute the optimum and compare it with k. So Decision ≤<sub>p</sub> Optimization, and hardness flows to the optimization problem.</li>
+</ol></div>
+<p>Same sentence as in Bayzid sir's notes (p.37): "If a decision problem is NP-complete, its optimization version is NP-hard."</p>
+
+<h2>9. One more from the bank: Subset Sum ≤<sub>p</sub> Set Partition (CT3 2022, 10 marks)</h2>
+<p><b>Set partition:</b> can a multiset S be split into two parts of equal sum? <b>Subset sum</b> (given NP-complete): is there a subset of S with sum exactly T? Let Σ be the total of S.</p>
+<div class="method"><h4>Reduction</h4><ol>
+<li>Add one new number \(x = |\Sigma - 2T|\). New multiset \(S' = S \cup \{x\}\). Polynomial time.</li>
+<li><b>Case 2T ≤ Σ</b> (so x = Σ − 2T; total of S′ is 2Σ − 2T; half is Σ − T). If a subset of S sums to T, add x to it: sum T + Σ − 2T = Σ − T, which is half. Conversely if S′ splits into halves of Σ − T, the half containing x minus x sums to Σ − T − (Σ − 2T) = T, a subset of S with sum T.</li>
+<li><b>Case 2T &gt; Σ</b> (x = 2T − Σ; total of S′ is 2T; half is T). A subset of S with sum T is itself a half. Conversely the half not containing x is inside S and sums to T; if x is in a half, the other half is inside S and sums to T.</li>
+<li>Set partition ∈ NP (certificate: the part A). So it is NP-complete.</li>
+</ol></div>
+
+<h2>10. Mandatory practice</h2>
+<p>These are the highest-probability proofs in this chapter. Write them on paper in the four-part template, then compare.</p>
+<div id="r1"></div>
+<div id="r2"></div>
+<div id="r3"></div>
+<div id="r4"></div>
+<div id="r5"></div>
+<div id="r6"></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/algo.js"></script>
+<script src="../assets/dsa.js"></script>
+<script>
+recall('#r1', { id: 'r1', marks: 10, q: 'Define the satisfiability problem and show that the independent set problem is NP-hard by reducing 3-SAT to it. Draw the construction for (x ∨ y ∨ z\') ∧ (x\' ∨ y\' ∨ p) ∧ (y ∨ z\' ∨ p\'). (2017–18 Q4(b))', points: ['3-SAT: CNF with exactly 3 literals per clause, is it satisfiable', 'Triangle per clause, one vertex per literal occurrence', 'Conflict edge between x and x\' in different triangles', 'k = number of clauses; polynomial size', '(⇒) one true literal per clause gives IS of size m, no conflict', '(⇐) IS of size m has exactly one vertex per triangle; set those literals true; consistent because of conflict edges', 'Say IS ∈ NP for NP-complete; the drawing of the triangles'], model: '<p><b>Construction:</b> for each of the m clauses draw a triangle on its three literals. Join each literal to its negation in other triangles. Ask for an independent set of size k = m.</p><p><b>(⇒)</b> A satisfying assignment makes at least one literal true in each clause: pick one per clause. They are in different triangles; no two of them are x and x\', so the set is independent of size m.</p><p><b>(⇐)</b> An independent set of size m uses at most one vertex per triangle, so exactly one per triangle. Make those literals true; no variable gets both values (conflict edges). Every clause has a true literal, so the formula is satisfied.</p><p>Size 3m vertices, O(m²) edges. 3-SAT ≤<sub>p</sub> IS, so IS is NP-hard (and in NP, so NP-complete).</p>' });
+recall('#r2', { id: 'r2', marks: 15, q: 'The independent set problem is NP-complete. Prove that the clique problem is as hard as the independent set problem. (2024–25 Q1(c))', points: ['Reduce FROM independent set TO clique', 'Complement graph: u–v an edge iff it is not an edge in G', 'Keep the same k, complement built in O(n²)', 'S independent in G iff S clique in the complement', 'Both directions written', 'Conclude clique is NP-hard; add clique ∈ NP for NP-complete'], model: '<p>Show IS ≤<sub>p</sub> Clique. Given (G, k) build the complement graph Ḡ on the same vertices where uv is an edge iff uv is not an edge of G. Time O(n²). Keep k.</p><p>Claim: S is independent in G iff S is a clique in Ḡ. If S is independent, every pair in S is a non-edge of G, hence an edge of Ḡ, so S is a clique. If S is a clique in Ḡ, every pair is an edge of Ḡ, hence a non-edge of G, so S is independent.</p><p>So G has an independent set of size ≥ k iff Ḡ has a clique of size ≥ k. Thus clique is at least as hard as IS, so NP-hard; clique ∈ NP (check k vertices pairwise adjacent), so NP-complete.</p>' });
+recall('#r3', { id: 'r3', marks: 15, q: 'In Set Cover (U, subsets S1..Sm, integer k) decide whether at most k subsets have union U. Prove set cover is NP-complete, given that vertex cover is NP-complete. (2023–24 Q3)', points: ['Set cover ∈ NP: certificate is k subsets, check the union equals U', 'Reduce VC to set cover: U = E, S_v = edges incident to v, same k', 'Polynomial size', '(⇒) a vertex cover C gives sets S_v, v in C, covering all edges', '(⇐) sets covering E give a vertex set; each edge is in some S_v so is touched', 'Conclude NP-complete (not just NP)'], model: '<p><b>In NP.</b> Certificate: k subsets. Check their number and that their union is U, in polynomial time.</p><p><b>Reduction VC ≤<sub>p</sub> SC.</b> From (G = (V, E), k): U = E, and for each v ∈ V the subset S<sub>v</sub> = edges incident to v. Same k. Polynomial.</p><p><b>(⇒)</b> If C is a vertex cover with |C| ≤ k, the subsets S<sub>v</sub> (v ∈ C) cover E since every edge has an endpoint in C.</p><p><b>(⇐)</b> If S<sub>v</sub> (v ∈ C), |C| ≤ k, cover E, every edge is incident to some v ∈ C, so C is a vertex cover.</p><p>VC is NP-complete, so Set Cover is NP-hard; with membership in NP it is NP-complete.</p>' });
+recall('#r4', { id: 'r4', marks: 12, q: 'Prove that vertex cover is at least as hard as independent set. (2018–19 Q7(c)) Then say how the same map shows the reverse.', points: ['S independent iff V − S is a vertex cover', 'Chain of iff: no edge inside S, every edge has an endpoint outside S', 'Sizes: IS ≥ k iff VC ≤ n − k', 'Reduction maps (G, k) to (G, n − k), linear time', 'Same map works for VC ≤p IS, so equally hard', 'VC ∈ NP for completeness'], model: '<p>S is independent ⇔ no edge has both ends in S ⇔ every edge has an endpoint in V − S ⇔ V − S is a vertex cover. So G has an independent set of size ≥ k iff G has a vertex cover of size ≤ n − k.</p><p>The map (G, k) → (G, n − k) is linear time, so IS ≤<sub>p</sub> VC: vertex cover is at least as hard as independent set. The identical map sends a VC instance to an IS instance, so VC ≤<sub>p</sub> IS too. VC ∈ NP (check the set touches all edges).</p>' });
+recall('#r5', { id: 'r5', marks: 17, q: 'You manage tasks, some pairs conflict, and you want to schedule as many tasks as possible with no two conflicting tasks chosen. Your friend says it maps to a popular NP-complete problem and is NP-hard by reduction. Justify. (2022–23 Q5(b))', points: ['Conflict graph: task = vertex, conflict = edge', 'Equals maximum independent set; decision form IS ≥ k', 'Membership in NP with certificate and check', 'Reduce 3-SAT (known NPC) to IS with triangles and conflict edges, k = m', 'Prove both directions', 'Conclude NP-complete; optimization version NP-hard'], model: '<p><b>Mapping.</b> Build a graph with a vertex per task and an edge per conflicting pair. A conflict-free selection is an independent set, so the problem is Independent Set (decision: size ≥ k).</p><p><b>In NP.</b> Certificate: chosen tasks; check count ≥ k and no edge inside.</p><p><b>Hardness.</b> Reduce 3-SAT to IS: a triangle per clause, conflict edges between x and x\', k = number of clauses. A satisfying assignment gives one true literal per clause, an independent set of size k. An independent set of size k has one vertex per triangle, giving a consistent set of true literals that satisfies every clause.</p><p>So scheduling is NP-complete; maximising the number of tasks is NP-hard.</p>' });
+recall('#r6', { id: 'r6', marks: 15, q: 'A platform wants the minimum set of users who reach all others through their connections. (i) Map to a known NP-complete problem. (ii) Prove NP-completeness using 3-SAT. (2021–22 Q7(a))', points: ['Dominating set: every user chosen or adjacent to a chosen user', 'In NP: certificate D, check size and domination', 'Triangle x_i, not x_i, d_i per variable', 'Clause vertex joined to its three literals; k = n', '(⇒) true literals chosen dominate triangles and clauses', '(⇐) d_i forces one vertex per triangle; swap d_i for x_i; clause vertex dominated by a chosen literal', 'Consistent assignment, every clause satisfied'], model: '<p><b>(i)</b> Users = vertices, connections = edges. Choosing users who reach everyone in one hop means a dominating set: every vertex is in D or adjacent to a vertex in D. Decision form: size ≤ k.</p><p><b>(ii)</b> In NP: certificate D, check |D| ≤ k and domination in O(n²). Reduction from 3-SAT: for each variable a triangle on x<sub>i</sub>, ¬x<sub>i</sub>, d<sub>i</sub>; for each clause a vertex c<sub>j</sub> joined to its literal vertices; k = n.</p><p>(⇒) Choose the true literal of each variable: n vertices; each triangle is dominated; each c<sub>j</sub> is dominated by a true literal in it. (⇐) d<sub>i</sub> has only triangle neighbours, so D hits every triangle; with |D| = n, exactly one per triangle, no c<sub>j</sub> in D. Swap any d<sub>i</sub> for x<sub>i</sub>. c<sub>j</sub> is dominated, so a literal of C<sub>j</sub> is chosen (true). Assignment is consistent, all clauses satisfied.</p>' });
+</script>
+</body>
+</html>

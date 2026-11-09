@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RB Deletion · CSE 207 Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Balanced trees · CLRS §13.4 · not in the slides or notes, but asked · must-know</div>
+<h1>RB Deletion from Zero: the 4 Cases</h1>
+<p class="lede">2024–25 Q5(a) (25 marks with insertion) asked deletions of 8, 12 and 19 from the tree you build. 2023–24 Q12(b), 10 marks: delete 50 from a given tree. 2020–21 Q6(b), 5+15: explain whether deletion can be fixed without rotation, then delete 150 from a given tree. The notes and slides stop before deletion, so this chapter teaches it completely. It follows CLRS. Read it in order.</p>
+
+<h2>1. Plain BST deletion first</h2>
+<p>Deleting node z from a normal BST has three structural cases. You already know them. Red-black adds colour bookkeeping on top.</p>
+<ol>
+<li><b>z has no children</b> (a leaf): remove it. Its place is now a NIL.</li>
+<li><b>z has one child</b>: the child takes z's place.</li>
+<li><b>z has two children</b>: find the <b>successor</b> y, the smallest key in z's right subtree (go right once, then left as far as you can). y has no left child. Move y into z's place. If y was deeper, y's right child takes y's old place. <b>Use the successor.</b> (The predecessor also works, but CLRS and this book use the successor, and the engine does too. If you use the predecessor, say so.)</li>
+</ol>
+<p>Examples on one tree, 20 (root) with 10 and 40, 40 has 30 and 50, 30 has left child 25:</p>
+<div class="figrow">
+<div><div class="figlabel">the tree</div><div id="s0"></div></div>
+<div><div class="figlabel">delete 10 (leaf)</div><div id="s1"></div></div>
+<div><div class="figlabel">delete 30 (one child 25)</div><div id="s2"></div></div>
+<div><div class="figlabel">delete 20 (two children): successor is 25</div><div id="s3"></div></div>
+</div>
+
+<h2>2. Why deleting a black node is the only problem</h2>
+<p>The colours of the five rules (see the properties chapter): red node has black children, every path has the same number of blacks.</p>
+<ul>
+<li><b>Removing a red node breaks nothing.</b> A red node adds no black to any path, so black counts stay equal. It had black children and a black parent, so no red-red pair appears. Done, no fix.</li>
+<li><b>Removing a black node breaks the black count.</b> Every path that went through it now has one black fewer. It can also create a red-red pair (a red child now sits under a red parent) or leave a red root.</li>
+</ul>
+<div class="key"><p><b>Which colour counts?</b> The colour of the node that is <b>physically removed from its position</b>. In cases 1 and 2 of section 1 that is z. In the two-child case it is the successor y: y moves up and takes z's colour, so z's colour is preserved and the position that really loses a node is y's old position, with y's original colour. Rule: <b>if the original colour of y (or z) was red, stop. If it was black, fix up.</b></p></div>
+
+<h3>Watch the three structural cases with colours</h3>
+<p>Press Next. Notice which ones stop immediately and which call the fix-up.</p>
+<div id="ts1"></div>
+<div id="ts2"></div>
+<div id="ts3"></div>
+
+<h2>3. The "extra black" idea</h2>
+<p>Call <b>x</b> the node that moves into the place that lost a black. It is either the child that took the removed node's place, or a NIL if there was none. Every path through x lost one black. Instead of repairing all paths at once, we pretend <b>x carries an extra black</b> to make up for it. Then the counts are correct again, but x is now <b>"doubly black"</b>, which breaks the rule that a node is red or black.</p>
+<p>The whole fix-up is: <b>push this extra black up the tree, or absorb it</b>, until it disappears.</p>
+<ul>
+<li>If x is <b>red</b>: it is "red and extra black", which is just one black. Colour x black. Done.</li>
+<li>If x is the <b>root</b>: the extra black can simply be dropped. Every path loses the same one black, so counts stay equal.</li>
+<li>Otherwise x is black with an extra black. Look at its <b>sibling w</b>. w is never NIL here: x's side is one black short, so the sibling side has black height at least 1 and w is a real node.</li>
+</ul>
+<h3>How to draw a NIL that is double black</h3>
+<p>NIL is normally drawn as a small black square. For double black, <b>draw a second square around it</b> (or write "2B" or put two dots on it) and name it "x". In the trace tool it appears as a box with a double ring. Do this on paper too: the examiner needs to see where the extra black sits. When the extra black moves up to a real node, draw that node with a double circle.</p>
+
+<h2>4. The four cases</h2>
+<p>Everything below is for x being the <b>left</b> child. If x is the right child, mirror left and right. w is x's sibling. The <b>far</b> child of w is the one on the side away from x. The <b>near</b> child is the one on x's side. Dashed grey nodes mean "any colour, copy it exactly". Amber ring: the node being fixed. Double ring: extra black.</p>
+<div class="method"><h4>Method · pick the case from w and its children</h4><ol>
+<li><b>w is red → Case 1.</b> Make w black, make the parent p red, rotate left at p. x's new sibling is black. Go to case 2, 3 or 4. (Never ends here.)</li>
+<li><b>w is black and both of its children are black → Case 2.</b> Colour w red. Move the extra black from x up to p. If p was red, p becomes black and you stop. If p was black, p is now the double-black x: repeat. (If p is the root, drop it and stop.)</li>
+<li><b>w is black, near child red, far child black → Case 3.</b> Make the near child black, w red, rotate right at w. Now the far child is red: you are in case 4.</li>
+<li><b>w is black, far child red → Case 4.</b> w takes p's colour. p becomes black, far child becomes black. Rotate left at p. The extra black is gone. <b>Stop.</b></li>
+</ol></div>
+<div class="key"><p><b>One-line memory:</b> sibling red: <b>case 1</b> (recolour, rotate, look again). Sibling black, both nephews black: <b>case 2</b> (recolour, climb). Far nephew red: <b>case 4</b> (finish). Near nephew red and far black: <b>case 3</b> (make far red, then case 4). Look at the far nephew first.</p></div>
+
+<h3>Case 1: sibling is red</h3>
+<div id="d1"></div>
+<p>p must be black because w is red. After the rotation x has a black sibling (c) and the same extra black. The tree is not finished; you continue with 2, 3 or 4 at the same x. Trace: delete 5 from <code>10B(5B,20R(15B,30B))</code>, case 1 then case 2:</p>
+<div id="c1"></div>
+
+<h3>Case 2: sibling black, both nephews black</h3>
+<div id="d2"></div>
+<p>Colouring w red removes one black from w's side, which matches x's side. The extra black now belongs to p. This is the only case that repeats, and it only recolours (no rotation). Trace A: p is red, so it stops. Trace B: p is black and the extra black climbs twice, to the root, where it is dropped.</p>
+<div id="c2a"></div>
+<div id="c2b"></div>
+
+<h3>Case 3: sibling black, near nephew red, far nephew black</h3>
+<div id="d3"></div>
+<p>This case does not fix anything yet. It only turns the picture into case 4 (a red far nephew). Trace: delete 5 from <code>10B(5B,15B(12R,))</code>.</p>
+<div id="c3"></div>
+
+<h3>Case 4: sibling black, far nephew red</h3>
+<div id="d4"></div>
+<p>Why it works: the left rotation moves one black (p) to x's side. The path through x now has p (black) plus x. The far nephew turns black to replace the black that w's side lost to the rotation. Colour check: w takes p's old colour so the colour above the piece is unchanged. Trace: delete 5 from <code>10B(5B,15B(,20R))</code>.</p>
+<div id="c4"></div>
+
+<h2>5. When does it stop?</h2>
+<table class="mat"><tr><th>Situation</th><th>What happens</th></tr>
+<tr><td>Removed node was red</td><td>Stop at once, no fix-up</td></tr>
+<tr><td>x is red (red and extra black)</td><td>Colour x black, stop</td></tr>
+<tr><td>x is the root</td><td>Drop the extra black, stop</td></tr>
+<tr><td>Case 4</td><td>Stop, always</td></tr>
+<tr><td>Case 2 and p is red</td><td>p becomes black, stop</td></tr>
+<tr><td>Case 2 and p is black</td><td>p is the new x: repeat one level up</td></tr>
+<tr><td>Case 1</td><td>Not an end. Always continues into case 2, 3 or 4</td></tr>
+<tr><td>Case 3</td><td>Not an end. Always continues into case 4</td></tr></table>
+<p>So deletion does <b>at most 3 rotations</b> (case 1, case 3, case 4 once each) and any amount of recolouring up the tree, O(log n) in total. Insertion needs at most 2 rotations.</p>
+
+<h2>6. Pseudocode</h2>
+<pre class="code">RB-DELETE(T, z)
+ y = z; y-orig = y.color
+ if z.left == NIL:  x = z.right; TRANSPLANT(T, z, z.right)
+ elif z.right == NIL: x = z.left; TRANSPLANT(T, z, z.left)
+ else
+   y = TREE-MINIMUM(z.right); y-orig = y.color; x = y.right
+   if y.p == z: x.p = y
+   else TRANSPLANT(T, y, y.right); y.right = z.right; y.right.p = y
+   TRANSPLANT(T, z, y); y.left = z.left; y.left.p = y
+   y.color = z.color                       // y takes z's colour
+ if y-orig == BLACK: RB-DELETE-FIXUP(T, x)
+
+RB-DELETE-FIXUP(T, x)
+ while x != T.root and x.color == BLACK
+   if x == x.p.left
+     w = x.p.right
+     if w.color == RED                                    // case 1
+       w.color = BLACK; x.p.color = RED
+       LEFT-ROTATE(T, x.p); w = x.p.right
+     if w.left.color == BLACK and w.right.color == BLACK  // case 2
+       w.color = RED; x = x.p
+     else
+       if w.right.color == BLACK                          // case 3
+         w.left.color = BLACK; w.color = RED
+         RIGHT-ROTATE(T, w); w = x.p.right
+       w.color = x.p.color; x.p.color = BLACK             // case 4
+       w.right.color = BLACK
+       LEFT-ROTATE(T, x.p); x = T.root
+   else (same with left and right exchanged)
+ x.color = BLACK</pre>
+<p>TRANSPLANT(T, u, v) replaces the subtree at u by the subtree at v (fixes the parent link). The last line colours a red x black, and also handles the root.</p>
+
+<h2>7. 2024–25 Q5(a): the three deletions</h2>
+<p>After inserting 41, 38, 31, 12, 19, 8, 25, 32 (previous chapter) the tree is <code>38B(19R(12B(8R,),31B(25R,32R)),41B)</code>. Then delete 8, 12, 19 in order.</p>
+<ul>
+<li><b>Delete 8.</b> 8 is a red leaf. Remove it. Nothing else changes.</li>
+<li><b>Delete 12.</b> 12 is a black leaf. Its place is a NIL with an extra black (x). Its sibling is 31 (black). 31's far child is 32, red. So <b>case 4</b>: 31 takes the parent's colour (19 was red, so 31 becomes red), 19 and 32 become black, rotate left at 19.</li>
+<li><b>Delete 19.</b> 19 now has only a right child, 25 (red). 25 moves up into 19's place. x is the red 25, so colour it black. Done.</li>
+</ul>
+<p>Final tree: <code>38B(31R(25B,32B),41B)</code>. Check black counts: every path from 38 down has 38, one more black, NIL.</p>
+<div id="t1"></div>
+<div class="drawit"><b>On paper:</b> draw the tree after each of the three deletions (three trees, colours on every node). After deleting 12, draw the intermediate tree with the NIL x in a double box, write "sibling 31 black, far child 32 red: case 4", and then the rotated tree. A marker gives marks per tree, so never skip an intermediate tree.</div>
+
+<h2>8. 2023–24 Q12(b): delete 50 (10 marks)</h2>
+<p>The figure: root 30 (black); 20 (black) and 45 (red); under 45: 40 (black) and 50 (black); under 40: 35 (red) and 42 (red). In the paper doubly circled nodes are red, single circles black. (Colours as read from the scan; they pass the black-height check.) The tree is <code>30B(20B,45R(40B(35R,42R),50B))</code>.</p>
+<p>50 is a black leaf, so x is the NIL that replaces it, and it is the right child of 45. Mirror case: x is on the right. Sibling 40 is black, and its far child (on the left, away from x) is 35, red: <b>case 4 mirrored</b>. 40 takes 45's colour (red), 45 and 35 become black, rotate right at 45. Result <code>30B(20B,40R(35B,45B(42R,)))</code>. This matches the correct student solution (the other student drew the same shape).</p>
+<div id="t2"></div>
+
+<h2>9. 2020–21 Q6(b): delete 150 (5+15 marks)</h2>
+<p>The figure, read from the scan (double circles and boxes are black, single circles red): 240 black root; 150 red and 390 black under it; 150 has 120 black and 190 black; 120 has 80 red and 140 black; 80 has 50 black and 100 black; 190 has 170 black and 210 red; 210 has 200 black and 220 black; 200 has left child 195 (red); 390 has 280 red and 450 black; 280 has 260 and 360, both black. All NILs black. I checked that every path has 3 blacks, so the reading is consistent.</p>
+<div id="g150"></div>
+<p>150 has two children, so its successor is 170 (go right to 190, then left to 170). 170 is black. It moves up and takes 150's colour (red). The position 170 left now holds a NIL with an extra black, the left child of 190. Sibling 210 is red: <b>case 1</b>. Rotate left at 190, then the new sibling is 200 (black, near child 195 red, far child NIL black): <b>case 3</b>, then <b>case 4</b>. Result: <code>240B(170R(120B(80R(50B,100B),140B),210B(195R(190B,200B),220B)),390B(280R(260B,360B),450B))</code>.</p>
+<div id="t3"></div>
+<h3>"Is it possible to fix without any rotation?" (5 marks)</h3>
+<p>Answer in two lines. <b>Sometimes yes, not always.</b> Recolouring alone is enough when the removed node is red, when x is red, or when you only hit case 2 (sibling and both nephews black). But when the sibling is red (case 1), or a nephew is red (cases 3 and 4), a rotation is unavoidable, because recolouring cannot change which side holds the extra black. The tree for 150 needs three rotations. Give one rotation-free example too:</p>
+<div id="t4"></div>
+<p>Deleting 35 only recolours (case 2 twice).</p>
+
+<h2>10. Traps</h2>
+<div class="trap"><h4>Where marks go</h4><ul>
+<li>Using the wrong colour to decide. The fix-up depends on the <b>original colour of the node that moved</b> (the successor), not on the colour of the key you deleted.</li>
+<li>Forgetting that the successor takes the deleted node's <b>colour</b> as well as its place.</li>
+<li>Stopping after case 1 or case 3. They always continue.</li>
+<li>Case 2: recolouring w red but forgetting to check whether p is red (stop) or black (continue).</li>
+<li>Mirror mistakes. When x is the right child, rotate right in case 1 and 4, left in case 3, and "far" is the left nephew.</li>
+<li>Treating a missing sibling child as no child. It is a black NIL.</li>
+<li>Not saying whether you used the successor or the predecessor.</li>
+</ul></div>
+
+<h2>11. Mandatory practice</h2>
+<p>Deletion is a 25-mark skill in 2024–25. Do all three random instances by hand before opening the answer.</p>
+<div id="r1"></div>
+<div id="p1"></div>
+<p class="drawit">Next: <a href="05-rb-gauntlet.html">the gauntlet</a>.</p>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/algo.js"></script>
+<script src="../assets/dsa.js"></script>
+<script>
+// ---- generic tree figures: nodes N(label,colour,left,right,opts), subtree triangles T(label,opts)
+const N = (k, c, l, r, o) => Object.assign({ k, c: c || '', l, r }, o);
+const T = (t, o) => Object.assign({ t }, o);
+function gsvg(root) {
+  const lay = n => { if (n.t) return n.w = 60; const a = n.l ? lay(n.l) : (n.r ? 34 : 0), b = n.r ? lay(n.r) : (n.l ? 34 : 0); return n.w = Math.max(a + b, 46); };
+  const place = (n, x0, d) => { n.d = d; if (n.t) { n.x = x0 + n.w / 2; return; } const a = n.l ? n.l.w : 34; if (n.l) place(n.l, x0, d + 1); if (n.r) place(n.r, x0 + a, d + 1);
+    n.x = n.l && n.r ? (n.l.x + n.r.x) / 2 : n.l ? n.l.x + 17 : n.r ? n.r.x - 17 : x0 + n.w / 2; };
+  lay(root); place(root, 0, 0);
+  const Y = d => 24 + d * 56, parts = [], nodes = []; let maxY = 0;
+  (function walk(n) { if (n.t) { maxY = Math.max(maxY, Y(n.d) + 50); return; } maxY = Math.max(maxY, Y(n.d) + 26); nodes.push(n); for (const c of [n.l, n.r]) if (c) { walk(c); } })(root);
+  (function edges(n) { if (n.t) return; for (const c of [n.l, n.r]) if (c) { parts.push(`<line class="ed" x1="${n.x}" y1="${Y(n.d)}" x2="${c.x}" y2="${Y(c.d)}"/>`); edges(c); } })(root);
+  (function tri(n) { if (n.t) { const y = Y(n.d); parts.push(`<polygon points="${n.x},${y} ${n.x - 26},${y + 42} ${n.x + 26},${y + 42}" style="fill:var(--plate);stroke:var(--muted);stroke-width:1.5"/><text class="tx" x="${n.x}" y="${y + 29}" style="font-size:14px">${n.t}</text>`); if (n.h) parts.push(`<text class="sm" x="${n.x}" y="${y + 54}">${n.h}</text>`); maxY = Math.max(maxY, y + 60); return; } for (const c of [n.l, n.r]) if (c) tri(c); })(root);
+  for (const n of nodes) { const x = n.x, y = Y(n.d), w = n.c === 'R' || n.c === 'B'; const st = n.c === 'a' ? ' style="fill:var(--plate);stroke-dasharray:4 3"' : '';
+    parts.push(`<circle class="nd ${n.c === 'R' || n.c === 'B' ? n.c : ''}"${st} cx="${x}" cy="${y}" r="16"/>`);
+    if (n.db) parts.push(`<circle class="db" cx="${x}" cy="${y}" r="20"/>`);
+    if (n.hl) parts.push(`<circle class="hl" cx="${x}" cy="${y}" r="${n.db ? 23 : 19}"/>`);
+    parts.push(`<text class="tx ${w ? 'w' : ''}" x="${x}" y="${y}">${n.k}</text>`);
+    if (n.bf !== undefined) parts.push(`<text class="vl" x="${x + 22}" y="${y - 12}" style="font-size:11px;fill:var(--accent);font-weight:600">${n.bf}</text>`);
+    if (n.tag) parts.push(`<text class="sm" x="${x}" y="${y + 31}">${n.tag}</text>`); }
+  const W = root.w, H = maxY + 8;
+  return `<svg class="dsa-fig" viewBox="0 0 ${W} ${H}" width="${W}" role="img" aria-label="tree figure">${parts.join('')}</svg>`;
+}
+function gfig(sel, root) { document.querySelector(sel).innerHTML = `<div class="fg-wrap">${gsvg(root)}</div>`; }
+function pair(sel, a, b, la, lb) { document.querySelector(sel).innerHTML = `<div class="figrow"><div><div class="figlabel">${la || 'before'}</div>${gsvg(a)}</div><div><div class="figlabel">${lb || 'after'}</div>${gsvg(b)}</div></div>`; }
+function pfig(sel, text, bf) { // plain (uncoloured) tree from "20(10(5),30)", optional balance factors
+  const t = Algo.parseTreeText(text); const h = n => n ? 1 + Math.max(h(n.l), h(n.r)) : 0;
+  (function w(n) { if (!n) return; delete n.c; if (bf) n.bf = h(n.l) - h(n.r); w(n.l); w(n.r); })(t);
+  document.querySelector(sel).innerHTML = `<div class="fg-wrap">${drawTree(t)}</div>`;
+}
+
+treeFig('#s0', '20B(10B,40R(30B(25R,),50B))');
+treeFig('#s1', '20B(,40R(30B(25R,),50B))');
+treeFig('#s2', '20B(10B,40R(25R,50B))');
+treeFig('#s3', '25B(10B,40R(30B,50B))');
+trace('#ts1', { kind: 'rb', input: '20B(10B,40R(30B(25R,),50B)) ; del 10' });
+trace('#ts2', { kind: 'rb', input: '20B(10B,40R(30B(25R,),50B)) ; del 30' });
+trace('#ts3', { kind: 'rb', input: '20B(10B,40R(30B(25R,),50B)) ; del 20' });
+// generic case figures. x: double black; a: any colour
+const X = (o) => N('x', 'B', undefined, undefined, Object.assign({ db: 1, hl: 1 }, o));
+pair('#d1', N('p', 'B', X(), N('w', 'R', N('c', 'B'), N('d', 'B'))), N('w', 'B', N('p', 'R', X(), N('c', 'B')), N('d', 'B')), 'before: sibling w red', 'after: colours swapped, left rotate at p. x has a black sibling c');
+pair('#d2', N('p', 'a', X(), N('w', 'B', N('c', 'B'), N('d', 'B'))), N('p', 'a', N('x', 'B'), N('w', 'R', N('c', 'B'), N('d', 'B')), { db: 1, hl: 1 }), 'before: w black, both children black', 'after: w red, extra black moves up to p');
+pair('#d3', N('p', 'a', X(), N('w', 'B', N('c', 'R'), N('d', 'B'))), N('p', 'a', X(), N('c', 'B', undefined, N('w', 'R', undefined, N('d', 'B')))), 'before: near child c red, far child d black', 'after: c black, w red, right rotate at w. Far child w is red: case 4');
+pair('#d4', N('p', 'a', X(), N('w', 'B', N('c', 'a'), N('d', 'R'))), N('w', 'a', N('p', 'B', N('x', 'B'), N('c', 'a')), N('d', 'B')), 'before: far child d red', 'after: left rotate at p. w gets p\'s old colour, p and d black. Extra black gone');
+trace('#c1', { kind: 'rb', input: '10B(5B,20R(15B,30B)) ; del 5' });
+trace('#c2a', { kind: 'rb', input: '20B(10R(5B,15B),30B) ; del 5' });
+trace('#c2b', { kind: 'rb', input: '20B(10B(5B,15B),30B(25B,35B)) ; del 5' });
+trace('#c3', { kind: 'rb', input: '10B(5B,15B(12R,)) ; del 5' });
+trace('#c4', { kind: 'rb', input: '10B(5B,15B(,20R)) ; del 5' });
+trace('#t1', { kind: 'rb', input: '38B(19R(12B(8R,),31B(25R,32R)),41B) ; del 8 12 19' });
+trace('#t2', { kind: 'rb', input: '30B(20B,45R(40B(35R,42R),50B)) ; del 50' });
+treeFig('#g150', '240B(150R(120B(80R(50B,100B),140B),190B(170B,210R(200B(195R,),220B))),390B(280R(260B,360B),450B))');
+trace('#t3', { kind: 'rb', input: '240B(150R(120B(80R(50B,100B),140B),190B(170B,210R(200B(195R,),220B))),390B(280R(260B,360B),450B)) ; del 150' });
+trace('#t4', { kind: 'rb', input: '20B(10B(5B,15B),30B(25B,35B)) ; del 35' });
+recall('#r1', { id: 'r1', marks: 15, q: 'Explain red-black deletion: why only black removal needs repair, the extra-black idea, and the four fix-up cases with a sketch of each. State when the fix-up stops. (derived from 2024–25 Q5a, 2020–21 Q6b)', points: ['Removed node red → nothing breaks; black → black count short on those paths', 'Successor replaces two-child node and takes its colour; original colour of the moved node decides', 'Extra black on x; red x just becomes black; root drops it', 'Case 1: sibling red → recolour and rotate at parent, continue', 'Case 2: sibling and both nephews black → sibling red, extra black moves to parent (stop if parent red)', 'Case 3: near nephew red, far black → rotate at sibling to make far red', 'Case 4: far nephew red → recolour and rotate at parent, stop', 'At most 3 rotations; recolouring up to the root'], model: 'Removing a red node changes no black count and creates no red-red pair, so nothing is repaired. Removing a black node (the original colour of the spliced node, or of the successor in the two-child case) leaves every path through that place one black short. Let x be the node that fills the place; give it an extra black (double black). If x is red, colour it black and stop; if x is the root, drop the extra black. Otherwise let w be its sibling (a real node). <br>Case 1 (w red): w black, p red, rotate at p towards x; continue. <br>Case 2 (w black, both children black): w red, extra black moves to p; if p red it turns black and we stop, otherwise repeat at p. <br>Case 3 (w black, near child red, far child black): near child black, w red, rotate at w away from x; now case 4. <br>Case 4 (w black, far child red): w takes p\'s colour, p and far child black, rotate at p towards x; stop. <br>At most three rotations are used; case 2 may recolour up to the root, O(log n).' });
+practice('#p1', { id: 'p1', kind: 'rb-delete', n: 3 });
+</script>
+</body>
+</html>

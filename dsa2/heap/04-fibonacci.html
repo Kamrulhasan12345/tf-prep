@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fibonacci Heap · CSE 207 Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Advanced heaps · Fibonacci heap · CLRS ch. 19 · Bayzid sir L7–8 · asked every year</div>
+<h1>Fibonacci Heap</h1>
+<p class="lede">Asked in 2024–25 Q4(d) (delete the min, 12 marks), 2023–24 Q2 (extract-min, 15), 2022–23 Q5(c) (RAHSUT-DELETE, 12; chapter 5), 2019–20 Q2(c) and Q4(a) (damaged tree f6, 8; running times, 8), 2018–19 Q6(b)(c) (delete min, 15; running times, 5), 2017–18 Q6(b)(c) and Q7(a) (running times and the "all O(1)" claim, 6+6; extract-min algorithm, 8; damaged tree of order 5, 4+6). Extract-min with consolidation is the one to master.</p>
+
+<h2>1. The idea</h2>
+<p>A Fibonacci heap is a <b>binomial heap with lazy union</b>. Binomial heaps keep a strict shape, and that costs O(log n) on every insert and union. A Fibonacci heap keeps no shape. It does nothing until the next extract-min, and then does all the tidying at once.</p>
+<ul>
+<li>A collection of <b>min-heap-ordered trees</b>, any shapes, any number of trees.</li>
+<li>The roots are in a <b>circular doubly linked root list</b>. A pointer <b>min</b> points to the smallest root.</li>
+<li>Each node stores its key, degree (number of children), parent, one child pointer, and a <b>mark</b> bit. A node is <b>marked</b> if it has lost one child since it last became a child of another node. Roots are never marked.</li>
+</ul>
+<p>It was invented to speed up Dijkstra: V extract-mins at O(log V) and E decrease-keys at O(1) give \(O(E + V\log V)\) instead of \(O(E\log V)\) for a binary heap.</p>
+<p>The heap in the 2024–25 question (min = 5, roots 7, 24, 23, 17, 5):</p>
+<div id="f1"></div>
+
+<h2>2. The cheap operations</h2>
+<div class="tbl"><table>
+<tr><th>Operation</th><th>What you do</th><th>Cost</th></tr>
+<tr><td>Insert x</td><td>Add a one-node tree to the root list. Update min if x is smaller.</td><td>O(1)</td></tr>
+<tr><td>Find-min</td><td>Return the min pointer.</td><td>O(1)</td></tr>
+<tr><td>Union H1, H2</td><td>Splice the two circular root lists together. min = the smaller of the two mins.</td><td>O(1)</td></tr>
+</table></div>
+<p>Insert does not look at degrees at all: that is the "lazy" part, and it is what the binomial heap structure gives up.</p>
+
+<h2>3. Extract-min and consolidate</h2>
+<p>This is the main operation. The root list can be long, so after removing the min you <b>consolidate</b>: link roots of equal degree until all roots have distinct degrees. An array A indexed by degree remembers one root per degree.</p>
+<div class="method"><h4>Method · extract-min</h4><ol>
+<li>Remove the min root z. Its children go into the root list, <b>in z's place</b> (they become roots and lose any mark).</li>
+<li>Make an empty array A[0 .. D(n)]. Go through the root list once, <b>starting at the root just right of where z was</b> and wrapping around to the end. (Children inserted for z come at the end of that walk.)</li>
+<li>For each root w, with degree d: while A[d] holds some root y, link the two: the one with the <b>larger key goes under the smaller</b>. The winner has degree d+1 now. Clear A[d] and set d = d+1. When A[d] is empty, store the winner in A[d].</li>
+<li>Rebuild the root list from the array and find the new min by scanning it.</li>
+</ol></div>
+<div class="key"><p><b>Order convention.</b> Bayzid sir's notes do not say where consolidation starts, but the slide's simulation starts to the right of the removed min, with the children in the min's place. The traces in this book do the same. The final set of trees can differ slightly if you start somewhere else, so write your convention down.</p></div>
+<pre class="code">FIB-HEAP-EXTRACT-MIN(H)
+  z = H.min
+  if z != NIL
+    for each child x of z: add x to the root list of H; x.p = NIL
+    remove z from the root list of H
+    if z == z.right: H.min = NIL
+    else H.min = z.right; CONSOLIDATE(H)
+    H.n = H.n - 1
+  return z
+
+CONSOLIDATE(H)
+  let A[0 .. D(H.n)] be a new array, all NIL
+  for each node w in the root list of H
+    x = w; d = x.degree
+    while A[d] != NIL
+      y = A[d]
+      if x.key > y.key: exchange x and y
+      FIB-HEAP-LINK(H, y, x)      // remove y from root list, make y a child of x, x.degree++, y.mark = FALSE
+      A[d] = NIL; d = d + 1
+    A[d] = x
+  H.min = NIL
+  for i = 0 to D(H.n)
+    if A[i] != NIL: add A[i] to the root list (rebuilt); update H.min if A[i].key < H.min.key</pre>
+
+<h3>2024–25 Q4(d), 12 marks: delete the minimum (5)</h3>
+<p>Press Next. Each "link" frame shows which roots are linked and the array A after the link. Four links happen: 23 under 7, then 24 under 7, then 18 under 17, then 41 under 17.</p>
+<div id="t1"></div>
+<p><b>Result:</b> three trees, 7 with children 30, 23(51), 24(26(35), 46) (degree 3), 52 (degree 0), and 17 with children 18, 41(44) (degree 2). The new min is 7. The degrees are 3, 0, 2, all different, so the heap is consolidated.</p>
+<div class="drawit"><b>On paper:</b> (1) Draw the heap with 5 removed and its children 18, 52, 41(44) added to the root list where 5 was. (2) Draw the array A as a row of boxes labelled 0, 1, 2, 3 and fill it after every root you process. (3) After each link redraw the root list. (4) Draw the final heap and circle the min. Write "link 23 under 7 (7 &lt; 23)" beside each link.</div>
+
+<h3>2023–24 Q2, 15 marks (from the solution sheets)</h3>
+<p>The question's own figure was not seen, only the two solutions, which agree on this heap: roots 6, 2(5), 1 with min 1, where 1 has children 3, 4 (marked) and 7 (marked, with child 8 which has child 9). Extract-min:</p>
+<div id="t2"></div>
+<p>Result: roots 2 (with children 5 and 3(6)), 4, and 7(8(9)); min = 2.</p>
+
+<h2>4. Decrease-key, cut, cascading cut</h2>
+<p>Decrease-key must be O(1). Bubbling up (as in a binary heap) is O(log n), so instead we <b>cut</b> the node out and make it a root.</p>
+<div class="method"><h4>Method · decrease-key(x, k)</h4><ol>
+<li>Set x.key = k. Let y = x.parent. If x is a root, or y.key ≤ k, heap order still holds: only update min if needed. Stop.</li>
+<li>Otherwise <b>CUT(x, y)</b>: remove x from y's child list, y.degree decreases, x goes to the root list, x.mark = false.</li>
+<li><b>CASCADING-CUT(y):</b> if y is a root, stop. If y is <b>unmarked</b>, mark it and stop (y has now lost its first child). If y is <b>marked</b> (it is now losing its second child), cut y from its parent too, then repeat the check at y's old parent.</li>
+<li>If k < H.min.key, update min to x.</li>
+</ol></div>
+<pre class="code">FIB-HEAP-DECREASE-KEY(H, x, k)
+  x.key = k; y = x.p
+  if y != NIL and x.key < y.key
+    CUT(H, x, y); CASCADING-CUT(H, y)
+  if x.key < H.min.key: H.min = x
+
+CUT(H, x, y)                  // remove x from child list of y, add x to root list
+  y.degree--; x.p = NIL; x.mark = FALSE
+
+CASCADING-CUT(H, y)
+  z = y.p
+  if z != NIL
+    if y.mark == FALSE: y.mark = TRUE
+    else CUT(H, y, z); CASCADING-CUT(H, z)</pre>
+<p><b>Why marks.</b> If a node could lose many children, a tree with many nodes could shrink to a very thin tree with a large degree, and the root list could grow like n. The mark rule says: a node may lose at most one child; losing a second one means cut the node itself. The shape then stays "fat enough" (chapter 5 proves the Fibonacci-number bound).</p>
+<p>An example of my own with a chain of marked nodes (nodes 18 and 21 are marked, shown by the star; the "*" is a mark). Decrease 30 to 2. Press Next: 2 is cut from 21, 21 is marked so it is cut from 18, 18 is marked so it is cut from 7, and 7 is a root so the cascade stops. Min becomes 2.</p>
+<div id="t3"></div>
+<div class="drawit"><b>On paper:</b> draw the heap before. Draw one picture per cut, marking which nodes are marked (an M or a filled node) and which are unmarked after the cut. Write "cascading cut" at each extra cut, and "stop: root" or "stop: now marked" at the end. Say the new min.</div>
+
+<h2>5. Delete</h2>
+<p><b>Delete x:</b> decrease its key to \(-\infty\) (it is cut to the root list and becomes the min), then extract-min. Cost = decrease-key + extract-min = O(log n) amortized. The trace below deletes 21 from the same heap and shows both phases.</p>
+<div id="t4"></div>
+
+<h2>6. Running times and the "all O(1)" claim</h2>
+<div class="tbl"><table>
+<tr><th>Operation</th><th>Binary heap</th><th>Binomial heap</th><th>Fibonacci heap (amortized)</th></tr>
+<tr><td>Insert</td><td>O(log n)</td><td>O(log n) worst, O(1) amortized</td><td><b>O(1)</b></td></tr>
+<tr><td>Find-min</td><td>O(1)</td><td>O(log n) (O(1) with a min pointer)</td><td><b>O(1)</b></td></tr>
+<tr><td>Union</td><td>O(n)</td><td>O(log n)</td><td><b>O(1)</b></td></tr>
+<tr><td>Extract-min</td><td>O(log n)</td><td>O(log n)</td><td>O(log n)</td></tr>
+<tr><td>Decrease-key</td><td>O(log n)</td><td>O(log n)</td><td><b>O(1)</b></td></tr>
+<tr><td>Delete</td><td>O(log n)</td><td>O(log n)</td><td>O(log n)</td></tr>
+</table></div>
+<p>The Fibonacci figures are <b>amortized</b>: an individual extract-min can take O(n) when the root list is long, but a sequence of m operations is cheap in total. Chapter 5 proves the table.</p>
+
+<div class="method"><h4>2017–18 Q6(b): "A friend says he has a mergeable heap with O(1) for insert, find-min, extract-min, union and decrease-key. Would you believe it?"</h4><ol>
+<li><b>No.</b> Suppose insert and extract-min both took O(1) (amortized is enough).</li>
+<li>Then you could sort n numbers by n inserts followed by n extract-mins, which would take O(n) time and give the numbers in sorted order.</li>
+<li>But every comparison-based sorting algorithm needs \(\Omega(n\log n)\) comparisons in the worst case. Contradiction.</li>
+<li>So at least one of insert and extract-min is \(\Omega(\log n)\). The best known (the Fibonacci heap) makes insert, find-min, union and decrease-key O(1) amortized and pays O(log n) amortized for extract-min.</li>
+</ol></div>
+<div class="trap"><h4>Where marks go</h4><ul>
+<li>Linking the wrong way: the larger key goes <b>under</b> the smaller.</li>
+<li>Stopping consolidation too early. Repeat until all root degrees are different. After linking, the new root has degree d+1 and may collide again with A[d+1].</li>
+<li>Leaving the min's children out of the root list, or forgetting that they lose their marks.</li>
+<li>Marking roots. Roots are never marked; cascading cut stops at a root.</li>
+<li>Cascading cut: a <b>marked</b> parent gets cut; an <b>unmarked</b> parent gets marked and the cascade stops. Do not swap these.</li>
+<li>Writing "amortized O(log n)" and "worst case O(n)" for extract-min as if they were the same claim. They are not; say both.</li>
+<li>Not showing array A. The marker wants to see each consolidation step.</li>
+</ul></div>
+
+<h2>7. Mandatory practice</h2>
+<p>Write the pseudocode and the argument from memory, then do the random extractions with array A on paper.</p>
+<div id="r1"></div>
+<div id="r2"></div>
+<div id="r3"></div>
+<div id="p1"></div>
+<div id="p2"></div>
+<p class="drawit"><b>If you got one wrong:</b> check where you started consolidating, then the first frame where your root list differs.</p>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/algo.js"></script>
+<script src="../assets/dsa.js"></script>
+<script>
+forestFig('#f1', '7(30) 24(26(35) 46) 23(51) 17 5(18 52 41(44)) min=5');
+trace('#t1', { kind: 'fib', input: '7(30) 24(26(35) 46) 23(51) 17 5(18 52 41(44)) min=5 ; ext' });
+trace('#t2', { kind: 'fib', input: '6 2(5) 1(3 4* 7*(8(9))) min=1 ; ext' });
+trace('#t3', { kind: 'fib', input: '7(18*(21*(30) 25) 38) 3 12 min=3 ; dec 30 2' });
+trace('#t4', { kind: 'fib', input: '7(18*(21*(30) 25) 38) 3 12 min=3 ; del 21' });
+recall('#r1', { id: 'r1', marks: 8, q: 'Write down the algorithm for extracting the minimum key from a Fibonacci heap, including CONSOLIDATE. (2017–18 Q6(c))', points: ['z = H.min; add z\'s children to the root list; remove z', 'Set the new min pointer then CONSOLIDATE', 'Array A indexed by degree', 'For each root: while A[d] is occupied, link the larger root under the smaller; d = d + 1', 'Store the result in A[d]', 'Rebuild the root list from A and find the min', 'Amortized O(log n)'], model: `<pre class="code">FIB-HEAP-EXTRACT-MIN(H)
+  z = H.min
+  if z != NIL
+    for each child x of z: add x to root list; x.p = NIL
+    remove z from root list
+    if z == z.right: H.min = NIL
+    else H.min = z.right; CONSOLIDATE(H)
+    H.n = H.n - 1
+  return z
+
+CONSOLIDATE(H)
+  A[0..D(H.n)] = NIL
+  for each root w
+    x = w; d = x.degree
+    while A[d] != NIL
+      y = A[d]; if x.key > y.key: swap x, y
+      LINK(y, x); A[d] = NIL; d = d + 1
+    A[d] = x
+  rebuild root list from A; H.min = smallest root</pre><p>Amortized cost O(log n): the potential \\(t(H)+2m(H)\\) pays for the long root list (chapter 5).</p>` });
+recall('#r2', { id: 'r2', marks: 10, q: 'Explain decrease-key in a Fibonacci heap. What are cut and cascading cut, and why do nodes carry a mark? Why is it O(1) amortized?', points: ['Set the key; if heap order holds with the parent, stop', 'Otherwise cut x to the root list and unmark it', 'Cascading cut at the parent: unmarked → mark and stop; marked → cut it too, recurse upward', 'Roots are never marked; the cascade stops at a root', 'Mark means the node has lost one child; losing a second means it is cut', 'This keeps trees fat, so root degrees are O(log n)', 'Cost O(1) plus c cuts; potential drops by about c, so amortized O(1)'], model: `<p>Decrease-key sets x.key = k. If x is a root or its parent's key is not larger, nothing else is needed. Otherwise x is <b>cut</b>: removed from its parent y, added to the root list, mark cleared. Then <b>CASCADING-CUT(y)</b>: if y is a root stop; if y is unmarked, mark it (it has lost its first child) and stop; if y is marked, it is losing its second child, so cut y as well and repeat at y's parent. Finally update min.</p><p>Marks limit each node to losing one child before it is itself cut. Without this a node of large degree could end up with very few descendants, and the number of roots after consolidation would not be O(log n). With it, a node of degree k has at least \\(F_{k+2}\\) descendants (chapter 5), so degrees are O(log n).</p><p>If c cuts happen, the actual cost is O(c). Each cut adds one root (+1 to \\(t\\)), and each cascading cut unmarks a node (−2 to \\(2m\\)). The potential \\(t+2m\\) changes by at most \\(4-c\\), so the amortized cost is O(1).</p>` });
+recall('#r3', { id: 'r3', marks: 6, q: 'A friend claims a mergeable heap with O(1) insert, find-min, extract-min, union and decrease-key. Would you believe it? (2017–18 Q6(b))', points: ['Answer: no', 'n inserts then n extract-mins would sort n numbers in O(n)', 'Comparison sorting needs Ω(n log n) comparisons', 'Contradiction: extract-min (or insert) cannot be O(1)', 'Fibonacci heap: O(1) amortized for the others, O(log n) amortized for extract-min'], model: `<p>No. If insert and extract-min were both O(1), then inserting n keys and extracting n times would sort them in O(n) time. Comparison-based sorting has an \\(\\Omega(n\\log n)\\) lower bound, so this is impossible. Hence one of insert or extract-min must cost \\(\\Omega(\\log n)\\). The Fibonacci heap is the best trade: insert, find-min, union and decrease-key are O(1) amortized and extract-min is O(log n) amortized.</p>` });
+practice('#p1', { id: 'p1', kind: 'fib-extract', n: 2 });
+practice('#p2', { id: 'p2', kind: 'fib-extract', n: 1 });
+</script>
+</body>
+</html>

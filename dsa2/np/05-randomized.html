@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Randomized Algorithms · CSE 207 Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Randomized algorithms · CLRS §5.1, §7.3–7.4 (quicksort); Karger is not in CLRS · Bayzid sir L15–16 · must-know</div>
+<h1>Randomized Quicksort, Monte Carlo, Karger</h1>
+<p class="lede">Asked: 2024–25 Q2(b) analyse the running time of randomized quicksort (12); 2018–19 Q8(b) the same (10); 2024–25 Q3(a) a Monte Carlo algorithm succeeds with probability at least 1/n², boost it to 1 − 1/n (10). Karger's min-cut is in Bayzid sir's notes (lectures 15–16) and Q3(a) is exactly its amplification step. No paper in these sources asks Karger's proof directly, but it is the one place where the n² comes from, so know it.</p>
+
+<h2>1. Las Vegas versus Monte Carlo</h2>
+<p>A randomized algorithm makes random choices, so the same input can give different runs. Two kinds, defined by what is allowed to go wrong:</p>
+<div class="tbl"><table>
+<tr><th></th><th>Las Vegas</th><th>Monte Carlo</th></tr>
+<tr><td>Answer</td><td><b>always correct</b></td><td>may be wrong, with a bounded probability</td></tr>
+<tr><td>Running time</td><td>random (we bound the expectation)</td><td>fixed or bounded</td></tr>
+<tr><td>"Gambles on"</td><td>running time</td><td>accuracy</td></tr>
+<tr><td>Example</td><td>randomized quicksort</td><td>Karger's min-cut</td></tr>
+</table></div>
+<p>A Monte Carlo algorithm can be repeated to make its error as small as you like. That is section 6.</p>
+
+<h2>2. Randomized quicksort</h2>
+<p>Ordinary quicksort takes the last element as the pivot. On an already sorted array the pivot is always the largest, one side is empty, and \(T(n) = T(n-1) + O(n) = O(n^2)\). A sorted array is an <b>adversarial input</b>: someone can design inputs that are always bad. The best case is a perfect split, \(T(n) = 2T(n/2) + O(n) = O(n \log n)\). Even a lopsided but fixed ratio split such as \(T(n) = T(n/10) + T(9n/10) + O(n)\) is \(O(n \log n)\).</p>
+<div class="key"><p><b>Randomized quicksort changes one line:</b> instead of <code>pivot = A[n−1]</code>, use <code>pivot = A[random index]</code>. Now no input is bad on purpose. Quicksort becomes Las Vegas: always sorted correctly, and the <i>expected</i> time is \(O(n \log n)\) for <b>every</b> input. The worst case is still \(O(n^2)\), but its probability is tiny.</p></div>
+<pre class="code">RANDOMIZED-QUICKSORT(A, p, r)
+  if p < r
+    i = RANDOM(p, r);  swap A[i] with A[r]     // random pivot
+    q = PARTITION(A, p, r)                      // O(r - p) comparisons with the pivot
+    RANDOMIZED-QUICKSORT(A, p, q - 1)
+    RANDOMIZED-QUICKSORT(A, q + 1, r)</pre>
+
+<h2>3. Proof: expected running time is O(n log n) (2024–25 Q2(b); 2018–19 Q8(b))</h2>
+<p>Write this as numbered steps. Every step below is worth marks.</p>
+<div class="method"><h4>Proof · expected number of comparisons</h4><ol>
+<li><b>Cost is comparisons.</b> Partition compares each element with the pivot, so the work in a call is proportional to the comparisons it makes. Every call removes its pivot from further calls, so there are at most n calls and the other work is O(n). Total time = O(n + X), where X is the total number of comparisons.</li>
+<li><b>Name the elements by rank.</b> Let \(z_1 < z_2 < \dots < z_n\) be the array in sorted order. (Initial positions do not matter.)</li>
+<li><b>Indicator variables.</b> For \(i < j\) let \(X_{ij} = 1\) if \(z_i\) and \(z_j\) are ever compared, and 0 otherwise. Then \(X = \sum_{i=1}^{n-1} \sum_{j=i+1}^{n} X_{ij}\).</li>
+<li><b>Linearity of expectation.</b> \(E[X] = \sum_{i \lt j} E[X_{ij}] = \sum_{i \lt j} \Pr[z_i \text{ and } z_j \text{ are compared}]\), because \(E[X_{ij}] = 1 \cdot \Pr[X_{ij}=1] + 0 \cdot \Pr[X_{ij}=0] = \Pr[X_{ij}=1]\).</li>
+<li><b>Two facts.</b> Elements are compared only with a pivot. Two elements in different partitions are never compared. After \(z_i, z_j\) are compared once, one of them was the pivot and is now gone, so they are <b>never compared twice</b>.</li>
+<li><b>The key probability.</b> Look at the set \(Z_{ij} = \{z_i, z_{i+1}, \dots, z_j\}\), which has \(j - i + 1\) elements. As long as no element of \(Z_{ij}\) has been a pivot, all of them stay together in the same sub-array (a pivot outside the range sends them all the same way). So the <b>first pivot chosen from \(Z_{ij}\)</b> decides:
+ <ul><li>it is \(z_i\) or \(z_j\): then \(z_i\) and \(z_j\) are compared.</li>
+ <li>it is strictly between them: they go to different sides and are never compared.</li></ul>
+ The pivot is uniformly random, so each of the \(j-i+1\) elements of \(Z_{ij}\) is equally likely to be the first one picked. Hence \(\Pr[z_i, z_j \text{ compared}] = \dfrac{2}{j-i+1}\).</li>
+<li><b>Sum.</b> Put \(k = j - i + 1\), which runs from 2 to \(n-i+1\):
+\[ E[X] = \sum_{i=1}^{n-1} \sum_{j=i+1}^{n} \frac{2}{j-i+1} = \sum_{i=1}^{n-1} \sum_{k=2}^{n-i+1} \frac{2}{k} \le \sum_{i=1}^{n-1} 2\ln n < 2n \ln n . \]
+The inner sum is a harmonic sum: \(\sum_{k=2}^{m} 1/k \le \int_1^m dx/x = \ln m\).</li>
+<li><b>Conclusion.</b> \(E[X] = O(n \log n)\), so the expected running time is \(O(n + n\log n) = O(n \log n)\) for every input. (\(2n\ln n \approx 1.39\, n \log_2 n\).) ∎</li>
+</ol></div>
+<div class="trap"><h4>Where marks go</h4><ul>
+<li>Writing "the average case is n log n" without the indicator-variable argument. The question says "analyse", so give the proof.</li>
+<li>The probability 2/(j − i + 1) is the heart. Explain why it is the <b>first</b> pivot in the range \(Z_{ij}\) that matters.</li>
+<li>Say that the expectation is over the algorithm's random choices, not over random inputs. That is why the bound holds for every input.</li>
+<li>Do not forget to mention the worst case is still \(O(n^2)\).</li>
+</ul></div>
+<div class="drawit"><b>On paper:</b> one small picture helps the key step: draw the sorted line \(z_1 \dots z_n\), bracket \(Z_{ij}\), and mark "pivot hits an end: compared" versus "pivot hits the middle: split apart".</div>
+
+<h2>4. Karger's contraction algorithm (Monte Carlo)</h2>
+<p>A <b>cut</b> is a set of edges whose removal splits the graph into two parts. The <b>minimum cut</b> is the smallest such set. The algorithm:</p>
+<div class="method"><h4>Method · Karger's min-cut</h4><ol>
+<li>Pick an edge uniformly at random.</li>
+<li><b>Contract</b> it: merge its endpoints u, v into one supernode. Edges from u or v to other vertices now go to the supernode. Keep parallel edges. Delete self-loops (an edge between the two merged vertices).</li>
+<li>Repeat until two supernodes remain (that is n − 2 contractions).</li>
+<li>The edges between the two supernodes are the output cut.</li>
+</ol></div>
+<figure>
+<svg viewBox="0 0 560 190" role="img" aria-label="Edge contraction" width="560">
+<defs><marker id="ar2" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" style="fill:var(--fg)"/></marker></defs>
+<g class="s-fg">
+<line x1="60" y1="90" x2="140" y2="90" style="stroke-width:3"/><line x1="60" y1="90" x2="100" y2="30"/><line x1="140" y1="90" x2="100" y2="30"/><line x1="140" y1="90" x2="190" y2="150"/>
+<line x1="390" y1="90" x2="370" y2="30"/><line x1="410" y1="90" x2="430" y2="30"/><line x1="410" y1="90" x2="450" y2="150"/>
+</g>
+<g>
+<circle cx="60" cy="90" r="14" class="cell-hl"/><text x="60" y="94" text-anchor="middle">u</text>
+<circle cx="140" cy="90" r="14" class="cell-hl"/><text x="140" y="94" text-anchor="middle">v</text>
+<circle cx="100" cy="30" r="14" class="cell-plain"/><text x="100" y="34" text-anchor="middle">x</text>
+<circle cx="190" cy="150" r="14" class="cell-plain"/><text x="190" y="154" text-anchor="middle">y</text>
+<ellipse cx="400" cy="90" rx="34" ry="16" class="cell-hl"/><text x="400" y="94" text-anchor="middle">uv</text>
+<circle cx="400" cy="20" r="14" class="cell-plain"/><text x="400" y="24" text-anchor="middle">x</text>
+<circle cx="450" cy="150" r="14" class="cell-plain"/><text x="450" y="154" text-anchor="middle">y</text>
+</g>
+<line x1="230" y1="90" x2="320" y2="90" class="s-acc" marker-end="url(#ar2)"/>
+<text x="275" y="80" text-anchor="middle" class="lbl">contract u–v</text>
+<text x="275" y="175" text-anchor="middle" class="lbl">u–x and v–x become two parallel edges uv–x · u–v disappears (self-loop) · v–y becomes uv–y</text>
+</svg>
+<figcaption>Parallel edges stay, self-loops go. Edges that survive are exactly the edges that cross every cut between the supernodes.</figcaption>
+</figure>
+<p>Bayzid sir's example graph has vertices a, b, c, d, p, q, r and edges a–b, a–c, b–d, c–p, d–p, p–q, p–r, q–r. Contractions end with supernodes {a, b, d} and {c, p, q, r}, and the cut is the two edges {a–c, d–p}. In his example this is a minimum cut (size 2). The exact order of his drawn contractions is partly unreadable in the scan, so I do not repeat it.</p>
+<figure>
+<svg viewBox="0 0 400 190" role="img" aria-label="Example graph with a minimum cut" width="400">
+<g class="s-fg">
+<line x1="40" y1="40" x2="40" y2="140"/><line x1="40" y1="140" x2="140" y2="140"/><line x1="320" y1="40" x2="320" y2="140"/><line x1="240" y1="90" x2="320" y2="40"/><line x1="240" y1="90" x2="320" y2="140"/>
+</g>
+<line x1="140" y1="40" x2="240" y2="90" class="s-fg"/>
+<g class="s-red dash"><line x1="40" y1="40" x2="140" y2="40"/><line x1="140" y1="140" x2="240" y2="90"/></g>
+<g>
+<circle cx="40" cy="40" r="14" class="cell-new"/><text x="40" y="44" text-anchor="middle">a</text>
+<circle cx="40" cy="140" r="14" class="cell-new"/><text x="40" y="144" text-anchor="middle">b</text>
+<circle cx="140" cy="140" r="14" class="cell-new"/><text x="140" y="144" text-anchor="middle">d</text>
+<circle cx="140" cy="40" r="14" class="cell-hl"/><text x="140" y="44" text-anchor="middle">c</text>
+<circle cx="240" cy="90" r="14" class="cell-hl"/><text x="240" y="94" text-anchor="middle">p</text>
+<circle cx="320" cy="40" r="14" class="cell-hl"/><text x="320" y="44" text-anchor="middle">q</text>
+<circle cx="320" cy="140" r="14" class="cell-hl"/><text x="320" y="144" text-anchor="middle">r</text>
+</g>
+<text x="200" y="182" text-anchor="middle" class="lbl">dashed red: a–c, d–p (cut of size 2)</text>
+</svg>
+<figcaption>The dashed edges a–c and d–p cross between {a, b, d} and {c, p, q, r}. The edge c–p stays inside the right-hand group.</figcaption>
+</figure>
+<p>The output is <b>not always</b> a minimum cut: if we contract an edge that belongs to every minimum cut we can never get one. That is the Monte Carlo risk. So we compute how likely success is.</p>
+
+<h2>5. Proof: Karger succeeds with probability at least 2/(n(n−1)) ≥ 2/n²</h2>
+<div class="method"><h4>Proof</h4><ol>
+<li>Fix a minimum cut C with k edges. The algorithm outputs C <b>exactly when it never contracts an edge of C</b>. Contracting only edges outside C keeps both sides of C intact.</li>
+<li>Suppose there are m supernodes left and no edge of C has been contracted. The minimum cut is still k: any cut of a contracted graph is also a cut of the original graph.</li>
+<li>So every supernode has degree at least k (the edges at a supernode form a cut). Hence the number of edges is at least \(mk/2\).</li>
+<li>The probability that the next random edge lies in C is at most \(\dfrac{k}{mk/2} = \dfrac{2}{m}\). So with probability at least \(1 - \dfrac{2}{m}\) the step is safe.</li>
+<li>The contractions go from \(m = n\) down to \(m = 3\) (n − 2 contractions). Multiply the survival probabilities:
+\[ \Pr[\text{success}] \ge \prod_{m=3}^{n}\Bigl(1 - \frac{2}{m}\Bigr) = \frac{n-2}{n}\cdot\frac{n-3}{n-1}\cdot\frac{n-4}{n-2}\cdots\frac{2}{4}\cdot\frac{1}{3} = \frac{2}{n(n-1)} \ge \frac{2}{n^2}. \]</li>
+<li>The product telescopes: numerators \(1\cdot 2 \cdots (n-2)\), denominators \(3 \cdot 4 \cdots n\), leaving \(2/(n(n-1))\). ∎</li>
+</ol></div>
+<p>So one run succeeds with probability at least \(2/n^2\), which is tiny but not zero. Repeating many times makes failure as small as we like. That is the next section.</p>
+
+<h2>6. Boosting the success probability (2024–25 Q3(a), 10 marks)</h2>
+<p><b>Question.</b> A Monte Carlo algorithm succeeds with probability at least \(1/n^2\). The boss wants success probability at least \(1 - 1/n\). How?</p>
+<p><b>Answer: run it independently about \(n^2 \ln n\) times and keep the best answer.</b> Working:</p>
+<div class="method"><h4>Working · amplification</h4><ol>
+<li>Run the algorithm t times with <b>fresh, independent</b> random bits each time.</li>
+<li>One run fails with probability at most \(1 - \dfrac{1}{n^2}\).</li>
+<li>All t runs fail with probability at most \(\Bigl(1 - \dfrac{1}{n^2}\Bigr)^t\), because the runs are independent.</li>
+<li>Use \(1 - x \le e^{-x}\) for all x: \(\Bigl(1 - \dfrac{1}{n^2}\Bigr)^t \le e^{-t/n^2}\).</li>
+<li>We want the failure probability to be at most \(1/n\): \(e^{-t/n^2} \le \dfrac{1}{n}\). Take natural logs: \(-\dfrac{t}{n^2} \le -\ln n\), i.e. \(t \ge n^2 \ln n\).</li>
+<li>Choose \(t = \lceil n^2 \ln n \rceil\). Then the failure probability is at most \(1/n\), so the success probability is at least \(1 - \dfrac{1}{n}\).</li>
+<li>Running time: t times the time of one run, so \(O(n^2 \log n)\) runs.</li>
+</ol></div>
+<p>The handwritten note in the paper margin reads "n² log n", which matches. General formula (Bayzid sir, p.53): with one-run success probability P and target failure probability δ, \(t \ge \dfrac{1}{P}\ln\dfrac{1}{\delta}\). Here \(P = 1/n^2\) and \(\delta = 1/n\).</p>
+<div class="tbl"><table>
+<tr><th>n</th><th>runs t = ⌈n² ln n⌉</th><th>failure at most</th></tr>
+<tr><td>10</td><td>231</td><td>1/10</td></tr>
+<tr><td>100</td><td>46 052</td><td>1/100</td></tr>
+</table></div>
+<div class="trap"><h4>Where marks go</h4><ul>
+<li><b>Independence.</b> Say it. Fresh random bits for each run, otherwise the product formula is wrong.</li>
+<li><b>How do you pick the answer?</b> The question does not say, so state your assumption: the correct answer can be recognised, or the outputs can be compared. For Karger, keep the <b>smallest cut</b> over the runs; the run is wrong only if it finds a larger cut. For a decision problem with one-sided error, accept if any run says YES. Majority voting does <b>not</b> work here, because the success probability is far below 1/2.</li>
+<li>Do not stop at "repeat many times". Derive t, with \(1-x \le e^{-x}\).</li>
+<li>\(t = n^2 \ln n\) uses the natural log. Using \(\log_2\) changes only a constant, but write \(\ln\) when you use \(e^{-x}\).</li>
+</ul></div>
+
+<h2>7. Mandatory practice</h2>
+<p>All three are proofs. Write them on paper, then check the model answer.</p>
+<div id="r1"></div>
+<div id="r2"></div>
+<div id="r3"></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/algo.js"></script>
+<script src="../assets/dsa.js"></script>
+<script>
+recall('#r1', { id: 'r1', marks: 12, q: 'Analyse the running time of randomized quicksort. (2024–25 Q2(b); 2018–19 Q8(b))', points: ['Random pivot, so no adversarial input; Las Vegas', 'Time is O(n + X), X = number of comparisons', 'Sorted order z1..zn, indicator X_ij for pair ever compared', 'Linearity of expectation: E[X] = sum of Pr[z_i, z_j compared]', 'Elements compared only with a pivot, and at most once', 'Pr[compared] = 2/(j−i+1): first pivot in {z_i..z_j} must be z_i or z_j', 'Sum becomes sum over i of sum of 2/k, bounded by 2 n ln n, so O(n log n)', 'Worst case still O(n²) with tiny probability'], model: '<p>Time is O(n + X) where X is the number of comparisons. Let z<sub>1</sub> &lt; … &lt; z<sub>n</sub> be the sorted order and X<sub>ij</sub> = 1 if z<sub>i</sub>, z<sub>j</sub> are ever compared. X = Σ X<sub>ij</sub>, and E[X] = Σ Pr[z<sub>i</sub>, z<sub>j</sub> compared].</p><p>Elements are compared only with a pivot, and after a comparison the pivot is gone, so a pair is compared at most once. Consider Z = {z<sub>i</sub>, …, z<sub>j</sub>}. Until a pivot falls in Z they stay together. The first pivot chosen from Z is uniform among its j − i + 1 elements; if it is z<sub>i</sub> or z<sub>j</sub> they are compared, if it lies strictly between they are separated forever. So Pr = 2/(j − i + 1).</p><p>E[X] = Σ<sub>i=1..n−1</sub> Σ<sub>k=2..n−i+1</sub> 2/k ≤ Σ<sub>i</sub> 2 ln n &lt; 2 n ln n. So expected time O(n log n) on every input. Worst case is still O(n²) but with negligible probability.</p>' });
+recall('#r2', { id: 'r2', marks: 10, q: 'Describe Karger\'s contraction algorithm and prove that it returns a minimum cut with probability at least 2/(n(n−1)).', points: ['Pick random edge, contract, keep parallel edges, delete self-loops, until 2 supernodes', 'Output is the edges between the two supernodes', 'Success iff no edge of a fixed min cut C (size k) is ever contracted', 'Min cut stays k, every supernode degree ≥ k, so ≥ mk/2 edges', 'Pr[bad edge at m supernodes] ≤ k/(mk/2) = 2/m', 'Multiply (1 − 2/m) for m = n down to 3', 'Telescoping gives 2/(n(n−1)) ≥ 2/n²'], model: '<p>Algorithm: repeatedly pick a uniformly random edge and contract it (merge endpoints, keep parallel edges, delete self-loops) until two supernodes remain; output the edges between them.</p><p>Fix a minimum cut C of size k. It is output iff no edge of C is contracted. With m supernodes and no edge of C contracted yet, the minimum cut is still k, so every supernode has degree ≥ k and the number of edges is ≥ mk/2. The chance the next edge is in C is ≤ k/(mk/2) = 2/m. Over m = n, n−1, …, 3: Pr[success] ≥ Π (1 − 2/m) = (n−2)/n · (n−3)/(n−1) · … · 2/4 · 1/3 = 2/(n(n−1)) ≥ 2/n².</p>' });
+recall('#r3', { id: 'r3', marks: 10, q: 'A Monte Carlo algorithm succeeds with probability at least 1/n². Your boss wants success probability at least 1 − 1/n. Explain how to achieve this. (2024–25 Q3(a))', points: ['Repeat with independent random bits and keep the best or any verified answer', 'Failure of all t runs ≤ (1 − 1/n²)^t', 'Use 1 − x ≤ e^(−x), so ≤ e^(−t/n²)', 'Require e^(−t/n²) ≤ 1/n, so t ≥ n² ln n', 'Take t = ceil(n² ln n); success ≥ 1 − 1/n', 'State how the answer is chosen (verify or compare); majority vote is not enough'], model: '<p>Run the algorithm t times with independent random bits and output the best answer (or any answer that verifies, or the smallest cut for min-cut). All t runs fail with probability at most (1 − 1/n²)<sup>t</sup> ≤ e<sup>−t/n²</sup>, using 1 − x ≤ e<sup>−x</sup>. We need e<sup>−t/n²</sup> ≤ 1/n, that is t/n² ≥ ln n, so t ≥ n² ln n. With t = ⌈n² ln n⌉ the failure probability is at most 1/n, so success is at least 1 − 1/n. The cost is t times the cost of one run. (General rule: t ≥ (1/P) ln(1/δ).)</p>' });
+</script>
+</body>
+</html>

@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dijkstra's Algorithm · CSE 207 Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Shortest paths · CLRS §24.3 · Monirul Islam sir L8, slide 08 · must-know</div>
+<h1>Dijkstra's Algorithm</h1>
+<p class="lede">Asked in 2024–25 (Q7b, 15 marks: construct a graph that gives a distance table), 2023–24 (Q10c, 13: correctness proof), 2019–20 (Q6a, 15: maximum-bandwidth path), 2018–19 (Q1a, 15: line-by-line complexity with an array), 2017–18 (Q8c: algorithm 5, proof 5, time 7, Fibonacci heap 5), 2020–21 (Q1b, 12: minimum-sum descent by Dijkstra), 2022–23 (Q2b, 12: positive weights), and CT-1 (AMR) Q2 (4 marks: binary heap against array). Correctness proof plus complexity is almost a guaranteed question.</p>
+
+<h2>1. The idea</h2>
+<p>Dijkstra is BFS with a priority queue. Keep a set \(S\) of vertices whose distance is final. Repeatedly pick the vertex \(u\) outside \(S\) with the smallest estimate \(d[u]\), put it in \(S\), and relax all its outgoing edges. It is the same shape as Prim.</p>
+<div class="key"><p><b>Condition:</b> all edge weights must be <b>non-negative</b>. With a negative edge the proof breaks and the answer can be wrong (section 6).</p></div>
+<pre class="code">DIJKSTRA(G, w, s)
+  INITIALIZE-SINGLE-SOURCE(G, s)        // d[v] = ∞, π[v] = NIL, d[s] = 0
+  S = {}
+  Q = V                                 // priority queue keyed by d[]
+  while Q is not empty
+      u = EXTRACT-MIN(Q)
+      S = S ∪ {u}
+      for each v in Adj[u]
+          RELAX(u, v, w)                // may DECREASE-KEY of v in Q</pre>
+<div class="method"><h4>Method · Dijkstra by hand</h4><ol>
+<li>Table: one row per step, one column per vertex. Row 0: \(0\) for the source, \(\infty\) elsewhere.</li>
+<li>Pick the unfinished vertex with the smallest \(d\). Circle it: it is final. Write the order of extraction.</li>
+<li>Relax every outgoing edge of that vertex. Update \(d\) (and \(\pi\)) only if the new value is strictly smaller.</li>
+<li>Repeat until all vertices are circled. Draw the shortest-path tree from \(\pi\).</li>
+<li>Ties for the minimum: choose alphabetical order, and say so.</li>
+</ol></div>
+
+<h2>2. Trace</h2>
+<p>The graph below is the answer graph for the 2024–25 construct-a-graph question (section 7). Watch the extraction order: it is exactly S, A, B, C, D, E, F, G, increasing in distance.</p>
+<div id="f1"></div>
+<div id="t1"></div>
+<div class="drawit"><b>On paper:</b> redraw the graph and write \(d\) next to every vertex, crossing out old values and keeping the new one. Number the vertices 1, 2, 3, ... in the order extracted. Bold the final tree edges (the edges \((\pi[v],v)\)). Show the table too, since a figure alone does not show the steps.</div>
+
+<h2>3. Correctness proof (2023–24 Q10c 13 marks, 2017–18 Q8c)</h2>
+<p><b>Claim.</b> Dijkstra terminates with \(d[v]=\delta(s,v)\) for every \(v\in V\), when all weights are \(\ge0\).</p>
+<p>Two facts from the relaxation properties of chapter 2 are used. Know both:</p>
+<ul>
+<li><b>Upper bound:</b> \(d[v]\ge\delta(s,v)\) at all times (proof by induction using the triangle inequality).</li>
+<li><b>Convergence:</b> if \(s\leadsto x\to y\) is a shortest path and \(d[x]=\delta(s,x)\) before \((x,y)\) is relaxed, then \(d[y]=\delta(s,y)\) afterwards.</li>
+</ul>
+<div class="method"><h4>Proof by loop invariant</h4><ol>
+<li><b>Invariant.</b> At the start of every iteration of the while loop, \(d[v]=\delta(s,v)\) for every \(v\in S\).</li>
+<li><b>Initialisation.</b> \(S=\varnothing\): true.</li>
+<li><b>Maintenance.</b> Let \(u\) be the vertex extracted in this iteration. We show \(d[u]=\delta(s,u)\) when \(u\) is added. Suppose not, and let \(u\) be the <i>first</i> vertex for which it fails. Then \(u\ne s\), because \(s\) is extracted first with \(d[s]=0=\delta(s,s)\). So \(S\ne\varnothing\) just before \(u\) is added.</li>
+<li>There is a path from \(s\) to \(u\). Otherwise \(d[u]=\infty=\delta(s,u)\) by the no-path property, and we are done. Let \(p\) be a shortest path from \(s\) to \(u\).</li>
+<li>\(p\) starts in \(S\) (at \(s\)) and ends outside \(S\) (at \(u\)). Let \(y\) be the <b>first vertex on \(p\) that is not in \(S\)</b>, and \(x\) its predecessor on \(p\), so \(x\in S\). (It can happen that \(y=u\).)</li>
+<li>\(x\in S\), and \(u\) is the first failure, so \(d[x]=\delta(s,x)\). When \(x\) was added to \(S\), the edge \((x,y)\) was relaxed. By the convergence property \(d[y]=\delta(s,y)\) now.</li>
+<li>\(y\) comes before or equals \(u\) on the shortest path \(p\), and <b>all weights are non-negative</b>, so \(\delta(s,y)\le\delta(s,u)\).</li>
+<li>Chain: \(d[y]=\delta(s,y)\le\delta(s,u)\le d[u]\), the last step by the upper bound.</li>
+<li>But \(u\) was chosen by EXTRACT-MIN while \(y\) was still in the queue, so \(d[u]\le d[y]\) (<b>the minimum was chosen</b>).</li>
+<li>Steps 8 and 9 give \(d[y]\le\delta(s,u)\le d[u]\le d[y]\). So all are equal and \(d[u]=\delta(s,u)\). This contradicts the choice of \(u\). The invariant is maintained.</li>
+<li><b>Termination.</b> The loop ends when \(Q=\varnothing\), so \(S=V\). By the invariant \(d[v]=\delta(s,v)\) for all \(v\). \(\blacksquare\)</li>
+</ol></div>
+<div class="trap"><h4>Where marks go</h4><ul>
+<li>The two places where the hypotheses are used must be visible: <b>non-negative weights</b> in step 7, <b>minimum chosen</b> in step 9. The student solution "DSA 23-24 solve" (Q10c) has the right shape but never writes the inequality chain \(d[u]\le d[y]=\delta(s,y)\le\delta(s,u)\le d[u]\). Write it.</li>
+<li>Define \(x\) and \(y\) before using them. Draw the picture: set \(S\) as a blob, \(p\) leaving it at \(x\to y\), then going on to \(u\).</li>
+<li>Do not say "the path goes through a vertex outside \(S\) so it is longer" without the weight sign.</li>
+</ul></div>
+
+<h2>4. Complexity</h2>
+<h3>Line by line with an array (2018–19 Q1a, 15 marks)</h3>
+<p>The code in the paper (adjacency list, array for \(d[\,]\), <code>ExtractMin</code> scans the array):</p>
+<pre class="code">Dijkstra(G)
+ 1  Q = V[G]
+ 2  for each v in Q
+ 3      d[v] = ∞
+ 4  d[s] = 0;  S = {}
+ 5  while (Q != {})
+ 6      u = ExtractMin(Q)
+ 7      S = S ∪ {u}
+ 8      for each v in u->Adj[]
+ 9          if (v in Q and d[v] > d[u] + w(u,v))
+10              d[v] = d[u] + w(u,v)</pre>
+<table class="tbl"><tr><th>Line</th><th>Cost per execution</th><th>Executions</th><th>Total</th></tr>
+<tr><td>1</td><td>copy the vertex set</td><td>1</td><td>\(O(V)\)</td></tr>
+<tr><td>2–3</td><td>\(O(1)\)</td><td>\(V\)</td><td>\(O(V)\)</td></tr>
+<tr><td>4</td><td>\(O(1)\)</td><td>1</td><td>\(O(1)\)</td></tr>
+<tr><td>5</td><td>\(O(1)\) test</td><td>\(V+1\)</td><td>\(O(V)\)</td></tr>
+<tr><td>6</td><td>scan the array: \(O(|Q|)\), \(|Q|\) = \(V, V-1,\dots,1\)</td><td>\(V\)</td><td>\(\sum_{k=1}^{V}k=O(V^2)\)</td></tr>
+<tr><td>7</td><td>\(O(1)\)</td><td>\(V\)</td><td>\(O(V)\)</td></tr>
+<tr><td>8</td><td>one step per edge in the list; the lists have total length \(E\)</td><td>\(\sum\deg(u)=E\), plus \(V\) list starts</td><td>\(O(V+E)\)</td></tr>
+<tr><td>9</td><td>"in Q" by a flag array, comparison: \(O(1)\)</td><td>\(\le E\)</td><td>\(O(E)\)</td></tr>
+<tr><td>10</td><td>\(O(1)\)</td><td>\(\le E\)</td><td>\(O(E)\)</td></tr></table>
+<p>Sum: \(O(V)+O(V)+O(V^2)+O(V+E)+O(E)=O(V^2+E)=\boxed{O(V^2)}\), since \(E\le V^2\). Line 6 is the bottleneck. Note the "adjacency list" matters: with an adjacency matrix lines 8 to 10 would cost \(V\) per extracted vertex, still \(O(V^2)\) total here.</p>
+<h3>The three implementations side by side</h3>
+<table class="tbl"><tr><th>Queue</th><th>Build</th><th>\(V\) EXTRACT-MIN</th><th>\(\le E\) DECREASE-KEY</th><th>Total</th></tr>
+<tr><td>Unsorted array</td><td>\(O(V)\)</td><td>\(O(V)\) each: \(O(V^2)\)</td><td>\(O(1)\) each: \(O(E)\)</td><td>\(O(V^2)\)</td></tr>
+<tr><td>Binary heap</td><td>\(O(V)\)</td><td>\(O(\log V)\) each: \(O(V\log V)\)</td><td>\(O(\log V)\) each: \(O(E\log V)\)</td><td>\(O((V+E)\log V)\), i.e. \(O(E\log V)\) if connected</td></tr>
+<tr><td>Fibonacci heap</td><td>\(O(V)\)</td><td>\(O(\log V)\) amortised each: \(O(V\log V)\)</td><td>\(O(1)\) amortised each: \(O(E)\)</td><td>\(O(E+V\log V)\)</td></tr></table>
+<div class="key"><p><b>Which is better?</b> Dense graph (\(E\approx V^2\)): array gives \(V^2\), binary heap gives \(V^2\log V\), so the plain array wins (Fibonacci ties). Sparse graph (\(E\approx V\)): array \(V^2\), binary heap \(V\log V\), so the heap wins. Fibonacci improves binary heap exactly when \(E\) is large compared with \(V\), because decrease-key becomes \(O(1)\). This is CT-1 Q2 (4 marks) and the Fibonacci part of 2017–18 Q8c (5 marks).</p></div>
+<p>The slide's version: "\(O(E+V\log V)\)" and "\(O(E+V^2)\) for the array". Write both forms.</p>
+
+<h2>5. Why negative edges break it</h2>
+<p>Edges S→A 3, S→B 2, A→B −2. The true distance to B is \(3-2=1\) via A. Dijkstra extracts B first (\(d=2\), the smallest), marks it final, and never revisits it.</p>
+<div id="t2"></div>
+<ol>
+<li>Dijkstra finishes with \(d[B]=2\), but \(\delta(S,B)=1\). Wrong.</li>
+<li>In the proof, step 7 fails: \(\delta(s,y)\le\delta(s,u)\) needs non-negative weights on the rest of the path. Here \(y=A\), \(u=B\): \(\delta(S,A)=3>\delta(S,B)=1\).</li>
+<li>The "add a constant to every edge" fix does not work either, because paths with more edges are penalised more. Use Bellman-Ford (chapter 2) or Johnson (chapter 5).</li>
+</ol>
+
+<h2>6. Prim against Dijkstra (class test: prove or disprove)</h2>
+<p>"Both add vertices to \(S\) one at a time. Prove or disprove that they add them in the same order." <b>Disprove.</b> Graph S-A 2, S-B 3, A-C 2 (undirected). Prim from S takes S, A, C, B (it adds C at once, key 2, before B, key 3). Dijkstra from S takes S, A, B, C (\(d[B]=3<d[C]=4\)).</p>
+<div id="t3"></div>
+<div id="t4"></div>
+<p>The reason: Prim compares edge weights, Dijkstra compares the distance from \(s\), so a vertex reached by a long path loses to one nearer the source.</p>
+
+<h2>7. The 2024–25 question: construct a graph (Q7b, 15 marks)</h2>
+<p>Given distances from S: S 0, A 2, B 4, C 5, D 7, E 8, F 9, G 11. Build a directed graph with non-negative integer weights so that Dijkstra gives exactly these distances, every vertex is reachable, at least two edges are on no shortest path, and every shortest path is unique.</p>
+<div class="method"><h4>Method · design, then justify</h4><ol>
+<li><b>Pick a tree first.</b> Give every vertex except S exactly one "tight" incoming edge \((u,v)\) with \(d[u]+w=d[v]\), so \(w=d[v]-d[u]\). Choose parents in increasing distance order: S→A 2 (\(2-0\)), A→B 2, B→C 1, C→D 2, C→E 3, E→F 1, D→G 4. Weights \(2,2,1,2,3,1,4\) are positive integers, and every vertex is reachable.</li>
+<li><b>Add the extra edges</b> so each is strictly slack: for an extra edge \((u,v)\) make \(d[u]+w>d[v]\). Then it is on no shortest path (condition 2) and cannot create a second shortest path (condition 3). Used: S→B 5 (\(0+5=5>4\)), A→C 4 (\(2+4=6>5\)), B→D 4 (\(4+4=8>7\)), F→G 3 (\(9+3=12>11\)). That is four extra edges, at least the two required.</li>
+<li><b>Final graph:</b> S→A 2, A→B 2, B→C 1, C→D 2, C→E 3, E→F 1, D→G 4, S→B 5, A→C 4, B→D 4, F→G 3.</li>
+<li><b>Justify by running Dijkstra</b> (trace below): extraction order S, A, B, C, D, E, F, G with the distances in the table. Every weight is non-negative, so the algorithm is correct and these are the true distances.</li>
+<li><b>Check uniqueness by tight edges:</b> every vertex has exactly one incoming edge with \(d[u]+w=d[v]\): A from S; B from A; C from B; D from C; E from C; F from E; G from D. A vertex with one tight incoming edge has one shortest path (induction from S). The four slack edges have \(d[u]+w>d[v]\), so none lies on a shortest path.</li>
+</ol></div>
+<div id="t5"></div>
+<div class="drawit"><b>On paper:</b> draw the 8 vertices with the distance written inside each. Draw the seven tree edges thick and label each with its weight; draw the four extra edges dashed and write beside each \(d[u]+w\) against \(d[v]\) (for example "0+5=5 &gt; 4"). Then the Dijkstra table. The marker looks for: all conditions listed and checked one by one.</div>
+
+<h2>8. Maximum-bandwidth path (2019–20 Q6a, 15 marks)</h2>
+<p>Each edge has a capacity (bandwidth). The bandwidth of a path is the minimum edge on it (the bottleneck). Find the path of maximum bandwidth from \(s\) to every vertex.</p>
+<div class="method"><h4>Method · modify Dijkstra in three places</h4><ol>
+<li>Store \(b[v]\) = best bottleneck known from \(s\) to \(v\). Initialise \(b[s]=\infty\), others \(0\) (or \(-\infty\)).</li>
+<li>Extract the unfinished vertex with the <b>largest</b> \(b\) (a max-priority queue).</li>
+<li>Relax with \(b[v]=\max\bigl(b[v],\ \min(b[u],\ w(u,v))\bigr)\). Keep \(\pi\) for the path.</li>
+<li>Time is the same as Dijkstra: \(O(E\log V)\) with a binary heap, \(O(E+V\log V)\) with a Fibonacci heap.</li>
+</ol></div>
+<div class="method"><h4>Justify (the question says "justify your answer")</h4><ol>
+<li>Extending a path by an edge never <b>increases</b> its bottleneck: \(\min(b,w)\le b\). This plays the role of "non-negative weights".</li>
+<li>Run the same invariant proof: when \(u\) (largest \(b\) outside \(S\)) is extracted, take a best path \(p\) to \(u\), the first vertex \(y\) off \(S\) and its predecessor \(x\in S\). The bottleneck of \(p\) up to \(y\) is \(b[y]\) (convergence), the bottleneck of the whole of \(p\) is at most that of its prefix, so \(\beta(s,u)\le\beta(s,y)=b[y]\le b[u]\) (largest chosen) \(\le\beta(s,u)\) (every estimate is a real path). All equal.</li>
+<li>Alternative answer: a path inside a <b>maximum spanning tree</b> is a maximum-bandwidth path between its ends (the MST bottleneck property, chapter 1), so build the maximum spanning tree and read the tree path.</li>
+<li>Small check (undirected S-A 4, S-B 7, A-B 3, A-T 6, B-T 5): extract S (\(\infty\)), then B (7), then T (\(\min(7,5)=5\)), then A. Best bandwidth to T is 5 via S, B, T.</li>
+</ol></div>
+<p>All-pairs strongest path (2017–18 Q2d) is the same idea with Floyd-Warshall: replace \(+\) by \(\min\) and \(\min\) by \(\max\): \(d_{ij}=\max\bigl(d_{ij},\min(d_{ik},d_{kj})\bigr)\). See chapter 4.</p>
+
+<h2>9. Minimum-sum descent by Dijkstra (2020–21 Q1b, 12 marks)</h2>
+<p>Positive integers in a triangle with \(n\) numbers in the bottom row. From the apex, go down each step to one of the two numbers directly below (adjacent). Find the path with the smallest sum. The figure for \(n=4\) is not in the text scan; the method does not depend on the numbers.</p>
+<div class="method"><h4>Method</h4><ol>
+<li><b>Vertices:</b> one per number of the triangle, \(1+2+\cdots+n=n(n+1)/2\) of them. Add a sink \(T\).</li>
+<li><b>Edges:</b> from the number at row \(i\), position \(j\), to the two below it: row \(i+1\) at positions \(j\) and \(j+1\). Give each edge the weight equal to the number at the <b>target</b> vertex. Add a 0-weight edge from every bottom-row vertex to \(T\).</li>
+<li><b>Source:</b> the apex, with \(d[\text{apex}]=\) the apex number (start there, since its number is part of the sum). Or add a source \(s\) with an edge of weight = the apex number.</li>
+<li>All weights are positive, so Dijkstra applies. The smallest descent sum is \(d[T]\); the path is read back with \(\pi\).</li>
+<li>Size: \(V=O(n^2)\), \(E=2\cdot n(n-1)/2+n=O(n^2)\). With a binary heap \(O(n^2\log n)\).</li>
+<li>Remark: the graph is a DAG, so the DAG algorithm of chapter 2 does it in \(O(n^2)\). The question just asks for the Dijkstra reduction.</li>
+</ol></div>
+
+<h2>10. Mandatory practice</h2>
+<p>Do these with pen and paper.</p>
+<div id="r1"></div>
+<div id="r2"></div>
+<div id="r3"></div>
+<div id="r4"></div>
+<div id="p1"></div>
+<div id="p2"></div>
+<p class="drawit"><b>If you got one wrong:</b> open the steps and find the first extraction where your choice differs. That vertex had a smaller \(d\) than the one you chose, or you forgot to update a \(d\) after relaxing.</p>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/algo.js"></script>
+<script src="../assets/dsa.js"></script>
+<script>
+const Q7B = 'S>A 2, A>B 2, B>C 1, C>D 2, C>E 3, E>F 1, D>G 4, S>B 5, A>C 4, B>D 4, F>G 3';
+graphFig('#f1', Q7B);
+trace('#t1', { kind: 'dijkstra', input: Q7B, s: 'S' });
+trace('#t2', { kind: 'dijkstra', input: 'S>A 3, S>B 2, A>B -2', s: 'S' });
+trace('#t3', { kind: 'prim', input: 'S-A 2, S-B 3, A-C 2', s: 'S' });
+trace('#t4', { kind: 'dijkstra', input: 'S-A 2, S-B 3, A-C 2', s: 'S' });
+trace('#t5', { kind: 'dijkstra', input: Q7B, s: 'S' });
+recall('#r1', { id: 'r1', marks: 13, q: 'Formulate a proof of the correctness of Dijkstra\'s algorithm. (2023–24 Q10c)', points: ['Loop invariant: every v in S has d[v] = delta(s,v)', 'Initialisation: S empty', 'Maintenance: first vertex u that fails; u is not s', 'Shortest path p, first vertex y outside S, predecessor x in S', 'Convergence: d[y] = delta(s,y) because x was relaxed', 'Non-negative weights give delta(s,y) <= delta(s,u)', 'Upper bound gives delta(s,u) <= d[u]; EXTRACT-MIN gives d[u] <= d[y]; chain forces equality', 'Termination: S = V'], model: '<p>Invariant: at the start of each iteration \\(d[v]=\\delta(s,v)\\) for all \\(v\\in S\\). Initially \\(S=\\varnothing\\). Suppose \\(u\\) is the first vertex added with \\(d[u]\\ne\\delta(s,u)\\); \\(u\\ne s\\), and \\(u\\) is reachable (else \\(d[u]=\\infty=\\delta\\)). Let \\(p\\) be a shortest path \\(s\\leadsto u\\), \\(y\\) the first vertex of \\(p\\) not in \\(S\\), \\(x\\in S\\) its predecessor. Then \\(d[x]=\\delta(s,x)\\) and \\((x,y)\\) was relaxed, so \\(d[y]=\\delta(s,y)\\) (convergence). Weights are non-negative, so \\(\\delta(s,y)\\le\\delta(s,u)\\). With the upper bound: \\(d[y]=\\delta(s,y)\\le\\delta(s,u)\\le d[u]\\). Since \\(u\\) was extracted before \\(y\\), \\(d[u]\\le d[y]\\). So \\(d[u]=\\delta(s,u)\\), contradiction. At the end \\(S=V\\). \\(\\blacksquare\\)</p>' });
+recall('#r2', { id: 'r2', marks: 15, q: 'Give the line-by-line time analysis of Dijkstra with an adjacency list and an array for d[] (use the pseudocode of the 2018–19 paper), then state the time with a binary heap and a Fibonacci heap. (2018–19 Q1a, 2017–18 Q8c)', points: ['Initialisation lines 1 to 4: O(V)', 'While loop runs V times', 'ExtractMin on an array O(V) each, O(V^2) total (line 6)', 'Inner loop: adjacency lists give O(E) in total for lines 8 to 10', 'Total O(V^2 + E) = O(V^2)', 'Binary heap O((V+E) log V)', 'Fibonacci heap O(E + V log V) with O(1) amortised decrease-key'], model: '<p>Lines 1 to 4: \\(O(V)\\). Line 5: \\(V+1\\) tests. Line 6: scanning the array costs \\(O(|Q|)\\), so \\(\\sum_{k=1}^{V}k=O(V^2)\\). Line 7: \\(O(V)\\). Lines 8 to 10: each edge is considered once from its tail, each in \\(O(1)\\), total \\(O(V+E)\\). Sum \\(O(V^2+E)=O(V^2)\\). With a binary heap: build \\(O(V)\\), \\(V\\) extract-mins at \\(O(\\log V)\\), at most \\(E\\) decrease-keys at \\(O(\\log V)\\): \\(O((V+E)\\log V)\\). With a Fibonacci heap extract-min is \\(O(\\log V)\\) amortised and decrease-key \\(O(1)\\) amortised: \\(O(E+V\\log V)\\).</p>' });
+recall('#r3', { id: 'r3', marks: 15, q: 'Distances from S are S 0, A 2, B 4, C 5, D 7, E 8, F 9, G 11. Construct a directed graph with non-negative integer weights so that Dijkstra produces these distances, all vertices are reachable, at least two edges lie on no shortest path, and shortest paths are unique. Justify. (2024–25 Q7b)', points: ['Tree edges with weight d[v] - d[parent]', 'Every vertex has exactly one tight incoming edge (unique shortest paths)', 'Extra edges with d[u] + w > d[v] (strictly slack), at least two', 'All weights non-negative integers, all vertices reachable', 'Run Dijkstra on it and show the extraction table', 'Argue correctness: non-negative weights so Dijkstra is correct'], model: '<p>Tree: S→A 2, A→B 2, B→C 1, C→D 2, C→E 3, E→F 1, D→G 4 (weight \\(=d[v]-d[\\text{parent}]\\)). Extra: S→B 5, A→C 4, B→D 4, F→G 3 (each has \\(d[u]+w>d[v]\\): \\(5>4\\), \\(6>5\\), \\(8>7\\), \\(12>11\\)). Each vertex has exactly one incoming edge with \\(d[u]+w=d[v]\\), so each has a unique shortest path, and the four extra edges are on none. Dijkstra extracts S, A, B, C, D, E, F, G with the final distances as given; weights are non-negative so the output is correct.</p>' });
+recall('#r4', { id: 'r4', marks: 15, q: 'Modify Dijkstra to find the path of maximum bandwidth (bottleneck = minimum edge on the path) from s to t, and justify. (2019–20 Q6a)', points: ['b[s] = infinity, others 0; extract the largest b', 'Relax: b[v] = max(b[v], min(b[u], w(u,v)))', 'Extending a path never increases its bottleneck (replaces non-negative weights)', 'Same invariant proof with min and max', 'Time same as Dijkstra', 'Or: use a maximum spanning tree path'], model: '<p>Keep \\(b[v]\\), the best bottleneck from \\(s\\); \\(b[s]=\\infty\\), others \\(0\\). Repeatedly extract the unfinished vertex with the largest \\(b\\) and relax each edge \\((u,v)\\): \\(b[v]=\\max(b[v],\\min(b[u],w(u,v)))\\). Correctness is the Dijkstra proof with "path weight" replaced by "bottleneck": extending a path never raises its bottleneck, so a vertex with the largest \\(b\\) outside \\(S\\) cannot be improved through a vertex outside \\(S\\). Time \\(O(E\\log V)\\) with a binary heap.</p>' });
+practice('#p1', { id: 'p1', kind: 'dijkstra', n: 2 });
+practice('#p2', { id: 'p2', kind: 'dijkstra', n: 1 });
+</script>
+</body>
+</html>

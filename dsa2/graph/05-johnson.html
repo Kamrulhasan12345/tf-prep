@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Johnson's Algorithm · CSE 207 Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">All-pairs shortest paths · CLRS §25.3 · Monirul Islam sir L12, slide 12 · must-know</div>
+<h1>Johnson's Algorithm</h1>
+<p class="lede">Asked in 2022–23 (Q1a, compulsory question, 12 marks: analyse the complexity), 2018–19 (Q2a, 15 marks: explain the clever idea), 2023–24 (Q9: "In what context is Johnson preferable to Floyd-Warshall", 5 of the 10+5 marks), and as a class-test question (modify the weights of a graph so that none is negative and shortest paths are preserved, 9 marks). Two different questions are asked about the same algorithm: the <b>idea</b> and the <b>complexity</b>. Learn both.</p>
+
+<h2>1. Why it exists</h2>
+<ul>
+<li>Floyd-Warshall costs \(\Theta(V^3)\) however few edges there are.</li>
+<li>Dijkstra from every vertex costs \(V\cdot O(E+V\log V)=O(VE+V^2\log V)\), much better on a sparse graph. But Dijkstra needs <b>non-negative</b> weights.</li>
+<li>Bellman-Ford from every vertex handles negative edges but costs \(O(V^2E)\), worse than Floyd-Warshall.</li>
+</ul>
+<div class="key"><p><b>The clever idea (2018–19, 15 marks).</b> Run Bellman-Ford <b>once</b> to compute a number \(h(v)\) for each vertex. Use these numbers to <b>reweight</b> every edge so that all weights become non-negative, <b>without changing which paths are shortest</b>. Then run Dijkstra from every vertex on the new weights, and convert the distances back. One slow run (\(O(VE)\)) buys the right to use the fast algorithm \(V\) times.</p></div>
+
+<h2>2. Reweighting: the two requirements</h2>
+<p>We want a new weight function \(\hat w\) with:</p>
+<ol>
+<li>For every pair \(u,v\): a path is shortest under \(w\) if and only if it is shortest under \(\hat w\).</li>
+<li>\(\hat w(u,v)\ge0\) for every edge.</li>
+</ol>
+<p>Choose any function \(h\colon V\to\mathbb R\) and define
+\[\hat w(u,v)=w(u,v)+h(u)-h(v).\]</p>
+<div class="method"><h4>Proof of requirement 1 (shortest paths are preserved)</h4><ol>
+<li>Take any path \(p=\langle v_0,v_1,\dots,v_k\rangle\). Its new weight is \(\hat w(p)=\sum_{i=1}^{k}\bigl(w(v_{i-1},v_i)+h(v_{i-1})-h(v_i)\bigr)\).</li>
+<li>The \(h\) terms telescope: \(h(v_0)-h(v_1)+h(v_1)-h(v_2)+\cdots+h(v_{k-1})-h(v_k)=h(v_0)-h(v_k)\).</li>
+<li>So \(\hat w(p)=w(p)+h(v_0)-h(v_k)\).</li>
+<li>The correction \(h(v_0)-h(v_k)\) depends only on the two <b>end vertices</b>, not on the path. Every path from \(u\) to \(v\) shifts by the same amount \(h(u)-h(v)\). So the one that was lightest is still lightest: \(\hat\delta(u,v)=\delta(u,v)+h(u)-h(v)\).</li>
+<li>For a cycle \(v_0=v_k\), \(h(v_0)-h(v_k)=0\), so cycle weights do not change either. A negative cycle stays negative. \(\blacksquare\)</li>
+</ol></div>
+<div class="method"><h4>Proof of requirement 2 (choose \(h\) cleverly)</h4><ol>
+<li>Build \(G'\): add a new vertex \(q\) with an edge \(q\to v\) of weight 0 to <b>every</b> vertex \(v\).</li>
+<li>Run Bellman-Ford from \(q\) on \(G'\). Let \(h(v)=\delta(q,v)\). Every vertex is reachable from \(q\), so \(h\) is finite, and \(h(v)\le0\) (the direct edge costs 0).</li>
+<li>For every edge \((u,v)\) of \(G\), the triangle inequality gives \(h(v)=\delta(q,v)\le\delta(q,u)+w(u,v)=h(u)+w(u,v)\).</li>
+<li>Rearrange: \(\hat w(u,v)=w(u,v)+h(u)-h(v)\ge0\). \(\blacksquare\)</li>
+</ol></div>
+<p>Why \(q\) with 0-weight edges: it makes every vertex reachable (so no \(\infty\)) and adds no edge <i>into</i> \(q\), so \(q\) lies on no cycle and no cycle weight changes. Why not "add a constant to every edge": paths with more edges would be penalised more, so the shortest path can change.</p>
+
+<h2>3. The algorithm</h2>
+<pre class="code">JOHNSON(G, w)
+  1. Build G' = G + new vertex q + edges (q, v) of weight 0 for all v in V
+  2. if BELLMAN-FORD(G', w, q) returns FALSE
+         report "negative cycle" and stop
+  3. for each vertex v:  h[v] = δ(q, v)                  // from step 2
+  4. for each edge (u,v) in E:  ŵ(u,v) = w(u,v) + h[u] - h[v]    // all ≥ 0
+  5. for each vertex u:
+         run DIJKSTRA(G, ŵ, u)  to get δ̂(u, v) for all v
+         for each vertex v:  d[u][v] = δ̂(u,v) - h[u] + h[v]     // undo
+  6. return d</pre>
+<div class="method"><h4>Method · Johnson by hand</h4><ol>
+<li>Draw \(q\) with 0 edges to all vertices.</li>
+<li>Compute \(h(v)\) by Bellman-Ford from \(q\). Write the \(h\) values next to the vertices. If Bellman-Ford finds a negative cycle, stop and say so.</li>
+<li>Write a table of the new weights: for each edge \((u,v)\), \(w+h(u)-h(v)\). Check every one is \(\ge0\). A negative result means an arithmetic slip.</li>
+<li>Run Dijkstra from each vertex on the new weights (write only the final distances if the question allows).</li>
+<li>Undo: \(d(u,v)=\hat d(u,v)-h(u)+h(v)\).</li>
+</ol></div>
+<h3>Trace: A→B 3, B→C −2, A→C 4, C→D 2, D→B 1</h3>
+<p>The only negative edge is B→C. \(h=(A\,0,\ B\,0,\ C\,{-2},\ D\,0)\). New weights: A→B 3, B→C 0, A→C 6, C→D 0, D→B 1. Then Dijkstra from every vertex. Final distances: A (0, 3, 1, 3), B (∞, 0, −2, 0), C (∞, 3, 0, 2), D (∞, 1, −1, 0). Check one: \(d(D,C)=\hat d(D,C)-h(D)+h(C)=1-0+(-2)=-1\), and indeed D→B→C costs \(1-2=-1\).</p>
+<div id="t1"></div>
+<h3>Trace: a bigger graph (5 vertices)</h3>
+<p>A→B 2, A→C 5, B→C −3, B→D 4, C→D 1, D→E −2, C→E 6. Three edges are negative. \(h=(0,0,-3,-2,-4)\). All reweighted edges are non-negative: A→B 2, A→C 8, B→C 0, B→D 6, C→D 0, D→E 0, C→E 7.</p>
+<div id="t2"></div>
+<h3>Trace: a graph with a negative cycle</h3>
+<p>The 2024–25 Floyd-Warshall graph. Bellman-Ford from \(q\) still relaxes in pass \(V\), so Johnson stops.</p>
+<div id="t3"></div>
+<div class="drawit"><b>On paper:</b> draw the graph and add \(q\) with dashed 0-weight arrows to every vertex. Write \(h(v)\) in a box beside each vertex. Redraw the graph with the new weights written on the edges and show that none is negative. Then a distance matrix, and a line showing the undo for at least one entry.</div>
+
+<h2>4. Complexity analysis (2022–23 Q1a, 12 marks)</h2>
+<p>Go through the steps one at a time and cost each. Then add them. \(G\) has \(V\) vertices and \(E\) edges.</p>
+<table class="tbl"><tr><th>Step</th><th>Work</th><th>Cost</th></tr>
+<tr><td>1. Build \(G'\)</td><td>one new vertex, \(V\) new edges</td><td>\(O(V+E)\) (or \(O(V)\) if you add in place)</td></tr>
+<tr><td>2. Bellman-Ford on \(G'\)</td><td>\(V+1\) vertices, \(E+V\) edges, \(V\) passes</td><td>\(O((V+1)(E+V))=O(VE+V^2)=O(VE)\) for a connected graph (\(E\ge V-1\))</td></tr>
+<tr><td>3. Read \(h\)</td><td>copy \(V\) numbers</td><td>\(O(V)\)</td></tr>
+<tr><td>4. Reweight</td><td>one addition pair per edge</td><td>\(O(E)\)</td></tr>
+<tr><td>5. Dijkstra from each of \(V\) sources</td><td>\(V\) runs</td><td>array: \(V\cdot O(V^2)=O(V^3)\); binary heap: \(V\cdot O((V+E)\log V)=O(VE\log V)\); Fibonacci heap: \(V\cdot O(E+V\log V)=O(VE+V^2\log V)\)</td></tr>
+<tr><td>5b. Undo for every pair</td><td>\(V^2\) pairs, \(O(1)\) each</td><td>\(O(V^2)\)</td></tr></table>
+<div class="method"><h4>Method · the total</h4><ol>
+<li>Fibonacci heap: \(O(VE)+O(VE+V^2\log V)+O(V^2)=\boxed{O(V^2\log V+VE)}\).</li>
+<li>Binary heap: \(O(VE)+O(VE\log V)=O(VE\log V)\).</li>
+<li>Array (dense-friendly): \(O(V^3)\).</li>
+<li>Space: \(\Theta(V^2)\) for the answer matrix.</li>
+<li>Sparse graph \(E=O(V)\): \(O(V^2\log V)\). Dense graph \(E=\Theta(V^2)\): \(O(V^3)\) with Fibonacci heaps, \(O(V^3\log V)\) with binary heaps.</li>
+</ol></div>
+<p>The slide writes it as \(O(V^2\lg V+VE)\), and the notes as "Bellman-Ford \(O(VE)\), Dijkstra \(O(V\lg V+E)\) each, total \(O(V^2\lg V+VE)\)". The same thing.</p>
+<div class="trap"><h4>Where marks go</h4><ul>
+<li>List every step with its cost. A single line "\(O(VE+V^2\log V)\)" without the breakdown loses most of the 12 marks.</li>
+<li>Say which heap you assume. Without a Fibonacci heap the Dijkstra phase is \(O(VE\log V)\).</li>
+<li>Do not forget that Bellman-Ford runs on \(G'\), which has one more vertex and \(V\) more edges (this does not change the order of growth).</li>
+</ul></div>
+
+<h2>5. Johnson against Floyd-Warshall (2023–24 Q9, the "5" of 10+5)</h2>
+<table class="tbl"><tr><th></th><th>Floyd-Warshall</th><th>Johnson</th></tr>
+<tr><td>Time</td><td>\(\Theta(V^3)\) always</td><td>\(O(V^2\log V+VE)\)</td></tr>
+<tr><td>Best on</td><td>dense graphs, \(E\approx V^2\)</td><td><b>sparse graphs</b>, \(E\approx V\)</td></tr>
+<tr><td>Negative edges</td><td>yes</td><td>yes (through reweighting)</td></tr>
+<tr><td>Negative cycles</td><td>detects (negative diagonal)</td><td>detects (Bellman-Ford step)</td></tr>
+<tr><td>Code</td><td>three loops, very short</td><td>needs Bellman-Ford, Dijkstra, a heap</td></tr>
+<tr><td>Constants</td><td>small</td><td>larger</td></tr></table>
+<div class="key"><p><b>Answer in two sentences.</b> "Johnson is preferable on sparse graphs, where \(E\) is far below \(V^2\): with \(E=O(V)\) it runs in \(O(V^2\log V)\) against Floyd-Warshall's \(\Theta(V^3)\). On dense graphs, where \(E\approx V^2\), Johnson is no faster, and Floyd-Warshall's simplicity and small constant make it the better choice."</p></div>
+
+<h2>6. The class-test form: "modify the weights so none is negative"</h2>
+<p>The question (9 marks) gives a graph with some negative edges and asks to change the weights so that no negative weight remains and shortest paths between any two vertices are preserved, "using an algorithm that works on any such graph". The graph is not in the text scan. The answer is steps 1 to 4 of Johnson: add \(q\), Bellman-Ford for \(h\), \(\hat w=w+h(u)-h(v)\), and list the new weight of every edge. Do not just add the same number to all edges: that changes shortest paths (a path with more edges gains more).</p>
+
+<h2>7. Mandatory practice</h2>
+<p>Do these with pen and paper. Use the two trace graphs above as your practice instances: cover the widget, do the \(h\) values and the new weights by hand, then press Run.</p>
+<div id="r1"></div>
+<div id="r2"></div>
+<div id="r3"></div>
+<div id="r4"></div>
+<p class="drawit"><b>If you got one wrong:</b> check \(h\) first. Every wrong reweighting traces back to a wrong \(h\); a negative new weight is the alarm.</p>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/algo.js"></script>
+<script src="../assets/dsa.js"></script>
+<script>
+trace('#t1', { kind: 'johnson', input: 'A>B 3, B>C -2, A>C 4, C>D 2, D>B 1' });
+trace('#t2', { kind: 'johnson', input: 'A>B 2, A>C 5, B>C -3, B>D 4, C>D 1, D>E -2, C>E 6' });
+trace('#t3', { kind: 'johnson', input: 'A>B 3, B>C 2, C>D 2, D>B -8, A>D 10, B>D 5' });
+recall('#r1', { id: 'r1', marks: 15, q: 'Johnson\'s algorithm uses Bellman-Ford and Dijkstra to solve all-pairs shortest paths on sparse graphs. Explain the basic clever idea and prove why it works. (2018–19 Q2a)', points: ['Dijkstra is fast but needs non-negative weights', 'Reweight: w-hat(u,v) = w(u,v) + h(u) - h(v)', 'Path weight changes by h(start) - h(end) only (telescoping), so shortest paths are preserved', 'Add source q with 0 edges to all vertices; h(v) = delta(q,v) by Bellman-Ford', 'Triangle inequality gives w-hat >= 0', 'Run Dijkstra from every vertex; undo with d(u,v) = d-hat(u,v) - h(u) + h(v)', 'Negative cycle detected by Bellman-Ford'], model: '<p>Dijkstra from every vertex is fast on sparse graphs but needs \\(w\\ge0\\). Johnson reweights: \\(\\hat w(u,v)=w(u,v)+h(u)-h(v)\\). For a path \\(v_0\\dots v_k\\) the \\(h\\) terms telescope, \\(\\hat w(p)=w(p)+h(v_0)-h(v_k)\\), which depends only on the endpoints, so shortest paths stay shortest. Choose \\(h(v)=\\delta(q,v)\\) in \\(G\\) plus a vertex \\(q\\) with 0-weight edges to all vertices (Bellman-Ford). The triangle inequality \\(h(v)\\le h(u)+w(u,v)\\) gives \\(\\hat w\\ge0\\). Run Dijkstra from every vertex and recover \\(\\delta(u,v)=\\hat\\delta(u,v)-h(u)+h(v)\\). If Bellman-Ford reports a negative cycle, stop.</p>' });
+recall('#r2', { id: 'r2', marks: 12, q: 'Analyse the complexity of Johnson\'s algorithm for all-pairs shortest paths. (2022–23 Q1a)', points: ['Build G prime: O(V + E)', 'Bellman-Ford on G prime: O(VE)', 'Reweighting: O(E)', 'Dijkstra V times: Fibonacci O(VE + V^2 log V) (binary heap O(VE log V), array O(V^3))', 'Undo for all pairs: O(V^2)', 'Total O(V^2 log V + VE)', 'Compare with Floyd-Warshall Theta(V^3): better when E is small'], model: '<p>Step costs: build \\(G^{\\prime}\\): \\(O(V+E)\\); Bellman-Ford on \\(V+1\\) vertices and \\(E+V\\) edges: \\(O(VE)\\); reweight: \\(O(E)\\); \\(V\\) Dijkstra runs, each \\(O(E+V\\log V)\\) with a Fibonacci heap: \\(O(VE+V^2\\log V)\\); undo: \\(O(V^2)\\). Total \\(O(V^2\\log V+VE)\\). With a binary heap the Dijkstra phase is \\(O(VE\\log V)\\); with an array \\(O(V^3)\\). For \\(E=O(V)\\) this is \\(O(V^2\\log V)\\), against \\(\\Theta(V^3)\\) for Floyd-Warshall.</p>' });
+recall('#r3', { id: 'r3', marks: 5, q: 'In what context is Johnson\'s algorithm preferable to Floyd-Warshall? (2023–24 Q9)', points: ['Sparse graphs (E much smaller than V^2)', 'Johnson O(V^2 log V + VE) against Floyd-Warshall Theta(V^3)', 'On dense graphs Floyd-Warshall is simpler with the same order and smaller constants'], model: '<p>On sparse graphs. With \\(E=O(V)\\), Johnson takes \\(O(V^2\\log V)\\), Floyd-Warshall \\(\\Theta(V^3)\\). On dense graphs (\\(E\\approx V^2\\)) Johnson is \\(O(V^3)\\) at best and has larger constants, so Floyd-Warshall is preferred.</p>' });
+recall('#r4', { id: 'r4', marks: 9, q: 'Modify the weights of a graph with negative edges so that no negative weights remain and shortest paths between all pairs are preserved. Give an algorithm that works on any such graph. (class test)', points: ['Add q with 0-weight edges to all vertices', 'Bellman-Ford from q gives h(v)', 'New weight w(u,v) + h(u) - h(v)', 'All new weights non-negative by the triangle inequality', 'Shortest paths preserved because each path shifts by h(start) - h(end)', 'Not valid: adding a constant to all edges'], model: '<p>Add a vertex \\(q\\) with 0-weight edges to every vertex; run Bellman-Ford from \\(q\\) to get \\(h(v)=\\delta(q,v)\\) (if a negative cycle is reported, stop: no valid reweighting exists). Set \\(\\hat w(u,v)=w(u,v)+h(u)-h(v)\\ge0\\). Every path from \\(u\\) to \\(v\\) changes by exactly \\(h(u)-h(v)\\), so shortest paths are unchanged.</p>' });
+</script>
+</body>
+</html>

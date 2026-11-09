@@ -1,0 +1,428 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Term Final 2022–23 · CSE 207 Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Past papers · L-2/T-1 CSE 207 · term final 2022–23 · paper dated 17/04/2024</div>
+<h1>Term Final 2022–23, solved</h1>
+<p class="lede">Full marks 210, time 3 hours. Section A: Q1 is <b>compulsory</b> (12 + 23), answer any two of Q2, Q3, Q4. Section B: Q5 is <b>compulsory</b> (6 + 17 + 12), answer any two of Q6, Q7, Q8. Every question is worth 35 marks. Try each part on paper first. Traces and tables come from the book's engine, not from hand work.</p>
+
+<div class="key"><p><b>How to read the hashing question (Q6a).</b> The probe is slot \(=(h(k)+f(i)) \bmod \text{size}\), with \(f(0)\) included. For the quadratic probe \(f(0)=3\), so even the first probe is shifted by 3. This reading is confirmed by the question itself: 100 lands in slot 3, and the search for 150 (home 0, first probe slot 3) then fails exactly after 100 is deleted. The paper writes the second hash as \(h_2(x)=19-(x\%17)\); the key \(x\) is used. Chaining is not asked.</p></div>
+
+<h2>Section A</h2>
+
+<h3>Question 1 · compulsory</h3>
+
+<div class="exam comp"><span class="comp-badge">COMPULSORY</span><div class="exam-src">2022–23 · Q1(a) · 12 marks</div>
+<div class="exam-q"><p>Analyze the complexity of Johnson's algorithm for the all-pair shortest paths problem.</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p>Chapter: <a href="../graph/05-johnson.html">Johnson's algorithm</a>.</p>
+<ol>
+<li><b>Step 1: add a source \(s\)</b> with a 0-weight edge to every vertex. Cost \(O(V)\).</li>
+<li><b>Step 2: Bellman-Ford from \(s\).</b> Gives \(h(v)=\delta(s,v)\) or reports a negative cycle (then stop). Cost \(O(VE)\) on the \(V+1\) vertices and \(E+V\) edges.</li>
+<li><b>Step 3: reweight</b> \(w'(u,v)=w(u,v)+h(u)-h(v)\). By the triangle inequality \(h(v)\le h(u)+w(u,v)\), so \(w'\ge0\). Every path from \(u\) to \(v\) changes by the same amount \(h(u)-h(v)\), so shortest paths do not change. Cost \(O(E)\).</li>
+<li><b>Step 4: Dijkstra from every vertex</b> on the non-negative graph. One run: \(O(V\log V+E)\) with a Fibonacci heap, \(O((V+E)\log V)\) with a binary heap. \(V\) runs: \(O(V^2\log V+VE)\) or \(O(VE\log V)\).</li>
+<li><b>Step 5: undo the reweighting:</b> \(d(u,v)=d'(u,v)-h(u)+h(v)\). Cost \(O(V^2)\).</li>
+<li><b>Total.</b> \(O(VE)+O(E)+O(V^2\log V+VE)+O(V^2)=\mathbf{O(V^2\log V+VE)}\) (Fibonacci heap), or \(O(VE\log V)\) with binary heaps. Space \(O(V^2)\) for the answer.</li>
+<li><b>Compare:</b> sparse graph (\(E=O(V)\)): \(O(V^2\log V)\), better than Floyd-Warshall \(O(V^3)\). Dense graph: \(O(V^3)\), the same.</li>
+</ol>
+</div></details></div>
+
+<div class="exam comp"><span class="comp-badge">COMPULSORY</span><div class="exam-src">2022–23 · Q1(b) · 23 marks</div>
+<div class="exam-q"><p>A city with N towns and M bidirectional roads of three types. Men may use roads of types 1 and 3; women may use roads of types 2 and 3. The Mayor wants to renovate (close) as many roads as possible while the city stays connected for both men and women. (i) Formulate the problem as a graph problem. (ii) Develop the solution using a well-known graph algorithm. (iii) Write the pseudo-code.</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p>Chapters: <a href="../graph/01-mst.html">MST and union-find</a>, <a href="../graph/08-matching-modelling.html">Modelling</a>. Pattern: "keep the fewest edges so that a connectivity condition holds" is a spanning-tree problem; the algorithm is union-find (Kruskal with no weights).</p>
+<p><b>(i) Formulation.</b></p>
+<ol>
+<li>Graph \(G=(V,E)\): town = vertex, road = undirected edge labelled 1, 2 or 3. \(|V|=N,\ |E|=M\).</li>
+<li>Men's graph \(G_m\): edges of types 1 and 3. Women's graph \(G_w\): types 2 and 3.</li>
+<li>Find a smallest set \(K\subseteq E\) of roads to <b>keep</b> such that \(K\cap(\text{types }1,3)\) connects all \(N\) towns and \(K\cap(\text{types }2,3)\) connects all \(N\) towns. The answer is \(M-|K|\). If one of \(G_m\), \(G_w\) is not connected to begin with, the answer is \(-1\) (impossible).</li>
+</ol>
+<p><b>(ii) Key idea: type-3 roads first.</b></p>
+<ol>
+<li>Men need a spanning tree of \(G_m\): \(N-1\) edges. Women need a spanning tree of \(G_w\): \(N-1\) edges. A type-3 road counts for both, types 1 and 2 count for one.</li>
+<li>If \(k_3\) type-3 roads are kept, the men still need \(N-1-k_3\) type-1 roads and the women \(N-1-k_3\) type-2 roads. So \(|K|=k_3+2(N-1-k_3)=2(N-1)-k_3\). <b>Maximise \(k_3\).</b></li>
+<li>The most type-3 roads that can be kept without a cycle is a spanning forest of the type-3 graph. Take it greedily with union-find: \(k_3\) = number of type-3 edges that join two different components.</li>
+<li><b>Why greedy is right (exchange argument).</b> Any optimal solution uses a set of type-3 roads that is acyclic. If it used fewer than a maximal forest, a type-3 road in the forest could replace a type-1 and a type-2 road it makes redundant, reducing \(|K|\). So a maximum acyclic set of type-3 roads is optimal, and the remaining roads are then chosen by the same union-find rule separately for men and women.</li>
+</ol>
+<p><b>(iii) Pseudo-code</b> (union-find with path compression and union by size, nearly \(O(1)\) per operation).</p>
+<pre class="code">MAX-RENOVATED(N, edges)
+  DSU_both = new DSU(N);  k3 = 0
+  for each edge (u, v, type 3)
+     if UNION(DSU_both, u, v) then k3 = k3 + 1
+  DSU_m = copy of DSU_both;  DSU_w = copy of DSU_both
+  km = 0;  kw = 0
+  for each edge (u, v, type 1): if UNION(DSU_m, u, v) then km++
+  for each edge (u, v, type 2): if UNION(DSU_w, u, v) then kw++
+  if components(DSU_m) != 1 or components(DSU_w) != 1 then return -1
+  return M - (k3 + km + kw)</pre>
+<p>Time \(O(M\,\alpha(N))\), \(\alpha\) the inverse Ackermann function. Space \(O(N)\). Check: \(k_3+k_m=N-1\) and \(k_3+k_w=N-1\), so the kept count is \(2(N-1)-k_3\).</p>
+<p class="drawit"><b>On paper:</b> draw a small example (4 towns, a few roads of each type), circle the type-3 spanning forest first, then add type-1 edges in one colour and type-2 in another, and count the unused roads.</p>
+</div></details></div>
+
+<h3>Question 2 (35)</h3>
+
+<div class="exam"><div class="exam-src">2022–23 · Q2(a)(b)(c) · 8 + 12 + 15 marks</div>
+<div class="exam-q"><p>(a) Develop an algorithm for finding the shortest path in a graph where all edge weights are equal. (8)<br>(b) Devise an efficient algorithm for the same problem where edge weights are non-equal but positive. (12)<br>(c) Develop an efficient algorithm when edge weights can be negative and the graph can have negative-weight cycles. (15)</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p>Chapters: <a href="../graph/02-bellman-dag.html">Bellman-Ford</a>, <a href="../graph/03-dijkstra.html">Dijkstra</a>.</p>
+<p><b>(a) Equal weights: BFS.</b> If every edge has weight \(c\), the shortest path is the one with the fewest edges, so the distance is \(c\times\)(number of edges) and BFS finds it.</p>
+<pre class="code">BFS(G, s)
+  for each v: d[v] = INF, parent[v] = NIL
+  d[s] = 0; enqueue s
+  while queue not empty
+     u = dequeue
+     for each v in Adj[u] with d[v] == INF
+         d[v] = d[u] + 1; parent[v] = u; enqueue v
+  // distance = c * d[v]; path from the parent pointers</pre>
+<p>Time \(O(V+E)\). BFS is correct because it visits vertices in order of increasing edge count.</p>
+<p><b>(b) Positive weights: Dijkstra.</b></p>
+<pre class="code">DIJKSTRA(G, w, s)
+  INITIALIZE-SINGLE-SOURCE(G, s)      // d[s]=0, others INF
+  S = empty;  Q = all vertices keyed by d
+  while Q not empty
+     u = EXTRACT-MIN(Q);  S = S + {u}
+     for each v in Adj[u]
+         if d[v] > d[u] + w(u,v)       // relax
+             d[v] = d[u] + w(u,v); parent[v] = u; DECREASE-KEY(Q, v, d[v])</pre>
+<p>Time \(O((V+E)\log V)\) with a binary heap, \(O(V\log V+E)\) with a Fibonacci heap. Correctness: see the proof in the chapter (greedy, needs non-negative weights).</p>
+<p><b>(c) Negative weights and possible negative cycles: Bellman-Ford with cycle handling.</b></p>
+<pre class="code">BELLMAN-FORD(G, w, s)
+  INITIALIZE-SINGLE-SOURCE(G, s)
+  repeat |V|-1 times
+     for each edge (u, v): RELAX(u, v, w)
+  for each edge (u, v)                  // one more round
+     if d[v] > d[u] + w(u,v) then mark v      // v is on or reachable from a negative cycle
+  every vertex reachable from a marked vertex has distance -INF
+  other vertices: d[v] is the true shortest distance</pre>
+<ol>
+<li>After round \(i\), every vertex whose shortest path has at most \(i\) edges is correct. A shortest path without a cycle has at most \(V-1\) edges, so \(V-1\) rounds are enough when no negative cycle is reachable.</li>
+<li>If after \(V-1\) rounds some edge still relaxes, there is a negative cycle reachable from \(s\). For those vertices no shortest path exists (the distance is \(-\infty\)). A search from the marked vertices finds all of them.</li>
+</ol>
+<p>Time \(O(VE)\). A DAG would give \(O(V+E)\), but the question allows cycles.</p>
+</div></details></div>
+
+<h3>Question 3 (35)</h3>
+
+<div class="exam"><div class="exam-src">2022–23 · Q3(a) · 8 marks</div>
+<div class="exam-q"><p>How is the concept of a potential function used to design a splay tree? Explain.</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p>Chapter: <a href="../tree/06-splay.html">Splay trees</a>. <b>Low priority:</b> splay trees are not in the available notes or slides; this was asked in older papers, not in 2024-25.</p>
+<ol>
+<li><b>Problem.</b> A splay tree does not store balance information. A single operation can cost \(O(n)\) (a long chain). We want to show that a sequence of \(m\) operations costs \(O(m\log n)\): each operation has <b>amortized</b> cost \(O(\log n)\).</li>
+<li><b>Potential.</b> \(s(x)\) = number of nodes in the subtree of \(x\). \(r(x)=\log_2 s(x)\) (the rank). \(\Phi(T)=\sum_x r(x)\). A balanced tree has a low potential and a chain has a high one.</li>
+<li><b>Amortized cost</b> of an operation = actual cost + \(\Phi_{\text{after}}-\Phi_{\text{before}}\). A cheap operation that leaves the tree more unbalanced pays for it by raising \(\Phi\); an expensive splay of a deep node lowers \(\Phi\) a lot and its actual cost is paid by that fall.</li>
+<li><b>Splay-step bound (access lemma).</b> For a node \(x\) with ranks \(r\) before and \(r'\) after one step: zig costs at most \(1+3(r'(x)-r(x))\); zig-zig and zig-zag each cost at most \(3(r'(x)-r(x))\) in amortized terms (cost counted as 2 rotations, proved with \(\log a+\log b\le 2\log(a+b)-2\)).</li>
+<li><b>Telescoping.</b> Summing over all steps of one splay, the differences telescope: amortized cost \(\le 3(r(\text{root})-r(x))+1\le 3\log_2 n+1=O(\log n)\).</li>
+<li>Over \(m\) operations from an empty tree, total actual cost \(\le\) total amortized cost \(+\Phi_{\text{start}}-\Phi_{\text{end}}=O(m\log n)\) since \(\Phi\le n\log n\).</li>
+</ol>
+</div></details></div>
+
+<div class="exam"><div class="exam-src">2022–23 · Q3(b) · 6 + 6 marks</div>
+<div class="exam-q"><p>Formulate the problem of maximum bipartite matching. Give two examples of real-life problems that can be solved using it.</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p>Chapter: <a href="../graph/08-matching-modelling.html">Bipartite matching and modelling</a>.</p>
+<ol>
+<li><b>Input.</b> A bipartite graph \(G=(L\cup R,E)\): every edge joins a vertex of \(L\) to one of \(R\).</li>
+<li><b>Matching.</b> \(M\subseteq E\) in which no two edges share an endpoint (every vertex is in at most one edge of \(M\)).</li>
+<li><b>Problem.</b> Find a matching of maximum size \(|M|\).</li>
+</ol>
+<p><b>Examples.</b></p>
+<ul>
+<li><b>Job assignment:</b> \(L\) = workers, \(R\) = jobs, edge = "worker is qualified for the job". The maximum matching is the most jobs that can be filled with one job per worker.</li>
+<li><b>Course or room allocation / car-parking:</b> \(L\) = students (or cars), \(R\) = seats (or parking slots), edge = allowed or reachable. Maximum matching = most students seated.</li>
+</ul>
+</div></details></div>
+
+<div class="exam"><div class="exam-src">2022–23 · Q3(c) · 10 + 5 marks</div>
+<div class="exam-q"><p>Develop a solution for the maximum bipartite matching problem. What is the Edmonds-Karp optimization for the Ford-Fulkerson algorithm?</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p>Chapters: <a href="../graph/06-flow.html">Flow networks, Ford-Fulkerson</a>, <a href="../graph/07-mincut-ek.html">Edmonds-Karp</a>, <a href="../graph/08-matching-modelling.html">Matching</a>.</p>
+<p><b>Reduction to max flow.</b></p>
+<ol>
+<li>Add a source \(s\) and sink \(t\). Edges \(s\to u\) for all \(u\in L\), edges \(u\to v\) for every \((u,v)\in E\) with \(u\in L\), edges \(v\to t\) for all \(v\in R\). Every capacity is 1.</li>
+<li>Find a max flow with Ford-Fulkerson. By the integrality theorem it is integral, so every edge carries 0 or 1.</li>
+<li>The edges \(L\to R\) with flow 1 form a matching: flow into \(u\in L\) is at most 1 so \(u\) uses at most one edge, same for \(v\in R\). Its size is \(|f|\).</li>
+<li>Conversely a matching of size \(k\) gives a flow of value \(k\). So max flow = max matching.</li>
+<li>Time: \(|f|\le\min(|L|,|R|)\le V\), each augmentation \(O(E)\), so \(O(VE)\).</li>
+</ol>
+<p>Example: \(L=\{a,b,c\}\), \(R=\{x,y,z\}\), edges a-x, a-y, b-x, c-y, c-z.</p>
+<div id="t3c"></div>
+<p><b>Edmonds-Karp optimization.</b> Ford-Fulkerson does not say how to choose the augmenting path, so with large capacities it can take \(|f^*|\) steps (and with irrational capacities it may not stop). Edmonds-Karp chooses the augmenting path with the <b>fewest edges</b>, found by BFS in the residual network. Then the shortest-path distance of every vertex from \(s\) in the residual graph never decreases, each edge becomes critical (the bottleneck) at most \(V/2\) times, there are \(O(VE)\) augmentations of cost \(O(E)\): total \(O(VE^2)\), independent of the capacities.</p>
+</div></details></div>
+
+<h3>Question 4 (35)</h3>
+
+<div class="exam"><div class="exam-src">2022–23 · Q4(a) · 8 marks</div>
+<div class="exam-q"><p>Prove the max-flow min-cut theorem.</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p>Chapter: <a href="../graph/07-mincut-ek.html">Max-flow min-cut, Edmonds-Karp</a>. The full numbered proof is written out in <a href="2023-24.html">the 2023–24 solution, Q11(c)</a>; short form here.</p>
+<ol>
+<li><b>Lemma.</b> For every flow \(f\) and every cut \((S,T)\): \(|f|=f(S,T)-f(T,S)\le c(S,T)\). So max flow \(\le\) min cut.</li>
+<li><b>No augmenting path \(\Rightarrow\) equality.</b> If \(G_f\) has no \(s\leadsto t\) path, let \(S\) = vertices reachable from \(s\) in \(G_f\), \(T\) = the rest (\(t\in T\)). Every edge \(S\to T\) is saturated (else the residual edge would reach \(T\)); every edge \(T\to S\) carries 0 flow. So \(|f|=c(S,T)\).</li>
+<li>By step 1 this flow is maximum and this cut is minimum. So <b>max flow = min cut</b>. A flow is maximum iff there is no augmenting path. ∎</li>
+</ol>
+</div></details></div>
+
+<div class="exam"><div class="exam-src">2022–23 · Q4(b) · 12 marks</div>
+<div class="exam-q"><p>Write down the properties of an AVL tree and prove that it is a balanced binary search tree.</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p>Chapter: <a href="../tree/01-rotations-avl.html">Rotations and AVL trees</a>.</p>
+<p><b>Properties.</b></p>
+<ol>
+<li>It is a binary search tree (left keys smaller, right keys larger).</li>
+<li>At every node the heights of the left and right subtrees differ by at most 1 (balance factor \(\in\{-1,0,+1\}\)).</li>
+<li>After an insert or delete, rotations (single or double) restore property 2; the height is stored or recomputed at each node.</li>
+</ol>
+<p><b>Proof: height is \(O(\log n)\).</b> (leaf height 0)</p>
+<ol>
+<li>Let \(N(h)\) = fewest nodes in an AVL tree of height \(h\). The root has subtrees of height \(h-1\) and, at least, \(h-2\).</li>
+<li>\(N(h)=N(h-1)+N(h-2)+1\), \(N(0)=1,\ N(1)=2\). So 1, 2, 4, 7, 12, 20, ...</li>
+<li>\(N(h)>2N(h-2)\), so \(N(h)\ge 2^{\lfloor h/2\rfloor}\).</li>
+<li>Any AVL tree of height \(h\) with \(n\) nodes has \(n\ge N(h)\ge2^{(h-1)/2}\), so \(h\le 2\log_2n+1\).</li>
+<li>So height is \(O(\log n)\): search, insert and delete cost \(O(\log n)\). ∎ (The sharper bound is \(1.44\log_2n\).)</li>
+</ol>
+</div></details></div>
+
+<div class="exam"><div class="exam-src">2022–23 · Q4(c) · 15 marks</div>
+<div class="exam-q"><p>Write the pseudo-code of an insertion operation in a Red-Black tree and explain graphically the different forms of transformation necessary to maintain the RB property while inserting an item. Briefly compare RB-tree and AVL-tree.</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p>Chapter: <a href="../tree/03-rb-insert.html">RB insertion: the 3 cases</a> (this is its recall question), <a href="../tree/02-rb-properties.html">RB properties</a>.</p>
+<pre class="code">RB-INSERT(T, z)
+   BST-insert z; z.color = RED
+   RB-INSERT-FIXUP(T, z)
+
+RB-INSERT-FIXUP(T, z)
+ while z.p.color == RED
+   if z.p == z.p.p.left
+     y = z.p.p.right              // uncle
+     if y.color == RED            // case 1
+       z.p.color = BLACK; y.color = BLACK
+       z.p.p.color = RED; z = z.p.p
+     else
+       if z == z.p.right          // case 2
+         z = z.p; LEFT-ROTATE(T, z)
+       z.p.color = BLACK          // case 3
+       z.p.p.color = RED
+       RIGHT-ROTATE(T, z.p.p)
+   else (same with left and right exchanged)
+ T.root.color = BLACK</pre>
+<p>Why red: a red node changes no black height; only "red has no red child" can break, and that is repaired locally. The three forms are case 1 (uncle red: recolour, move up), case 2 (uncle black, bent: rotate at the parent to straighten) and case 3 (uncle black, straight: recolour, rotate at the grandparent). Example with all three forms:</p>
+<div id="t4c"></div>
+<p class="drawit"><b>On paper:</b> three small drawings, one per case, each with "before" and "after": case 1 shows grandparent black with two red children and a red grandchild, then the recolouring; case 2 shows the bend and the first rotation; case 3 shows the line, recolour, one rotation. Mark red nodes with R.</p>
+<table class="mat"><tr><th></th><th>Red-black tree</th><th>AVL tree</th></tr>
+<tr><td>Height bound</td><td>\(\le 2\log_2(n+1)\)</td><td>\(\le1.44\log_2 n\) (tighter)</td></tr>
+<tr><td>Search</td><td>slightly slower (taller)</td><td>faster (more balanced)</td></tr>
+<tr><td>Insert</td><td>at most 2 rotations</td><td>at most 1 (single or double)</td></tr>
+<tr><td>Delete</td><td>at most 3 rotations</td><td>up to \(O(\log n)\) rotations</td></tr>
+<tr><td>Extra storage</td><td>1 colour bit</td><td>balance factor or height</td></tr>
+<tr><td>Best when</td><td>many inserts and deletes</td><td>many lookups</td></tr></table>
+</div></details></div>
+
+<h2>Section B</h2>
+
+<h3>Question 5 · compulsory</h3>
+
+<div class="exam comp"><span class="comp-badge">COMPULSORY</span><div class="exam-src">2022–23 · Q5(a) · 6 marks</div>
+<div class="exam-q"><p>Differentiate among NP, NP-hard and NP-complete classes of problems.</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p>Chapter: <a href="../np/01-classes.html">P, NP, co-NP, NP-complete</a>.</p>
+<table class="mat"><tr><th>Class</th><th>Meaning</th><th>Must be a decision problem?</th></tr>
+<tr><td>NP</td><td>a "yes" answer can be verified in polynomial time from a certificate</td><td>yes</td></tr>
+<tr><td>NP-hard</td><td>every problem in NP reduces to it in polynomial time; it is at least as hard as all of NP</td><td>no (optimization problems too); it need not be in NP</td></tr>
+<tr><td>NP-complete</td><td>in NP <b>and</b> NP-hard</td><td>yes</td></tr></table>
+<p>NP-complete = NP \(\cap\) NP-hard. If any NP-complete problem is in P, then P = NP. Examples: SAT, vertex cover (NP-complete); halting problem (NP-hard, not in NP); optimization TSP (NP-hard, not a decision problem).</p>
+</div></details></div>
+
+<div class="exam comp"><span class="comp-badge">COMPULSORY</span><div class="exam-src">2022–23 · Q5(b) · 17 marks</div>
+<div class="exam-q"><p>A team of employees, each with tasks. Some tasks cannot be worked on simultaneously due to dependencies or resource constraints. The goal is to maximize productivity by scheduling as many tasks as possible, with no two conflicting tasks assigned to the same team member simultaneously. A friend says: "The problem can be mapped to a popular NP-complete problem and proved NP-hard by reduction." Justify the comment by mapping the problem to an NP-complete problem and reducing it to another known NP-complete problem.</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p>Chapter: <a href="../np/02-reductions.html">Reductions, with proof templates</a>. The question is loose, so state your model first; the marks are for a clean mapping and a correct reduction.</p>
+<p><b>Part 1: map to INDEPENDENT SET.</b></p>
+<ol>
+<li>Model: a task is a vertex; two tasks that conflict (cannot run at the same time for the same member) are joined by an edge. Choosing the tasks to run simultaneously means choosing a set with no conflicting pair, i.e. an <b>independent set</b>.</li>
+<li>Decision version SCHEDULE: given tasks, conflicts and \(k\), can \(k\) tasks be chosen with no two in conflict? This is exactly INDEPENDENT SET on the conflict graph with the same \(k\).</li>
+<li>INDEPENDENT SET is a popular NP-complete problem. Maximising the number of scheduled tasks is its optimization version, so it is NP-hard.</li>
+</ol>
+<p><b>Part 2: prove INDEPENDENT SET NP-hard by VERTEX COVER \(\le_p\) INDEPENDENT SET</b> (vertex cover is the known NP-complete problem).</p>
+<ol>
+<li>Given \((G=(V,E),k)\) for VERTEX COVER, output \((G,\ n-k)\) for INDEPENDENT SET, where \(n=|V|\). Poly time.</li>
+<li><b>Key fact:</b> \(S\) is a vertex cover iff \(V\setminus S\) is independent. (\(S\) covers every edge \(\iff\) no edge has both endpoints outside \(S\).)</li>
+<li><b>Forward.</b> If \(G\) has a vertex cover of size \(\le k\), its complement is independent with size \(\ge n-k\).</li>
+<li><b>Backward.</b> If \(G\) has an independent set of size \(\ge n-k\), its complement is a vertex cover of size \(\le k\).</li>
+<li>So VC \(\le_p\) IS and IS is NP-hard. With membership in NP (certificate: the \(k\) tasks, check all pairs), IS is NP-complete. Hence SCHEDULE is NP-hard. ∎</li>
+</ol>
+<div class="trap"><h4>Where marks go</h4><ul><li>Reduce <em>from</em> the known problem <em>to</em> the new one. Writing it backwards (IS to VC) proves nothing about IS.</li><li>Write the construction, the polynomial time, and both directions of the iff.</li></ul></div>
+</div></details></div>
+
+<div class="exam comp"><span class="comp-badge">COMPULSORY</span><div class="exam-src">2022–23 · Q5(c) · 12 marks</div>
+<div class="exam-q"><p>Recall the deletion operation of the Fibonacci heap. Professor Rahsut proposes RAHSUT-DELETE(H, x): if x == H.min, FIB-HEAP-EXTRACT-MIN(H); else y = x.p; if y != NIL, CUT(H, x, y) and CASCADING-CUT(H, y); add x's children to the root list of H; remove x from the root list of H. (i) Construct a good upper bound on the actual time of RAHSUT-DELETE when x is not H.min, in terms of x.degree and the number c of calls to CASCADING-CUT. (ii) Let H' be the heap that results, with x not a root. Find the potential of H' in terms of x.degree, c, t(H) and m(H).</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p>Chapters: <a href="../heap/04-fibonacci.html">Fibonacci heap</a>, <a href="../heap/05-amortized.html">Potential method</a>. Potential \(\Phi(H)=t(H)+2m(H)\): \(t\) = number of trees (roots), \(m\) = number of marked nodes. \(c\) counts calls to CASCADING-CUT (the last call ends the cascade).</p>
+<p><b>(i) Actual time.</b></p>
+<ol>
+<li>CUT: \(O(1)\).</li>
+<li>CASCADING-CUT: \(c\) calls, each \(O(1)\) (a cut and a mark test): \(O(c)\).</li>
+<li>Adding \(x\)'s children to the root list, one by one: \(O(x.\text{degree})\). Removing \(x\) from the root list: \(O(1)\).</li>
+<li>Total: \(\mathbf{O(x.\text{degree}+c)}\).</li>
+</ol>
+<p><b>(ii) Potential of \(H'\).</b></p>
+<ol>
+<li><b>Roots.</b> \(x\) is cut (+1 root) and then removed (−1): net 0. The \(x.\text{degree}\) children become roots: \(+x.\text{degree}\). Each of the \(c-1\) cascading cuts that actually cut a node adds a root: \(+(c-1)\). So \(t(H')=t(H)+x.\text{degree}+c-1\).</li>
+<li><b>Marks.</b> Each of the \(c-1\) cuts clears a mark: \(-(c-1)\). The last call may mark one node: at most \(+1\). \(x\) itself, if it was marked, disappears (only lowers \(m\)). So \(m(H')\le m(H)-(c-1)+1=m(H)-c+2\).</li>
+<li><b>Potential:</b> \[\Phi(H')\le t(H)+x.\text{degree}+c-1+2\bigl(m(H)-c+2\bigr)=t(H)+2m(H)+x.\text{degree}-c+3.\]</li>
+<li>So \(\Phi(H')-\Phi(H)\le x.\text{degree}-c+3\).</li>
+</ol>
+<p><b>Amortized cost</b> (not asked, but marks for it if time): actual \(O(x.\text{degree}+c)\) plus \(\Delta\Phi\le x.\text{degree}-c+3\). Scaling the potential units, the \(c\) terms cancel, but the \(x.\text{degree}\) term stays, so the amortized cost is \(O(x.\text{degree})=O(\log n)\). This matches the original FIB-HEAP-DELETE; it is not \(O(1)\) as the professor might hope.</p>
+<div class="trap"><h4>Where marks go</h4><ul><li>The count of new roots is \(c-1\) (not \(c\)) because the last CASCADING-CUT call does not cut. State what \(c\) counts.</li><li>Children moved to the root list keep their marks in this variant, so \(m\) does not drop for them.</li></ul></div>
+</div></details></div>
+
+<h3>Question 6 (35)</h3>
+
+<div class="exam"><div class="exam-src">2022–23 · Q6(a) · 15 + 5 marks</div>
+<div class="exam-q"><p>You use hash function h1 into a table of size 16; your friend uses h2 into size 17. h1 hashes the keys 100, 130, 110, 150, 160, 200, 700, 800, 300 into 0, 3, 2, 0, 3, 1, 2, 5, 8. h2 hashes them into 1, 4, 7, 10, 13, 4, 7, 10, 13. You use quadratic probing \(f(i)=2i^2+3\); your friend uses double hashing with the second hash \(h_2'(x)=19-(x\%17)\). Insert in the given order, then delete 100 and search 150: your table says "key 150 not found". (i) Compare the two by the total unsuccessful probes during insertion. (15) (ii) Identify the possible core reason for not finding 150 and give a solution. (5)</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p>Chapter: <a href="../heap/01-hashing.html">Chaining and open addressing</a>. Probe \(i\) goes to \((h(k)+f(i))\bmod m\), \(i=0,1,\dots\) (see the note at the top).</p>
+<h4>Your table: quadratic probing, size 16, \(f(i)=2i^2+3\)</h4>
+<div id="th6a"></div>
+<p>Final: slot 3=100, 4=200, 5=110, 6=130, 7=700, 8=160, 10=800, 11=150, 13=300; the rest are empty. Unsuccessful probes: 150: 2, 160: 1, 700: 1, 800: 1, 300: 1. <b>Total 6.</b></p>
+<h4>Friend's table: double hashing, size 17, step \(19-(x\%17)\)</h4>
+<div id="th6b"></div>
+<p>Steps: 100→4, 130→8, 110→11, 150→5, 160→12, 200→6, 700→16, 800→18, 300→8. Final: slot 1=100, 4=130, 6=700, 7=110, 10=150, 11=800, 12=300, 13=160, 16=200; the rest are empty. Unsuccessful probes: 200: 2, 700: 1, 800: 1, 300: 2. <b>Total 6.</b></p>
+<p><b>(i) Comparison.</b> Both need 6 unsuccessful probes, so on this input neither wins. In general double hashing is better: the step depends on the key, so keys that start at the same slot follow different paths (no clustering), and the prime size 17 makes every step coprime with the size, so every slot is reachable. Quadratic probing with \(2i^2+3\) in a table of size 16 reaches only a few slots (the offsets \(2i^2\bmod16\) take only the values 0, 2, 8), so insertion can fail with a table that is not full.</p>
+<p><b>(ii) Why 150 is not found, and the fix.</b></p>
+<ol>
+<li>150 has home slot 0, so its first probe is slot \((0+3)\bmod16=3\). That slot held 100 when 150 was inserted, so 150 went on and sat in slot 11 (probes 3, 5, 11).</li>
+<li>Deleting 100 simply emptied slot 3. Search for 150 now probes slot 3, finds it empty and stops, concluding "not found", although 150 is in slot 11.</li>
+<li><b>Core reason:</b> deleting by emptying a slot breaks the probe chain of every key that was pushed past it.</li>
+<li><b>Fix:</b> lazy deletion. Mark the slot as <b>DELETED</b> (a tombstone). Search continues past DELETED slots and stops only at a truly empty one. Insert may reuse a DELETED slot. If many tombstones accumulate, rehash the table.</li>
+</ol>
+</div></details></div>
+
+<div class="exam"><div class="exam-src">2022–23 · Q6(b) · 15 marks</div>
+<div class="exam-q"><p>Give a 2-approximation algorithm for the vertex cover problem and prove that the algorithm computes a vertex cover at most twice the size of the optimal vertex cover.</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p>Chapter: <a href="../np/06-approximation.html">Approximation algorithms</a>. <b>Syllabus note:</b> Bayzid sir's notes say vertex cover is "not in syllabus", but it was asked here and again in 2024–25 (15 marks each). Learn it.</p>
+<pre class="code">APPROX-VERTEX-COVER(G)
+  C = empty set;  E' = G.E
+  while E' is not empty
+     pick any edge (u, v) in E'
+     C = C + {u, v}
+     remove from E' every edge incident on u or v
+  return C</pre>
+<ol>
+<li>Let \(A\) be the edges picked. After a pick all edges at \(u\) and \(v\) are removed, so no later pick touches them: \(A\) is a matching.</li>
+<li><b>Cover.</b> The loop stops when \(E'\) is empty. Every edge was picked (both ends in \(C\)) or removed because it touched a picked vertex. So \(C\) is a vertex cover.</li>
+<li><b>Size.</b> Each pick adds 2 new vertices: \(|C|=2|A|\).</li>
+<li><b>Lower bound.</b> A cover has to contain an endpoint of each edge of \(A\), and those edges share no endpoint, so \(|OPT|\ge|A|\).</li>
+<li>\(|C|=2|A|\le2|OPT|\). Time \(O(V+E)\). ∎ Tight on a path of 4 edges A-B-C-D-E (picks A-B, C-D: size 4; optimum \(\{B,D\}\): size 2).</li>
+</ol>
+</div></details></div>
+
+<h3>Question 7 (35)</h3>
+
+<div class="exam"><div class="exam-src">2022–23 · Q7(a) · 20 marks</div>
+<div class="exam-q"><p>Four places in a village; start from a place, visit all others and return to the first without visiting a place twice except the start; minimum cost. Cost matrix (from row to column): 1: 0 10 15 20; 2: 5 0 12 18; 3: 8 9 0 17; 4: 11 14 16 0. Give an exponential-time algorithm of running time \(O(n^22^n)\) and find the optimal tour with it.</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p>Chapter: <a href="../np/04-branch-bound.html">Branch and bound; TSP by DP</a>. <b>Syllabus note:</b> Held-Karp is not in the lecture notes, but it was asked here and in 2021–22 (as branch and bound). The method is easy to execute by hand for \(n=4\).</p>
+<p><b>Held-Karp.</b> Fix city 1 as the start. \(C(S,j)\) = cheapest path that starts at 1, visits exactly the cities of \(S\) (\(S\subseteq\{2..n\}\)) and ends at \(j\in S\).</p>
+<ol>
+<li>\(C(\{j\},j)=d(1,j)\).</li>
+<li>\(C(S,j)=\min_{i\in S\setminus\{j\}}\bigl[C(S\setminus\{j\},i)+d(i,j)\bigr]\).</li>
+<li>Answer \(=\min_{j}\bigl[C(\{2..n\},j)+d(j,1)\bigr]\); rebuild the tour from the stored best \(i\).</li>
+<li><b>Time.</b> \(2^{n-1}\) subsets, \(n\) endings, \(n\) choices of \(i\): \(O(n^22^n)\). Space \(O(n2^n)\). (Brute force is \(O((n-1)!)\).)</li>
+</ol>
+<div id="t7a"></div>
+<p><b>Answer: minimum cost 50, tour 1 → 2 → 3 → 4 → 1</b> (\(10+12+17+11=50\)).</p>
+<p class="drawit"><b>On paper:</b> a table with one row per \((S,j)\): sizes 1, 2, 3, with the value and the predecessor. Then read back from the last row.</p>
+</div></details></div>
+
+<div class="exam"><div class="exam-src">2022–23 · Q7(b) · 15 marks</div>
+<div class="exam-q"><p>Luggage capacity 60 kg. Items (value, weight): 1 (120, 15), 2 (110, 10), 3 (95, 25), 4 (135, 35), 5 (80, 20), 6 (150, 30). Maximise the total value using branch and bound.</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p>Chapter: <a href="../np/04-branch-bound.html">Branch and bound; TSP by DP</a>. Method: sort by value per weight, bound = fractional knapsack, expand the largest bound first, prune when bound \(\le\) best.</p>
+<p>Ratios: item 2 \(=11\), item 1 \(=8\), item 6 \(=5\), item 5 \(=4\), item 4 \(=3.86\), item 3 \(=3.8\).</p>
+<div id="t7b"></div>
+<p><b>Answer: items 1, 2, 6.</b> Weight \(15+10+30=55\le60\), value \(120+110+150=380\).</p>
+<p class="drawit"><b>On paper:</b> root "W=0 V=0 ub=…" and in each box W, V and ub. Take branch left, skip branch right. Cross out boxes that are over 60 kg or whose ub is at most the best so far; circle the leaf 380.</p>
+</div></details></div>
+
+<h3>Question 8 (35)</h3>
+
+<div class="exam"><div class="exam-src">2022–23 · Q8(a) · 23 marks</div>
+<div class="exam-q"><p>Two max priority queues pq1 and pq2 implemented as binomial heaps, both initially empty. (i) Insert 5, 20, 4, 19, 1, −3, 6, 12, 3, 2, 18 in pq1 and 25, 21, 10, 13, 17, 9, 8, 11, 7 in pq2. Draw the two binomial heaps. (ii) Meld pq1 and pq2, then decrease the key of node 20 to −20 in the melded queue. Show the steps. (iii) What is the total actual cost in credits if Extract-Max is called two times consecutively on the result? Unlinking a node from its children = 1 credit, two-node addition = 1 credit, insertion of a node = 1 credit, a two-key comparison = 1 credit; everything else 0.</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p>Chapter: <a href="../heap/03-binomial-heap.html">Binomial heap operations</a>. In a max-heap the parent is larger than its children. Link rule: the larger root stays on top, the other tree becomes its leftmost child.</p>
+<h4>(i) The two heaps</h4>
+<p>pq1 has 11 keys (\(11=1011_2\)): \(B_0\), \(B_1\), \(B_3\). pq2 has 9 keys (\(9=1001_2\)): \(B_0\), \(B_3\).</p>
+<div id="t8a1"></div>
+<div id="t8a2"></div>
+<p>pq1: roots 18 (\(B_0\)), 3(2) (\(B_1\)), 20(12(1(−3),6), 19(4), 5) (\(B_3\)). pq2: roots 7 (\(B_0\)), 25(17(11(8),9), 13(10), 21) (\(B_3\)).</p>
+<h4>(ii) Meld, then decrease 20 to −20</h4>
+<ol>
+<li>Merge root lists by degree: 18, 7 (\(B_0\)); 3 (\(B_1\)); 20, 25 (\(B_3\)).</li>
+<li>Link 18 and 7: 18 is larger, 18(7). Now two \(B_1\): 18(7) and 3(2). 18 is larger: \(B_2\)=18(3(2), 7).</li>
+<li>Link the two \(B_3\): 25 is larger, 20's tree becomes 25's leftmost child: \(B_4\)=25(20(…), 17(…), 13(10), 21). Meld cost 3 comparisons, 3 links.</li>
+</ol>
+<div id="f8a3"></div>
+<ol start="4">
+<li><b>Decrease key 20 to −20.</b> In a max-heap the key falls, so heap order can break <em>downwards</em>. Sift down: swap with the larger child while a child is larger. Children of the node are 12, 19, 5: swap with 19 (19 moves up). Now its children are 4: 4 &gt; −20, swap (4 moves up). −20 is a leaf. Two swaps.</li>
+</ol>
+<div id="f8a4"></div>
+<p>(Equivalent alternative: delete the node and insert −20 as a new key.)</p>
+<h4>(iii) Two Extract-Max calls</h4>
+<p><b>Counting rule used:</b> comparisons to find the maximum root (number of roots − 1), one credit per child unlinked from the removed root, then for the union of the children's heap with the old root list: one comparison and one link (node addition) per link.</p>
+<table class="mat"><tr><th>Call</th><th>Max</th><th>Find max</th><th>Unlink</th><th>Union comparisons</th><th>Links</th><th>Credits</th></tr>
+<tr><td>1</td><td>25</td><td>1</td><td>4</td><td>2</td><td>2</td><td>9</td></tr>
+<tr><td>2</td><td>21</td><td>2</td><td>0</td><td>0</td><td>0</td><td>2</td></tr></table>
+<p><b>Total: 11 credits.</b> After call 1 the roots are 21 (\(B_0\)), 13(10) (\(B_1\)), and 19(18(17(11(8),9),3(2),7), 12(1(−3),6), 4(−20), 5) (\(B_4\)). After call 2 (21 has no children): 13(10) and the \(B_4\) tree.</p>
+<div id="f8a5"></div>
+<div class="trap"><h4>Where marks go</h4><ul><li>The marking depends on the counting rule. State it in one line, as above, and follow it. A different but stated rule (for instance not counting comparisons in finding the maximum) changes the numbers and loses only if you are inconsistent.</li><li>In a max-heap a key decrease needs sift-down, not the usual bubble-up.</li></ul></div>
+</div></details></div>
+
+<div class="exam"><div class="exam-src">2022–23 · Q8(b) · 12 marks</div>
+<div class="exam-q"><p>Prove that in a binomial heap, the amortized cost of INSERT is \(O(1)\) and the worst-case cost of EXTRACT-MIN and DECREASE-KEY is \(O(\log n)\).</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p>Chapters: <a href="../heap/02-binomial-trees.html">Binomial trees</a>, <a href="../heap/03-binomial-heap.html">Binomial heap operations</a>, <a href="../heap/05-amortized.html">Potential method</a>.</p>
+<ol>
+<li><b>Facts.</b> A binomial heap with \(n\) keys has one tree \(B_i\) for each 1-bit of \(n\). So it has at most \(\lfloor\log_2n\rfloor+1\) trees, every tree has height at most \(\log_2n\), every degree at most \(\log_2 n\).</li>
+<li><b>INSERT, amortized.</b> Potential \(\Phi(H)=t(H)\), the number of trees. Insert makes a one-node heap and unions it in, like adding 1 to a binary counter. If \(k\) links happen, the actual cost is \(O(1+k)\).</li>
+<li>Each link reduces the number of trees by 1, and the new node adds 1: \(\Delta\Phi=1-k\).</li>
+<li>Amortized cost \(=(1+k)+(1-k)=2=O(1)\). ∎ (Starting from an empty heap, \(\Phi\ge0\), so the total actual cost of \(m\) inserts is at most \(2m\).)</li>
+<li><b>EXTRACT-MIN, worst case.</b> Finding the minimum root scans at most \(\log n+1\) roots: \(O(\log n)\). The min root has at most \(\log n\) children; reversing them and uniting the two heaps (each with \(O(\log n)\) trees) costs \(O(\log n)\), because UNION walks the two root lists once. Total \(O(\log n)\). ∎</li>
+<li><b>DECREASE-KEY, worst case.</b> Lower the key and exchange it with its parent while the parent is larger. A node is at depth at most the tree height, \(\le\log n\), and each exchange is \(O(1)\). So \(O(\log n)\). ∎</li>
+</ol>
+</div></details></div>
+
+<h2>Mandatory</h2>
+<p>This paper has two compulsory questions. Time yourself: about 45 minutes for Q1, about 35 for Q5.</p>
+<div id="r1"></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/algo.js"></script>
+<script src="../assets/dsa.js"></script>
+<script>
+trace('#t3c', { kind: 'ek', input: 'S>a 1, S>b 1, S>c 1, a>x 1, a>y 1, b>x 1, c>y 1, c>z 1, x>T 1, y>T 1, z>T 1', s: 'S', t: 'T' });
+trace('#t4c', { kind: 'rb', input: '41 38 31 12 19 8' });
+const m6 = (x, m) => ((x % m) + m) % m;
+const H1 = { 100: 0, 130: 3, 110: 2, 150: 0, 160: 3, 200: 1, 700: 2, 800: 5, 300: 8 };
+const H2 = { 100: 1, 130: 4, 110: 7, 150: 10, 160: 13, 200: 4, 700: 7, 800: 10, 300: 13 };
+trace('#th6a', { kind: 'hash', input: '100 130 110 150 160 200 700 800 300 ; 16', opts: { mode: 'quad', h: k => H1[k], f: (k, i) => m6(H1[k] + 2 * i * i + 3, 16) } });
+trace('#th6b', { kind: 'hash', input: '100 130 110 150 160 200 700 800 300 ; 17', opts: { mode: 'double', h: k => H2[k], f: (k, i) => m6(H2[k] + i * (19 - (k % 17)), 17) } });
+trace('#t7a', { kind: 'tsp', input: '0 10 15 20 ; 5 0 12 18 ; 8 9 0 17 ; 11 14 16 0' });
+trace('#t7b', { kind: 'knapsack', input: '15:120 10:110 25:95 35:135 20:80 30:150 ; 60' });
+trace('#t8a1', { kind: 'binomial', input: '5 20 4 19 1 -3 6 12 3 2 18', opts: { max: true } });
+trace('#t8a2', { kind: 'binomial', input: '25 21 10 13 17 9 8 11 7', opts: { max: true } });
+forestFig('#f8a3', '18(3(2) 7) 25(20(12(1(-3) 6) 19(4) 5) 17(11(8) 9) 13(10) 21)');
+forestFig('#f8a4', '18(3(2) 7) 25(19(12(1(-3) 6) 4(-20) 5) 17(11(8) 9) 13(10) 21)');
+forestFig('#f8a5', '13(10) 19(18(17(11(8) 9) 3(2) 7) 12(1(-3) 6) 4(-20) 5)');
+recall('#r1', { id: 'r1', marks: 70, q: 'Attempt this paper\'s compulsory questions in the time limit, then mark them. Q1(a): the complexity of Johnson\'s algorithm. Q1(b): the road renovation problem (formulate, solve, pseudo-code). Q5(a): NP vs NP-hard vs NP-complete. Q5(b): the task-scheduling reduction. Q5(c): the RAHSUT-DELETE bound and potential.', points: ['Johnson: add source, Bellman-Ford O(VE), reweight w\' = w + h(u) - h(v) ≥ 0, V Dijkstra runs, undo; total O(V² log V + VE)', 'Road problem: type-3 edges serve both graphs; keep = 2(N−1) − k3, so maximise k3 with union-find', 'Pseudo-code: union type 3, copy the DSU for men and women, add type 1 and type 2, return M − kept, or −1 if not connected', 'NP = verifiable; NP-hard = every NP problem reduces to it; NP-complete = both', 'Scheduling = independent set on the conflict graph; reduction VC to IS with k → n − k, both directions', 'RAHSUT-DELETE actual cost O(x.degree + c)', 'Roots: t(H\') = t(H) + x.degree + c − 1; marks: m(H\') ≤ m(H) − c + 2', 'Potential Φ(H\') ≤ t(H) + 2m(H) + x.degree − c + 3'], model: '<p>Q1(b): count \\(k_3\\) = type-3 edges that merge components (union-find), copy the DSU, add type 1 edges for men and type 2 for women, check both are connected, answer \\(M-(k_3+k_m+k_w)=M-(2(N-1)-k_3)\\). Q5(b): conflict graph, independent set, VC to IS by complement. Q5(c): \\(O(\\deg+c)\\); \\(t\' = t+\\deg+c-1\\); \\(m\'\\le m-c+2\\); \\(\\Phi\'\\le t+2m+\\deg-c+3\\).</p>' });
+</script>
+</body>
+</html>

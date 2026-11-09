@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hashing · CSE 207 Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Hashing · CLRS ch. 11 · Bayzid sir L1–3 · asked almost every year</div>
+<h1>Hashing: Chaining and Open Addressing</h1>
+<p class="lede">Asked in 2024–25 Q6(a) (25 marks, four strategies on one table), 2023–24 Q1 (8+7, chaining proof and double hashing), 2022–23 Q6(a) (15+5, probe counts and "why search fails"), 2021–22 Q6(a)(b) (15+5+5 and 10), 2019–20 Q1 (10+10+15), 2018–19 Q5 (12+6+12) and 2017–18 Q7(c)(d). The table questions are pure drawing and counting, so they are safe marks if you do not slip.</p>
+
+<h2>1. The setup</h2>
+<p>A hash table has <b>m slots</b> numbered 0 to m−1. A hash function h maps a key to a slot. Two different keys with the same slot are a <b>collision</b>. The <b>load factor</b> is \(\alpha = n/m\), where n is the number of stored keys.</p>
+<p>There are two ways to handle a collision.</p>
+<ul>
+<li><b>Chaining:</b> each slot holds a linked list of all keys that hash there. \(\alpha\) can be above 1.</li>
+<li><b>Open addressing:</b> every key lives in the array itself. On a collision you try another slot, following a <b>probe sequence</b> \(h(k,0), h(k,1), h(k,2), \dots\) until you find a free slot. Needs \(n \le m\), so \(\alpha \le 1\).</li>
+</ul>
+<div class="key"><p><b>Simple uniform hashing</b> is the assumption behind every expected-time proof: each key is equally likely to go to any of the m slots, independently of the others. Write it in the first line of every proof.</p></div>
+
+<h2>2. Chaining and its analysis</h2>
+<p>Insert: compute h(k), add to the chain. Search: compute h(k), walk that chain. Cost is 1 for hashing plus the chain length walked.</p>
+
+<div class="method"><h4>Proof · unsuccessful search takes expected \(O(1+\alpha)\) (2018–19 Q5(a), 2019–20, 2023–24)</h4><ol>
+<li>Assume simple uniform hashing. The key being searched for is not in the table and goes to a random slot.</li>
+<li>Chain j holds \(n_j\) keys with \(\sum_j n_j = n\), so the average chain length is \(n/m = \alpha\).</li>
+<li>The search computes h(k) (cost 1) and walks the whole chain (expected length \(\alpha\)).</li>
+<li>Expected time \(= 1 + \alpha = O(1+\alpha)\).</li>
+</ol></div>
+
+<div class="method"><h4>Proof · successful search takes expected \(O(1+\alpha)\) (Bayzid sir's version)</h4><ol>
+<li>Searching for a key y that is in the table costs the same as the <b>unsuccessful</b> search for y just before y was inserted. At that moment the chain at h(y) held only the keys inserted earlier.</li>
+<li>When the i-th key is inserted (\(i = 0, 1, \dots, n-1\)), i keys are already in the table, so the expected chain length is \(i/m\). The search for that key costs \(1 + i/m\).</li>
+<li>Average over all n keys (each is equally likely to be the one searched):
+\[ \frac1n \sum_{i=0}^{n-1}\Bigl(1+\frac im\Bigr) = 1 + \frac{1}{nm}\cdot\frac{n(n-1)}{2} = 1 + \frac{n-1}{2m} \approx 1 + \frac{\alpha}{2}. \]</li>
+<li>So successful search is \(O(1+\alpha/2) = O(1+\alpha)\). Asymptotically it equals unsuccessful search; in practice it is slightly faster.</li>
+</ol></div>
+<p><b>Other forms of the same question.</b> 2017–18 7(c) asks for the expected number of items that collide with x. Let \(X_y = 1\) if key y shares x's slot. \(\Pr[X_y=1] = 1/m\). By linearity of expectation \(E[\sum_{y\ne x} X_y] = (n-1)/m \approx \alpha\). 2021–22 6(b) asks for both searches: write the two proofs above.</p>
+<div class="key"><p><b>2019–20 Q1(b), "1 + log α" expected unsuccessful search.</b> The notes do not cover this; this is my reading. Keep each chain in a balanced BST (or a sorted array) instead of a list. The average chain holds \(\alpha\) keys, so an unsuccessful search is 1 for hashing plus \(O(\log\alpha)\) for the BST search. The arrival times are distinct integers, so a sorted structure is natural.</p></div>
+
+<h2>3. Open addressing: three probe sequences</h2>
+<p>Insert walks the probe sequence for i = 0, 1, 2, ... and stores the key in the first free slot. Search follows the same sequence and stops at the key (found) or at an empty slot (not found). The exam asks for <b>unsuccessful probes</b>: the probes that landed on an occupied slot. If a key is placed on probe number i (counting from 0), it had exactly i unsuccessful probes.</p>
+<div class="tbl"><table>
+<tr><th>Method</th><th>Probe i</th><th>Distinct sequences</th><th>Weakness</th></tr>
+<tr><td>Linear</td><td>\((h(k)+c\,i) \bmod m\)</td><td>m</td><td>Primary clustering: runs of full slots grow, and a long run catches more keys, so it grows faster</td></tr>
+<tr><td>Quadratic</td><td>\((h(k)+c_1 i + c_2 i^2) \bmod m\)</td><td>m</td><td>Same start gives the same path; does not reach every slot</td></tr>
+<tr><td>Double</td><td>\((h_1(k) + i\,h_2(k)) \bmod m\)</td><td>\(m^2\)</td><td>\(h_2(k)\) must never be 0 and should share no factor with m</td></tr>
+</table></div>
+<p>Linear probing is "not uniform at all": two keys that hit the same start slot follow the same path, and only m different paths exist. A perfect uniform scheme would have m! paths, which is practically impossible (strong uniform hashing). Double hashing has m starts times m jump sizes.</p>
+
+<h3>Quadratic probing may miss slots (2018–19 Q5(b), 2017–18 Q7(d)(i))</h3>
+<p>The statement "quadratic probing does not necessarily probe all locations" is <b>true</b>. Agree and prove it.</p>
+<div class="method"><h4>Proof · for \(h(k,i) = (h(k)+i^2) \bmod m\)</h4><ol>
+<li>Take i and m−i. \((m-i)^2 = m^2 - 2mi + i^2 \equiv i^2 \pmod m\).</li>
+<li>So probes i and m−i land on the same slot. Among i = 0..m−1 at most \(\lfloor m/2\rfloor + 1\) slots are distinct.</li>
+<li>For m > 2 that is fewer than m, so some slots are never probed.</li>
+<li>Example from the notes: m = 7, h(k) = 0 gives the squares 0, 1, 4, 2, 2, 4, 1, 0, ... so slots 3, 5, 6 are never reached.</li>
+</ol></div>
+<p>The notes also state, without proof, that if m is prime and at least half the table is empty, quadratic probing always finds a free slot. Short reason: for \(0 \le i < j < m/2\), \(i^2 \equiv j^2\) means \((j-i)(j+i) \equiv 0 \pmod m\). For prime m that needs m to divide j−i or j+i, and both are between 1 and m−1. So the first \(\lceil m/2\rceil\) probes are all different slots.</p>
+
+<h2>4. Deletion: why search fails (2022–23 Q6(a)(ii), 2021–22 Q6(a)(iii))</h2>
+<p>If you delete a key in open addressing by just emptying its slot, you cut the probe path of every key that was pushed past that slot. Search stops at the first empty slot, so it reports "not found" for a key that is still in the table.</p>
+<div class="method"><h4>Method · answer for "why not found and how to fix"</h4><ol>
+<li><b>Reason:</b> deleting set the slot to EMPTY. The searched key was inserted later and collided with the deleted key, so its probe sequence passes through that slot. Search sees EMPTY there and stops early.</li>
+<li><b>Fix:</b> do not empty the slot. Mark it <code>isDeleted = true</code> (a tombstone). Search treats a tombstone as occupied and keeps probing. Insert may reuse the tombstone.</li>
+<li><b>Cost:</b> tombstones lengthen searches, so rebuild (rehash) the table when there are many. Chaining does not have this problem: unlink the node.</li>
+</ol></div>
+<p>The paper instances are worked in the traces below. In both, the deleted key sat on the probe path of the searched key.</p>
+
+<h2>5. The 2024–25 question, all four strategies</h2>
+<p>Table size 11, keys 10, 22, 31, 4, 15, 28, 17, 88, 59 in this order, \(h(k) = k \bmod 11\). Chaining; linear probing \((h(k)+2i) \bmod 11\); quadratic probing \((h(k)+3i^2) \bmod 11\); double hashing with \(h_1(k) = k \bmod 11\), \(h_2(k) = 7 - (k \bmod 7)\). Build each table and count unsuccessful probes. Step through each one.</p>
+<div class="method"><h4>Method · one key at a time</h4><ol>
+<li>Write the key's probe formula with its numbers. For double hashing compute \(h_2(k)\) once.</li>
+<li>List slots for i = 0, 1, 2, ... until you hit a free one. Write the list next to the key.</li>
+<li>Place the key. Unsuccessful probes for this key = the position i of the free slot.</li>
+<li>Redraw or update the 11-cell row. Add up the counts at the end.</li>
+</ol></div>
+<h3>Chaining</h3>
+<div id="t1"></div>
+<p>Keys are appended at the tail of each chain here; if you push at the head, the chain order flips but the counts of collisions do not change. Four keys (15, 17, 88, 59) found a non-empty chain. Walking past the keys already there costs 1 + 1 + 1 + 2 = 5 comparisons. Chaining has no "unsuccessful probes" in the open-addressing sense, so say which count you give.</p>
+<h3>Linear probing, step 2</h3>
+<div id="t2"></div>
+<p>Unsuccessful probes: 15 → 1, 28 → 1, 17 → 3, 88 → 1, 59 → 5. <b>Total 11.</b> Note step 2 is coprime to 11, so every slot is reachable.</p>
+<h3>Quadratic probing, \(3i^2\)</h3>
+<div id="t3"></div>
+<div class="trap"><h4>Where marks go: key 17 cannot be placed</h4><ul>
+<li>For 17, \(h = 6\). The offsets \(3i^2 \bmod 11\) for i = 0..5 are 0, 3, 1, 5, 4, 9, so the probes are slots 6, 9, 7, 0, 10, 4. They then repeat in the opposite order.</li>
+<li>All six are full: 28, 31, 15, 22, 10, 4. Free slots 1, 2, 3, 5, 8 are never visited. The table is not full, yet 17 fails. This is the "misses slots" result from section 3.</li>
+<li>Total for the keys that are placed: 15 → 1, 88 → 1, 59 → 2, so <b>4</b>. State separately that 17 uses 6 unsuccessful probes and is <b>not inserted</b>. The question says tables must be "uniquely determined", so report the failure; do not invent a slot for 17.</li>
+</ul></div>
+<h3>Double hashing</h3>
+<div id="t4"></div>
+<p>\(h_2\): 15 → 6, 17 → 4, 88 → 3, 59 → 4. Unsuccessful probes: 15 → 2, 17 → 2, 88 → 4, 59 → 1. <b>Total 9.</b></p>
+<div class="tbl"><table>
+<tr><th>Slot</th><th>0</th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th><th>7</th><th>8</th><th>9</th><th>10</th><th>Unsuccessful</th></tr>
+<tr><td>Chaining</td><td>22,88</td><td></td><td></td><td></td><td>4,15,59</td><td></td><td>28,17</td><td></td><td></td><td>31</td><td>10</td><td>0 probes, 4 collisions</td></tr>
+<tr><td>Linear</td><td>22</td><td>17</td><td>88</td><td>59</td><td>4</td><td></td><td>15</td><td></td><td>28</td><td>31</td><td>10</td><td>11</td></tr>
+<tr><td>Quadratic</td><td>22</td><td></td><td></td><td>88</td><td>4</td><td>59</td><td>28</td><td>15</td><td></td><td>31</td><td>10</td><td>4 (17 fails)</td></tr>
+<tr><td>Double</td><td>22</td><td>88</td><td></td><td>17</td><td>4</td><td>15</td><td>28</td><td></td><td>59</td><td>31</td><td>10</td><td>9</td></tr>
+</table></div>
+<div class="drawit"><b>On paper:</b> draw four 11-cell rows, cells numbered 0 to 10 above the boxes. Beside each key write its probe list, for example "59: 4, 6, 8, 10, 1, 3". Circle the final slot. Put the unsuccessful-probe total under each table. For quadratic probing write "17: 6, 9, 7, 0, 10, 4, then repeats, all full: not inserted".</div>
+
+<h2>6. The 2022–23 and 2021–22 instances</h2>
+<p>Both give the same nine keys 100, 130, 110, 150, 160, 200, 700, 800, 300, with printed hash values (h1) 0, 3, 2, 0, 3, 1, 2, 5, 8 for you and 1, 4, 7, 10, 13, 4, 7, 10, 13 (h2) for your friend. I read the probe function f(i) literally: slot \(= (h(k) + f(i)) \bmod m\), starting at i = 0, so \(f(0) = 3\) shifts even the first probe. If your marker starts at h(k) itself, the totals change but the reason for the failed search does not.</p>
+<h3>2022–23 Q6(a): m = 16, \(f(i) = 2i^2+3\); friend m = 17, double hashing with \(19-(x \bmod 17)\)</h3>
+<p>Yours (6 unsuccessful probes: 150 → 2, 160 → 1, 700 → 1, 800 → 1, 300 → 1):</p>
+<div id="t5"></div>
+<p>Friend's (6 unsuccessful probes: 200 → 2, 700 → 1, 800 → 1, 300 → 2):</p>
+<div id="t6"></div>
+<p><b>Both total 6.</b> The totals tie, so argue from the structure: 17 is prime, which makes every nonzero step visit all slots, while 16 is a power of two. Part (ii): you inserted 100 at slot 3 and 150 went 3, 5, 11. Deleting 100 empties slot 3, so searching 150 starts at slot 3, sees EMPTY and reports "not found". Fix: tombstone.</p>
+<h3>2021–22 Q6(a): m = 15, \(f(i) = 3i^2+5\); friend m = 17, double hashing with \(11-(x \bmod 17)\)</h3>
+<p>Yours (6 unsuccessful probes). Delete 110 (slot 7), search 700: its path is 7, 10, and slot 7 is now empty, so "not found".</p>
+<div id="t7"></div>
+<p>Friend's: this scheme is <b>broken</b>. \(h_2(300) = 11 - (300 \bmod 17) = 11 - 11 = 0\), so the step is 0 and key 300 probes slot 13 forever. Other keys give negative steps (100 → −4). Insertion of 300 fails. Part (ii): a prime size like 17 is the right idea, but only if \(h_2\) is always between 1 and m−1.</p>
+<div id="t8"></div>
+<div class="drawit"><b>On paper:</b> draw the 16 (or 15, or 17) cell row with indices. For each key write h, then the probe list. Mark the deleted slot with a cross and draw an arrow from the searched key's probe list to it, labelled "search stops here".</div>
+
+<h2>7. Load factor and table size</h2>
+<ul>
+<li>Chaining: expected search \(1+\alpha\). Keep \(\alpha\) constant (grow the table when it gets large) and you get O(1).</li>
+<li>Open addressing: \(\alpha < 1\) always. The expected number of probes for an unsuccessful search is at most \(1/(1-\alpha)\) under uniform hashing (CLRS Theorem 11.6; Bayzid sir's notes do not derive it). At \(\alpha = 0.9\) that is 10 probes, so resize at about 0.5 to 0.7.</li>
+<li>Table size: prime m helps quadratic probing (the half-empty guarantee) and double hashing (any \(h_2\) in 1..m−1 is coprime to m).</li>
+</ul>
+
+<h2>8. Mandatory practice</h2>
+<p>Do these with pen and paper. The hash questions are marked by slot contents, so write all 11 cells.</p>
+<div id="r1"></div>
+<div id="r2"></div>
+<div id="r3"></div>
+<div id="p1"></div>
+<div id="p2"></div>
+<p class="drawit"><b>If you got one wrong:</b> open the steps and find the first key whose probe list differs from yours. Check the formula, then the arithmetic mod m.</p>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/algo.js"></script>
+<script src="../assets/dsa.js"></script>
+<script>
+const M = (x, m) => ((x % m) + m) % m;
+const K = '10 22 31 4 15 28 17 88 59 ; 11';
+trace('#t1', { kind: 'hash', input: K, opts: { mode: 'chain' } });
+trace('#t2', { kind: 'hash', input: K, opts: { mode: 'linear', f: (k, i) => M(k % 11 + 2 * i, 11) } });
+trace('#t3', { kind: 'hash', input: K, opts: { mode: 'quad', f: (k, i) => M(k % 11 + 3 * i * i, 11) } });
+trace('#t4', { kind: 'hash', input: K, opts: { mode: 'double' } });
+const KS = '100 130 110 150 160 200 700 800 300', H1 = [0, 3, 2, 0, 3, 1, 2, 5, 8], H2 = [1, 4, 7, 10, 13, 4, 7, 10, 13], KA = KS.split(' ').map(Number);
+const h1 = k => H1[KA.indexOf(k)], h2 = k => H2[KA.indexOf(k)];
+trace('#t5', { kind: 'hash', input: KS + ' ; 16', opts: { mode: 'quad', f: (k, i) => M(h1(k) + 2 * i * i + 3, 16) } });
+trace('#t6', { kind: 'hash', input: KS + ' ; 17', opts: { mode: 'double', f: (k, i) => M(h2(k) + i * (19 - k % 17), 17) } });
+trace('#t7', { kind: 'hash', input: KS + ' ; 15', opts: { mode: 'quad', f: (k, i) => M(h1(k) + 3 * i * i + 5, 15) } });
+trace('#t8', { kind: 'hash', input: KS + ' ; 17', opts: { mode: 'double', f: (k, i) => M(h2(k) + i * (11 - k % 17), 17) } });
+recall('#r1', { id: 'r1', marks: 15, q: 'Assume simple uniform hashing. Prove that a successful search in a chained hash table takes expected \\(O(1+\\alpha)\\) time, where \\(\\alpha\\) is the load factor. (2019–20 Q1(a), 2023–24 Q1(i))', points: ['State the assumption: simple uniform hashing, \\(\\alpha = n/m\\)', 'Successful search for y costs the same as the unsuccessful search just before y was inserted', 'The i-th inserted key sees expected chain length \\(i/m\\), cost \\(1 + i/m\\)', 'Average over the n keys: \\(\\frac1n\\sum_{i=0}^{n-1}(1+i/m)\\)', 'Evaluate to \\(1 + (n-1)/(2m) \\approx 1 + \\alpha/2\\)', 'Conclude \\(O(1+\\alpha)\\); unsuccessful search is \\(1+\\alpha\\)'], model: `<ol><li>Simple uniform hashing: each key goes to each of the m slots with probability \\(1/m\\), independently. \\(\\alpha = n/m\\).</li><li>Searching for a key y that is present costs the same as the unsuccessful search for y made just before y was inserted, because the chain then held exactly the keys inserted earlier.</li><li>When the i-th key is inserted (\\(i = 0,\\dots,n-1\\)), i keys are in the table, so the chain at its slot has expected length \\(i/m\\). The cost is \\(1 + i/m\\) (one hash plus the chain walk).</li><li>Averaging over the n keys: \\[\\frac1n\\sum_{i=0}^{n-1}\\Bigl(1+\\frac im\\Bigr) = 1 + \\frac{n-1}{2m}.\\]</li><li>This is \\(1 + \\alpha/2 - \\alpha/(2n) = O(1+\\alpha)\\). An unsuccessful search walks a whole chain of expected length \\(\\alpha\\), so it costs \\(1+\\alpha\\).</li></ol>` });
+recall('#r2', { id: 'r2', marks: 10, q: 'You deleted a key from an open-addressing hash table and a later search for another key says "not found", although that key is in the table. Explain the core reason and give a fix. (2022–23 Q6(a)(ii), 2021–22 Q6(a)(iii))', points: ['Deleting emptied the slot', 'The searched key collided earlier, so its probe path passes through that slot', 'Search stops at the first empty slot and reports not found', 'Fix: mark the slot isDeleted (tombstone) instead of emptying it', 'Search skips tombstones and continues; insert may reuse them', 'Cost: tombstones lengthen probes, so rehash occasionally'], model: `<p>Deletion set the slot to EMPTY. The key we search for was inserted after the deleted key and found its slot occupied, so it was pushed along its probe sequence and sits beyond that slot. Search follows the same sequence, reaches the now-empty slot, and stops because an empty slot means "the key is not in the table".</p><p>Fix: keep an <code>isDeleted</code> flag. Delete marks the slot as deleted rather than empty. Search treats a deleted slot as occupied and continues. Insert may place a new key in a deleted slot. If many tombstones pile up, rebuild the table.</p>` });
+recall('#r3', { id: 'r3', marks: 8, q: 'Quadratic probing \\(h(k,i) = (h(k)+i^2) \\bmod m\\) does not necessarily probe all locations. Prove it. (2018–19 Q5(b), 2017–18 Q7(d)(i))', points: ['Agree with the statement', '\\((m-i)^2 \\equiv i^2 \\pmod m\\)', 'Probes i and m−i hit the same slot, so at most \\(\\lfloor m/2\\rfloor+1\\) distinct slots', 'Fewer than m slots for m > 2', 'Concrete example, e.g. m = 7: slots 0, 1, 4, 2 only'], model: `<ol><li>Agree: some slots are never probed.</li><li>For any i, \\((m-i)^2 = m^2 - 2mi + i^2 \\equiv i^2 \\pmod m\\). So probes i and m−i give the same slot.</li><li>Among \\(i = 0,\\dots,m-1\\) at most \\(\\lfloor m/2\\rfloor + 1\\) different slots occur. For \\(m > 2\\) this is less than m.</li><li>Example: m = 7, h(k) = 0: squares mod 7 are 0, 1, 4, 2, 2, 4, 1, so only slots 0, 1, 2, 4 are probed. Slots 3, 5, 6 are never reached.</li></ol>` });
+practice('#p1', { id: 'p1', kind: 'hash-linear', n: 2 });
+practice('#p2', { id: 'p2', kind: 'hash-double', n: 2 });
+</script>
+</body>
+</html>

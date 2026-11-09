@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Approximation Algorithms · CSE 207 Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Approximation algorithms · CLRS ch. 35 · Bayzid sir L17 (definition only) · must-know</div>
+<h1>Approximation Algorithms</h1>
+<p class="lede">Vertex cover 2-approximation: 2024–25 Q2(a) (15), 2022–23 Q6(b) (15), 2018–19 Q8(a) (10). Set cover approximation: 2017–18 Q4(c) (3+7). TSP: 2017–18 Q3(d) discuss general TSP and give an approximation for Euclidean TSP (2+3+5), 2019–20 Q8(a) build a near optimal tour from an MST (12), 2020–21 Q4(c) bottleneck TSP 3-approximation (13). Knapsack FPTAS: 2021–22 Q8 (5 + 15 + 15). Sorting by reversals: 2023–24 Q5. "Approaches to deal with NP-complete problems": 2023–24 Q4(b) and 2017–18 Q3(a).</p>
+<div class="trap"><h4>Syllabus honesty</h4><ul>
+<li>Bayzid sir's notes (p.55) define approximation algorithms and the ratio, then write "See 2-approximation algorithm of Vertex Cover (not in syllabus)". It was asked in 2018–19, 2022–23 and 2024–25 for 10 to 15 marks each time. <b>Learn it</b>.</li>
+<li>Set cover greedy, TSP, FPTAS, and sorting by reversals are not in his notes. They come from past papers and the question bank. The bottleneck TSP 3-approximation (2020–21) is not covered here: no source gives its method.</li>
+</ul></div>
+
+<h2>1. What an approximation algorithm promises</h2>
+<p>A <b>heuristic</b> returns a good-enough answer with no promise. An <b>approximation algorithm</b> is a polynomial-time heuristic with a <b>proven bound on how far from optimal</b> it can be. Example promise: "the output is at most 1.5 times the optimum."</p>
+<div class="tbl"><table>
+<tr><th>Problem type</th><th>Guarantee</th><th>Ratio</th></tr>
+<tr><td>Minimisation</td><td>ALG ≤ ρ · OPT</td><td>ρ = ALG / OPT ≥ 1</td></tr>
+<tr><td>Maximisation</td><td>ALG ≥ OPT / ρ (equivalently ρ = OPT / ALG ≥ 1)</td><td>Bayzid sir writes the max version as ALG ≥ α · OPT with α ≤ 1</td></tr>
+</table></div>
+<p>The closer the ratio is to 1, the better. Ratio 1 means optimal. <b>State which convention you use</b> and keep to it. A 2-approximation for a minimisation problem never returns more than twice the optimum.</p>
+<div class="key"><p><b>The pattern behind every proof here.</b> You cannot compare to OPT directly because OPT is NP-hard to compute. So (1) find something easy to compute that is a <b>lower bound on OPT</b> (for minimisation), (2) show your algorithm's cost is at most a constant times that lower bound. Chain: ALG ≤ c · lower bound ≤ c · OPT.</p></div>
+
+<h2>2. Vertex cover: 2-approximation by maximal matching (2024–25 Q2(a), 2022–23 Q6(b), 2018–19 Q8(a))</h2>
+<p>Pick any uncovered edge, take <b>both</b> endpoints, and remove every edge those endpoints touch. Repeat.</p>
+<pre class="code">APPROX-VERTEX-COVER(G = (V, E))
+  C = {}
+  E' = E
+  while E' is not empty
+     pick any edge (u, v) in E'
+     C = C ∪ {u, v}                      // both endpoints
+     remove from E' every edge incident to u or to v
+  return C</pre>
+<p>Runs in \(O(V + E)\) with adjacency lists.</p>
+<div class="method"><h4>Proof · cover, matching, ratio 2</h4><ol>
+<li><b>C is a vertex cover.</b> The loop ends only when E′ is empty. Every edge left E′ either because it was picked (both its endpoints entered C) or because it touched a vertex that entered C. So every edge has an endpoint in C.</li>
+<li><b>The picked edges form a matching M</b> (no two share an endpoint). After picking (u, v) every edge touching u or v is deleted, so no later edge can touch them.</li>
+<li><b>|C| = 2|M|</b>, since each picked edge adds two new vertices (their endpoints are not in C yet, otherwise the edge would have been deleted).</li>
+<li><b>OPT ≥ |M|.</b> Any vertex cover must contain at least one endpoint of every edge of M. The edges of M share no endpoints, so these endpoints are all <b>different</b> vertices. So any cover, in particular an optimal cover \(C^*\), has at least |M| vertices.</li>
+<li>Therefore \(|C| = 2|M| \le 2\,|C^*|\). The algorithm is a 2-approximation. ∎</li>
+</ol></div>
+<p>The lower bound \(|M| \le OPT\) is the whole trick, and it is the sentence graders look for.</p>
+<h3>Checked example</h3>
+<p>Path-like graph with edges a–b, b–c, c–d, d–e, e–f, b–e (processed in this order). The algorithm picks a–b, then c–d, then e–f, so C = {a, b, c, d, e, f}, size 6. A brute-force search gives the optimal cover {a, c, e}, size 3. The ratio is exactly 2, so the bound is tight on this graph. (Another tight family: the complete bipartite graph \(K_{n,n}\), where the matching has n edges, ALG = 2n, OPT = n.)</p>
+<div class="drawit"><b>On paper:</b> the small graph, the picked edges (matching) in a heavy line, the vertices of C circled, and the optimal cover marked with a different symbol. Next to it write "|C| = 2|M| and OPT ≥ |M|".</div>
+<div class="trap"><h4>Where marks go</h4><ul>
+<li>Picking only <b>one</b> endpoint is not the algorithm and does not give ratio 2. Take both.</li>
+<li>The proof needs <b>OPT ≥ |M|</b> because M is a matching. Without the "disjoint edges" argument you lose most of the marks.</li>
+<li>Forgetting to prove that C is a vertex cover at all.</li>
+</ul></div>
+
+<h2>3. Set cover: greedy, ratio \(H_n \le \ln n + 1\) (2017–18 Q4(c))</h2>
+<p>Universe U of n elements, subsets \(S_1..S_m\). Choose the fewest subsets covering U. <b>Greedy:</b> repeatedly pick the subset that covers the most still-uncovered elements, until all are covered.</p>
+<pre class="code">GREEDY-SET-COVER(U, S)
+  C = {};  R = U                          // R = uncovered elements
+  while R is not empty
+     pick S_i in S maximising |S_i ∩ R|
+     C = C ∪ {S_i};  R = R − S_i
+  return C</pre>
+<div class="method"><h4>Proof · charging argument</h4><ol>
+<li>When greedy picks a set that covers r new elements, give each of those elements a <b>price 1/r</b>. Then the number of sets chosen equals the sum of the prices of all n elements.</li>
+<li>Number the elements \(e_1, e_2, \dots, e_n\) in the order greedy covers them.</li>
+<li>Just before \(e_k\) is covered, at least \(n - k + 1\) elements are uncovered (\(e_k, \dots, e_n\)).</li>
+<li>An optimal cover with OPT sets covers all of them, so some set in it covers at least \((n-k+1)/\text{OPT}\) of them (pigeonhole).</li>
+<li>Greedy chose the set with the most new elements, so it covers at least that many: \(r \ge (n-k+1)/\text{OPT}\). Hence \(\text{price}(e_k) \le \dfrac{\text{OPT}}{n-k+1}\).</li>
+<li>Sum: \(|C| = \sum_{k=1}^n \text{price}(e_k) \le \text{OPT} \sum_{k=1}^{n} \dfrac{1}{n-k+1} = \text{OPT}\cdot H_n \le \text{OPT}(\ln n + 1)\). ∎</li>
+</ol></div>
+<p>So greedy is an \(H_n\)-approximation. The ratio grows with n, unlike vertex cover's constant 2.</p>
+
+<h2>4. TSP</h2>
+<h3>4.1 General TSP cannot be approximated (2017–18 Q3(d), the "discuss" part)</h3>
+<p><b>Claim.</b> If P ≠ NP, then for no constant ρ ≥ 1 (and no polynomial-time computable ρ(n)) is there a polynomial-time ρ-approximation for general TSP.</p>
+<div class="method"><h4>Proof · from Hamiltonian cycle</h4><ol>
+<li>Suppose such an algorithm A exists. We use it to decide Hamiltonian cycle (an NP-complete problem).</li>
+<li>Given G = (V, E), build a complete graph G′ on V. Edge cost 1 if the edge is in E, and cost \(\rho |V| + 1\) otherwise.</li>
+<li>If G has a Hamiltonian cycle, G′ has a tour of cost |V|, so the optimum is |V| and A returns a tour of cost ≤ ρ|V|.</li>
+<li>If G has no Hamiltonian cycle, every tour in G′ uses at least one non-edge, so it costs at least \((|V|-1) + \rho|V| + 1 > \rho|V|\).</li>
+<li>So A's tour has cost ≤ ρ|V| exactly when G is Hamiltonian. That decides Hamiltonian cycle in polynomial time, so P = NP. Contradiction. ∎</li>
+</ol></div>
+<h3>4.2 Metric (Euclidean) TSP: 2-approximation by MST (2019–20 Q8(a); 2017–18 Q3(d))</h3>
+<p>Condition: costs satisfy the <b>triangle inequality</b> (\(c(a,c) \le c(a,b) + c(b,c)\)); Euclidean distances do.</p>
+<div class="method"><h4>Method · MST double walk</h4><ol>
+<li>Build a minimum spanning tree T of the cities (Prim or Kruskal).</li>
+<li>Walk around T (a depth-first traversal that returns along each edge). That walk uses every tree edge twice.</li>
+<li>List the cities in <b>preorder</b> (the order of first visit) and return to the start. Skipping a city already visited is a <b>shortcut</b>. The result is the tour H.</li>
+</ol></div>
+<figure>
+<svg viewBox="0 0 440 250" role="img" aria-label="MST preorder tour with shortcuts" width="440">
+<g class="s-fg"><line x1="220" y1="40" x2="120" y2="120"/><line x1="220" y1="40" x2="320" y2="120"/><line x1="120" y1="120" x2="60" y2="200"/><line x1="120" y1="120" x2="180" y2="200"/></g>
+<g class="s-acc dash"><line x1="60" y1="200" x2="180" y2="200" style="stroke-width:2"/><line x1="180" y1="200" x2="320" y2="120" style="stroke-width:2"/></g>
+<g>
+<circle cx="220" cy="40" r="15" class="cell-hl"/><text x="220" y="44" text-anchor="middle">r</text><text x="244" y="34" class="lbl">1</text>
+<circle cx="120" cy="120" r="15" class="cell-plain"/><text x="120" y="124" text-anchor="middle">p</text><text x="96" y="114" class="lbl">2</text>
+<circle cx="320" cy="120" r="15" class="cell-plain"/><text x="320" y="124" text-anchor="middle">q</text><text x="344" y="114" class="lbl">5</text>
+<circle cx="60" cy="200" r="15" class="cell-plain"/><text x="60" y="204" text-anchor="middle">s</text><text x="36" y="194" class="lbl">3</text>
+<circle cx="180" cy="200" r="15" class="cell-plain"/><text x="180" y="204" text-anchor="middle">t</text><text x="204" y="194" class="lbl">4</text>
+</g>
+<text x="220" y="238" text-anchor="middle" class="lbl">solid = MST edges · dashed blue = shortcuts s→t and t→q · preorder r p s t q, then back to r</text>
+</svg>
+<figcaption>Full walk: r p s p t p r q r. Shortcut the repeated visits and get the tour r → p → s → t → q → r. The tour uses the tree edges r–p, p–s, q–r and the shortcuts s–t and t–q. By the triangle inequality each shortcut is no longer than the walk it skips.</figcaption>
+</figure>
+<div class="method"><h4>Proof · cost at most 2 · OPT</h4><ol>
+<li><b>c(T) ≤ OPT.</b> Delete any one edge from an optimal tour. What remains is a spanning path, which is a spanning tree. The MST is no more expensive, so \(c(T) \le \text{OPT}\).</li>
+<li>The full walk uses each tree edge twice, so its cost is \(2c(T)\).</li>
+<li><b>Shortcuts do not increase cost.</b> Replacing a detour a → b → c by the direct edge a → c costs no more, by the triangle inequality. So \(c(H) \le 2c(T)\).</li>
+<li>Therefore \(c(H) \le 2c(T) \le 2\,\text{OPT}\). ∎</li>
+</ol></div>
+<div class="drawit"><b>On paper:</b> the MST in heavy lines, preorder numbers beside the cities, the final tour in a different style, and a line stating "c(T) ≤ OPT, walk = 2c(T), shortcuts ≤ walk". The figure for 2019–20 Q8(a) is not readable in the scan, so use these steps on whatever graph is given.</div>
+<p>Note: the triangle inequality is essential. Without it, section 4.1 shows no constant ratio is possible.</p>
+
+<h2>5. 0/1 knapsack FPTAS (2021–22 Q8: parts a, b, c)</h2>
+<p>The exact DP \(OPT(i, w)\) (best value from items 1..i with weight limit w) takes \(O(nW)\) time. That is polynomial in the <b>number</b> W, not in the number of bits of W, so it is not polynomial time. The approximation scheme rounds the <b>values</b> and does the DP over values.</p>
+<div class="method"><h4>Method · the scheme in the question</h4><ol>
+<li>Let \(V_{\max}\) be the largest value. Set the scaling unit \(\theta = \dfrac{\epsilon V_{\max}}{2n}\).</li>
+<li>Scaled values \(\hat v_i = \lceil v_i / \theta \rceil\) (integers). Use \(\bar v_i = \hat v_i\,\theta\) for the rounded value.</li>
+<li>\(OPT(i, v)\) = the <b>minimum weight</b> of a subset of items 1..i whose scaled value is at least v. \(OPT(0, 0) = 0\), \(OPT(0, v > 0) = \infty\), and \(OPT(i, v) = \min\{OPT(i-1, v),\ w_i + OPT(i-1, \max(0, v - \hat v_i))\}\).</li>
+<li>Answer: the largest v with \(OPT(n, v) \le W\). The items behind it are the output set S.</li>
+</ol></div>
+<h3>(a) Why OPT(i, v) and not OPT(i, w)?</h3>
+<p>The table over weights has W columns. W can be exponentially large in its bit length, so the DP is only pseudo-polynomial. And you cannot round the weights: rounding could make a set look feasible when it is not (or the reverse), breaking the capacity constraint. Values can be rounded safely, since rounding only changes the <b>objective</b> by a bounded amount, and after rounding the total value is at most about \(n \cdot 2n/\epsilon\), a polynomial. So a table indexed by value has polynomial size.</p>
+<h3>(b) The luggage instance, ε = 0.1</h3>
+<p>Capacity 600. Values 1200, 1100, 950, 1350, 800, 1500; weights 150, 100, 250, 350, 200, 300. n = 6, \(V_{\max} = 1500\). Unit \(\theta = 0.1 \times 1500 / 12 = 12.5\). Scaled values (value / 12.5): <b>96, 88, 76, 108, 64, 120</b>. All six are exact integers, so rounding changes nothing here. (A computer run of the DP, checked against trying all 64 subsets:) the largest scaled value reachable within weight 600 is <b>304</b>, with minimum weight 550, using items <b>1, 2 and 6</b>. True value 1200 + 1100 + 1500 = <b>3800</b>, weight 150 + 100 + 300 = 550. The true optimum is also 3800, so the ratio is 1 on this instance. The DP table has \(6 \times 553\) entries (maximum total scaled value is 552).</p>
+<h3>(c) Proof: value within a (1 + ε) factor, time \(O(n^3/\epsilon)\)</h3>
+<div class="method"><h4>Proof</h4><ol>
+<li>Let \(S^*\) be an optimal set (true values) and S the set returned. Assume every single item fits in the bag, so \(V_{\max} \le \text{OPT}\).</li>
+<li>Rounding up gives \(v_i \le \bar v_i \le v_i + \theta\) for every item.</li>
+<li>S is optimal for the rounded values, so \(\sum_{S} \bar v_i \ge \sum_{S^*} \bar v_i\).</li>
+<li>Chain: \(\sum_{S} v_i \ \ge\ \sum_{S} \bar v_i - n\theta \ \ge\ \sum_{S^*} \bar v_i - n\theta \ \ge\ \sum_{S^*} v_i - n\theta = \text{OPT} - n\theta\).</li>
+<li>\(n\theta = \epsilon V_{\max}/2 \le \epsilon\,\text{OPT}/2\). So \(\sum_S v_i \ge (1 - \epsilon/2)\,\text{OPT}\).</li>
+<li>For \(0 < \epsilon \le 1\): \((1+\epsilon)(1 - \epsilon/2) = 1 + \tfrac{\epsilon}{2}(1 - \epsilon) \ge 1\). So \((1+\epsilon) \sum_S v_i \ge \text{OPT}\): the value is within a \(1+\epsilon\) factor of optimal.</li>
+<li><b>Time.</b> Each \(\hat v_i \le \lceil V_{\max}/\theta \rceil = \lceil 2n/\epsilon \rceil\). The largest total scaled value is \(O(n \cdot n/\epsilon)\). The table has n rows and \(O(n^2/\epsilon)\) columns, and each entry costs O(1). Total \(O(n^3/\epsilon)\). ∎</li>
+</ol></div>
+<div class="trap"><h4>Where marks go</h4><ul>
+<li>Scaling by the wrong amount. It is \(\epsilon V_{\max}/(2n)\), as the question says.</li>
+<li>In (c) say "S is optimal for the rounded problem" and that rounding loses at most θ per item, n items, so at most nθ.</li>
+<li>The condition \(V_{\max} \le \text{OPT}\) (every item fits alone) is what turns nθ into \(\epsilon\,\text{OPT}/2\).</li>
+</ul></div>
+
+<h2>6. Sorting by reversals (2023–24 Q5) · low priority</h2>
+<p>A <b>reversal</b> (i, j) reverses the segment between positions i and j. The goal is the fewest reversals that turn a permutation into 1 2 ... n. Add \(\pi_0 = 0\) and \(\pi_{n+1} = n+1\) at the ends. A <b>breakpoint</b> lies between neighbours that are not consecutive numbers (they differ by anything other than 1, in either order). The question's example: [4 1 2 3] becomes [0 4 1 2 3 5], with 3 breakpoints (0|4, 4|1, 3|5).</p>
+<div class="method"><h4>(i) Lower bound</h4><ol>
+<li>A reversal cuts the sequence at only <b>two</b> places, so it can change at most 2 adjacencies and remove at most 2 breakpoints.</li>
+<li>The identity has 0 breakpoints. So a permutation with b breakpoints needs at least \(\lceil b/2 \rceil\) reversals: \(\text{OPT} \ge b/2\).</li>
+<li>On [4 1 2 3]: b = 3, so OPT ≥ 2, and the question shows 2 reversals suffice.</li>
+</ol></div>
+<div class="method"><h4>(ii) Approximation with ratio at most 4</h4><ol>
+<li>A <b>strip</b> is a maximal run with no breakpoint inside. Strips are increasing or decreasing.</li>
+<li>Known lemma (Kececioglu and Sankoff): if some decreasing strip exists, there is a reversal that removes at least one breakpoint. Idea: take the smallest element k in a decreasing strip. The element k − 1 lies in an increasing strip. Reverse the segment that places k − 1 next to k. This creates a new adjacency and cuts only at breakpoints.</li>
+<li>If there is no decreasing strip, reverse any increasing strip (not a single element, and not one made of 0 or n + 1). That makes a decreasing strip and does not add breakpoints.</li>
+<li>So every breakpoint removed costs at most 2 reversals: total ≤ 2b.</li>
+<li>With OPT ≥ b/2: \(2b \le 4\,\text{OPT}\). Ratio at most 4. ∎</li>
+</ol></div>
+<p>Flag: the lemma in step 2 is only sketched here. One student solution for 2023–24 Q5 gives the example "5 1 2 3 4 8 6 7" with b = 3. With 0 and 9 added there are <b>5</b> breakpoints (0|5, 5|1, 4|8, 8|6, 7|9), so the lower bound is 3. Count breakpoints on the extended permutation, always.</p>
+
+<h2>7. Coping with NP-complete problems: the list (2023–24 Q4(b); 2017–18 Q3(a))</h2>
+<p>For "what are some approaches" give each approach, one line of what it does, and an example from the course.</p>
+<div class="tbl"><table>
+<tr><th>Approach</th><th>What you give up</th><th>Course example</th></tr>
+<tr><td><b>Special cases</b>: restrict the input so a polynomial algorithm exists</td><td>generality</td><td>vertex cover on a tree in linear time (2019–20 Q7(a))</td></tr>
+<tr><td><b>Backtracking</b>: grow partial solutions, prune a branch at the first failure</td><td>worst case still exponential</td><td>SAT trees, Hamiltonian circuit</td></tr>
+<tr><td><b>Branch and bound</b>: backtracking with bounds, for optimization</td><td>worst case still exponential</td><td>0/1 knapsack, TSP</td></tr>
+<tr><td><b>Approximation algorithms</b>: polynomial time, provable ratio</td><td>exact optimality</td><td>vertex cover 2-approx, metric TSP 2-approx, knapsack FPTAS</td></tr>
+<tr><td><b>Randomized algorithms</b>: Monte Carlo with repetition</td><td>certainty of correctness</td><td>Karger min-cut</td></tr>
+<tr><td><b>Heuristics</b>: greedy or local search with no guarantee</td><td>any guarantee</td><td>greedy or local search, for example a nearest-neighbour tour</td></tr>
+<tr><td><b>Better exponential algorithms</b> and DP over subsets</td><td>still exponential</td><td>Held-Karp \(O(n^2 2^n)\) instead of \(n!\)</td></tr>
+<tr><td><b>Fixed-parameter tractability</b> (2020–21 Q4(b), 7 marks): running time \(f(k) \cdot n^c\), exponential only in a small parameter k</td><td>only helps when k is small</td><td>vertex cover with a small cover size k (branch on an edge: one of its endpoints must be in the cover, depth k)</td></tr>
+</table></div>
+
+<h2>8. Mandatory practice</h2>
+<p>All are proof or method answers. Write on paper first.</p>
+<div id="r1"></div>
+<div id="r2"></div>
+<div id="r3"></div>
+<div id="r4"></div>
+<div id="r5"></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/algo.js"></script>
+<script src="../assets/dsa.js"></script>
+<script>
+recall('#r1', { id: 'r1', marks: 15, q: 'Give a 2-approximation algorithm for vertex cover and prove that it returns a cover at most twice the size of an optimal cover. (2022–23 Q6(b); 2024–25 Q2(a); 2018–19 Q8(a))', points: ['Pick an uncovered edge, add both endpoints, delete all edges touching them, repeat', 'C is a vertex cover: every edge is picked or touched by a picked vertex', 'Picked edges form a matching M (disjoint endpoints)', '|C| = 2|M|', 'OPT ≥ |M|: a cover needs a distinct endpoint for each matching edge', '|C| = 2|M| ≤ 2 OPT, ratio 2', 'Polynomial time, O(V+E)'], model: '<p><b>Algorithm.</b> C = ∅. While edges remain: pick an edge (u, v), add u and v to C, delete every edge incident to u or v. Return C. It takes O(V + E).</p><p><b>C is a cover.</b> The loop stops when no edge is left; every edge was either picked (both endpoints in C) or deleted because it touched a vertex in C.</p><p><b>Ratio.</b> The picked edges form a matching M, since after picking (u, v) every edge at u or v is removed. Each pick adds two vertices, so |C| = 2|M|. Any vertex cover must contain at least one endpoint of each edge of M, and these endpoints are distinct because the edges of M are disjoint. So OPT ≥ |M|. Therefore |C| = 2|M| ≤ 2·OPT. ∎</p>' });
+recall('#r2', { id: 'r2', marks: 10, q: 'Give an approximation algorithm for set cover and compute its approximation ratio. (2017–18 Q4(c))', points: ['Greedy: pick the set covering the most uncovered elements, repeat', 'Charge price 1/r to each of the r newly covered elements; cost = sum of prices', 'Before covering the k-th element at least n−k+1 are uncovered', 'Optimal sets cover them, so one covers at least (n−k+1)/OPT of them', 'price(e_k) ≤ OPT/(n−k+1)', 'Sum is OPT times harmonic number H_n ≤ OPT (ln n + 1)'], model: '<p>Greedy picks, at each step, the subset that covers the most still-uncovered elements. When it picks a set covering r new elements, charge each of them 1/r; the number of sets chosen is the sum of all prices. Number the elements in the order they get covered. Before e<sub>k</sub> is covered at least n − k + 1 elements are uncovered; the optimal cover (OPT sets) covers them all, so one of its sets covers at least (n − k + 1)/OPT of them. Greedy takes a set with at least as many new elements, so price(e<sub>k</sub>) ≤ OPT/(n − k + 1). Summing, |C| ≤ OPT · Σ 1/(n − k + 1) = OPT · H<sub>n</sub> ≤ OPT (ln n + 1).</p>' });
+recall('#r3', { id: 'r3', marks: 12, q: 'Discuss the approximability of general TSP. Give an approximation algorithm for Euclidean (metric) TSP and compute its ratio. (2017–18 Q3(d); 2019–20 Q8(a))', points: ['General TSP: no constant ratio unless P = NP, via Hamiltonian cycle with costs 1 and ρ|V|+1', 'Metric TSP: build an MST', 'Preorder walk with shortcuts gives the tour', 'MST cost ≤ OPT because a tour minus an edge is a spanning tree', 'Full walk costs 2·MST', 'Shortcuts do not cost more by the triangle inequality, so ratio 2'], model: '<p><b>General TSP.</b> If a polynomial ρ-approximation existed we could decide Hamiltonian cycle: give edges of G cost 1 and non-edges cost ρ|V| + 1. A Hamiltonian G has a tour of cost |V|, so the algorithm returns cost ≤ ρ|V|; a non-Hamiltonian G forces a non-edge, so every tour costs more than ρ|V|. So P = NP; no constant ratio exists unless P = NP.</p><p><b>Metric TSP.</b> Build an MST T, take a preorder traversal of T and return to the start (shortcutting repeated vertices). MST ≤ OPT, since a tour minus one edge is a spanning tree. The full walk costs 2c(T). By the triangle inequality shortcuts never increase the cost. So the tour costs ≤ 2c(T) ≤ 2·OPT: ratio 2.</p>' });
+recall('#r4', { id: 'r4', marks: 25, q: 'Knapsack FPTAS (2021–22 Q8). (a) Why OPT(i, v) instead of OPT(i, w)? (c) Prove the returned value is within 1+ε of optimal and the time is O(n³/ε).', points: ['Weights table is pseudo-polynomial in W; rounding weights breaks feasibility', 'Round values: θ = ε Vmax / 2n, v̂ = ceil(v/θ)', 'OPT(i, v) = min weight to reach scaled value ≥ v, recurrence with two choices', 'v ≤ v̄ ≤ v + θ', 'Chain: value(S) ≥ scaled(S) − nθ ≥ scaled(S*) − nθ ≥ OPT − nθ', 'nθ = ε Vmax / 2 ≤ ε OPT / 2, so (1+ε) value(S) ≥ OPT', 'v̂ ≤ 2n/ε, table n × O(n²/ε), O(1) per entry, O(n³/ε)'], model: '<p>(a) The weight table has W columns, which is pseudo-polynomial (W can be huge), and weights cannot be rounded without risking infeasible sets. Values can be rounded safely and then the table has only O(n²/ε) columns.</p><p>(c) Let θ = εV<sub>max</sub>/2n, v̂<sub>i</sub> = ⌈v<sub>i</sub>/θ⌉, v̄<sub>i</sub> = v̂<sub>i</sub>θ. Then v<sub>i</sub> ≤ v̄<sub>i</sub> ≤ v<sub>i</sub> + θ. S (returned) is optimal for v̄, S* optimal for v: Σ<sub>S</sub> v ≥ Σ<sub>S</sub> v̄ − nθ ≥ Σ<sub>S*</sub> v̄ − nθ ≥ Σ<sub>S*</sub> v − nθ = OPT − nθ. Since V<sub>max</sub> ≤ OPT, nθ = εV<sub>max</sub>/2 ≤ ε·OPT/2, so Σ<sub>S</sub> v ≥ (1 − ε/2)OPT and (1 + ε)Σ<sub>S</sub> v ≥ (1+ε)(1 − ε/2)OPT ≥ OPT for ε ≤ 1.</p><p>Time: v̂<sub>i</sub> ≤ ⌈2n/ε⌉, total scaled value O(n²/ε), table n × O(n²/ε), O(1) each: O(n³/ε).</p>' });
+recall('#r5', { id: 'r5', marks: 6, q: 'What are some approaches to deal with an NP-complete problem? (2023–24 Q4(b); 2017–18 Q3(a))', points: ['Special cases with polynomial algorithms', 'Backtracking and branch and bound (prune the search space, still exponential in the worst case)', 'Approximation algorithms with a proven ratio', 'Randomized algorithms (Monte Carlo, repeat to reduce error)', 'Heuristics without a guarantee, DP over subsets for better exponential time', 'Fixed-parameter algorithms, exponential only in a small parameter'], model: '<p>(1) Solve special cases efficiently, for example vertex cover on trees. (2) Backtracking and (3) branch and bound prune the exponential search space, correct but still exponential in the worst case. (4) Approximation algorithms run in polynomial time with a proven ratio, for example the 2-approximation for vertex cover. (5) Randomized algorithms trade certainty for speed, for example Karger. (6) Heuristics give no guarantee; better exponential algorithms such as Held-Karp reduce the cost. (7) Fixed-parameter algorithms are exponential only in a small parameter k.</p>' });
+</script>
+</body>
+</html>

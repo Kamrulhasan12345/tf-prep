@@ -1,0 +1,485 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Term final 2019–20 · CSE 207 Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Past paper · L-2/T-2 2019–20 · Term final · solved</div>
+<h1>Term final 2019–20</h1>
+<p class="lede">Full marks 210, time 3 hours. Section A has Q1–Q4 and Section B has Q5–Q8. Answer any three from each section, on separate scripts. Each question is 35 marks. Try each part on paper first, then open the answer. This paper has the cleanest set of "standard" questions: hashing tables, binomial deletion, a knapsack branch-and-bound tree, AVL claims, RB insert, and max-flow modelling.</p>
+
+<div class="trap"><h4>Source notes</h4><ul>
+<li>Figures were checked against the scan (Q2(b) heap, Q3(c) knapsack table: item 2 is weight 3, value 9; Q4(c) tree; Q8(a) graph).</li>
+<li>Quadratic probing convention used: \(h(k,i)=(k+i^2)\bmod m\).</li>
+<li>AVL convention (teacher): height of a leaf = 0, \(bf=h(\text{left})-h(\text{right})\). Minimum nodes: N(0)=1, N(1)=2, N(h)=N(h−1)+N(h−2)+1.</li>
+</ul></div>
+
+<h2>Section A</h2>
+
+<h3>Question 1</h3>
+
+<div class="exam"><div class="exam-src">Q1(a) · 10 marks</div><div class="exam-q"><p>Assuming simple uniform hashing, prove that a successful search in separate chaining requires expected O(1+α) work, where α is the load factor.</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p><b>Setup.</b> \(n\) keys in a table of \(m\) slots, \(\alpha=n/m\). Simple uniform hashing: each key lands in each slot with probability \(1/m\), independently. New keys are inserted at the <b>head</b> of the chain. The searched key is equally likely to be any of the \(n\) stored keys.</p>
+<ol>
+<li>Let \(x_1,\dots,x_n\) be the keys in insertion order. Searching for \(x_i\) examines \(x_i\) itself, plus every key inserted <i>after</i> \(x_i\) into the same chain (they sit in front of it).</li>
+<li>For \(j>i\), let \(X_{ij}=1\) if \(x_j\) and \(x_i\) hash to the same slot. \(P(X_{ij}=1)=1/m\), so \(E[X_{ij}]=1/m\).</li>
+<li>Expected work for a random stored key:
+\[E\Big[\frac1n\sum_{i=1}^{n}\Big(1+\sum_{j=i+1}^{n}X_{ij}\Big)\Big]=\frac1n\sum_{i=1}^{n}\Big(1+\frac{n-i}{m}\Big)\]</li>
+<li>\(\sum_{i=1}^{n}(n-i)=\frac{n(n-1)}2\). So the value is \(1+\frac{n-1}{2m}=1+\frac\alpha2-\frac{\alpha}{2n}\).</li>
+<li>Add \(\Theta(1)\) for computing the hash and reaching the slot. Total \(\Theta\big(2+\frac\alpha2-\frac\alpha{2n}\big)=\Theta(1+\alpha)\). \(\blacksquare\)</li>
+</ol>
+<p>Chapter: <a href="../heap/01-hashing.html">Chaining and open addressing</a>.</p>
+</div></details></div>
+
+<div class="exam"><div class="exam-src">Q1(b) · 10 marks</div><div class="exam-q"><p>Suppose you have invited N people to a dinner, and you asked someone to enter their arrival times into a hash table. Assume that exactly one guest can enter the dinner hall at a particular time. Assuming separate chaining, briefly describe how you can achieve 1+logα expected time for an unsuccessful search, where α is the load factor.</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p><b>Idea.</b> Arrival times are distinct numbers (one guest per time), so they can be ordered. Keep each chain as a <b>balanced BST</b> (or any sorted structure) instead of a linked list.</p>
+<ol>
+<li>The hash picks the slot in \(O(1)\).</li>
+<li>An unsuccessful search in a balanced BST holding \(L\) keys costs \(O(\log(1+L))\) comparisons (the \(+1\) handles empty chains).</li>
+<li>Under simple uniform hashing the chain length \(L\) has \(E[L]=\alpha\). The function \(\log(1+x)\) is concave, so by Jensen's inequality \(E[\log(1+L)]\le\log(1+E[L])=\log(1+\alpha)\).</li>
+<li>Expected time \(\le 1+\log(1+\alpha)=O(1+\log\alpha)\) (for \(\alpha\ge1\); for small \(\alpha\) it is \(O(1)\)).</li>
+</ol>
+<p>Compare the linked list: \(\Theta(1+\alpha)\). Cost: inserts/deletes become \(O(\log)\) too and the BST needs extra pointers.</p>
+<p>Chapter: <a href="../heap/01-hashing.html">Chaining and open addressing</a>.</p>
+</div></details></div>
+
+<div class="exam"><div class="exam-src">Q1(c) · 15 marks</div><div class="exam-q"><p>Consider successively inserting the keys 10, 22, 31, 4, 15, 28, 16, 37 and 59 into a hash table of size m = 11 with hash function h(k) = k mod m. Illustrate the resulting hash tables after inserting these keys using (i) linear probing and (ii) quadratic probing. You do not need to show the intermediate steps, just show the hash tables after inserting all the elements.</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p>Home slots: 10→10, 22→0, 31→9, 4→4, 15→4, 28→6, 16→5, 37→4, 59→4. Collisions: 15, 16, 37, 59. Linear probe: \((h+i)\bmod 11\). Quadratic probe: \((h+i^2)\bmod 11\).</p>
+<table class="mat"><caption>Final tables (engine-checked)</caption>
+<tr><th>slot</th><th>0</th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th><th>7</th><th>8</th><th>9</th><th>10</th></tr>
+<tr><th>(i) linear</th><td>22</td><td>59</td><td></td><td></td><td>4</td><td>15</td><td>28</td><td>16</td><td>37</td><td>31</td><td>10</td></tr>
+<tr><th>(ii) quadratic</th><td>22</td><td></td><td>59</td><td>16</td><td>4</td><td>15</td><td>28</td><td></td><td>37</td><td>31</td><td>10</td></tr>
+</table>
+<p><b>Where the collisions went.</b></p>
+<ul>
+<li>Linear: 15: 4→5. 16: 5→6→7. 37: 4,5,6,7→8. 59: 4,5,6,7,8,9,10,0→1 (8 failed probes: primary clustering).</li>
+<li>Quadratic: 15: 4→5. 16: 5, 6 (+1), 9 (+4), 3 (+9). 37: 4, 5 (+1), 8 (+4). 59: 4, 5 (+1), 8 (+4), 2 (+9).</li>
+</ul>
+<div id="t1"></div>
+<div id="t2"></div>
+<div class="drawit"><b>On paper:</b> draw both tables as vertical arrays 0..10 with the keys in them. Next to each key write the number of probes, for example "16 (4 probes)". The examiner marks the final tables.</div>
+<p>Chapter: <a href="../heap/01-hashing.html">Chaining and open addressing</a>.</p>
+</div></details></div>
+
+<h3>Question 2</h3>
+
+<div class="exam"><div class="exam-src">Q2(a) · 10 marks</div><div class="exam-q"><p>Prove that there are <sup>k</sup>C<sub>i</sub> nodes at depth i in a binomial heap B<sub>k</sub> of order k.</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p>Let \(D(k,i)\) be the number of nodes at depth \(i\) in \(B_k\). Claim: \(D(k,i)=\binom ki\). Induction on \(k\).</p>
+<ol>
+<li><b>Base.</b> \(B_0\) is one node at depth 0: \(D(0,0)=1=\binom00\) and \(D(0,i)=0=\binom0i\) for \(i>0\).</li>
+<li><b>Structure.</b> \(B_k\) is two copies of \(B_{k-1}\): the root of one becomes the (leftmost) child of the root of the other.</li>
+<li><b>Count.</b> A node at depth \(i\) of \(B_k\) is either (a) a node at depth \(i\) of the first \(B_{k-1}\) (the copy that kept the root), or (b) a node at depth \(i-1\) of the copy that was attached (it sits one level lower now).</li>
+<li>So \(D(k,i)=D(k-1,i)+D(k-1,i-1)\).</li>
+<li>By the hypothesis this is \(\binom{k-1}{i}+\binom{k-1}{i-1}=\binom ki\) (Pascal's rule). \(\blacksquare\)</li>
+</ol>
+<p>Chapter: <a href="../heap/02-binomial-trees.html">Binomial trees and their proofs</a>.</p>
+</div></details></div>
+
+<div class="exam"><div class="exam-src">Q2(b) · 17 marks</div><div class="exam-q"><p>Show the binomial heap that results when the node X with key 17 is deleted from the binomial heap shown in the Figure for Q2(b). Show the intermediate steps.</p>
+<p><b>Heap read from scan:</b> root list 3 (B<sub>4</sub>), 23 (B<sub>1</sub>). 3 has children 15, 11, 28, 33. 15 has children 17 (X), 42, 23. 17 has children 21, 18; 21 has child 25. 42 has child 45. 11 has children 19, 16; 19 has child 20. 28 has child 30. The root 23 has child 89.</p>
+<div id="f1"></div></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p><b>Method.</b> Delete = decrease-key to \(-\infty\), bubble up to the root, then extract-min. (The picture draws \(-\infty\) as 0.)</p>
+<div class="method"><h4>Steps</h4><ol>
+<li><b>Decrease 17 to −∞.</b> It sits under 15, which sits under 3.</li>
+<li><b>Bubble up.</b> Exchange −∞ with its parent 15, then with its parent 3. The B<sub>4</sub> tree now has −∞ at the root. 15 moved down into 17's old place, and 3 moved down into 15's old place.</li>
+</ol></div>
+<div id="f2"></div>
+<div class="method"><h4>Extract-min</h4><ol start="3">
+<li><b>Remove the root −∞.</b> Its children, in the order 3, 11, 28, 33 (degrees B<sub>3</sub>, B<sub>2</sub>, B<sub>1</sub>, B<sub>0</sub>), are <b>reversed</b> to get a new heap: 33, 28(30), 11(...), 3(...) (increasing degree).</li>
+<li><b>Union</b> with the old root list (23(89), a B<sub>1</sub>). Merge by degree: 33 (B<sub>0</sub>), 23 and 28 (both B<sub>1</sub>), 11 (B<sub>2</sub>), 3 (B<sub>3</sub>).</li>
+<li>Two B<sub>1</sub>: 23 &lt; 28, so 28 becomes the leftmost child of 23. Now a B<sub>2</sub>.</li>
+<li>Two B<sub>2</sub>: 11 &lt; 23, so 23 becomes the leftmost child of 11. Now a B<sub>3</sub>.</li>
+<li>Two B<sub>3</sub>: 3 &lt; 11, so 11 becomes the leftmost child of 3. Now a B<sub>4</sub>.</li>
+</ol></div>
+<p><b>Result:</b> root list 33 (B<sub>0</sub>), 3 (B<sub>4</sub>). 17 nodes = 16 + 1.</p>
+<div id="f3"></div>
+<p>3 has children (left to right) 11, 15, 42, 23. 11 has children 23, 19, 16. That 23 has children 28 and 89, and 28 has child 30. 19 has child 20. 15 has children 21, 18; 21 has child 25. 42 has child 45.</p>
+<div class="drawit"><b>On paper:</b> draw the heap four times: the given heap, after the bubble-up (with the exchange arrows), the two heaps just before the union (reversed children + old root 23), and the final result. Label each link "B1+B1: 23&lt;28".</div>
+<p>Chapter: <a href="../heap/03-binomial-heap.html">Binomial heap operations</a>.</p>
+</div></details></div>
+
+<div class="exam"><div class="exam-src">Q2(c) · 8 marks</div><div class="exam-q"><p>In the context of Fibonacci heaps, draw the maximally damaged tree of degree 6 (i.e., f<sub>6</sub>).</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p><b>Definition.</b> A maximally damaged tree \(f_k\) is a tree whose root has degree \(k\) and which has the fewest nodes any such tree can have, \(F_{k+2}\). It is what you get when every child is cut as much as the rules allow.</p>
+<div class="method"><h4>Construction</h4><ol>
+<li>Let the root's children be \(y_1,\dots,y_k\) in the order they were linked.</li>
+<li>\(y_1\) is a single unmarked leaf (degree 0).</li>
+<li>For \(i\ge2\): \(y_i\) was linked with degree \(i-1\) and has lost exactly one child, so it has degree \(i-2\) and is <b>marked</b>. Below it hangs a copy of \(f_{i-2}\).</li>
+<li>So \(f_6\) has root with children: a leaf, a marked leaf (\(f_0\)), a marked root of \(f_1\), of \(f_2\), of \(f_3\), of \(f_4\). Sizes \(1,1,2,3,5,8\), total with the root \(=21=F_8\).</li>
+</ol></div>
+<p>Marked nodes are drawn double-circled (here with *). The root is not marked.</p>
+<div id="f4"></div>
+<p>Size check: \(|f_k|=1+\sum_{i}|f_{i-2}|+1\) gives \(1,2,3,5,8,13,21\) for \(k=0..6\): the Fibonacci numbers.</p>
+<div class="drawit"><b>On paper:</b> draw the root, then the six children left to right with their degrees 0, 0, 1, 2, 3, 4. Double-circle every child except the first. Write the node count 21.</div>
+<p>Chapter: <a href="../heap/05-amortized.html">Potential method and damaged trees</a>.</p>
+</div></details></div>
+
+<h3>Question 3</h3>
+
+<div class="exam"><div class="exam-src">Q3(a) · 8 marks</div><div class="exam-q"><p>Suppose X ∈ NP-complete. Prove that X ∈ P if and only if P = NP.</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<ol>
+<li><b>(⇐)</b> Suppose P = NP. X is NP-complete, so \(X\in NP=P\). So \(X\in P\).</li>
+<li><b>(⇒)</b> Suppose \(X\in P\). Take any \(Y\in NP\).</li>
+<li>Since X is NP-complete, \(Y\le_p X\): there is a polynomial-time function \(f\) with \(y\in Y\iff f(y)\in X\).</li>
+<li>To decide \(y\): compute \(f(y)\) (polynomial time, so \(|f(y)|\) is polynomial in \(|y|\)) and run the polynomial-time algorithm for X on it. Total time polynomial.</li>
+<li>So \(Y\in P\). Hence \(NP\subseteq P\). Also \(P\subseteq NP\) always. So P = NP. \(\blacksquare\)</li>
+</ol>
+<p>Chapter: <a href="../np/01-classes.html">P, NP, co-NP, NP-complete</a>.</p>
+</div></details></div>
+
+<div class="exam"><div class="exam-src">Q3(b) · 12 marks</div><div class="exam-q"><p>For a graph G = (V, E), a set S of vertices in G is a vertex cover if every edge e in G has at least one end in S. Given a graph G and a number K, the vertex cover problem asks if G contains a vertex cover of size at most K.</p>
+<p>Given a set U of n elements, a collection S<sub>1</sub>, ..., S<sub>m</sub> of subsets of U, and a number k, the set cover problem asks if there exists a collection of at most k of these subsets whose union is equal to U.</p>
+<p>Prove that the set cover problem is at least as hard as the vertex cover problem.</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p>Show Vertex Cover \(\le_p\) Set Cover.</p>
+<div class="method"><h4>Reduction (polynomial time)</h4><ol>
+<li>Input: graph \(G=(V,E)\), number \(K\).</li>
+<li>Universe \(U=E\) (the set of edges).</li>
+<li>For each vertex \(v\in V\), a subset \(S_v=\{\,e\in E: v\text{ is an endpoint of }e\,\}\).</li>
+<li>Set \(k=K\). This is built in \(O(V+E)\) time.</li>
+</ol></div>
+<p><b>Correctness.</b></p>
+<ol>
+<li>(⇒) If \(C\subseteq V\) is a vertex cover with \(|C|\le K\), then \(\{S_v:v\in C\}\) is a collection of at most \(K\) subsets. Every edge has an endpoint in \(C\), so every edge lies in some chosen \(S_v\). Their union is \(U\).</li>
+<li>(⇐) If \(\le k=K\) subsets \(S_v\) (\(v\in C\)) cover \(U=E\), then every edge belongs to some \(S_v\) with \(v\in C\), i.e. has an endpoint in \(C\). So \(C\) is a vertex cover of size \(\le K\).</li>
+<li>So G has a vertex cover of size \(\le K\) iff the set cover instance is a yes-instance. Hence any algorithm for set cover solves vertex cover: set cover is at least as hard. \(\blacksquare\)</li>
+</ol>
+<p>Chapter: <a href="../np/02-reductions.html">Reductions, with proof templates</a>.</p>
+</div></details></div>
+
+<div class="exam"><div class="exam-src">Q3(c) · 15 marks</div><div class="exam-q"><p>Consider the following instance of a 0-1 knapsack problem. Solve this problem using branch-and-bound algorithm. You must show the branch-and-bound tree.</p>
+<p>Knapsack capacity = 10. Items (weight, value): 1: (2, 10); 2: (3, 9); 3: (2, 20); 4: (5, 30).</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<div class="method"><h4>Method (Bayzid sir)</h4><ol>
+<li>Sort by value/weight: item 3 (10), item 4 (6), item 1 (5), item 2 (3).</li>
+<li>Each node holds (weight so far W, value so far V) and an <b>upper bound</b>: V plus the fractional-knapsack value of the remaining items.</li>
+<li>Always expand the open node with the largest upper bound. Prune a node whose bound \(\le\) best value found, or that is infeasible.</li>
+</ol></div>
+<p><b>Tree (checked with the engine):</b></p>
+<pre>root            W=0  V=0   ub = 20+30+10+(1/3)(9) = 63
+ take 3         W=2  V=20  ub=63
+  take 4        W=7  V=50  ub=63
+   take 1       W=9  V=60  ub=63   best = 60
+    take 2      W=12  infeasible (capacity 10)
+    skip 2      W=9  V=60  leaf, ub=60
+   skip 1       W=7  V=50  ub=59   pruned (59 &lt;= 60)
+  skip 4        W=2  V=20  ub=39   pruned
+ skip 3         W=0  V=0   ub=49   pruned</pre>
+<p><b>Answer:</b> take items 1, 3, 4: weight 2+2+5 = 9 ≤ 10, value 10+20+30 = <b>60</b>. All remaining nodes have bound below 60, so 60 is optimal.</p>
+<div id="t3"></div>
+<div class="drawit"><b>On paper:</b> draw the binary tree with edge labels "take i" / "skip i", and in each node write W, V and ub. Mark pruned nodes with a cross and the reason ("59 ≤ 60"). Underline the best leaf.</div>
+<p>Chapter: <a href="../np/04-branch-bound.html">Branch and bound; TSP by DP</a>.</p>
+</div></details></div>
+
+<h3>Question 4</h3>
+
+<div class="exam"><div class="exam-src">Q4(a) · 8 marks</div><div class="exam-q"><p>Mention the amortized running times of the following operations for binomial and Fibonacci heaps: (i) Union, (ii) Find min, (iii) Extract min, and (iv) Decrease key.</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<table class="mat"><tr><th>Operation</th><th>Binomial heap</th><th>Fibonacci heap (amortized)</th></tr>
+<tr><th>Union</th><td>\(O(\log n)\)</td><td>\(O(1)\)</td></tr>
+<tr><th>Find min</th><td>\(O(\log n)\) (\(O(1)\) with a min pointer)</td><td>\(O(1)\)</td></tr>
+<tr><th>Extract min</th><td>\(O(\log n)\)</td><td>\(O(\log n)\)</td></tr>
+<tr><th>Decrease key</th><td>\(O(\log n)\)</td><td>\(O(1)\)</td></tr>
+</table>
+<p>Insert is also \(O(1)\) amortized in both (binomial insert is like a binary counter increment). The Fibonacci heap wins on union and decrease-key by being lazy: it only fixes the structure during extract-min.</p>
+<p>Chapter: <a href="../heap/05-amortized.html">Potential method and damaged trees</a>.</p>
+</div></details></div>
+
+<div class="exam"><div class="exam-src">Q4(b) · 12 marks</div><div class="exam-q"><p>Prove or disprove the following two statements.</p>
+<p>(i) In an AVL tree, the difference in length between the shortest and the longest paths from the root to the leaves is at most one.</p>
+<p>(ii) The minimum number of nodes in an AVL tree with height 5 is 20.</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p><b>(i) False.</b> The balance rule limits the heights of the two subtrees, not the depths of every leaf. Counterexample (an AVL tree, every node has |bf| ≤ 1):</p>
+<div id="f5"></div>
+<ul>
+<li>Right side: 30 has children 25 (leaf) and 35 (with child 40). The leaf 25 is at depth 2: 20→30→25.</li>
+<li>Left side: 20→10→6→3→1, leaf 1 at depth 4.</li>
+<li>Shortest root-to-leaf path = 2 edges, longest = 4 edges: difference 2. So the statement is false.</li>
+<li>Check the balance: 3 has bf +1, 6 has bf +1, 14 has bf −1, 10 has bf +1, 35 has bf −1, 30 has bf −1, root 20 has bf \(3-2=+1\). All within ±1.</li>
+</ul>
+<p><b>(ii) True</b> (with height of a leaf = 0). Let \(N(h)\) be the minimum number of nodes of an AVL tree of height \(h\). A minimal tree has a root, one minimal subtree of height \(h-1\) and one of height \(h-2\).</p>
+<ol>
+<li>\(N(0)=1,\ N(1)=2\).</li>
+<li>\(N(h)=N(h-1)+N(h-2)+1\).</li>
+<li>\(N(2)=2+1+1=4,\ N(3)=4+2+1=7,\ N(4)=7+4+1=12,\ N(5)=12+7+1=\mathbf{20}\). \(\blacksquare\)</li>
+</ol>
+<p>(If a leaf had height 1, the number for "height 5" would be 12. The teacher's convention gives 20, which matches the claim.)</p>
+<p>Chapter: <a href="../tree/01-rotations-avl.html">Rotations and AVL trees</a>.</p>
+</div></details></div>
+
+<div class="exam"><div class="exam-src">Q4(c) · 15 marks</div><div class="exam-q"><p>Insert 11 into the Red-Black tree shown in the Figure for Q4(c). You have to show the intermediate steps. The red and black nodes are indicated by 'r' and 'b', respectively.</p>
+<p><b>Tree read from scan:</b> 23b with left child 8r and right child 27b. 8 has children 6b and 15b. 15 has children 13r and 19r. 27 has only a right child 29r.</p>
+<div id="f6"></div></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p>Insert 11 as in a BST: 11 &lt; 23, 11 &gt; 8, 11 &lt; 15, 11 &lt; 13, so it is the left child of 13. Colour it red. Parent 13 is red, so there is a red-red violation. Name z = 11, p = 13, g = 15.</p>
+<div class="method"><h4>Steps (checked with the engine)</h4><ol>
+<li><b>Case 1</b> (uncle 19 is red): recolour p = 13 and uncle 19 black, g = 15 red. Move z up to 15.</li>
+<li>Now z = 15 (red) has parent 8 (red): violation again. g = 23, uncle = 27 (black). 15 is an <b>inner</b> child (23→8→15 bends). <b>Case 2:</b> left-rotate at parent 8. The old 8 becomes the lower node; set z = 8.</li>
+<li><b>Case 3</b> (uncle black, straight line 23→15→8): colour parent 15 black, grandparent 23 red, then right-rotate at 23.</li>
+<li>Root is 15 (black). Done.</li>
+</ol></div>
+<div id="t4"></div>
+<p><b>Result:</b> <code>15B(8R(6B,13B(11R,)),23R(19B,27B(,29R)))</code>. Check black height: every path from 15 passes 2 black nodes below the root (e.g. 15, 13 then NIL; 15, 27, NIL).</p>
+<div id="f7"></div>
+<div class="drawit"><b>On paper:</b> draw the tree after the BST insert (11 red), after case 1, after case 2 (rotation) and after case 3. Beside each write the case and the rotation. Finally colour the root black.</div>
+<p>Chapter: <a href="../tree/03-rb-insert.html">RB insertion: the 3 cases</a>.</p>
+</div></details></div>
+
+<h2>Section B</h2>
+
+<h3>Question 5</h3>
+
+<div class="exam"><div class="exam-src">Q5(a) · 13 marks</div><div class="exam-q"><p>Given a graph with integer edge weights between 1 and 5 (inclusive), you want to find the shortest weighted path between a pair of vertices. How would you reduce this problem to the shortest unweighted path problem, which can be solved using a Breadth First Search?</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<div class="method"><h4>Reduction</h4><ol>
+<li>Replace every edge \((u,v)\) of weight \(w\) by a chain of \(w\) unit edges: \(u\to d_1\to d_2\to\dots\to d_{w-1}\to v\), with \(w-1\) new dummy vertices.</li>
+<li>Run BFS from \(s\) on the new unweighted graph.</li>
+<li>The BFS distance from \(s\) to \(t\) equals the weighted shortest distance in the original graph. Read the path back through parent pointers and delete the dummy vertices.</li>
+</ol></div>
+<p><b>Why it is correct.</b> A path in the new graph that goes from an original vertex to an original vertex must follow whole chains (dummy vertices have in- and out-degree 1 along their chain). Each chain of an edge of weight \(w\) has exactly \(w\) edges. So paths correspond one to one with original paths, and path length equals path weight.</p>
+<p><b>Size.</b> At most \(4E\) dummy vertices and \(5E\) edges, so \(V'\le V+4E\), \(E'\le5E\). BFS time \(O(V+E)\), which is better than Dijkstra's \(O(E\log V)\) when weights are bounded by a constant. The same idea with weights up to \(W\) gives \(O(V+WE)\).</p>
+<p>Chapter: <a href="../graph/03-dijkstra.html">Dijkstra: trace, proof, variants</a>.</p>
+</div></details></div>
+
+<div class="exam"><div class="exam-src">Q5(b) · 12 marks</div><div class="exam-q"><p>Prove that if all edge weights of a graph are positive, then any subset of edges that connects all vertices and has minimum total weight must be a tree. Give an example to show that the same conclusion does not follow if we allow some weights to be nonpositive.</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p><b>Proof.</b></p>
+<ol>
+<li>Let \(F\) be a subset of edges that connects all vertices and has minimum total weight. Suppose \(F\) is not a tree. It is connected, so it contains a cycle \(C\).</li>
+<li>Remove any edge \(e\) of \(C\). The rest is still connected: any path that used \(e\) can go around the rest of \(C\).</li>
+<li>The new set \(F-e\) connects all vertices and has weight \(w(F)-w(e)<w(F)\), because \(w(e)>0\).</li>
+<li>This contradicts the minimality of \(F\). So \(F\) has no cycle, and being connected it is a tree. \(\blacksquare\)</li>
+</ol>
+<p><b>Counterexample for nonpositive weights.</b> Take a triangle with vertices \(a,b,c\) and all three edges of weight \(-1\).</p>
+<ul>
+<li>Any spanning tree has 2 edges: total \(-2\).</li>
+<li>The whole triangle connects everything and has total \(-3<-2\). So the minimum-weight connecting subset is the triangle, which has a cycle, so it is not a tree.</li>
+<li>Even weight 0 breaks "must": with weights 0 the triangle ties with the trees, so a minimum subset need not be a tree.</li>
+</ul>
+<p>Chapter: <a href="../graph/01-mst.html">Cut property, Kruskal, Prim, uniqueness</a>.</p>
+</div></details></div>
+
+<div class="exam"><div class="exam-src">Q5(c) · 10 marks</div><div class="exam-q"><p>The reverse of a directed graph G = (V, E) is another directed graph G<sub>R</sub> = (V, E<sub>R</sub>) on the same vertex set, but with all edges reversed; that is, E<sub>R</sub> = {(v, u) : (u, v) ∈ E}. Give a linear-time algorithm for computing the reverse of a graph in adjacency list format.</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<pre class="code">REVERSE(G)                       // G given as Adj[1..|V|]
+ for each u in V
+    AdjR[u] = empty list         // O(V)
+ for each u in V                 // visit every edge exactly once
+    for each v in Adj[u]
+       append u to AdjR[v]       // O(1): add u at the head of v's list
+ return AdjR</pre>
+<ol>
+<li>Edge \((u,v)\) is read once while scanning \(Adj[u]\), and produces \((v,u)\) by putting \(u\) into \(AdjR[v]\).</li>
+<li>Initialising the lists costs \(\Theta(V)\). Scanning all lists costs \(\Theta(V+E)\). Each insertion is \(O(1)\).</li>
+<li>Total \(\Theta(V+E)\), linear in the size of the adjacency list. \(\blacksquare\)</li>
+</ol>
+<p>Chapter: <a href="../graph/02-bellman-dag.html">Relaxation, Bellman-Ford, DAG</a>.</p>
+</div></details></div>
+
+<h3>Question 6</h3>
+
+<div class="exam"><div class="exam-src">Q6(a) · 15 marks</div><div class="exam-q"><p>A new startup FastRoute wants to route information along a path in a communication network, represented as a graph. Each node represents a router and each edge represents a wire between routers. The wires are weighted by the maximum bandwidth they can support. FastRoute comes to you and asks you to develop an algorithm to find the path with maximum bandwidth from any source s to any destination t. As you would expect, the bandwidth of a path is the minimum of the bandwidths of the edges on that path; the minimum edge is the bottleneck. Explain how to modify Dijkstra's algorithm to do this. Justify your answer.</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p><b>Modify three things.</b> Let \(b[v]\) be the best bottleneck found from \(s\) to \(v\).</p>
+<ol>
+<li>Initialise \(b[s]=+\infty\) and \(b[v]=0\) (or \(-\infty\)) for all other \(v\).</li>
+<li>Extract the vertex with the <b>maximum</b> \(b\) (use a max-heap).</li>
+<li>Relax with \(\min\) instead of \(+\): \(b[v]\leftarrow\max\big(b[v],\ \min(b[u],\,w(u,v))\big)\).</li>
+</ol>
+<pre class="code">WIDEST-PATH(G, s)
+ for each v: b[v] = 0, pi[v] = NIL
+ b[s] = INF
+ Q = max-priority-queue over V keyed by b
+ while Q not empty
+   u = EXTRACT-MAX(Q)
+   for each (u,v) in Adj[u]
+     if min(b[u], w(u,v)) &gt; b[v]
+        b[v] = min(b[u], w(u,v)); pi[v] = u</pre>
+<p><b>Justification (same proof as Dijkstra).</b></p>
+<ol>
+<li>Claim: when \(u\) is extracted, \(b[u]\) is the true best bottleneck \(\beta(s,u)\).</li>
+<li>Suppose some \(u\) is the first extracted with \(b[u]<\beta(s,u)\). Take an optimal path \(P\) to \(u\); let \((x,y)\) be the first edge on \(P\) leaving the set \(S\) of extracted vertices. \(x\) is correct, so after relaxing, \(b[y]\ge\min(\beta(s,x),w(x,y))\ge\beta(s,u)\), because the bottleneck of the prefix of \(P\) is at least that of the whole path.</li>
+<li>Since \(u\) was picked before \(y\), \(b[u]\ge b[y]\ge\beta(s,u)\), contradicting \(b[u]<\beta(s,u)\).</li>
+<li>The key property that makes this work: extending a path can only <b>lower</b> (never raise) its bottleneck, mirroring "extending a path never lowers its length" for non-negative weights.</li>
+</ol>
+<p>Time: \(O(E\log V)\) with a binary heap. Alternative: take a <b>maximum spanning tree</b>; the widest path between any two vertices is the path in that tree.</p>
+<p>Chapter: <a href="../graph/03-dijkstra.html">Dijkstra: trace, proof, variants</a>.</p>
+</div></details></div>
+
+<div class="exam"><div class="exam-src">Q6(b) · 10 marks</div><div class="exam-q"><p>Kruskal's algorithm can return different spanning trees for the same input graph G, depending on how it breaks ties when the edges are sorted. Show that for each minimum spanning tree T of G, there is a way to sort the edges of G in Kruskal's algorithm so that the algorithm returns T.</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p><b>Choice of order.</b> Sort by weight. Among edges of equal weight, put the edges of \(T\) <b>first</b>. Let \(K\) be the tree Kruskal returns with this order. \(K\) is an MST (Kruskal is correct). Claim \(K=T\).</p>
+<ol>
+<li>Suppose \(K\neq T\). Both have \(|V|-1\) edges, so they differ. Let \(e\) be the first edge in the sorted order that is in exactly one of \(K\), \(T\). All earlier edges are in both or in neither.</li>
+<li><b>Case \(e\in T\setminus K\).</b> Kruskal rejected \(e\), so \(e\)'s endpoints were already connected by edges of \(K\) that come earlier than \(e\). Those edges are in \(K\), and since they are before \(e\) they are also in \(T\) (no difference before \(e\)). So \(T\) contains a path between the endpoints of \(e\) plus \(e\) itself: a cycle in \(T\). Contradiction.</li>
+<li><b>Case \(e\in K\setminus T\).</b> \(T+e\) contains a cycle \(C\). Not every edge of \(C-e\) is in \(K\) (else \(K\) has a cycle), so some \(f\in C\), \(f\in T\setminus K\) exists. Since \(T\) is an MST and \(e\notin T\), \(w(f)\le w(e)\) (cycle property). Also \(f\) differs between the trees and \(f\neq e\), so \(f\) comes <b>after</b> \(e\) in the order, hence \(w(f)\ge w(e)\). So \(w(f)=w(e)\). But among equal weights T-edges come first, and \(f\in T\), \(e\notin T\), so \(f\) is before \(e\). Contradiction.</li>
+<li>Both cases are impossible, so \(K=T\). \(\blacksquare\)</li>
+</ol>
+<p>Chapter: <a href="../graph/01-mst.html">Cut property, Kruskal, Prim, uniqueness</a>.</p>
+</div></details></div>
+
+<div class="exam"><div class="exam-src">Q6(c) · 10 marks</div><div class="exam-q"><p>Show how to express the single-source shortest-paths problem as a product of matrices and a vector. Describe how evaluating this product corresponds to a Bellman-Ford-like algorithm.</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p>Use the <b>min-plus</b> (tropical) product: \((A\otimes x)_i=\min_j\,(a_{ij}+x_j)\).</p>
+<ol>
+<li>Let \(W\) be the \(n\times n\) matrix with \(W_{ij}=w(j,i)\) if edge \(j\to i\) exists, \(W_{ii}=0\), and \(\infty\) otherwise. (So row \(i\) lists the edges <i>into</i> \(i\).)</li>
+<li>Let \(d^{(0)}\) be the vector with \(0\) at the source \(s\) and \(\infty\) elsewhere.</li>
+<li>Define \(d^{(k)}=W\otimes d^{(k-1)}\). Entry \(i\): \(d^{(k)}_i=\min_j\big(W_{ij}+d^{(k-1)}_j\big)=\min\big(d^{(k-1)}_i,\ \min_{(j,i)\in E}d^{(k-1)}_j+w(j,i)\big)\).</li>
+<li>By induction, \(d^{(k)}_i\) is the shortest distance from \(s\) to \(i\) using <b>at most \(k\) edges</b>.</li>
+<li>So \(d^{(n-1)}=W^{\otimes(n-1)}\otimes d^{(0)}\) holds the shortest-path distances (if there is no negative cycle). It is a product of \(n-1\) matrices and one vector.</li>
+</ol>
+<p><b>Link to Bellman-Ford.</b> One multiplication \(W\otimes d\) computes, for every vertex, the best over all its incoming edges: that is exactly one round of Bellman-Ford, which relaxes every edge once. Bellman-Ford does \(n-1\) rounds, i.e. \(n-1\) multiplications. Cost: one product is \(O(E)\) using the sparse structure (or \(O(n^2)\) dense), so \(O(VE)\) overall. A further multiplication that still changes \(d\) means a negative cycle is reachable.</p>
+<p><b>Small illustration</b> (edges A→B 4, A→C 1, C→B 2, B→D 1, source A): \(d^{(0)}=(0,\infty,\infty,\infty)\), \(d^{(1)}=(0,4,1,\infty)\), \(d^{(2)}=(0,3,1,5)\), \(d^{(3)}=(0,3,1,4)\), after which nothing changes.</p>
+<p>Chapter: <a href="../graph/02-bellman-dag.html">Relaxation, Bellman-Ford, DAG</a>; <a href="../graph/04-apsp.html">Matrix squaring</a>.</p>
+</div></details></div>
+
+<h3>Question 7</h3>
+
+<div class="exam"><div class="exam-src">Q7(a) · 13 marks</div><div class="exam-q"><p>A vertex cover of a graph G = (V, E) is a subset of vertices S ⊆ V that includes at least one endpoint of every edge in E. Give a linear-time algorithm for the following task. Input: An undirected tree T = (V, E). Output: The size of the smallest vertex cover of T.</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p><b>Greedy from the leaves.</b> The edge to a leaf must be covered. Choosing the leaf's <b>parent</b> is never worse than choosing the leaf, because the parent also covers its other edges.</p>
+<pre class="code">MIN-VC-TREE(T, root r)
+ DFS from r to get parent[] and a post-order (children before parents)
+ inCover[v] = false for all v;  count = 0
+ for v in post-order
+    if v != r and not inCover[v] and not inCover[parent[v]]
+       // edge (v, parent[v]) still uncovered: take the parent
+       inCover[parent[v]] = true     // parent[v] joins the cover
+       count = count + 1
+ return count</pre>
+<p>Here <code>inCover[x]</code> means "x is in the cover". Step by step: process a vertex only after all its children. If edge \((v,p)\) is not yet covered (neither end chosen), choose \(p\).</p>
+<p><b>Correctness (exchange argument).</b></p>
+<ol>
+<li>Take a leaf \(v\) with parent \(p\). Any cover contains \(v\) or \(p\). If it contains \(v\) and not \(p\), swap \(v\) for \(p\): all edges of \(v\) (just \((v,p)\)) are still covered, and the cover is no larger. So some minimum cover contains \(p\).</li>
+<li>Choose \(p\), delete \(p\) and all its edges. The remaining forest is smaller, and a minimum cover of it plus \(p\) is a minimum cover of the tree. Repeat. The post-order processing does exactly this.</li>
+</ol>
+<p><b>Time.</b> DFS \(O(V+E)\) and one pass, so \(O(V)\) since \(E=V-1\). Equivalent known fact: for a tree, min vertex cover = max matching (König), and the greedy above also builds a maximal matching. (Alternative: DP with states "v in cover / v not in cover", also \(O(V)\).)</p>
+<p>Chapter: <a href="../np/06-approximation.html">Approximation algorithms</a>.</p>
+</div></details></div>
+
+<div class="exam"><div class="exam-src">Q7(b) · 10 marks</div><div class="exam-q"><p>Give an efficient algorithm to find the length (number of edges) of a minimum-length negative-weight cycle in a graph.</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p><b>Idea.</b> Find the smallest \(k\) for which some closed walk of exactly \(k\) edges has negative weight. That \(k\) is the answer, and it is at most \(n\).</p>
+<pre class="code">MIN-NEG-CYCLE-LENGTH(G, w)
+ for k = 1 to n
+    // D_k[i][j] = min weight of a walk with EXACTLY k edges from i to j
+    D_k = D_(k-1) (min-plus product) W        // D_1 = W, with no zero diagonal
+    if some D_k[i][i] &lt; 0 return k
+ return NONE                                      // no negative cycle</pre>
+<ol>
+<li><b>Why the first such \(k\) is the cycle length.</b> A negative simple cycle of length \(\ell\) is a closed walk of \(\ell\) edges, so the first \(k\le\ell\).</li>
+<li>Conversely, a negative closed walk of \(k\) edges splits into simple cycles, and at least one of them is negative and has length \(\le k\). So a negative simple cycle of length \(\le k\) exists. With \(k\) minimal this means the shortest negative cycle has length exactly \(k\).</li>
+<li><b>Time.</b> Each min-plus product is \(O(n^3)\) and there are at most \(n\) of them: \(O(n^4)\).</li>
+<li><b>Cheaper:</b> for each start vertex \(s\), run a Bellman-Ford that tracks walks with exactly \(k\) edges: \(D_0[s]=0\); \(D_k[v]=\min_{(u,v)}D_{k-1}[u]+w(u,v)\). Check \(D_k[s]<0\). Time \(O(V\cdot VE)=O(V^2E)\), better for sparse graphs.</li>
+</ol>
+<p>Chapter: <a href="../graph/02-bellman-dag.html">Relaxation, Bellman-Ford, DAG</a>.</p>
+</div></details></div>
+
+<div class="exam"><div class="exam-src">Q7(c) · 12 marks</div><div class="exam-q"><p>You are given a strongly connected directed graph G = (V, E) with positive edge weights along with a particular node v<sub>0</sub> ∈ V. Give an efficient algorithm for finding shortest paths between all pairs of nodes, with the one restriction that these paths must all pass through v<sub>0</sub>.</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<div class="method"><h4>Algorithm</h4><ol>
+<li>Run Dijkstra from \(v_0\) on \(G\). This gives \(d(v_0,v)\) for every \(v\).</li>
+<li>Build the reverse graph \(G^R\) (all edges flipped) and run Dijkstra from \(v_0\) on it. This gives \(d(u,v_0)\) for every \(u\).</li>
+<li>For every pair \((u,v)\): \(\text{dist}_{v_0}(u,v)=d(u,v_0)+d(v_0,v)\).</li>
+</ol></div>
+<p><b>Why.</b> A path from \(u\) to \(v\) that passes through \(v_0\) is a path \(u\leadsto v_0\) followed by \(v_0\leadsto v\). Minimising the whole means minimising each half independently. G is strongly connected, so every distance is finite.</p>
+<p><b>Time.</b> Two Dijkstra runs, \(O(E\log V)\) each, plus \(O(V^2)\) to fill the answer table: \(O(E\log V+V^2)\). Far better than \(V\) Dijkstra runs or Floyd-Warshall (\(O(V^3)\)).</p>
+<p><b>Remark.</b> The two halves can share a vertex, in which case the combined walk visits it twice; with positive weights this is still the shortest walk that <i>passes through</i> \(v_0\), which is what the question wants.</p>
+<p>Chapter: <a href="../graph/03-dijkstra.html">Dijkstra: trace, proof, variants</a>.</p>
+</div></details></div>
+
+<h3>Question 8</h3>
+
+<div class="exam"><div class="exam-src">Q8(a) · 12 marks</div><div class="exam-q"><p>The graph in Figure for Q8(a) is an instance of the symmetric traveling salesman problem with distances that satisfy the triangle inequality. Show how to construct a near optimal solution using a minimum spanning tree.</p>
+<p><b>Graph read from scan</b> (complete graph on a, b, c, d, e): a–b 2, a–c 2, a–d 1, a–e 6, b–c 4, b–d 3, b–e 5, c–d 3, c–e 4, d–e 6.</p>
+<div id="f8"></div></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<div class="method"><h4>2-approximation (MST preorder)</h4><ol>
+<li>Compute an MST \(T\) of the graph (Kruskal below).</li>
+<li>Pick a root (a). Walk \(T\) in depth-first order and list vertices in <b>preorder</b>. Visit children in any fixed order.</li>
+<li>Close the list back to the root. This is the tour. (Preorder = the full DFS walk of \(2|T|\) cost with repeated vertices shortcut. The triangle inequality says shortcuts never cost more.)</li>
+</ol></div>
+<p><b>Kruskal on this graph:</b> sorted edges ad(1), ab(2), ac(2), bd(3), cd(3), bc(4), ce(4), ...</p>
+<ul>
+<li>Accept a–d (1), a–b (2), a–c (2). Reject b–d, c–d, b–c (cycles). Accept c–e (4). Done: four edges, total 9.</li>
+</ul>
+<div id="t5"></div>
+<div id="f9"></div>
+<ol>
+<li><b>Full walk of the tree</b> from a, children in order d, b, c: a, d, a, b, a, c, e, c, a. Cost \(2\times9=18\).</li>
+<li><b>Preorder</b> (skip repeated vertices): a, d, b, c, e, then back to a.</li>
+<li><b>Tour cost:</b> a–d 1 + d–b 3 + b–c 4 + c–e 4 + e–a 6 = <b>18</b>.</li>
+</ol>
+<p><b>Why it is within 2 of optimal.</b> Let \(OPT\) be the optimal tour. Delete one edge: a spanning tree, so \(w(T)\le OPT\). The preorder tour costs at most the full walk, \(2w(T)\le 2\,OPT\). Here \(18\le 2\times9\). The true optimum for this graph is 15 (tour a, b, e, c, d, a: 2+5+4+3+1), so our tour is 1.2 times the optimum.</p>
+<div class="drawit"><b>On paper:</b> draw the MST (4 edges, weights), draw the DFS walk with numbers 1..8 along it, then the shortcut tour as a dashed cycle on the original graph with the cost of each edge.</div>
+<p>Chapter: <a href="../np/06-approximation.html">Approximation algorithms</a>.</p>
+</div></details></div>
+
+<div class="exam"><div class="exam-src">Q8(b) · 10 + 7 + 6 = 23 marks</div><div class="exam-q"><p>Ad-hoc networks are made up of cheap, low-powered wireless devices, which can communicate within a limited range. Consider an ad-hoc wireless network where any two devices can communicate if and only if the distance between them is at most D. To improve reliability, we require each device x to have k potential backup devices, all within distance D of x; we call these k devices the backup set of x. Also, we do not want any device to be in the backup set of more than b devices, say; otherwise, a single failure might affect a large fraction of the network.</p>
+<p>Suppose we are given the communication distance D, parameters b and k, and an array d[1...n, 1...n] of distances, where d[i, j] is the distance between device i and device j. The problem is to design and analyze an algorithm that either computes a backup set of size k for each of the n devices, such that no device appears in more than b backup sets, or correctly reports that no good collection of backup sets exists. Now answer the following questions:</p>
+<p>(i) Reduce this problem to a max-flow problem. Describe a max-flow problem (a directed, capacitated graph G, a source and sink pair) such that a good collection of backup sets exist if and only if the max-flow in G has a certain size. What is this size? (10)</p>
+<p>(ii) Prove the correctness of your reduction. Show that a good collection of backup sets exist if and only if the max-flow in G has a certain size. (7)</p>
+<p>(iii) Give an algorithm to solve this max-flow problem. What is the running time of this algorithm as a function of n, k and b? (6)</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p><b>(i) The network (10 marks).</b> This is a bipartite "degree-constrained" assignment, just like bipartite matching.</p>
+<div class="method"><h4>Build G</h4><ol>
+<li>Vertices: source \(s\), sink \(t\), a "left copy" \(\ell_i\) for each device \(i\), and a "right copy" \(r_j\) for each device \(j\). Total \(2n+2\) vertices.</li>
+<li>Edges \(s\to\ell_i\) with capacity \(k\) (device \(i\) needs \(k\) backups).</li>
+<li>Edges \(\ell_i\to r_j\) with capacity 1 whenever \(i\ne j\) and \(d[i,j]\le D\) (device \(j\) may back up \(i\); capacity 1 because \(j\) can be listed once in \(i\)'s set).</li>
+<li>Edges \(r_j\to t\) with capacity \(b\) (device \(j\) appears in at most \(b\) sets).</li>
+<li><b>Size to test:</b> a good collection exists iff the max flow equals <b>\(nk\)</b> (all source edges saturated).</li>
+<li>The backup set of \(i\) is \(\{j:\text{flow on }\ell_i\to r_j=1\}\).</li>
+</ol></div>
+<p><b>(ii) Correctness (7 marks).</b></p>
+<ol>
+<li>(⇒) Suppose a good collection exists. Send 1 unit along \(s\to\ell_i\to r_j\to t\) for each \(j\) in \(i\)'s backup set. Edge \(s\to\ell_i\) carries \(k\) (capacity \(k\)). Each \(\ell_i\to r_j\) carries at most 1. Each \(r_j\to t\) carries the number of sets containing \(j\), at most \(b\). Capacities hold and flow is conserved, so the flow has value \(nk\). The maximum is at most \(nk\) (the cut at the source), so max flow \(=nk\).</li>
+<li>(⇐) Suppose max flow \(=nk\). Capacities are integers, so by the <b>integrality theorem</b> there is an integer maximum flow. Edges out of \(s\) are all saturated, so each \(\ell_i\) receives exactly \(k\) units, which it sends along \(k\) distinct edges \(\ell_i\to r_j\) (capacity 1, integer). Define \(i\)'s backup set as those \(k\) devices \(j\): each is within distance \(D\) (only such edges exist). Edge \(r_j\to t\) has capacity \(b\), so \(j\) is chosen by at most \(b\) devices. So the collection is good. \(\blacksquare\)</li>
+<li>If max flow \(<nk\), by the equivalence no good collection exists: report that.</li>
+</ol>
+<p><b>(iii) Algorithm and running time (6 marks).</b></p>
+<ol>
+<li>Run Ford-Fulkerson (augmenting paths) on G. The flow value is at most \(nk\) and the capacities are integers, so there are at most \(nk\) augmentations.</li>
+<li>G has \(2n+2\) vertices and \(O(n^2)\) edges (the \(\ell_i\to r_j\) edges dominate), so each augmenting path search (BFS/DFS) costs \(O(n^2)\).</li>
+<li>Total \(O(nk\cdot n^2)=O(n^3k)\). Note it does not depend on \(b\) in this bound. (With Edmonds-Karp the bound would be \(O(VE^2)=O(n^5)\), independent of \(k\) and \(b\).)</li>
+</ol>
+<div class="drawit"><b>On paper:</b> draw \(s\), the two columns \(\ell_1..\ell_n\) and \(r_1..r_n\), \(t\). Label the three kinds of edge with capacities \(k\), 1, \(b\), and write "target: max flow = nk".</div>
+<p>Chapter: <a href="../graph/08-matching-modelling.html">Bipartite matching and modelling</a>, <a href="../graph/06-flow.html">Flow networks, residuals, Ford-Fulkerson</a>.</p>
+</div></details></div>
+
+<h2>Mandatory</h2>
+<p>Do this with a timer and pen and paper. Nothing in the paper helps if you only read the answers.</p>
+<div id="r1"></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/algo.js"></script>
+<script src="../assets/dsa.js"></script>
+<script>
+trace('#t1', { kind: 'hash', input: '10 22 31 4 15 28 16 37 59 ; 11', opts: { mode: 'linear' } });
+trace('#t2', { kind: 'hash', input: '10 22 31 4 15 28 16 37 59 ; 11', opts: { mode: 'quad' } });
+forestFig('#f1', '3(15(17(21(25) 18) 42(45) 23) 11(19(20) 16) 28(30) 33) 23(89)');
+forestFig('#f2', '0(3(15(21(25) 18) 42(45) 23) 11(19(20) 16) 28(30) 33) 23(89)');
+forestFig('#f3', '33 3(11(23(28(30) 89) 19(20) 16) 15(21(25) 18) 42(45) 23)');
+forestFig('#f4', '1(2 3* 4*(5) 6*(7 8*) 9*(10 11* 12*(13)) 14*(15 16* 17*(18) 19*(20 21*)))');
+trace('#t3', { kind: 'knapsack', input: '2:10 3:9 2:20 5:30 ; 10' });
+treeFig('#f5', '20(10(6(3(1,),8),14(,16)),30(25,35(,40)))');
+treeFig('#f6', '23B(8R(6B,15B(13R,19R)),27B(,29R))');
+trace('#t4', { kind: 'rb', input: '23B(8R(6B,15B(13R,19R)),27B(,29R)) ; 11' });
+treeFig('#f7', '15B(8R(6B,13B(11R,)),23R(19B,27B(,29R)))');
+graphFig('#f8', 'a-b 2, a-c 2, a-d 1, a-e 6, b-c 4, b-d 3, b-e 5, c-d 3, c-e 4, d-e 6');
+trace('#t5', { kind: 'kruskal', input: 'a-b 2, a-c 2, a-d 1, a-e 6, b-c 4, b-d 3, b-e 5, c-d 3, c-e 4, d-e 6' });
+graphFig('#f9', 'a-d 1, a-b 2, a-c 2, c-e 4');
+recall('#r1', { id: 'r1', marks: 35, q: 'Attempt one full question group in the time limit, then mark it. Pick a whole question (all its parts) from this paper, set a timer for about 35 minutes, write it on paper, then mark it against the answers above.', points: ['Set a timer and wrote the whole group, not only the easy parts', 'Every tree/table was drawn at every step, not only the final one', 'Proofs were written as numbered steps', 'Marked it against the solution and noted the first place I went wrong'] });
+</script>
+</body>
+</html>

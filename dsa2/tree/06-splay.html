@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Splay Trees · CSE 207 Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Balanced trees · Sleator and Tarjan, not in CLRS 3rd ed. main text · short must-do, 30 minutes</div>
+<h1>Splay Trees</h1>
+<p class="lede">Short but worth the 30 minutes: asked in 2017–18 (Q6(a) splay a key, 10 marks; Q6(d) main objective, 5), 2018–19 (Q3(b), 15), 2020–21 (Q6(a) rank and potential after insertion, 5+10), 2021–22 (Q2(a) splay steps, 8), 2022–23 (Q3(a) potential function, 8) and 2023–24 (Q13(b) insert 30 and delete 35, 13). Not asked in 2019–20 or 2024–25. Syllabus note: the notes and slides do not teach splay trees, and Bayzid sir's page marks it "not in syllabus", but the papers above did ask it, so learn the three steps and the potential idea.</p>
+
+<h2>1. The idea</h2>
+<p>A splay tree is an ordinary BST with <b>no colours and no heights</b>. After every access (search, insert, delete) the touched node is moved to the root by a sequence of rotations called <b>splaying</b>. Recently used keys stay near the top.</p>
+<div class="key"><p><b>2017–18 Q6(d): "main objective? does it explicitly balance height?"</b> The objective is good <b>amortised</b> time: any sequence of m operations on n keys costs O(m log n) in total, and frequently accessed keys become cheap. It does <b>not</b> explicitly balance the height. One operation can still cost O(n) (a stick of 5 keys, access the deepest). The cost is paid back by later operations.</p></div>
+
+<h2>2. The three splay steps</h2>
+<p>Let x be the node being splayed, p its parent, g its grandparent. Repeat the right step until x is the root. Greek letters are whole subtrees.</p>
+<div class="method"><h4>Method · choose by the shape x, p, g</h4><ol>
+<li><b>Zig</b> (p is the root): one rotation at p.</li>
+<li><b>Zig-zig</b> (x and p are children on the <b>same</b> side, a straight line): rotate at <b>g first</b>, then at <b>p</b>.</li>
+<li><b>Zig-zag</b> (x and p are on <b>opposite</b> sides, a bend): rotate at <b>p</b>, then at <b>g</b> (this is x rotated up twice).</li>
+</ol></div>
+<h3>Zig</h3>
+<div id="z1"></div>
+<h3>Zig-zig</h3>
+<div id="z2"></div>
+<h3>Zig-zag</h3>
+<div id="z3"></div>
+<div class="trap"><h4>Where marks go</h4><ul>
+<li>In zig-zig, rotating at p first (that is, rotating x up twice) is wrong. It does not give the amortised bound and the final tree is different.</li>
+<li>Splaying until x is the root, not just one step.</li>
+<li>Showing only the final tree when the question says "show the intermediate steps". Draw the tree after every step and name it (zig, zig-zig, zig-zag).</li>
+</ul></div>
+<p>Watch zig-zig twice on a stick: access 1 in 5(4(3(2(1)))).</p>
+<div id="t0"></div>
+
+<h2>3. Operations</h2>
+<div class="method"><h4>Method · search, insert, delete</h4><ol>
+<li><b>Access / search k:</b> walk down as in a BST, then splay the node found. If k is not there, splay the last node you touched.</li>
+<li><b>Insert k:</b> BST insert as a leaf, then splay the new node to the root.</li>
+<li><b>Delete k:</b> splay k to the root and remove it. You now have a left tree L and a right tree R. Splay the <b>largest key of L</b> to the root of L (it then has no right child). Attach R as its right child.</li>
+</ol></div>
+
+<h2>4. The exam instances</h2>
+<h3>2023–24 Q13(b): insert 30, then delete 35 (13 marks)</h3>
+<p>Tree as read from the scan: root 13 with left 7 and right 26. 26 has left 17 and right 45. 45 has left 40. 40 has left 35. (The figure was read from a transcription; check it against your paper.) The student solution was marked "out of syllabus" and not worked, so this trace is the engine's.</p>
+<div id="t1"></div>
+<p>Insert 30 goes under 35 (30 &lt; 35, so it is the left child of 35). Splay: zig-zig (30, 35, 40), then zig-zag (30, 45, 26), then zig at the root 13. Delete 35: splay 35 (zig-zag) to the root, remove it, splay 30, the largest key of the left tree, which already is its root, and attach the right subtree 45(40).</p>
+<h3>Other papers</h3>
+<p>2017–18 Q6(a) splay(1), 2018–19 Q3(b) access 3 then 9 then delete 6, and 2021–22 Q2(a) have figures that did not survive the scan (the tree shapes are unreadable). The method above is all they need: write the three steps, then apply them one at a time, drawing every intermediate tree.</p>
+<div class="drawit"><b>On paper:</b> name x, p, g before every step. Write "zig-zig at 40: rotate g=40 then p=35" next to the tree. Redraw after each step. For delete, draw the split into L and R, then the joined result.</div>
+
+<h2>5. Rank and potential, in brief</h2>
+<p>Needed for 2022–23 Q3(a) (8) and 2020–21 Q6(a) (5+10). Amortised analysis uses a <b>potential function</b> Φ, a number stored with the tree that goes up when the tree gets worse and down when it gets better.</p>
+<ul>
+<li><b>Size</b> s(v) = number of nodes in the subtree rooted at v (including v).</li>
+<li><b>Rank</b> r(v) = lg s(v). A leaf has rank 0.</li>
+<li><b>Potential</b> Φ(T) = sum of r(v) over all nodes. A stick has a large potential, a balanced tree has a small one.</li>
+<li><b>Amortised cost</b> of an operation = actual cost + ΔΦ.</li>
+</ul>
+<div class="key"><p><b>Access lemma (state it, do not re-prove it unless asked):</b> splaying x in a tree with root t has amortised cost at most 3(r(t) − r(x)) + 1. Summed over all steps it telescopes, so a splay costs O(log n) amortised. The idea in words: an expensive access walks down a long path, which means the tree was unbalanced; splaying that path rebalances it and the potential drops by about as much as the work done.</p></div>
+<div class="method"><h4>Method · 2020–21 Q6(a): ΔΦ from an insertion (before the splay) is O(log n), 10 marks</h4><ol>
+<li>The tree had n nodes. Insert x as a leaf. Its rank is lg 1 = 0. Only the ancestors change: let them be u₀ (root), u₁, …, u_k (the parent of x), with sizes s₀, …, s_k before the insertion. Each size grows by 1.</li>
+<li>\[ \Delta\Phi = \sum_{i=0}^{k} \left[\lg(s_i + 1) - \lg s_i\right]. \]</li>
+<li>u_{i−1} is the parent of u_i, so s_{i−1} ≥ s_i + 1. Hence for i ≥ 1: \( \lg(s_i+1) \le \lg s_{i-1} \).</li>
+<li>So for i ≥ 1 each term is at most \( \lg s_{i-1} - \lg s_i \), and these telescope: \[ \sum_{i=1}^{k} \le \lg s_0 - \lg s_k \le \lg n. \]</li>
+<li>The root term: \( \lg(s_0+1) - \lg s_0 \le 1 \), since s₀ ≥ 1.</li>
+<li>Total: \( \Delta\Phi \le \lg n + 1 = O(\log n) \).</li>
+</ol></div>
+
+<h2>6. Mandatory practice</h2>
+<div id="r1"></div>
+<div id="r2"></div>
+<div id="p1"></div>
+<p class="drawit">Back to the topic list, or finish with <a href="05-rb-gauntlet.html">the gauntlet</a>.</p>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/algo.js"></script>
+<script src="../assets/dsa.js"></script>
+<script>
+// ---- generic tree figures: nodes N(label,colour,left,right,opts), subtree triangles T(label,opts)
+const N = (k, c, l, r, o) => Object.assign({ k, c: c || '', l, r }, o);
+const T = (t, o) => Object.assign({ t }, o);
+function gsvg(root) {
+  const lay = n => { if (n.t) return n.w = 60; const a = n.l ? lay(n.l) : (n.r ? 34 : 0), b = n.r ? lay(n.r) : (n.l ? 34 : 0); return n.w = Math.max(a + b, 46); };
+  const place = (n, x0, d) => { n.d = d; if (n.t) { n.x = x0 + n.w / 2; return; } const a = n.l ? n.l.w : 34; if (n.l) place(n.l, x0, d + 1); if (n.r) place(n.r, x0 + a, d + 1);
+    n.x = n.l && n.r ? (n.l.x + n.r.x) / 2 : n.l ? n.l.x + 17 : n.r ? n.r.x - 17 : x0 + n.w / 2; };
+  lay(root); place(root, 0, 0);
+  const Y = d => 24 + d * 56, parts = [], nodes = []; let maxY = 0;
+  (function walk(n) { if (n.t) { maxY = Math.max(maxY, Y(n.d) + 50); return; } maxY = Math.max(maxY, Y(n.d) + 26); nodes.push(n); for (const c of [n.l, n.r]) if (c) { walk(c); } })(root);
+  (function edges(n) { if (n.t) return; for (const c of [n.l, n.r]) if (c) { parts.push(`<line class="ed" x1="${n.x}" y1="${Y(n.d)}" x2="${c.x}" y2="${Y(c.d)}"/>`); edges(c); } })(root);
+  (function tri(n) { if (n.t) { const y = Y(n.d); parts.push(`<polygon points="${n.x},${y} ${n.x - 26},${y + 42} ${n.x + 26},${y + 42}" style="fill:var(--plate);stroke:var(--muted);stroke-width:1.5"/><text class="tx" x="${n.x}" y="${y + 29}" style="font-size:14px">${n.t}</text>`); if (n.h) parts.push(`<text class="sm" x="${n.x}" y="${y + 54}">${n.h}</text>`); maxY = Math.max(maxY, y + 60); return; } for (const c of [n.l, n.r]) if (c) tri(c); })(root);
+  for (const n of nodes) { const x = n.x, y = Y(n.d), w = n.c === 'R' || n.c === 'B'; const st = n.c === 'a' ? ' style="fill:var(--plate);stroke-dasharray:4 3"' : '';
+    parts.push(`<circle class="nd ${n.c === 'R' || n.c === 'B' ? n.c : ''}"${st} cx="${x}" cy="${y}" r="16"/>`);
+    if (n.db) parts.push(`<circle class="db" cx="${x}" cy="${y}" r="20"/>`);
+    if (n.hl) parts.push(`<circle class="hl" cx="${x}" cy="${y}" r="${n.db ? 23 : 19}"/>`);
+    parts.push(`<text class="tx ${w ? 'w' : ''}" x="${x}" y="${y}">${n.k}</text>`);
+    if (n.bf !== undefined) parts.push(`<text class="vl" x="${x + 22}" y="${y - 12}" style="font-size:11px;fill:var(--accent);font-weight:600">${n.bf}</text>`);
+    if (n.tag) parts.push(`<text class="sm" x="${x}" y="${y + 31}">${n.tag}</text>`); }
+  const W = root.w, H = maxY + 8;
+  return `<svg class="dsa-fig" viewBox="0 0 ${W} ${H}" width="${W}" role="img" aria-label="tree figure">${parts.join('')}</svg>`;
+}
+function gfig(sel, root) { document.querySelector(sel).innerHTML = `<div class="fg-wrap">${gsvg(root)}</div>`; }
+function pair(sel, a, b, la, lb) { document.querySelector(sel).innerHTML = `<div class="figrow"><div><div class="figlabel">${la || 'before'}</div>${gsvg(a)}</div><div><div class="figlabel">${lb || 'after'}</div>${gsvg(b)}</div></div>`; }
+function pfig(sel, text, bf) { // plain (uncoloured) tree from "20(10(5),30)", optional balance factors
+  const t = Algo.parseTreeText(text); const h = n => n ? 1 + Math.max(h(n.l), h(n.r)) : 0;
+  (function w(n) { if (!n) return; delete n.c; if (bf) n.bf = h(n.l) - h(n.r); w(n.l); w(n.r); })(t);
+  document.querySelector(sel).innerHTML = `<div class="fg-wrap">${drawTree(t)}</div>`;
+}
+
+pair('#z1', N('p', 'a', N('x', 'a', T('α'), T('β')), T('γ')), N('x', 'a', T('α'), N('p', 'a', T('β'), T('γ'))), 'before: p is the root', 'after zig: right rotate at p');
+pair('#z2', N('g', 'a', N('p', 'a', N('x', 'a', T('α'), T('β')), T('γ')), T('δ')), N('x', 'a', T('α'), N('p', 'a', T('β'), N('g', 'a', T('γ'), T('δ')))), 'before: x, p, g in a line', 'after zig-zig: rotate at g, then at p');
+pair('#z3', N('g', 'a', N('p', 'a', T('α'), N('x', 'a', T('β'), T('γ'))), T('δ')), N('x', 'a', N('p', 'a', T('α'), T('β')), N('g', 'a', T('γ'), T('δ'))), 'before: x, p, g bend', 'after zig-zag: rotate at p, then at g');
+trace('#t0', { kind: 'splay', input: '5(4(3(2(1)))) ; acc 1' });
+trace('#t1', { kind: 'splay', input: '13(7,26(17,45(40(35)))) ; 30 del 35' });
+recall('#r1', { id: 'r1', marks: 8, q: 'What are the splay-step operations to restructure a binary search tree, and what is the main objective of splay trees? Do they explicitly balance the height? (2021–22 Q2a, 2017–18 Q6d)', points: ['Zig: p is root, one rotation', 'Zig-zig: x and p on the same side, rotate g then p', 'Zig-zag: opposite sides, rotate p then g', 'Splay repeated until x is the root; used after search, insert and delete', 'Objective: amortised O(log n) per operation, recent keys near root', 'No explicit balancing; single operation can be O(n)'], model: 'To splay x repeat until x is the root: <b>zig</b> if the parent is the root (one rotation at the parent); <b>zig-zig</b> if x and its parent are on the same side of their parents (rotate at the grandparent first, then at the parent); <b>zig-zag</b> if they are on opposite sides (rotate at the parent, then at the grandparent). The main objective is good amortised time, O(log n) per operation over any sequence, and fast access to recently used keys. Splay trees do not explicitly balance the height: one operation can cost O(n), but its cost is repaid by the potential drop.' });
+recall('#r2', { id: 'r2', marks: 15, q: 'Define the rank of a node of a splay tree. Prove that the change in potential of a splay tree, not resulting from any splay, after an insertion is O(log n), where the tree had n nodes before the insertion. (2020–21 Q6a, 5+10)', points: ['Rank r(v) = lg of subtree size; potential = sum of ranks', 'Only ancestors of the new leaf change: sizes s_i grow to s_i + 1', 'ΔΦ = sum of lg(s_i+1) − lg(s_i)', 's_{i−1} ≥ s_i + 1 so each term ≤ lg s_{i−1} − lg s_i', 'Telescoping gives ≤ lg n', 'Root term ≤ 1, total ≤ lg n + 1 = O(log n)'], model: 'Size s(v) is the number of nodes in the subtree of v; rank r(v) = lg s(v); potential Φ is the sum of all ranks. Insert x as a leaf, its rank is 0. Only the ancestors u₀ (root) … u_k (parent) change, each size going from s_i to s_i + 1. So ΔΦ = Σ [lg(s_i+1) − lg s_i]. For i ≥ 1, s_{i−1} ≥ s_i + 1, so lg(s_i+1) ≤ lg s_{i−1} and the term is at most lg s_{i−1} − lg s_i. These telescope to lg s₀ − lg s_k ≤ lg n. The root term lg(s₀+1) − lg s₀ ≤ 1. Hence ΔΦ ≤ lg n + 1 = O(log n).' });
+practice('#p1', { id: 'p1', kind: 'splay', n: 2 });
+</script>
+</body>
+</html>

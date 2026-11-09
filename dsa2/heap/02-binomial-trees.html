@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Binomial Trees · CSE 207 Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Advanced heaps · binomial trees · Bayzid sir L4 · proofs are asked every year</div>
+<h1>Binomial Trees and Their Proofs</h1>
+<p class="lede">Asked in 2024–25 Q4(a) (kCi nodes at depth i, 8 marks) and Q4(c) (H1 vs H2, 7 marks), 2023–24 Q13(a) (nodes, height, root degree, 5 marks each), 2019–20 Q2(a) (10), 2018–19 Q6(a) (10), 2017–18 Q7(b) (5), and CT-4 (H1 vs H2, 10). These are induction proofs with a fixed shape. Learn the shape once and you can write all of them.</p>
+
+<h2>1. Why this exists</h2>
+<p>A binary heap merges two heaps in O(n): you copy the arrays and rebuild. We want merge in O(log n). The fix is a different shape: a <b>binomial heap</b> is a list of <b>binomial trees</b>, and merging works like adding two binary numbers. This chapter is only the trees. Chapter 3 builds the heap.</p>
+
+<h2>2. Definition</h2>
+<ul>
+<li><b>B<sub>0</sub></b> is a single node.</li>
+<li><b>B<sub>k</sub></b> is two copies of B<sub>k−1</sub> linked: the root of one becomes a child of the root of the other. k is the <b>order</b>.</li>
+</ul>
+<p>Unrolled, the root of B<sub>k</sub> has k children, and they are the roots of B<sub>k−1</sub>, B<sub>k−2</sub>, ..., B<sub>1</sub>, B<sub>0</sub>. In this book the biggest child is drawn leftmost. Numbers below are labels, not keys.</p>
+<div class="figrow">
+<div><div class="figlabel">B<sub>0</sub></div><div id="f0"></div></div>
+<div><div class="figlabel">B<sub>1</sub></div><div id="f1"></div></div>
+<div><div class="figlabel">B<sub>2</sub></div><div id="f2"></div></div>
+<div><div class="figlabel">B<sub>3</sub></div><div id="f3"></div></div>
+</div>
+<div class="figlabel">B<sub>4</sub> (16 nodes: root, then children B<sub>3</sub>, B<sub>2</sub>, B<sub>1</sub>, B<sub>0</sub>)</div>
+<div id="f4"></div>
+<div class="figlabel">Linking: two B<sub>2</sub> trees (left, right) make a B<sub>3</sub> when node 5 hangs under node 1</div>
+<div id="f5"></div>
+<div class="drawit"><b>On paper:</b> draw B<sub>0</sub> to B<sub>3</sub> in a row, each built from two copies of the one before. Write the level numbers 0, 1, 2, ... down the side. For B<sub>3</sub> the levels hold 1, 3, 3, 1 nodes, for B<sub>4</sub> they hold 1, 4, 6, 4, 1. That is Pascal's triangle, and it is the proof of property 5.</div>
+
+<h2>3. The five properties</h2>
+<div class="key"><p>For the binomial tree B<sub>k</sub>:<br>
+1. It has exactly \(2^k\) nodes.<br>
+2. Its height is k (a single node has height 0).<br>
+3. The root has degree k, and no other node has a higher degree.<br>
+4. The children of the root, from the left, are the roots of B<sub>k−1</sub>, ..., B<sub>0</sub>.<br>
+5. There are \(\binom{k}{i}\) nodes at depth i, for \(i = 0, \dots, k\).</p></div>
+<p>The name comes from property 5: the level sizes are the binomial coefficients. Consequence: a binomial tree with n nodes has \(k = \log_2 n\), so its root degree and its height are both \(\log_2 n\). That is where every O(log n) in the next chapter comes from.</p>
+
+<h2>4. Proofs, ready to copy</h2>
+<p>All five use induction on k and the same fact: <b>B<sub>k</sub> is two B<sub>k−1</sub>, called A and C, where C's root hangs under A's root.</b> Say that sentence first.</p>
+
+<div class="method"><h4>Proof 1 · B<sub>k</sub> has \(2^k\) nodes</h4><ol>
+<li><b>Base k = 0:</b> B<sub>0</sub> is one node, \(2^0 = 1\).</li>
+<li><b>Hypothesis:</b> B<sub>k−1</sub> has \(2^{k-1}\) nodes.</li>
+<li><b>Step:</b> B<sub>k</sub> consists of two copies of B<sub>k−1</sub>, so it has \(2\cdot 2^{k-1} = 2^k\) nodes. ∎</li>
+</ol></div>
+
+<div class="method"><h4>Proof 2 · the height of B<sub>k</sub> is k</h4><ol>
+<li><b>Base k = 0:</b> one node, height 0.</li>
+<li><b>Hypothesis:</b> B<sub>k−1</sub> has height k−1.</li>
+<li><b>Step:</b> A keeps its height k−1 under its own root. C's root is one level below A's root, so C's deepest node is at depth \(1 + (k-1) = k\).</li>
+<li>Height of B<sub>k</sub> = \(\max(k-1,\; k) = k\). ∎</li>
+</ol></div>
+
+<div class="method"><h4>Proof 3 · the root of B<sub>k</sub> has degree k</h4><ol>
+<li><b>Base k = 0:</b> a single node has degree 0.</li>
+<li><b>Hypothesis:</b> the root of B<sub>k−1</sub> has degree k−1.</li>
+<li><b>Step:</b> the root of B<sub>k</sub> is A's root. It keeps its k−1 children and gains one more, C's root. Degree \(= (k-1)+1 = k\).</li>
+<li>No node has a higher degree: every non-root node sits inside a smaller binomial tree (property 4), whose root has a smaller degree. ∎</li>
+</ol></div>
+
+<div class="method"><h4>Proof 4 · the children of the root are the roots of B<sub>k−1</sub>, ..., B<sub>0</sub></h4><ol>
+<li><b>Base:</b> B<sub>0</sub> has no children (the empty list). B<sub>1</sub> has one child, B<sub>0</sub>.</li>
+<li><b>Hypothesis:</b> the root of B<sub>k−1</sub> has children that are roots of B<sub>k−2</sub>, ..., B<sub>0</sub>.</li>
+<li><b>Step:</b> B<sub>k</sub>'s root is A's root. Its old children are the roots of B<sub>k−2</sub>, ..., B<sub>0</sub>. The new child is C's root, and C is a B<sub>k−1</sub>. So the children are B<sub>k−1</sub>, B<sub>k−2</sub>, ..., B<sub>0</sub>. ∎</li>
+</ol></div>
+
+<div class="method"><h4>Proof 5 · there are \(\binom ki\) nodes at depth i in B<sub>k</sub> (2024–25 Q4(a), 2019–20 Q2(a), 2018–19 Q6(a), 2017–18 Q7(b))</h4><ol>
+<li>Let \(D(k,i)\) be the number of nodes at depth i in B<sub>k</sub>. Claim: \(D(k,i) = \binom ki\).</li>
+<li><b>Base k = 0:</b> one node at depth 0 and none deeper. \(D(0,0) = 1 = \binom 00\) and \(D(0,i) = 0 = \binom 0i\) for \(i>0\).</li>
+<li><b>Hypothesis:</b> \(D(k-1,i) = \binom{k-1}{i}\) for all i.</li>
+<li><b>Step:</b> B<sub>k</sub> = A plus C. A's nodes keep their depth. C hangs under A's root, so every node of C is one level deeper than it was in C.</li>
+<li>Depth i of B<sub>k</sub> therefore holds: depth i of A, plus depth \(i-1\) of C. So
+\[ D(k,i) = D(k-1,i) + D(k-1,i-1) = \binom{k-1}{i} + \binom{k-1}{i-1}. \]</li>
+<li>Pascal's rule (prove it in one line so no mark is lost):
+\[ \binom{k-1}{i}+\binom{k-1}{i-1} = \frac{(k-1)!}{i!\,(k-1-i)!} + \frac{(k-1)!}{(i-1)!\,(k-i)!} = \frac{(k-1)!}{i!\,(k-i)!}\,\bigl[(k-i)+i\bigr] = \frac{k!}{i!\,(k-i)!} = \binom ki. \]</li>
+<li>Edge cases: for \(i=0\) the term \(\binom{k-1}{-1}\) is 0, and for \(i=k\) the term \(\binom{k-1}{k}\) is 0, so the identity still holds. ∎</li>
+<li>Check: \(\sum_i \binom ki = 2^k\), which agrees with Proof 1.</li>
+</ol></div>
+<div class="drawit"><b>On paper:</b> beside Proof 5 draw B<sub>2</sub> split into A (left, solid) and C (right, dashed) with an arrow from C's root to A's root, and write the level counts of A as 1, 1 and of C shifted down as 0, 1, 1. Adding gives 1, 2, 1. Examiners like the picture because it shows the "depth i of A plus depth i−1 of C" step.</div>
+
+<h2>5. From n nodes to trees</h2>
+<p>A binomial heap with n nodes is a set of binomial trees, at most one of each order. Because each B<sub>k</sub> has \(2^k\) nodes, the orders present are exactly the 1-bits of n written in binary. The structure is therefore unique for a given n.</p>
+<div class="method"><h4>Method · which trees does an n-node heap have?</h4><ol>
+<li>Write n in binary.</li>
+<li>Each 1 at bit position k means one B<sub>k</sub> is present. A 0 means none.</li>
+<li>Check by adding \(2^k\) for each tree: the sum must be n.</li>
+</ol></div>
+<p><b>Example, n = 19.</b> \(19 = 16 + 2 + 1 = 10011_2\). The heap has B<sub>4</sub> (16 nodes), B<sub>1</sub> (2 nodes), B<sub>0</sub> (1 node). \(16+2+1 = 19\). It has \(\lfloor \log_2 19\rfloor + 1 = 5\) bit positions, at most 5 trees, here 3. The largest degree is 4. Another: n = 26 = \(11010_2\) gives B<sub>4</sub>, B<sub>3</sub>, B<sub>1</sub>.</p>
+<div class="key"><p>A heap with n nodes has at most \(\lfloor\log_2 n\rfloor + 1\) trees and every tree has height at most \(\lfloor\log_2 n\rfloor\). This is why find-min over the root list, union, and extract-min are all O(log n).</p></div>
+
+<h2>6. Prove or disprove: H1 and H2 (2024–25 Q4(c); CT-4 Q2)</h2>
+<p><b>Question.</b> The highest-order tree in binomial heap H1 is B<sub>m</sub>. The highest-order tree in H2 is B<sub>m+1</sub>. "H2 must have more nodes than H1, regardless of how many trees are in each." Prove or disprove.</p>
+<p>The statement is <b>true</b>. The tempting wrong idea is that H1 might compensate by having many trees, but a heap holds at most one tree of each order.</p>
+<div class="method"><h4>Proof</h4><ol>
+<li>H1's trees have distinct orders, all at most m. So H1 contains at most one each of B<sub>0</sub>, ..., B<sub>m</sub>.</li>
+<li>The most nodes H1 can have is when it holds all of them: \(2^0 + 2^1 + \dots + 2^m = 2^{m+1} - 1\).</li>
+<li>H2 contains B<sub>m+1</sub>, which alone has \(2^{m+1}\) nodes, and possibly more trees.</li>
+<li>So \(|H2| \ge 2^{m+1} > 2^{m+1} - 1 \ge |H1|\). The statement is true. ∎</li>
+</ol></div>
+<div class="trap"><h4>Where marks go</h4><ul>
+<li>Writing "disproved" after trying one example. A prove-or-disprove needs a general argument.</li>
+<li>Forgetting the geometric sum \(2^{m+1}-1\). It is the whole proof; say it in words ("a heap with n nodes is the binary representation of n") if you like, but write the sum.</li>
+<li>Assuming trees may repeat. Equal orders are always merged.</li>
+<li>Using an exact count of trees: the claim says "regardless of how many".</li>
+</ul></div>
+
+<h2>7. Mandatory practice</h2>
+<p>Write each proof out in full, with the base, the hypothesis and the step labelled. There is no random generator for proofs, so be strict when you tick the points.</p>
+<div id="r1"></div>
+<div id="r2"></div>
+<div id="r3"></div>
+<div id="r4"></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/algo.js"></script>
+<script src="../assets/dsa.js"></script>
+<script>
+forestFig('#f0', '1');
+forestFig('#f1', '1(2)');
+forestFig('#f2', '1(2(3) 4)');
+forestFig('#f3', '1(2(3(4) 5) 6(7) 8)');
+forestFig('#f4', '1(2(3(4(5) 6) 7(8) 9) 10(11(12) 13) 14(15) 16)');
+forestFig('#f5', '1(2(3) 4) 5(6(7) 8)');
+recall('#r1', { id: 'r1', marks: 15, q: 'Prove by induction that the binomial tree B<sub>k</sub> has (i) \\(2^k\\) nodes, (ii) height k, (iii) root degree k. (2023–24 Q13(a), 5 marks each)', points: ['State how B_k is built: two B_(k-1), one root under the other', '(i) base k=0 has 1 node; step 2 · 2^(k-1) = 2^k', '(ii) base height 0; step: max(k-1, 1+(k-1)) = k', '(iii) base degree 0; step: root keeps k-1 children and gains one, so k', 'Hypothesis stated each time'], model: `<p>B<sub>k</sub> is two copies A and C of B<sub>k−1</sub>; C's root becomes a child of A's root. Induction on k.</p><ol><li><b>Nodes.</b> Base: B<sub>0</sub> has \\(1 = 2^0\\) node. If B<sub>k−1</sub> has \\(2^{k-1}\\) nodes, B<sub>k</sub> has \\(2\\cdot2^{k-1} = 2^k\\).</li><li><b>Height.</b> Base: B<sub>0</sub> has height 0. If B<sub>k−1</sub> has height k−1: A has height k−1, and C is one level lower, so its deepest node is at depth \\(1+(k-1) = k\\). Height \\(=\\max(k-1,k) = k\\).</li><li><b>Root degree.</b> Base: B<sub>0</sub> has degree 0. If the root of B<sub>k−1</sub> has degree k−1, then B<sub>k</sub>'s root (A's root) keeps those k−1 children and gains C's root: degree k.</li></ol>` });
+recall('#r2', { id: 'r2', marks: 10, q: 'Prove that there are \\(\\binom ki\\) nodes at depth i in the binomial tree B<sub>k</sub>. (2024–25 Q4(a), 2019–20 Q2(a), 2018–19 Q6(a))', points: ['B_k = A plus C, two B_(k-1); C hangs under A\'s root', 'Base k=0: one node at depth 0, C(0,0)=1', 'Hypothesis: D(k-1,i) = C(k-1,i)', 'Depth i of B_k = depth i of A + depth i-1 of C', 'D(k,i) = C(k-1,i) + C(k-1,i-1)', 'Pascal: that equals C(k,i) (shown or cited)'], model: `<ol><li>B<sub>k</sub> is two copies A and C of B<sub>k−1</sub>, with C's root a child of A's root. Let \\(D(k,i)\\) = number of nodes at depth i. Induct on k.</li><li>Base \\(k=0\\): one node at depth 0, so \\(D(0,0)=1=\\binom00\\), and \\(D(0,i)=0=\\binom 0i\\) for \\(i>0\\).</li><li>Hypothesis: \\(D(k-1,i)=\\binom{k-1}{i}\\) for all i.</li><li>Step: A's nodes keep their depths. Every node of C is one level deeper than inside C. So depth i of B<sub>k</sub> has the depth-i nodes of A and the depth-\\((i-1)\\) nodes of C: \\[D(k,i) = \\binom{k-1}{i}+\\binom{k-1}{i-1}.\\]</li><li>Pascal's rule: \\[\\frac{(k-1)!}{i!(k-1-i)!}+\\frac{(k-1)!}{(i-1)!(k-i)!} = \\frac{(k-1)!}{i!(k-i)!}[(k-i)+i] = \\binom ki.\\] For \\(i=0\\) and \\(i=k\\) the missing term is 0. ∎</li></ol>` });
+recall('#r3', { id: 'r3', marks: 7, q: 'Heap H1 has a highest-order tree B<sub>m</sub>, heap H2 has B<sub>m+1</sub> as its highest. Prove or disprove: "H2 must have more nodes than H1, regardless of how many trees are in each." (2024–25 Q4(c))', points: ['Decide: true', 'A binomial heap has at most one tree of each order', 'H1 has at most 2^0 + ... + 2^m = 2^(m+1) - 1 nodes', 'H2 has at least 2^(m+1) nodes from B_(m+1) alone', 'Compare: |H2| > |H1|'], model: `<p><b>True.</b> A binomial heap has at most one tree of each order, because equal orders are linked. So H1, whose trees have orders at most m, has at most \\(2^0+2^1+\\dots+2^m = 2^{m+1}-1\\) nodes. H2 contains B<sub>m+1</sub>, which has \\(2^{m+1}\\) nodes by property 1. Hence \\(|H2|\\ge 2^{m+1} > 2^{m+1}-1 \\ge |H1|\\). ∎</p>` });
+recall('#r4', { id: 'r4', marks: 6, q: 'A binomial heap holds 19 nodes. Which binomial trees does it contain, how many nodes does each have, and what is the largest root degree? Then repeat for 26 nodes.', points: ['19 = 10011 in binary', 'B4 (16), B1 (2), B0 (1)', 'Largest degree 4', '26 = 11010 in binary', 'B4 (16), B3 (8), B1 (2)', 'Largest degree 4'], model: `<p>\\(19 = 10011_2 = 16+2+1\\): B<sub>4</sub> (16 nodes), B<sub>1</sub> (2), B<sub>0</sub> (1); largest root degree 4. \\(26 = 11010_2 = 16+8+2\\): B<sub>4</sub>, B<sub>3</sub>, B<sub>1</sub>; largest root degree 4.</p>` });
+</script>
+</body>
+</html>

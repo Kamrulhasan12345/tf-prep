@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rotations and AVL Trees · CSE 207 Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Balanced trees · CLRS §13.2 and problem 13-3 · Monirul Islam sir L18, slides 18 · must-know</div>
+<h1>Rotations and AVL Trees</h1>
+<p class="lede">AVL is asked almost every year. 2024–25: Q5(b), 10 marks (name the imbalance, show before and after), Q6(b), 10 marks (smallest AVL tree of height 5). 2023–24: Q12(a) height O(log n), 10; Q12(c) insert and delete sequence, 15. 2022–23: Q4(b) properties and balance proof, 12. 2021–22: Q2(b) left-heavy fix with figures, 12. 2020–21: Q7(a) two insertions, 5+5. 2019–20: Q4(b) prove or disprove, 12. 2018–19: Q3(a) rotations, 15. 2017–18: Q5(a) height proof, 12; Q5(d), 4.</p>
+
+<h2>1. The problem: a BST can be a stick</h2>
+<p>Search, insert and delete in a binary search tree cost O(h), where h is the height. If you insert 1, 2, 3, 4, 5 in order, every key goes to the right of the last one. The tree is a chain and h = n − 1, so every operation costs O(n).</p>
+<div id="f0"></div>
+<p>A <b>balanced</b> tree keeps h about lg n. The notes list four tools: rotations, AVL trees, red-black trees, splay trees. Rotations are the basic move that the other three all use.</p>
+<p><b>Height convention (your teacher's):</b> a leaf has height 0. An empty child has height −1. So <code>h(node) = 1 + max(h(left), h(right))</code>. All numbers in this chapter use it.</p>
+
+<h2>2. Rotation: change the shape, keep the order</h2>
+<p>A rotation moves one node up and its parent down, in O(1), and the in-order sequence stays sorted. Greek letters below are whole subtrees. Their order is always <b>α &lt; x &lt; β &lt; y &lt; γ</b>.</p>
+<div id="fr1"></div>
+<p>Read the picture left to right for <b>right rotate at y</b> (y is the node that goes down, to the right). Read it right to left for <b>left rotate at x</b>. The name always says which node goes down and in which direction.</p>
+<div class="method"><h4>Method · right rotate at y (y has a left child x)</h4><ol>
+<li>x becomes the root of this piece. y becomes x's right child.</li>
+<li>The subtree β (x's old right child) must move: it becomes y's left child. This is the only subtree that changes parent. The slides call it "transplant x.right into y.left".</li>
+<li>α stays under x, γ stays under y. The link above the piece now points to x instead of y.</li>
+</ol></div>
+<p>Left rotate at x is the mirror: y = x.right moves up, x becomes y's left child, β (y's old left child) becomes x's right child.</p>
+<pre class="code">LEFT-ROTATE(T, x)
+ y = x.right
+ x.right = y.left                  // beta moves over
+ if y.left != NIL: y.left.p = x
+ y.p = x.p                         // y takes x's place under the parent
+ if x.p == NIL: T.root = y
+ elif x == x.p.left: x.p.left = y
+ else: x.p.right = y
+ y.left = x; x.p = y</pre>
+<p>A concrete one with numbers. Right rotate at 30:</p>
+<div class="figrow"><div><div class="figlabel">before</div><div id="fr2a"></div></div><div><div class="figlabel">right rotate at 30</div><div id="fr2b"></div></div></div>
+<p>20 goes up. 30 goes down to its right. 25 (the old right child of 20, between 20 and 30) becomes the left child of 30. Check by reading in order: 10, 20, 25, 30, 40 in both trees.</p>
+<div class="key"><p>Rotation changes depths. In the right rotation, α goes up one level, γ goes down one level, β stays at the same depth. That is why a rotation can fix a tree that is too heavy on one side.</p></div>
+
+<h2>3. What an AVL tree is</h2>
+<p>An <b>AVL tree</b> is a BST in which <b>for every node</b>, the heights of its left and right subtrees differ by at most 1. The slides phrase it as: both subtrees are AVL trees, and the sibling height difference is at most 1.</p>
+<p><b>Balance factor</b> (the sign convention used in the papers): <code>bf(v) = h(left) − h(right)</code>. A node is fine if bf ∈ {−1, 0, +1}. bf = +2 means too heavy on the left. bf = −2 means too heavy on the right.</p>
+<div class="figrow"><div><div class="figlabel">AVL: every bf is -1, 0 or +1</div><div id="fa1"></div></div><div><div class="figlabel">Not AVL: root is 0 but node 30 has +2</div><div id="fa2"></div></div></div>
+<div class="trap"><h4>Where marks go</h4><ul>
+<li>Checking only the root. The rule is for <b>every</b> node. The right-hand tree has bf 0 at the root and is still not AVL.</li>
+<li>Mixing the sign. Say once at the top of your answer: "bf = height(left) − height(right)".</li>
+<li>Counting a leaf as height 1 and an empty tree as 0. The numbers (N(5) = 20 and so on) assume leaf = 0.</li>
+</ul></div>
+
+<h2>4. The four imbalance cases</h2>
+<p>After an insert or delete, one node can reach bf = ±2. Call the <b>lowest</b> such node <b>A</b>. Call its taller child <b>B</b>. If needed, call B's taller child <b>C</b>. The case name is the path A → B → C: first letter A→B, second letter B→C.</p>
+<div class="method"><h4>Method · pick the rotation from two numbers</h4><ol>
+<li>Find the lowest node A with bf = +2 or −2.</li>
+<li>Look at B, the child on the heavy side, and its bf.</li>
+<li><b>bf(A) = +2, bf(B) = +1 or 0</b> → <b>LL</b>: one <b>right rotate at A</b>.</li>
+<li><b>bf(A) = +2, bf(B) = −1</b> → <b>LR</b>: <b>left rotate at B</b>, then <b>right rotate at A</b>.</li>
+<li><b>bf(A) = −2, bf(B) = −1 or 0</b> → <b>RR</b>: one <b>left rotate at A</b>.</li>
+<li><b>bf(A) = −2, bf(B) = +1</b> → <b>RL</b>: <b>right rotate at B</b>, then <b>left rotate at A</b>.</li>
+</ol></div>
+<div class="key"><p>Same sign (or B is 0): the heavy side is a straight line, one rotation. Opposite signs: the heavy side bends like a zig-zag, two rotations. The slides say it as: "rotate once if left-left or right-right, twice if left-right or right-left", and "move to the right, then to the left: two steps down to the heavier subtree".</p></div>
+<p>Heights in the figures: for an insertion, one subtree has just grown, so it is h+1 while its neighbours are h. The small label under each triangle shows this. Blue numbers beside a node are bf.</p>
+
+<h3>LL: A is +2, B is +1</h3>
+<div id="c1"></div>
+<h3>RR: A is −2, B is −1 (mirror of LL)</h3>
+<div id="c2"></div>
+<h3>LR: A is +2, B is −1</h3>
+<div id="c3"></div>
+<h3>RL: A is −2, B is +1 (mirror of LR)</h3>
+<div id="c4"></div>
+<p>After deletion, B can have bf = 0 (both its subtrees are h+1). That still counts as LL or RR and one rotation fixes A, but the result is B = −1, A = +1 for LL (or B = +1, A = −1 for RR), not 0, 0. The whole subtree keeps its height this time, so the walk up the tree continues only if the height dropped.</p>
+
+<h2>5. 2024–25 Q5(b), the exact answer</h2>
+<p><i>"After inserting a key into an AVL tree, a node A becomes unbalanced such that its balance factor becomes +2, while its left child B has a balance factor of −1. Determine the exact type of imbalance, describe the rotations, show the subtree before and after, with the final balance factors of all nodes involved." (10 marks)</i></p>
+<div class="method"><h4>Method · model answer, in the order a marker ticks it</h4><ol>
+<li><b>Type.</b> bf(A) = +2 means the left side is too tall. bf(B) = −1 means B's <b>right</b> side is the taller one. So the new key went into the right subtree of A's left child: a <b>Left-Right (LR)</b> imbalance. A single right rotation at A would not work, because the heavy part (C) would just move to the other side.</li>
+<li><b>Heights.</b> Let δ (A's right subtree) have height h. Then B has height h+2, so α (B's left) has height h and C (B's right) has height h+1. C's children β and γ have heights h and h, or h and h−1, or h−1 and h. (If C is the new leaf, β and γ are empty and the formulas still work with h = −1.)</li>
+<li><b>Rotation 1: left rotate at B.</b> C moves up, B becomes C's left child, β moves to B's right. Now A, C, B form a straight left line (LL shape).</li>
+<li><b>Rotation 2: right rotate at A.</b> C moves up again. A becomes C's right child, γ moves to A's left.</li>
+<li><b>Result.</b> C is the root of the subtree, B is its left child with α and β, A is its right child with γ and δ.</li>
+<li><b>Final balance factors.</b> bf(C) = 0 always. B and A depend on C's old bf, see the table.</li>
+<li><b>Order and height.</b> The in-order sequence α B β C γ A δ is unchanged. The subtree has height h+2 again, the same as before the insertion, so no ancestor above A is affected.</li>
+</ol></div>
+<div id="q5b"></div>
+<table class="mat"><tr><th>Old bf(C)</th><th>β</th><th>γ</th><th>New bf(B)</th><th>New bf(A)</th><th>New bf(C)</th></tr>
+<tr><td>+1</td><td>h</td><td>h−1</td><td>h − h = 0</td><td>(h−1) − h = −1</td><td>0</td></tr>
+<tr><td>0 (or C is the new node)</td><td>h</td><td>h</td><td>0</td><td>0</td><td>0</td></tr>
+<tr><td>−1</td><td>h−1</td><td>h</td><td>h − (h−1) = +1</td><td>h − h = 0</td><td>0</td></tr></table>
+<p>Check on real numbers: insert 9 into the 23–24 tree gives exactly this. A = 15, B = 7, C = 9 (a new leaf, so the middle row). Trace it below.</p>
+<div id="t0"></div>
+<div class="drawit"><b>On paper:</b> draw the before tree (A, B, C and the four triangles α β γ δ, with bf next to A and B), draw the middle tree after the first rotation (label "left rotate at B"), draw the after tree (label "right rotate at A"), then write the bf of A, B and C in the final tree. Write the word "LR" and the one-line reason. Drawing the middle tree is optional but earns the "sequence" mark safely.</div>
+
+<h2>6. Insertion and deletion</h2>
+<div class="method"><h4>Method · AVL insertion</h4><ol>
+<li>Insert as in a normal BST. The new node is a leaf, bf = 0.</li>
+<li>Walk up from the new node, updating heights and bf.</li>
+<li>At the <b>first (lowest) node with bf = ±2</b>, apply the case from section 4.</li>
+<li>Stop. After the rotation the subtree is as tall as before the insert, so no other node can be unbalanced. <b>Insertion needs at most one rotation (single or double).</b></li>
+</ol></div>
+<div class="method"><h4>Method · AVL deletion</h4><ol>
+<li>Delete as in an ordinary BST. If the node z has two children, find x, the in-order successor (smallest key in the right subtree), <b>copy the key of x into z, then delete x</b> (x has at most one child). The slides draw it as "z: to be deleted, copy key of x to z, then delete x". Using the predecessor instead is also correct, but say which one you use.</li>
+<li>Walk from the place where a node was removed up <b>to the root</b>, updating heights and bf.</li>
+<li>At every node with bf = ±2, rotate as in section 4. If the heavy child has bf = 0, use the single rotation.</li>
+<li>Do not stop at the first rotation. A rotation can shorten the subtree, which can unbalance a node higher up. <b>Deletion may need O(log n) rotations.</b></li>
+</ol></div>
+<pre class="code">AVL-INSERT(T, k)
+ BST-insert k as a leaf; z = new node
+ for each ancestor v of z, from the bottom up
+   update h(v)
+   if |bf(v)| == 2
+     rebalance(v)          // LL, LR, RR or RL
+     break                 // one fix is enough for insert
+
+AVL-DELETE(T, k)
+ z = node with key k
+ if z has two children: x = successor(z); z.key = x.key; z = x
+ splice out z (it has at most one child)
+ for each ancestor v of z, from the bottom up to the root
+   update h(v)
+   if |bf(v)| == 2: rebalance(v)    // no break: keep going</pre>
+
+<h2>7. The real instances</h2>
+<h3>2020–21 Q7(a): insert 20, then 68</h3>
+<p>Tree: 60 with left 40 (child 30) and right 70 (left child 65). Insert 20: it lands under 30 and node 40 gets +2, left child 30 has +1, so LL. Insert 68: it lands right of 65 and node 70 gets +2 with left child 65 at −1, so LR. Watch both.</p>
+<div id="t1"></div>
+<h3>2023–24 Q12(c): insert 15 22 24 7 9, then delete 24</h3>
+<p>The student solution files disagree. One of them rotates at the wrong node after inserting 9. The trace below is the correct one: 9 makes node 15 LR, giving 22(9(7,15),24). Deleting 24 leaves 22 with bf +2 and left child 9 with bf 0, so one right rotation (the LL case with B = 0) gives 9(7, 22(15)).</p>
+<div id="t2"></div>
+<div class="drawit"><b>On paper:</b> redraw after every operation, with bf beside each node. Mark the unbalanced node ("A, bf +2") before the rotation and write the case name beside the arrow. Show the double rotation as two trees, not one jump.</div>
+
+<h2>8. Height is O(log n): the proof</h2>
+<p>Asked in 2023–24 Q12(a), 2022–23 Q4(b), 2017–18 Q5(a). Idea: find the <b>fewest nodes</b> an AVL tree of height h can have. If that grows exponentially in h, then h is logarithmic in n.</p>
+<div class="method"><h4>Method · exam-ready proof</h4><ol>
+<li>Let N(h) be the minimum number of nodes in an AVL tree of height h. Leaf height is 0, so N(0) = 1 and N(1) = 2.</li>
+<li>Take a tree of height h with the fewest nodes. Its root has two subtrees. One has height h−1 (to make the tree height h). The other must have height at least h−2 (AVL rule). To use as few nodes as possible, both subtrees are themselves minimal, so \[ N(h) = N(h-1) + N(h-2) + 1. \]</li>
+<li>Since N(h−1) &gt; N(h−2), we get \( N(h) &gt; 2N(h-2) \). Repeating: \( N(h) \ge 2^{\lfloor h/2 \rfloor} \), so \( N(h) \ge 2^{(h-1)/2} \).</li>
+<li>A tree with n nodes and height h has \( n \ge N(h) \ge 2^{(h-1)/2} \). Take logs: \( h \le 2\lg n + 1 \).</li>
+<li>Therefore \( h = O(\log n) \). Also h ≥ lg n for any binary tree, so h = Θ(log n).</li>
+</ol></div>
+<p><b>Sharper bound (optional, impresses):</b> the recurrence says \( N(h)+1 = (N(h-1)+1) + (N(h-2)+1) \), the Fibonacci rule, so \( N(h) + 1 = F_{h+3} \) (with F₁ = F₂ = 1). Since \( F_k \approx \varphi^k/\sqrt5 \), \( h \lesssim 1.44\lg n \). Table: h = 0, 1, 2, 3, 4, 5 gives N = 1, 2, 4, 7, 12, 20.</p>
+<p><b>2018–19 Q3(a)(iii): maximum height with 10 nodes.</b> We need the largest h with N(h) ≤ 10. N(3) = 7 ≤ 10 but N(4) = 12 &gt; 10, so the maximum height is <b>3</b>.</p>
+<p><b>2017–18 Q5(d): i-th and (i+2)-th Fibonacci numbers are x and y, what is the minimum number of nodes with height i−1?</b> From N(h) + 1 = F_{h+3}: N(i−1) = F_{i+2} − 1 = <b>y − 1</b> (with F₁ = F₂ = 1, leaf height 0). The source does not give a key, so state your Fibonacci indexing and your leaf-height convention in the answer.</p>
+<div class="trap"><h4>Where marks go</h4><ul>
+<li>Writing the recurrence without saying why the other subtree has height h−2 (the AVL rule allows h−1 or h−2, the minimum uses h−2).</li>
+<li>Jumping from N(h) to "so h is log n" without the inequality \( n \ge N(h) \) and the step that turns it into a bound on h.</li>
+<li>Using "=" where it should be "≥" in step 3.</li>
+</ul></div>
+
+<h2>9. Smallest AVL tree of height 5 (2024–25 Q6(b), 10 marks; 2019–20 Q4(b))</h2>
+<p>Build it from the recurrence: <b>T(h) = a root with T(h−1) on one side and T(h−2) on the other</b>. T(0) is a single node. T(1) is a root with one child. Count: 1, 2, 4, 7, 12, 20.</p>
+<div class="method"><h4>Method · construct on paper</h4><ol>
+<li>Draw T(3) (7 nodes) and T(4) (12 nodes) first. They are the parts.</li>
+<li>T(4) = root with T(3) on the left and T(2) on the right: 12 = 7 + 4 + 1. Check the count.</li>
+<li>T(5) = root with T(4) left and T(3) right: 20 = 12 + 7 + 1.</li>
+<li>Number the nodes 1 to 20 by in-order position (left to right) so it is a valid BST. Write bf beside each node (the figure below shows them).</li>
+</ol></div>
+<div id="m5"></div>
+<p>This tree also settles <b>2019–20 Q4(b)</b>.</p>
+<div class="key"><p><b>(i) "The difference between the shortest and the longest root-to-leaf paths is at most one": FALSE.</b> In the tree above the path 13 → 8 → 11 → 12 has 3 edges and the path 13 → 8 → 5 → 3 → 2 → 1 has 5 edges. AVL balances the <b>heights of siblings</b> at every node, not the lengths of all paths. <b>(ii) "The minimum number of nodes with height 5 is 20": TRUE</b>, by N(5) = N(4) + N(3) + 1 = 12 + 7 + 1 = 20 (leaf height 0). If a paper used leaf = 1, the same tree has height 6 and the answer shifts, so state your convention.</p></div>
+<div class="drawit"><b>On paper:</b> draw the full 20-node tree, number it, and write the count next to each subtree (7, 12, 20). That is the proof that 20 is the minimum: shrinking any subtree breaks the AVL rule at its parent.</div>
+
+<h2>10. Mandatory practice</h2>
+<p>Do these with pen and paper first, then check.</p>
+<div id="r1"></div>
+<div id="r2"></div>
+<div id="r3"></div>
+<div id="p1"></div>
+<div id="p2"></div>
+<p class="drawit"><b>If you got one wrong:</b> open the steps and find the first frame where your tree differs. It names the case you misread. Next: <a href="02-rb-properties.html">red-black properties</a>.</p>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/algo.js"></script>
+<script src="../assets/dsa.js"></script>
+<script>
+// ---- generic tree figures: nodes N(label,colour,left,right,opts), subtree triangles T(label,opts)
+const N = (k, c, l, r, o) => Object.assign({ k, c: c || '', l, r }, o);
+const T = (t, o) => Object.assign({ t }, o);
+function gsvg(root) {
+  const lay = n => { if (n.t) return n.w = 60; const a = n.l ? lay(n.l) : (n.r ? 34 : 0), b = n.r ? lay(n.r) : (n.l ? 34 : 0); return n.w = Math.max(a + b, 46); };
+  const place = (n, x0, d) => { n.d = d; if (n.t) { n.x = x0 + n.w / 2; return; } const a = n.l ? n.l.w : 34; if (n.l) place(n.l, x0, d + 1); if (n.r) place(n.r, x0 + a, d + 1);
+    n.x = n.l && n.r ? (n.l.x + n.r.x) / 2 : n.l ? n.l.x + 17 : n.r ? n.r.x - 17 : x0 + n.w / 2; };
+  lay(root); place(root, 0, 0);
+  const Y = d => 24 + d * 56, parts = [], nodes = []; let maxY = 0;
+  (function walk(n) { if (n.t) { maxY = Math.max(maxY, Y(n.d) + 50); return; } maxY = Math.max(maxY, Y(n.d) + 26); nodes.push(n); for (const c of [n.l, n.r]) if (c) { walk(c); } })(root);
+  (function edges(n) { if (n.t) return; for (const c of [n.l, n.r]) if (c) { parts.push(`<line class="ed" x1="${n.x}" y1="${Y(n.d)}" x2="${c.x}" y2="${Y(c.d)}"/>`); edges(c); } })(root);
+  (function tri(n) { if (n.t) { const y = Y(n.d); parts.push(`<polygon points="${n.x},${y} ${n.x - 26},${y + 42} ${n.x + 26},${y + 42}" style="fill:var(--plate);stroke:var(--muted);stroke-width:1.5"/><text class="tx" x="${n.x}" y="${y + 29}" style="font-size:14px">${n.t}</text>`); if (n.h) parts.push(`<text class="sm" x="${n.x}" y="${y + 54}">${n.h}</text>`); maxY = Math.max(maxY, y + 60); return; } for (const c of [n.l, n.r]) if (c) tri(c); })(root);
+  for (const n of nodes) { const x = n.x, y = Y(n.d), w = n.c === 'R' || n.c === 'B'; const st = n.c === 'a' ? ' style="fill:var(--plate);stroke-dasharray:4 3"' : '';
+    parts.push(`<circle class="nd ${n.c === 'R' || n.c === 'B' ? n.c : ''}"${st} cx="${x}" cy="${y}" r="16"/>`);
+    if (n.db) parts.push(`<circle class="db" cx="${x}" cy="${y}" r="20"/>`);
+    if (n.hl) parts.push(`<circle class="hl" cx="${x}" cy="${y}" r="${n.db ? 23 : 19}"/>`);
+    parts.push(`<text class="tx ${w ? 'w' : ''}" x="${x}" y="${y}">${n.k}</text>`);
+    if (n.bf !== undefined) parts.push(`<text class="vl" x="${x + 22}" y="${y - 12}" style="font-size:11px;fill:var(--accent);font-weight:600">${n.bf}</text>`);
+    if (n.tag) parts.push(`<text class="sm" x="${x}" y="${y + 31}">${n.tag}</text>`); }
+  const W = root.w, H = maxY + 8;
+  return `<svg class="dsa-fig" viewBox="0 0 ${W} ${H}" width="${W}" role="img" aria-label="tree figure">${parts.join('')}</svg>`;
+}
+function gfig(sel, root) { document.querySelector(sel).innerHTML = `<div class="fg-wrap">${gsvg(root)}</div>`; }
+function pair(sel, a, b, la, lb) { document.querySelector(sel).innerHTML = `<div class="figrow"><div><div class="figlabel">${la || 'before'}</div>${gsvg(a)}</div><div><div class="figlabel">${lb || 'after'}</div>${gsvg(b)}</div></div>`; }
+function pfig(sel, text, bf) { // plain (uncoloured) tree from "20(10(5),30)", optional balance factors
+  const t = Algo.parseTreeText(text); const h = n => n ? 1 + Math.max(h(n.l), h(n.r)) : 0;
+  (function w(n) { if (!n) return; delete n.c; if (bf) n.bf = h(n.l) - h(n.r); w(n.l); w(n.r); })(t);
+  document.querySelector(sel).innerHTML = `<div class="fg-wrap">${drawTree(t)}</div>`;
+}
+
+pfig('#f0', '1(,2(,3(,4(,5))))');
+// rotation generic
+pair('#fr1', N('y', 'a', N('x', 'a', T('α'), T('β')), T('γ')), N('x', 'a', T('α'), N('y', 'a', T('β'), T('γ'))), 'before: y has left child x', 'after right rotate at y (read backwards for left rotate at x)');
+pfig('#fr2a', '30(20(10,25),40)');
+pfig('#fr2b', '20(10,30(25,40))');
+pfig('#fa1', '20(10(5),30)', true);
+pfig('#fa2', '50(30(10(5)),60(,70(,80)))', true);
+// four cases: A,B,C with bf
+const two = (id, a, b) => pair(id, a, b, 'before', 'after');
+two('#c1', N('A', '', N('B', '', T('α', { h: 'h+1' }), T('β', { h: 'h' }), { bf: '+1' }), T('γ', { h: 'h' }), { bf: '+2', hl: 1 }), N('B', '', T('α', { h: 'h+1' }), N('A', '', T('β', { h: 'h' }), T('γ', { h: 'h' }), { bf: '0' }), { bf: '0' }));
+two('#c2', N('A', '', T('α', { h: 'h' }), N('B', '', T('β', { h: 'h' }), T('γ', { h: 'h+1' }), { bf: '−1' }), { bf: '−2', hl: 1 }), N('B', '', N('A', '', T('α', { h: 'h' }), T('β', { h: 'h' }), { bf: '0' }), T('γ', { h: 'h+1' }), { bf: '0' }));
+two('#c3', N('A', '', N('B', '', T('α', { h: 'h' }), N('C', '', T('β'), T('γ'), { bf: 'c' }), { bf: '−1' }), T('δ', { h: 'h' }), { bf: '+2', hl: 1 }), N('C', '', N('B', '', T('α', { h: 'h' }), T('β')), N('A', '', T('γ'), T('δ', { h: 'h' })), { bf: '0' }));
+two('#c4', N('A', '', T('α', { h: 'h' }), N('B', '', N('C', '', T('β'), T('γ'), { bf: 'c' }), T('δ', { h: 'h' }), { bf: '+1' }), { bf: '−2', hl: 1 }), N('C', '', N('A', '', T('α', { h: 'h' }), T('β')), N('B', '', T('γ'), T('δ', { h: 'h' })), { bf: '0' }));
+// Q5b: before, after first rotation, after
+document.querySelector('#q5b').innerHTML = '<div class="figrow">' +
+ [['before (insertion made A = +2)', N('A', '', N('B', '', T('α', { h: 'h' }), N('C', '', T('β', { h: 'h or h−1' }), T('γ', { h: 'h or h−1' }), { bf: 'c' }), { bf: '−1' }), T('δ', { h: 'h' }), { bf: '+2', hl: 1 })],
+  ['after rotation 1: left rotate at B', N('A', '', N('C', '', N('B', '', T('α', { h: 'h' }), T('β')), T('γ')), T('δ', { h: 'h' }))],
+  ['after rotation 2: right rotate at A', N('C', '', N('B', '', T('α', { h: 'h' }), T('β')), N('A', '', T('γ'), T('δ', { h: 'h' })), { bf: '0' })]]
+ .map(([l, t]) => `<div><div class="figlabel">${l}</div>${gsvg(t)}</div>`).join('') + '</div>';
+// min tree h=5
+pfig('#m5', '13(8(5(3(2(1),4),7(6)),11(10(9),12)),18(16(15(14),17),20(19)))', true);
+trace('#t0', { kind: 'avl', input: '15 22 24 7 9' });
+trace('#t1', { kind: 'avl', input: '60(40(30),70(65)) ; 20 68' });
+trace('#t2', { kind: 'avl', input: '15 22 24 7 9 del 24' });
+recall('#r1', { id: 'r1', marks: 10, q: 'After inserting a key into an AVL tree, a node A has balance factor +2 while its left child B has balance factor −1. Determine the type of imbalance, give the rotations, and draw the subtree before and after with final balance factors. (2024–25 Q5b)', points: ['Left-Right (LR) case: left side too tall, but B is heavy on its right', 'Subtrees named: alpha under B left, C under B right with beta, gamma, delta under A right', 'Rotation 1: left rotate at B (C goes up)', 'Rotation 2: right rotate at A', 'Figure before and after showing C as root with B and A as children', 'Final bf: C = 0; B and A from the table (+1 → 0,−1; 0 → 0,0; −1 → +1,0)', 'Order preserved and subtree height back to the pre-insert height'], model: 'bf(A) = +2 so the left side is too tall; bf(B) = −1 so B\'s right child C is the taller one. This is an <b>LR</b> imbalance. Let δ have height h. Then B has height h+2, α has height h, C has height h+1. <br>Step 1: left rotate at B: C becomes A\'s left child, B becomes C\'s left child, β becomes B\'s right child. <br>Step 2: right rotate at A: C becomes the subtree root, A becomes C\'s right child, γ becomes A\'s left child. <br>Result: C(B(α,β), A(γ,δ)). bf(C) = 0. If C was +1 before (β = h, γ = h−1) then B = 0, A = −1. If C was 0 then B = A = 0. If C was −1 (β = h−1, γ = h) then B = +1, A = 0. In-order order is preserved and the height is h+2 again, as before the insertion.' });
+recall('#r2', { id: 'r2', marks: 10, q: 'Prove that the height of an AVL tree with n nodes is O(log n). (2023–24 Q12a)', points: ['Define N(h) = min nodes at height h, N(0)=1, N(1)=2', 'Recurrence N(h)=N(h−1)+N(h−2)+1 with the reason (subtrees h−1 and h−2)', 'N(h) > 2N(h−2) hence N(h) ≥ 2^{(h−1)/2}', 'n ≥ N(h) and take logs: h ≤ 2 lg n + 1', 'Conclusion h = O(log n)'], model: 'Let N(h) be the fewest nodes in an AVL tree of height h. N(0) = 1, N(1) = 2. A minimal tree of height h has a root, one subtree of height h−1 and (AVL rule, minimal) one of height h−2, both minimal, so N(h) = N(h−1) + N(h−2) + 1. Since N(h−1) > N(h−2), N(h) > 2N(h−2), hence N(h) ≥ 2^{⌊h/2⌋} ≥ 2^{(h−1)/2}. For an AVL tree with n nodes and height h, n ≥ N(h) ≥ 2^{(h−1)/2}, so h ≤ 2 lg n + 1 = O(log n). (Fibonacci: N(h)+1 = F_{h+3}, giving h ≤ 1.44 lg n.)' });
+recall('#r3', { id: 'r3', marks: 12, q: 'Prove or disprove: (i) in an AVL tree the shortest and longest root-to-leaf path lengths differ by at most one; (ii) the minimum number of nodes in an AVL tree of height 5 is 20. (2019–20 Q4b)', points: ['(i) is false, with a concrete counterexample', 'Counterexample: min tree of height 5 has paths of 3 and 5 edges', 'Explain AVL balances sibling heights not all path lengths', '(ii) is true: N(5)=N(4)+N(3)+1=12+7+1=20', 'State leaf height = 0'], model: '(i) False. The minimum AVL tree of height 5 (20 nodes) has a leaf at depth 3 (13, 8, 11, 12) and a leaf at depth 5 (13, 8, 5, 3, 2, 1), so the difference is 2. AVL only bounds the height difference of two subtrees of the same node. (ii) True. N(0)=1, N(1)=2, N(h)=N(h−1)+N(h−2)+1 gives N(2)=4, N(3)=7, N(4)=12, N(5)=20, and the recurrence is exact because the minimal tree uses minimal subtrees of heights h−1 and h−2 (leaf height 0).' });
+practice('#p1', { id: 'p1', kind: 'avl-insert', n: 2 });
+practice('#p2', { id: 'p2', kind: 'avl-delete', n: 1 });
+</script>
+</body>
+</html>

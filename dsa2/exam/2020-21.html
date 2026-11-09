@@ -1,0 +1,561 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Term final 2020–21 · CSE 207 Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Past paper · L-2/T-2 2020–21 · Term final · solved</div>
+<h1>Term final 2020–21</h1>
+<p class="lede">Full marks 210, time 3 hours. Two sections, four questions each, answer any three from each. Every question is 35 marks. Section B says: write pseudocode whenever an algorithm is asked. Try each part on paper first, then open the answer. This paper has several "design" questions (greedy, Dijkstra tricks, max-flow modelling) that the notes only teach by example, so read those answers as templates.</p>
+
+<div class="trap"><h4>Source notes</h4><ul>
+<li>All figures were read from the scan. The Q6(b) red-black tree was checked: every root-to-NIL path has 3 black nodes.</li>
+<li>Skip lists, Gale-Shapley, and splay potential are not in the teachers' notes. The answers below are self-contained.</li>
+<li>Splay trees: low priority. Skip lists: expect at most a short question.</li>
+</ul></div>
+
+<h2>Section A</h2>
+
+<h3>Question 1</h3>
+
+<div class="exam"><div class="exam-src">Q1(a) · 8 marks</div><div class="exam-q"><p>Design an efficient algorithm for finding the length of the longest path in a dag (directed acyclic graph).</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p><b>Idea.</b> In a dag, process vertices in topological order. Then when you stand at <code>u</code>, every path ending at <code>u</code> has already been counted.</p>
+<pre class="code">LONGEST-DAG(G, w)
+ topologically sort V                 // DFS, reverse finish order
+ for each v in V: len[v] = 0          // best path that ENDS at v (just v alone = 0)
+ for each u in topological order
+   for each edge (u,v) in Adj[u]
+     if len[u] + w(u,v) &gt; len[v]
+        len[v] = len[u] + w(u,v)
+ return max over v of len[v]</pre>
+<ol>
+<li>Correctness by induction on the order: when <code>u</code> is reached, all its in-neighbours came earlier, so <code>len[u]</code> is final.</li>
+<li>Time: DFS \(\Theta(V+E)\), the loop \(\Theta(V+E)\). Total \(\Theta(V+E)\).</li>
+<li>Equivalent trick: negate every weight and run DAG shortest paths. This is legal because a dag has no cycles, so no negative cycle can appear.</li>
+</ol>
+<p>Chapter: <a href="../graph/02-bellman-dag.html">Relaxation, Bellman-Ford, DAG</a>.</p>
+</div></details></div>
+
+<div class="exam"><div class="exam-src">Q1(b) · 12 marks</div><div class="exam-q"><p><i>Minimum-sum descent.</i> Some positive integers are arranged in an equilateral triangle with n numbers in its base like the one in Figure for Q.1(b) for n = 4. The problem is to find the smallest sum in a descent from the triangle apex to its base through a sequence of adjacent numbers (shown in the figure by the circles). Explain how the minimum-sum descent problem can be solved by Dijkstra's algorithm.</p>
+<p><b>Figure data (read from scan):</b> row 1: 2; row 2: 5 4; row 3: 1 4 7; row 4: 8 6 9 6. The circled descent is 2, 5, 1, 6.</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p><b>Model as a graph.</b></p>
+<ol>
+<li>One vertex per number. Name them A (2), B (5), C (4), D (1), E (4), F (7), G (8), H (6), I (9), J (6), reading left to right, row by row.</li>
+<li>A number is adjacent to the two numbers just below it. Edge \(u\to v\) gets weight = the number written in <b>v</b> (we pay for a number when we step on it).</li>
+<li>Add a sink T with a weight-0 edge from every bottom-row vertex.</li>
+<li>All weights are positive, so Dijkstra applies. Run it from A. The answer is \(2 + d(T)\), because the apex number was never paid by an edge.</li>
+<li>The path is read back with the parent pointers \(\pi\).</li>
+</ol>
+<p><b>Why Dijkstra and not a simple DP?</b> A DP over rows also works in \(O(n^2)\). Dijkstra is the "graph" answer the question wants: \(V = n(n+1)/2+1\), \(E = O(V)\), so \(O(V\log V)\) with a heap.</p>
+<div id="t1"></div>
+<p>Result: \(d(T) = 12\), so the minimum sum is \(2+12 = 14\), via A, B, D, H, which is the circled descent 2, 5, 1, 6.</p>
+<div class="drawit"><b>On paper:</b> draw the triangle as a layered graph with edge weights, then the table of d values after each extract (as in the trace), then circle the final path.</div>
+<p>Chapter: <a href="../graph/03-dijkstra.html">Dijkstra: trace, proof, variants</a>.</p>
+</div></details></div>
+
+<div class="exam"><div class="exam-src">Q1(c) · 15 marks</div><div class="exam-q"><p>Let T be a minimum spanning tree of graph G obtained by Prim's algorithm. Let G<sub>new</sub> be a graph obtained by adding to G a new vertex and some edges, with weights, connecting the new vertex to some vertices in G. Can you construct a minimum spanning tree of G<sub>new</sub> by adding one of the new edges to T? If your answer is yes, explain how; if your answer is no, explain why not.</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p><b>Answer: not in general.</b> It works only when the new vertex gets exactly one new edge. With two or more new edges the MST may need several of them and drop an old tree edge.</p>
+<p><b>Counterexample.</b> G is the path a–b (5), b–c (5), so T = G. New vertex v with edges v–a (1) and v–c (1). Best "T plus one new edge" is T + v–a, weight 11. But the real MST of G<sub>new</sub> is {v–a, v–c, a–b}, weight 7. It uses two new edges and drops b–c.</p>
+<p><b>What is true: the new MST uses only edges of T and the new edges.</b></p>
+<ol>
+<li>Take any edge \(e\in E(G)\setminus T\). T is an MST of G, so \(e\) is a heaviest edge on the cycle formed by \(T+e\). (If a lighter edge were on that cycle, swapping would give a lighter spanning tree.)</li>
+<li>That cycle still exists in G<sub>new</sub>, and \(e\) is still a heaviest edge on it.</li>
+<li>By the cycle property, a heaviest edge of a cycle can be removed without losing an MST. So \(e\) can be discarded.</li>
+<li>Hence an MST of G<sub>new</sub> lies inside \(T\cup F\), where F is the set of new edges.</li>
+</ol>
+<p><b>Algorithm.</b> Run Kruskal (or Prim) on the graph \((V\cup\{v\},\ T\cup F)\). It has \(|V|-1+|F|\) edges, so it takes \(O((|V|+|F|)\log |V|)\) instead of re-solving G<sub>new</sub> from scratch.</p>
+<div id="t2"></div>
+<p>Chapter: <a href="../graph/01-mst.html">Cut property, Kruskal, Prim, uniqueness</a>.</p>
+</div></details></div>
+
+<h3>Question 2</h3>
+
+<div class="exam"><div class="exam-src">Q2(a) · 12 marks</div><div class="exam-q"><p>The shortest paths to a given vertex from each other vertex of a weighted digraph is called the <i>single-destination shortest-paths</i> problem. Solve the single-destination shortest-path problem in a graph with nonnegative numbers assigned to its vertices in addition to the edge weights.</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p><b>Meaning.</b> The cost of a path = sum of its edge weights + sum of the numbers \(n(x)\) of the vertices on it. Destination is \(t\).</p>
+<ol>
+<li><b>Reverse every edge.</b> A path \(x_k\to\dots\to x_1\to t\) in G is a path \(t\to x_1\to\dots\to x_k\) in the reversed graph \(G^R\).</li>
+<li><b>Move vertex costs onto edges.</b> For each edge \((u,v)\) of G, the reversed edge \((v,u)\) gets weight \(w'(v,u)=w(u,v)+n(u)\). We charge the vertex we step <i>into</i>. All \(w'\ge 0\).</li>
+<li>Run <b>Dijkstra from t</b> on \(G^R\) with weights \(w'\). The true cost of the shortest path from \(x\) to \(t\) in G is \(d'(x)+n(t)\), because \(t\) itself was never charged.</li>
+<li>Time: \(O(E\log V)\) with a binary heap.</li>
+</ol>
+<p><b>Why it is right.</b> Every path from \(t\) in \(G^R\) corresponds one to one to a path into \(t\) in G. Each vertex of it except \(t\) is charged once, through the edge entering it. So path costs agree up to the constant \(n(t)\), and Dijkstra is valid because \(w'\ge0\).</p>
+<p>Chapter: <a href="../graph/03-dijkstra.html">Dijkstra: trace, proof, variants</a>.</p>
+</div></details></div>
+
+<div class="exam"><div class="exam-src">Q2(b) · 10 marks</div><div class="exam-q"><p>Explain how to implement Warshall's algorithm without using extra memory for storing elements of the algorithm's intermediate matrices.</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p>Keep <b>one</b> matrix \(R\) and update it in place:</p>
+<pre class="code">WARSHALL(R)                 // R[i][j] = 1 if edge i-&gt;j or i = j
+ for k = 1 to n
+   for i = 1 to n
+     for j = 1 to n
+       R[i][j] = R[i][j] OR (R[i][k] AND R[k][j])</pre>
+<ol>
+<li>The textbook version builds \(R^{(k)}\) from \(R^{(k-1)}\) in a separate matrix. The in-place version needs the old values only in row \(k\) and column \(k\).</li>
+<li>During round \(k\), row \(k\) does not change: \(R[k][j]\leftarrow R[k][j]\ \text{OR}\ (R[k][k]\ \text{AND}\ R[k][j])\). Since \(R[k][k]=1\) already, this equals \(R[k][j]\).</li>
+<li>Column \(k\) does not change either: \(R[i][k]\leftarrow R[i][k]\ \text{OR}\ (R[i][k]\ \text{AND}\ R[k][k])=R[i][k]\).</li>
+<li>So every value read in round \(k\) from row \(k\) or column \(k\) is the same as in \(R^{(k-1)}\). Overwriting other cells early is harmless: the result equals \(R^{(k)}\).</li>
+<li>Space: \(\Theta(1)\) extra. Time \(\Theta(n^3)\). The same argument works for Floyd-Warshall (\(d[k][k]=0\) when there is no negative cycle).</li>
+</ol>
+<p>Chapter: <a href="../graph/04-apsp.html">Matrix squaring, Floyd-Warshall, closure</a>.</p>
+</div></details></div>
+
+<div class="exam"><div class="exam-src">Q2(c) · 13 marks</div><div class="exam-q"><p><i>Rumor spreading:</i> There are n people, each in possession of a different rumor. They want to share all the rumors with each other by sending electronic messages. Assume that a sender includes all the rumors he or she knows at the time the message is sent and that a message may only have one addressee. Design a greedy algorithm that always yields the minimum number of messages they need to send to guarantee that every one of them gets all the rumors.</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p><b>Answer: \(2n-2\) messages</b> (for \(n\ge2\)).</p>
+<div class="method"><h4>Method · the hub algorithm</h4><ol>
+<li>Pick person 1 as the hub.</li>
+<li>Persons \(2,3,\dots,n\) each send one message to person 1. Now person 1 knows all \(n\) rumors. That is \(n-1\) messages.</li>
+<li>Person 1 sends one message to each of \(2,\dots,n\). Each now has everything. That is \(n-1\) more messages.</li>
+</ol></div>
+<p><b>Lower bound (why you cannot do better).</b></p>
+<ol>
+<li>Look at the first moment some person \(p\) knows all \(n\) rumors. Nobody knew all rumors before this.</li>
+<li>Rumors of all \(n\) people had to flow into \(p\), so the messages sent up to that moment connect all \(n\) people. A connected graph on \(n\) vertices needs at least \(n-1\) edges. So at least \(n-1\) messages were sent.</li>
+<li>At that moment only \(p\) knows everything. (The sender of the last message cannot know all, or it would have known all earlier.) The other \(n-1\) people each need at least one more message.</li>
+<li>Total \(\ge (n-1)+(n-1)=2n-2\). The hub algorithm meets it, so it is optimal.</li>
+</ol>
+<p><b>Check small cases.</b> n = 2: A→B, B→A, 2 messages. n = 3: B→A, C→A, A→B, A→C is 4 messages, and 3 is impossible.</p>
+<p class="drawit"><b>If a marker expects the "2n−4" answer:</b> that is for <i>phone calls</i> (two-way). Here a message has one addressee and goes one way, so the answer is \(2n-2\).</p>
+<p>Chapter: this is a modelling question; see <a href="../graph/08-matching-modelling.html">Bipartite matching and modelling</a> for how to argue lower bounds.</p>
+</div></details></div>
+
+<h3>Question 3</h3>
+
+<div class="exam"><div class="exam-src">Q3(a) · 10 marks</div><div class="exam-q"><p>You want to increase the maximum flow of a network as much as possible, but you are only allowed to increase the capacity of one edge. How do you find such an edge? (Give pseudocode). You may assume the existence of algorithms to compute max flow min cut. What's the running time of your algorithm?</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p><b>Key fact.</b> Raising an edge's capacity helps only if that edge crosses <b>every</b> minimum cut. In a residual network after max flow, edge \((u,v)\) is such an edge exactly when \(u\) is reachable from \(s\) and \(t\) is reachable from \(v\) in \(G_f\).</p>
+<pre class="code">BEST-EDGE(G, s, t)
+ f = MAX-FLOW(G, s, t)                 // any algorithm, e.g. Edmonds-Karp
+ build residual network G_f
+ A = vertices reachable from s in G_f          // BFS
+ B = vertices that can reach t in G_f          // BFS on reversed G_f
+ for each original edge (u,v)
+    if u in A and v in B return (u,v)          // saturated, on every min cut
+ return NONE                                    // no single edge helps</pre>
+<ol>
+<li>Such an edge is saturated: if it had residual capacity, \(v\) would be in \(A\), and then \(s\to u\to v\to t\) would be an augmenting path, contradiction.</li>
+<li>Raise its capacity by 1: the residual edge \(u\to v\) appears and \(s\leadsto u\to v\leadsto t\) is an augmenting path, so max flow grows by at least 1. If the edge is not of this kind, some min cut avoids it, and the max flow cannot grow.</li>
+<li>Time: one max-flow computation + two BFS, \(O(\text{maxflow} + V + E)\). With Edmonds-Karp, \(O(VE^2)\).</li>
+</ol>
+<p>Chapter: <a href="../graph/07-mincut-ek.html">Max-flow min-cut, Edmonds-Karp</a>.</p>
+</div></details></div>
+
+<div class="exam"><div class="exam-src">Q3(b) · 10 marks</div><div class="exam-q"><p>In a stable matching problem (Gale-Shapley algorithm) each participant has a true preference order. Now consider a woman <i>w</i>. Suppose <i>w</i> prefers man <i>m</i> to <i>m′</i>, but both <i>m</i> and <i>m′</i> are low on her list of preferences. Can it be the case that by switching the order of <i>m</i> and <i>m′</i> on her list of preferences (i.e., by falsely claiming that she prefers <i>m′</i> to <i>m</i>) and running the algorithm with this false preference list, <i>w</i> will end up with a man <i>m″</i> that she truly prefers to both <i>m</i> and <i>m′</i>? Give proof to support your answer.</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p><b>Answer: yes, it can.</b> Men-proposing Gale-Shapley is strategy-proof for men but not for women. A single example proves "can be the case".</p>
+<p><b>Example (3 men, 3 women).</b> Preferences, best first:</p>
+<ul>
+<li>Men: M0: W X Y; M1: Y W X; M2: W Y X.</li>
+<li>Women: W: M1, M2, M0; X: M2, M1, M0; Y: M2, M0, M1.</li>
+</ul>
+<p>Here w = W, m = M2, m′ = M0, and the man she truly prefers to both is m″ = M1.</p>
+<p><b>Truthful run (men propose).</b></p>
+<ol>
+<li>M0→W, M1→Y, M2→W. W holds M2 (she likes M2 more than M0) and rejects M0. Y holds M1.</li>
+<li>M0→X. X holds M0.</li>
+<li>Result: W–M2, Y–M1, X–M0. W gets her second choice.</li>
+</ol>
+<p><b>Lying run: W reports M1, M0, M2</b> (swapped M2 and M0).</p>
+<ol>
+<li>M0→W, M1→Y, M2→W. Now W prefers M0 to M2, so she keeps M0 and rejects M2. Y holds M1.</li>
+<li>M2 proposes to Y. Y prefers M2 to M1, so Y drops M1.</li>
+<li>M1 proposes to W (his next choice). W's list has M1 first, so she takes M1 and rejects M0.</li>
+<li>M0→X. X holds M0.</li>
+<li>Result: W–M1, Y–M2, X–M0. W now has M1, her true first choice, better than both M2 and M0.</li>
+</ol>
+<p><b>Why it works.</b> The lie made W reject M2 early. M2 then "bumped" M1 off Y, and M1 came back to W. A woman can use her list to steer which men are free to propose to her.</p>
+<div class="trap"><h4>Where marks go</h4><ul>
+<li>Say clearly "yes" and give a concrete instance, with both runs written out.</li>
+<li>Honest limit: I tested many random small instances by computer (not a proof). The swap helps only when her true partner is m or lies between m and m′. If her true partner is better than both, or is m′ or worse, swapping the two cannot help. Do not claim more than the example.</li>
+<li>Contrast: for men, truth-telling is a dominant strategy (the man-optimal matching gives each man his best stable partner).</li>
+</ul></div>
+<p>No chapter covers Gale-Shapley; the answer above is self-contained.</p>
+</div></details></div>
+
+<div class="exam"><div class="exam-src">Q3(c) · 15 marks</div><div class="exam-q"><p><i>Jack Straws:</i> In the game of Jack Straws, a number of plastic or wooden "straws" are dumped on the table and players try to remove them one by one without disturbing the other straws. Here, we are only concerned with whether various pairs of straws are connected by a path of touching straws. Given a list of the endpoints for n &gt; 1 straws (as if they were dumped on a large piece of graph paper), determine all the pairs of straws that are connected. Note that touching is connecting, but also that two straws can be connected indirectly via other connected straws.</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p><b>Model.</b> Each straw is a vertex. Put an edge between two straws if the two line segments intersect (touching counts). Two straws are connected iff they are in the same connected component.</p>
+<div class="method"><h4>Method</h4><ol>
+<li>For every pair \((i,j)\), test whether segments \(i\) and \(j\) intersect (orientation test below). \(O(n^2)\) tests.</li>
+<li>Union the two straws in a union-find structure (or build adjacency lists).</li>
+<li>Label components with DFS/BFS or read union-find roots.</li>
+<li>Report every pair \((i,j)\) with the same component label.</li>
+</ol></div>
+<pre class="code">orient(p,q,r) = sign( (q.x-p.x)*(r.y-p.y) - (q.y-p.y)*(r.x-p.x) )   // 0 = collinear
+
+INTERSECT(p1,p2,p3,p4)
+ o1 = orient(p1,p2,p3); o2 = orient(p1,p2,p4)
+ o3 = orient(p3,p4,p1); o4 = orient(p3,p4,p2)
+ if o1 != o2 and o3 != o4 return TRUE            // proper crossing
+ if o1 == 0 and onSegment(p1,p2,p3) return TRUE  // touching / collinear overlap
+ if o2 == 0 and onSegment(p1,p2,p4) return TRUE
+ if o3 == 0 and onSegment(p3,p4,p1) return TRUE
+ if o4 == 0 and onSegment(p3,p4,p2) return TRUE
+ return FALSE
+
+JACK-STRAWS(S[1..n])
+ make-set(i) for all i
+ for i = 1 to n-1: for j = i+1 to n
+    if INTERSECT(S[i], S[j]) union(i, j)
+ for i = 1 to n-1: for j = i+1 to n
+    if find(i) == find(j) print (i, j)</pre>
+<p>Time: \(O(n^2\,\alpha(n))\) for the unions plus \(O(n^2)\) to print, so \(O(n^2)\). <code>onSegment(p,q,r)</code> checks that \(r\) lies within the bounding box of \(p,q\) (valid because \(r\) is already known to be collinear).</p>
+<p>Chapter: <a href="../graph/01-mst.html">MST chapter (union-find)</a>.</p>
+</div></details></div>
+
+<h3>Question 4</h3>
+
+<div class="exam"><div class="exam-src">Q4(a) · 15 marks</div><div class="exam-q"><p>The edge connectivity of an undirected graph is the minimum number k of edges that must be removed to disconnect the graph. For example, the edge connectivity of a tree is 1, and the edge connectivity of a cyclic chain of vertices is 2. Show how to determine the edge connectivity of an undirected graph G = (V, E) by running a maximum-flow algorithm on at most |V| flow networks, each having O(V) vertices and O(E) edges.</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<div class="method"><h4>Method</h4><ol>
+<li>Replace each undirected edge \(\{u,v\}\) by two directed edges \((u,v)\) and \((v,u)\), each of capacity 1. The network has \(V\) vertices and \(2E\) edges.</li>
+<li>Fix any vertex \(s\).</li>
+<li>For every other vertex \(t\), compute the max flow from \(s\) to \(t\). That is \(|V|-1\) flow networks.</li>
+<li>Edge connectivity \(k=\min_t \text{maxflow}(s,t)\).</li>
+</ol></div>
+<pre class="code">EDGE-CONNECTIVITY(G)
+ build N: each undirected edge -&gt; two arcs of capacity 1
+ s = any vertex
+ k = infinity
+ for each t != s
+    k = min(k, MAX-FLOW(N, s, t))
+ return k</pre>
+<p><b>Proof.</b></p>
+<ol>
+<li>Let \((S,V\setminus S)\) be a cut of N with \(s\in S\). Its capacity counts arcs from \(S\) to \(V\setminus S\), which is exactly the number of undirected edges crossing it (each crossing edge contributes one arc in that direction).</li>
+<li>Any set of edges whose removal disconnects G separates \(s\) from some vertex \(t\). So the global minimum cut separates \(s\) from some \(t\), and has size \(\ge \text{maxflow}(s,t)\) by max-flow min-cut, so \(\ge \min_t\).</li>
+<li>Conversely, for each \(t\), a minimum \(s\)–\(t\) cut is a set of edges whose removal disconnects G, so \(k\le \text{maxflow}(s,t)\) for all \(t\).</li>
+<li>Hence \(k=\min_t \text{maxflow}(s,t)\).</li>
+</ol>
+<p>Each max flow is at most \(V-1\) (degree of \(s\) is at most \(V-1\)), so Ford-Fulkerson takes \(O(VE)\) per \(t\), \(O(V^2E)\) in total.</p>
+<p>Chapter: <a href="../graph/07-mincut-ek.html">Max-flow min-cut, Edmonds-Karp</a>.</p>
+</div></details></div>
+
+<div class="exam"><div class="exam-src">Q4(b) · 7 marks</div><div class="exam-q"><p>What is fixed-parameter tractability? Why is it useful?</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<ol>
+<li><b>Definition.</b> A problem with input size \(n\) and a parameter \(k\) is fixed-parameter tractable (FPT) if it can be solved in time \(f(k)\cdot n^{c}\), where \(f\) is any function of \(k\) alone and \(c\) is a constant independent of \(k\).</li>
+<li><b>Example.</b> Vertex cover with parameter \(k\) (is there a cover of size \(\le k\)?) runs in \(O(2^k\cdot n)\): pick an uncovered edge, branch on which endpoint goes in the cover, depth at most \(k\). The input is huge but \(k\) is small.</li>
+<li><b>Why useful.</b> An NP-hard problem is still exponential in general. FPT confines the exponential blow-up to the small parameter and keeps polynomial growth in \(n\). So it is practical when \(k\) is small, for example, a few dozen. Compare \(n^{k}\) (not FPT): the exponent itself grows with \(k\).</li>
+</ol>
+<p>Chapter: <a href="../np/06-approximation.html">Approximation algorithms</a> (ways to cope with NP-hard problems).</p>
+</div></details></div>
+
+<div class="exam"><div class="exam-src">Q4(c) · 13 marks</div><div class="exam-q"><p>In the <i>bottleneck traveling salesperson problem (TSP)</i>, we are given an undirected graph G with weights on its edges and asked to find a tour that visits the vertices of G exactly once and returns to the start so as to minimize the cost of the maximum-weight edge in the tour. Assuming that the weights in G satisfy the triangle inequality, design a polynomial-time 3-approximation algorithm for bottleneck TSP.</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p><b>Idea.</b> The heaviest edge of a minimum spanning tree is at most the optimal bottleneck. Then walk the tree in a way that skips at most 2 intermediate vertices, so each tour edge costs at most 3 times that.</p>
+<div class="method"><h4>Algorithm</h4><ol>
+<li>Compute an MST \(T\) of G. Let \(b_T\) be its heaviest edge.</li>
+<li>Build a Hamiltonian cycle \(H\) in \(T^3\) (the graph joining vertices at tree distance \(\le 3\)), using the lemma below.</li>
+<li>Output \(H\).</li>
+</ol></div>
+<p><b>Claim 1: \(b_T\le b^*\)</b> where \(b^*\) is the optimal bottleneck value.</p>
+<ol>
+<li>An optimal tour minus one edge is a spanning tree whose heaviest edge is \(\le b^*\).</li>
+<li>An MST minimises the heaviest edge among all spanning trees. So \(b_T\le b^*\).</li>
+</ol>
+<p><b>Claim 2: if \(u,v\) are at tree distance \(\le 3\), then \(w(u,v)\le 3b_T\).</b> The tree path has at most 3 edges, each \(\le b_T\), and the triangle inequality gives \(w(u,v)\le\) path weight \(\le 3b_T\).</p>
+<p>So every edge of \(H\) weighs at most \(3b_T\le 3b^*\): a 3-approximation.</p>
+<p><b>Lemma (the cube of a tree is Hamiltonian).</b> For every tree with at least 2 vertices and every tree edge \((u,v)\), \(T^3\) has a Hamiltonian path from \(u\) to \(v\). Proof by induction on the number of vertices.</p>
+<ol>
+<li>Base: 2 vertices, the path is \(u,v\).</li>
+<li>Remove edge \((u,v)\); this splits \(T\) into \(T_u\ni u\) and \(T_v\ni v\).</li>
+<li>If \(T_u\) is a single vertex, take the path "\(u\)" and put \(u'=u\). Otherwise \(u\) has a neighbour \(u'\) in \(T_u\), and by induction \(T_u^3\) has a Hamiltonian path from \(u\) to \(u'\). Similarly get a path \(v'\ \dots\ v\) in \(T_v^3\).</li>
+<li>Join them: go \(u\leadsto u'\), jump \(u'\to v'\), go \(v'\leadsto v\). The jump is legal: \(u'-u-v-v'\) has length 3, so \(u'v'\in T^3\).</li>
+<li>This is a Hamiltonian path from \(u\) to \(v\). Because \((u,v)\) is a tree edge, \(vu\in T^3\) closes it into a Hamiltonian cycle.</li>
+</ol>
+<p>Time: MST \(O(E\log V)\) plus the recursion \(O(V)\). Polynomial.</p>
+<p>Chapter: <a href="../np/06-approximation.html">Approximation algorithms</a>.</p>
+</div></details></div>
+
+<h2>Section B</h2>
+
+<h3>Question 5</h3>
+
+<div class="exam"><div class="exam-src">Q5(a) · 10 marks</div><div class="exam-q"><p>A friend of you claims that it is possible to implement Find-Min operation in a Binomial Min Heap in O(1) time using the idea of Fibonacci Min Heap. Justify his claim with proper explanation.</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p><b>The claim is true.</b> A Fibonacci heap keeps a pointer <code>H.min</code> to the smallest root. Do the same in a binomial heap.</p>
+<ol>
+<li>The minimum key of a binomial heap is always a root (heap order in every tree). So storing <code>min</code> is enough.</li>
+<li><b>Find-min:</b> return <code>H.min</code>. \(O(1)\).</li>
+<li><b>Insert / union:</b> after the usual work, compare the old <code>min</code>(s) with each other. \(O(1)\) extra work.</li>
+<li><b>Decrease-key:</b> after bubbling up, if the new key is smaller than <code>min.key</code>, update <code>min</code>. \(O(1)\) extra.</li>
+<li><b>Extract-min:</b> remove <code>min</code>, merge its children as usual, then rescan the root list (at most \(\lfloor\log n\rfloor+1\) roots) to find the new minimum. \(O(\log n)\), the same order as extract-min already costs, so the bound is unchanged.</li>
+</ol>
+<p>So find-min drops from \(O(\log n)\) (scan the root list) to \(O(1)\) with no change to the other bounds.</p>
+<p>Chapters: <a href="../heap/03-binomial-heap.html">Binomial heap operations</a>, <a href="../heap/04-fibonacci.html">Fibonacci heap</a>.</p>
+</div></details></div>
+
+<div class="exam"><div class="exam-src">Q5(b) · 5 + 10 = 15 marks</div><div class="exam-q"><p>Prove that the expected space usage of a skip list having n items is O(n). Perform the following operations on the given skip list sequentially: (i) Insert key = 17 where i = 2; (ii) Insert key = 25 where i = 4; (iii) Delete key = 25. Show all the steps and the resulting skip lists.</p>
+<p><b>Figure data (read from scan):</b> h = 3, n = 4. S3: −∞, +∞. S2: −∞, 15, +∞. S1: −∞, 15, 23, +∞. S0: −∞, 10, 15, 23, 36, +∞.</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p><b>Proof of \(O(n)\) expected space.</b></p>
+<ol>
+<li>When a key is inserted, it is promoted to the next level with probability \(1/2\) (coin flip). So the key appears at level \(i\) with probability \(1/2^{i}\).</li>
+<li>Let \(X_i\) be the number of keys at level \(i\). \(E[X_i]=n/2^{i}\).</li>
+<li>Expected total nodes \(=\sum_{i\ge0}E[X_i]=n\sum_{i\ge0}2^{-i}\le 2n\).</li>
+<li>The two sentinels per level add \(O(h)\), and \(h=O(\log n)\) with high probability. So the expected space is \(O(n)\).</li>
+</ol>
+<p><b>Operations.</b> Here "i" is the number of heads: the key is stored in \(S_0,\dots,S_i\). Insert: walk down from the top-left, keep the last node visited on each level (the predecessor), then splice the key in after the predecessor on levels \(0..i\).</p>
+<p><b>(i) Insert 17, i = 2.</b> Search path (predecessors): S3: −∞, S2: 15, S1: 15, S0: 15. Insert 17 after 15 in S0, S1, S2.</p>
+<pre>S3: -inf ----------------------------------------- +inf
+S2: -inf ------ 15 -- 17 ------------------------- +inf
+S1: -inf ------ 15 -- 17 -- 23 ------------------- +inf
+S0: -inf -- 10 -- 15 -- 17 -- 23 -- 36 ------------ +inf</pre>
+<p><b>(ii) Insert 25, i = 4.</b> The key must reach level 4, but the top list is S3. Create a new empty list S4 (just −∞, +∞), so the height \(h\) goes from 3 to 4. Predecessors: S4: −∞, S3: −∞, S2: 17, S1: 23, S0: 23.</p>
+<pre>S4: -inf ----------------------------------------- 25 -- +inf
+S3: -inf ----------------------------------------- 25 -- +inf
+S2: -inf ------ 15 -- 17 ------------------------- 25 -- +inf
+S1: -inf ------ 15 -- 17 -- 23 ------------------- 25 -- +inf
+S0: -inf -- 10 -- 15 -- 17 -- 23 -- 25 -- 36 ------------ +inf</pre>
+<p><b>(iii) Delete 25.</b> Search finds 25 in all levels; remove it from S0..S4 (use the predecessors found on the way down). Now S4 and S3 hold only the sentinels. Keep <b>one</b> empty top list: remove S4, keep S3. The height is back to 3.</p>
+<pre>S3: -inf ----------------------------------------- +inf
+S2: -inf ------ 15 -- 17 ------------------------- +inf
+S1: -inf ------ 15 -- 17 -- 23 ------------------- +inf
+S0: -inf -- 10 -- 15 -- 17 -- 23 -- 36 ------------ +inf</pre>
+<div class="drawit"><b>On paper:</b> redraw all four levels after each of the three operations, write the predecessor of each level beside the picture, and note "S4 created" and "S4 removed".</div>
+<p>No chapter covers skip lists; this answer is self-contained.</p>
+</div></details></div>
+
+<div class="exam"><div class="exam-src">Q5(c) · 5 marks</div><div class="exam-q"><p>Describe how Fibonacci numbers are related to Fibonacci Heaps.</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<ol>
+<li>Let \(x\) be a node of degree \(k\) in a Fibonacci heap. Order its children by the time they were linked to \(x\): \(y_1,\dots,y_k\).</li>
+<li>When \(y_i\) was linked, \(x\) already had \(i-1\) children, and linking only happens between roots of equal degree, so \(y_i\) had degree \(\ge i-1\) then. Since then it lost at most 1 child (a second loss would have cut it). So \(\deg y_i\ge i-2\).</li>
+<li>Let \(s_k\) be the minimum size of a subtree whose root has degree \(k\). Then \(s_k\ge 2+\sum_{i=2}^{k}s_{i-2}\), which gives \(s_k\ge F_{k+2}\) (the \((k+2)\)-th Fibonacci number: \(F_0=0,F_1=1\)).</li>
+<li>\(F_{k+2}\ge\phi^{k}\) with \(\phi=(1+\sqrt5)/2\). So \(n\ge\phi^{k}\), hence the maximum degree is \(D(n)\le\log_\phi n=O(\log n)\).</li>
+<li>This bound is why extract-min's consolidation touches only \(O(\log n)\) degrees, giving \(O(\log n)\) amortized extract-min.</li>
+</ol>
+<p>Chapter: <a href="../heap/04-fibonacci.html">Fibonacci heap</a>, <a href="../heap/05-amortized.html">Potential method and damaged trees</a>.</p>
+</div></details></div>
+
+<div class="exam"><div class="exam-src">Q5(d) · 5 marks</div><div class="exam-q"><p>In one approach to solve the Traveling Salesman Problem using branch-and-bound technique, the lower bound of the cost of completing a partial tour has been calculated from the cost of the minimum spanning tree spanning the remaining nodes of the graph. Decide whether this bound function will give correct answer all the time, with proper explanation. If there is any better bound function for this problem, mention it.</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<ol>
+<li><b>Yes, it is a valid lower bound</b> (it never overestimates), provided weights are non-negative. Branch and bound only needs the bound to be \(\le\) the true best completion cost, so pruning never throws away the optimum.</li>
+<li>Reason: whatever completion we choose, the remaining part of the tour visits all remaining nodes. Remove the two edges that join the remaining nodes to the end of the partial tour and to the start. What is left is a path through all remaining nodes: a spanning tree of them. Its cost is \(\ge\) MST(remaining nodes).</li>
+<li>So \(\text{bound}=\text{cost(partial tour)}+\text{MST(remaining)}\le\) true cost of every completion.</li>
+<li><b>It is weak</b>, because it ignores the two connecting edges. Better bounds: add the cheapest edge from the current end to a remaining node and the cheapest edge from a remaining node back to the start; or use the 1-tree bound (MST on all but one vertex plus the two cheapest edges at that vertex), or the Held-Karp (1-tree with penalties) bound; or, for each city, half the sum of its two cheapest edges.</li>
+</ol>
+<p>Chapter: <a href="../np/04-branch-bound.html">Branch and bound; TSP by DP</a>.</p>
+</div></details></div>
+
+<h3>Question 6</h3>
+
+<div class="exam"><div class="exam-src">Q6(a) · 5 + 10 = 15 marks</div><div class="exam-q"><p>Define the rank of a node of a splay tree. Prove that the change in potential of a splay tree not resulting from any splay after an insertion operation is O(log n), where the splay tree had n nodes before the insertion operation.</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p><b>Definitions (5 marks).</b></p>
+<ul>
+<li>Size \(s(x)\) = number of nodes in the subtree rooted at \(x\) (including \(x\)).</li>
+<li>Rank \(r(x)=\log_2 s(x)\).</li>
+<li>Potential \(\Phi(T)=\sum_{x}r(x)\).</li>
+</ul>
+<p><b>Proof (10 marks).</b> Insert the new key \(z\) as a leaf, before splaying. Let \(y_1,y_2,\dots,y_d\) be the ancestors of \(z\) (\(y_1\) its parent, \(y_d\) the root), with sizes \(s_1,\dots,s_d\) before the insertion.</p>
+<ol>
+<li>Only the ancestors change size, each by +1. The new leaf has \(s(z)=1\), so \(r(z)=0\). Nothing else changes.</li>
+<li>\(\Delta\Phi=\sum_{i=1}^{d}\big[\log_2(s_i+1)-\log_2 s_i\big]=\sum_{i=1}^{d}\log_2\!\Big(1+\frac1{s_i}\Big)\).</li>
+<li>Each \(y_{i+1}\) contains \(y_i\)'s subtree plus \(y_{i+1}\) itself, so \(s_{i+1}\ge s_i+1\). Also \(s_1\ge1\). Hence \(s_i\ge i\).</li>
+<li>So \(\Delta\Phi\le\sum_{i=1}^{d}\log_2\frac{i+1}{i}=\log_2\prod_{i=1}^{d}\frac{i+1}{i}=\log_2(d+1)\). The product telescopes.</li>
+<li>\(d\le n\), so \(\Delta\Phi\le\log_2(n+1)=O(\log n)\). \(\blacksquare\)</li>
+</ol>
+<p>The splay that follows is charged separately by the access lemma (amortized \(3(r(\text{root})-r(z))+1\)).</p>
+<p>Chapter: <a href="../tree/06-splay.html">Splay trees</a> (low priority).</p>
+</div></details></div>
+
+<div class="exam"><div class="exam-src">Q6(b) · 5 + 15 = 20 marks</div><div class="exam-q"><p>Usually we have to fix a Red-Black tree after deleting a node when the properties of the Red-Black tree get violated because of node deletion. Explain whether it is possible to do so without performing any rotation. Delete the node with key = 150 from the given Red-Black tree (see the figure below). Here double-circled nodes and rectangular nodes are black, while the single-circled nodes are red. Show all the steps and the resulting Red-Black tree.</p>
+<p><b>Tree read from scan</b> (B = black, R = red, NIL leaves black), in the notation of the widgets:</p>
+<p><code>240B(150R(120B(80R(50B,100B),140B),190B(170B,210R(200B(195R,),220B))),390B(280R(260B,360B),450B))</code></p>
+<div id="f1"></div></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p><b>Part 1 (5 marks): yes, it is possible.</b></p>
+<ul>
+<li>If the node that is physically removed is <b>red</b>, nothing breaks: no black-height changes. No fix-up at all.</li>
+<li>If a black node is removed, the extra black may be removed by <b>recolouring only</b>: case 2 (sibling black, both its children black) recolours the sibling red and moves the extra black up. It stops with no rotation when it reaches a red node (colour it black) or the root.</li>
+<li>Rotations occur only in cases 1, 3, 4. At most 3 rotations per delete in total.</li>
+</ul>
+<p><b>Part 2 (15 marks): delete 150.</b> 150 has two children, so use the in-order successor (the minimum of the right subtree): that is 170.</p>
+<div class="method"><h4>Steps (checked with the engine)</h4><ol>
+<li>Successor of 150 is <b>170</b> (black leaf). 170 moves into 150's place and takes 150's colour (red). The black node removed is the old 170, so its NIL position (left child of 190) carries an <b>extra black</b>.</li>
+<li><b>Case 1.</b> The sibling of the problem spot, 210, is red. Swap the colours of 210 and parent 190 (210 black, 190 red) and left-rotate at 190. The new sibling is 200, black.</li>
+<li><b>Case 3.</b> Sibling 200 is black. Its near child 195 is red and its far child (NIL) is black. Swap colours of 200 and 195 and right-rotate at 200. Now the sibling is 195 and its far child 200 is red.</li>
+<li><b>Case 4.</b> Sibling 195 is black with a red far child 200. Sibling takes the parent's colour (190 was red, so 195 becomes red); parent 190 and far child 200 become black; left-rotate at 190. The extra black is gone. Stop.</li>
+</ol></div>
+<div id="t3"></div>
+<p><b>Result:</b></p>
+<div id="f2"></div>
+<p><code>240B(170R(120B(80R(50B,100B),140B),210B(195R(190B,200B),220B)),390B(280R(260B,360B),450B))</code>. Black height is 3 on every path (check: 240, 210, 190 or 200 is 3 black nodes).</p>
+<div class="drawit"><b>On paper:</b> redraw the tree after each of the 4 steps. Mark the double-black / extra black spot with a heavy dot. Label each step with its case number and the rotation, for example "Case 1: recolour 210 black, 190 red, left-rotate at 190".</div>
+<p>Chapter: <a href="../tree/04-rb-delete.html">RB deletion: the 4 cases</a>.</p>
+</div></details></div>
+
+<h3>Question 7</h3>
+
+<div class="exam"><div class="exam-src">Q7(a) · 5 + 5 = 10 marks</div><div class="exam-q"><p>Insert a node with key = 20 to the given AVL tree (see the figure below). Then perform another insertion of a node with key = 68 on the resulting AVL tree. Show all the steps and the resulting AVL trees.</p>
+<p><b>Tree read from scan:</b> 60(40(30,),70(65,)).</p>
+<div id="f3"></div></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p>Convention: height of a leaf = 0, balance factor \(bf=h(\text{left})-h(\text{right})\). Imbalanced if \(|bf|=2\).</p>
+<div class="method"><h4>Insert 20</h4><ol>
+<li>BST insert: 60, then 40, then 30, then left of 30. Walk up: 30 has bf +1, 40 has bf <b>+2</b> (left height 1, right empty = −1).</li>
+<li>Left child 30 has bf +1, so this is the <b>LL case</b>: right-rotate at 40. Result: 30 with children 20 and 40.</li>
+<li>Tree: 60(30(20,40),70(65,)). Balanced; heights restored, so no further rotation (one rotation always suffices for insert).</li>
+</ol></div>
+<div class="method"><h4>Insert 68</h4><ol>
+<li>BST insert: 60, right to 70, left to 65, right of 65. Walk up: 65 bf −1, 70 bf <b>+2</b> (left height 1, right empty).</li>
+<li>Left child 65 has bf −1, so this is the <b>LR case</b>: left-rotate at 65, then right-rotate at 70. 68 becomes the root of that subtree with children 65 and 70.</li>
+<li>Tree: 60(30(20,40),68(65,70)).</li>
+</ol></div>
+<div id="t4"></div>
+<div class="drawit"><b>On paper:</b> draw the tree after the plain insert (with bf written beside each node, the +2 circled), then after the rotation(s). Name the case (LL, LR). For LR, draw the intermediate tree between the two rotations.</div>
+<p>Chapter: <a href="../tree/01-rotations-avl.html">Rotations and AVL trees</a>.</p>
+</div></details></div>
+
+<div class="exam"><div class="exam-src">Q7(b) · 7 + 3 = 10 marks</div><div class="exam-q"><p>Using an example, show that if a problem is in NP, the complement of that problems is in co-NP. Draw the general consensus regarding P, NP and co-NP in a Venn diagram.</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<ol>
+<li><b>Definition.</b> A problem \(L\) is in co-NP iff its complement \(\overline L\) (swap yes and no) is in NP. So "the complement of an NP problem is in co-NP" is the definition applied to \(\overline{\overline L}=L\).</li>
+<li><b>Example.</b> SAT is in NP: a yes-instance has a short certificate (a satisfying assignment, checked in polynomial time). Its complement UNSAT ("no assignment satisfies the formula") is therefore in co-NP. Its no-instances (satisfiable formulas) are exactly the ones with a short certificate.</li>
+<li>Similarly TAUTOLOGY (true under all assignments) is in co-NP: its complement "some assignment falsifies the formula" has a short certificate.</li>
+</ol>
+<p><b>Venn diagram (consensus).</b> P sits inside the overlap of NP and co-NP. NP-complete problems are in NP but believed not in co-NP. TAUTOLOGY-type problems are in co-NP but believed not in NP. It is open whether NP = co-NP and whether P = NP ∩ co-NP.</p>
+<svg viewBox="0 0 460 210" width="100%" style="max-width:520px" role="img" aria-label="Venn diagram of P, NP and co-NP">
+<ellipse cx="170" cy="105" rx="130" ry="85" fill="none" stroke="currentColor" stroke-width="2"/>
+<ellipse cx="290" cy="105" rx="130" ry="85" fill="none" stroke="currentColor" stroke-width="2"/>
+<ellipse cx="230" cy="115" rx="45" ry="32" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="4 3"/>
+<text x="90" y="30" font-size="14" fill="currentColor">NP</text>
+<text x="350" y="30" font-size="14" fill="currentColor">co-NP</text>
+<text x="222" y="120" font-size="14" fill="currentColor">P</text>
+<text x="70" y="108" font-size="12" fill="currentColor">NP-complete</text>
+<text x="330" y="108" font-size="12" fill="currentColor">TAUTOLOGY, UNSAT</text>
+<text x="196" y="168" font-size="11" fill="currentColor">NP ∩ co-NP</text>
+</svg>
+<p>Chapter: <a href="../np/01-classes.html">P, NP, co-NP, NP-complete</a>.</p>
+</div></details></div>
+
+<div class="exam"><div class="exam-src">Q7(c) · 10 marks</div><div class="exam-q"><p>You are given the task to implement the hash table data structure for a new programming language. You may use either separate chaining or open addressing. In open addressing, there are various options for probing. Explain your choice precisely with proper justification.</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p><b>Choice: separate chaining for a general-purpose language table; if open addressing is demanded, double hashing.</b> State one and defend it with concrete reasons.</p>
+<ol>
+<li><b>Chaining.</b> Never "full": the load factor \(\alpha\) may exceed 1 and expected search is \(\Theta(1+\alpha)\) under simple uniform hashing. Deletion is trivial (unlink). Degrades gracefully with a bad load estimate. Cost: pointer memory and cache misses.</li>
+<li><b>Open addressing.</b> Better cache behaviour and no pointers, but needs \(\alpha<1\), resizing, and deletion needs tombstones.</li>
+<li><b>Probing options.</b>
+<ul>
+<li><i>Linear:</i> best cache locality, but primary clustering (long runs build up) and expected probes blow up as \(\alpha\to1\).</li>
+<li><i>Quadratic:</i> removes primary clustering, still has secondary clustering (keys with the same hash follow the same sequence). Visits only about half the slots unless \(m\) is prime and \(\alpha<1/2\).</li>
+<li><i>Double hashing:</i> \(h(k,i)=(h_1(k)+i\,h_2(k))\bmod m\). Different keys get different step sizes, so almost no clustering; it approximates uniform hashing. Needs \(h_2(k)\) coprime to \(m\) (e.g. \(m\) prime, \(h_2(k)=1+(k\bmod(m-1))\)) so the sequence covers every slot.</li>
+</ul></li>
+<li><b>Decision.</b> For a language runtime: chaining for the general dictionary (robust to bad hash functions and deletions). When memory/cache matters: open addressing with double hashing, \(m\) prime, resize at \(\alpha\approx0.7\).</li>
+</ol>
+<p>Chapter: <a href="../heap/01-hashing.html">Chaining and open addressing</a>.</p>
+</div></details></div>
+
+<div class="exam"><div class="exam-src">Q7(d) · 5 marks</div><div class="exam-q"><p>Mr. X has proposed a new algorithm for insertion to a Red-Black tree, where the color of the newly inserted node is set to black by default. Discuss the advantages and disadvantages of this algorithm over the traditional algorithm followed for insertion to a Red-Black tree.</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p><b>Advantage (only one):</b> a black node can never create a red-red violation, so the "red parent" cases (1, 2, 3) disappear.</p>
+<p><b>Disadvantages (these decide it):</b></p>
+<ol>
+<li>A new black node adds 1 to the black height of <b>every</b> path through it. The new leaf replaces a NIL on one path, so that path now has one more black than all the others. Property 5 is <b>always</b> broken (unless the tree was empty), so <b>every</b> insertion needs a fix-up.</li>
+<li>With a red node, a black parent means no work at all (about half of all insertions). The traditional rule makes the common case free.</li>
+<li>The repair for a lone extra black is global: the extra black may have to travel to the root (like deletion's double-black), and it needs the sibling's colour and children to decide rotations. It is more complicated than the 3 insert cases, and uses more rotations/recolourings.</li>
+</ol>
+<p>So: no benefit, and it makes the cheap case expensive.</p>
+<p>Chapter: <a href="../tree/03-rb-insert.html">RB insertion: the 3 cases</a>.</p>
+</div></details></div>
+
+<h3>Question 8</h3>
+
+<div class="exam"><div class="exam-src">Q8(a) · 5 + 10 = 15 marks</div><div class="exam-q"><p>Prove or disprove the claim that "We do not mark the root node of any tree in the decrease key operation performed on a Fibonacci Min Heap, even if the root node loses a child". Perform an extract-min operation on the Fibonacci Min Heap shown below. Here double-circled nodes are marked and the single-circled nodes are unmarked. Show all the steps and the resulting Fibonacci Min Heap.</p>
+<p><b>Heap read from scan</b> (* = marked): root list 17, 129, 90, 110 with min = 17. Children: 17 has 163*, 350, 479; 163* has 382*; 350 has 575; 129 has 849.</p>
+<div id="f4"></div></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p><b>The claim is true (5 marks).</b></p>
+<ol>
+<li>The mark on a node \(x\) means "\(x\) has lost a child since it last became a child of another node". Its purpose: allow at most one lost child before cutting \(x\) away, which keeps every subtree of degree \(k\) at least size \(F_{k+2}\).</li>
+<li>That argument is only needed for nodes that sit <b>under a parent</b>. A root has no parent link to cut, so there is nothing to protect. Marking it would only add potential (\(2\cdot\text{marks}\)) for no gain.</li>
+<li>CASCADING-CUT stops at a root: <code>if y.p != NIL then (if y unmarked then mark y else CUT and recurse)</code>. When a root later becomes a child in consolidation (LINK), its mark is cleared. So the invariant "a node is marked only if it is a non-root that lost a child since becoming a child" holds, even if the root lost many children.</li>
+<li>Since the root's degree only shrinks, its subtree size bound \(F_{k+2}\) at the time it is linked (with its mark cleared) is still satisfied. So not marking roots is correct.</li>
+</ol>
+<p><b>Extract-min (10 marks).</b> Steps (from the engine, consolidation starts at the root right of the removed min, 129, going around):</p>
+<ol>
+<li>Remove 17. Its children 163, 350, 479 move to the root list and lose their marks (163 becomes unmarked; 382 stays marked since it is not a root).</li>
+<li>Consolidate with degree table A[]. Roots in order: 129(849), 90, 110, 163(382*), 350(575), 479.</li>
+<li>129 has degree 1: A[1]=129. 90 has degree 0: A[0]=90. 110 has degree 0: link 110 under 90 (90 now degree 1). 90 and 129 both degree 1: link 129 under 90 (90 now degree 2). A[2]=90.</li>
+<li>163 degree 1: A[1]=163. 350 degree 1: link 350 under 163 (163 now degree 2). 163 and 90 both degree 2: link 163 under 90 (90 now degree 3). A[3]=90.</li>
+<li>479 degree 0: A[0]=479. Done. New min is 90.</li>
+</ol>
+<div id="t5"></div>
+<p><b>Result:</b> roots 90 and 479. 90 has children 110, 129(849), 163(382*, 350(575)). Mark on 382 is kept. Min pointer is 90.</p>
+<div id="f5"></div>
+<div class="drawit"><b>On paper:</b> draw (1) the root list after removing 17, (2) the table A[0..3] after each link, (3) the final heap with the min pointer on 90 and the mark on 382.</div>
+<p>Chapter: <a href="../heap/04-fibonacci.html">Fibonacci heap</a>.</p>
+</div></details></div>
+
+<div class="exam"><div class="exam-src">Q8(b) · 10 marks</div><div class="exam-q"><p>Consider the following boolean formula: (x ∨ y′) ∧ (x′ ∨ w) ∧ (x ∨ y ∨ z′) ∧ (x′ ∨ w ∨ z). Use backtracking algorithm to decide whether the boolean formula is satisfiable or not. If satisfiable, find all the assignments of the boolean variables for which the boolean formula is satisfiable. You must show the backtracking tree.</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p>Branch on variables in the order w, x, y, z. At each node, simplify the residual formula: a satisfied clause disappears, a false literal is deleted. Success when the formula is empty; failure when a clause becomes empty.</p>
+<div id="t6"></div>
+<p><b>Answer: satisfiable.</b> The satisfying assignments:</p>
+<ol>
+<li>w=0, x=0, y=0, z=0</li>
+<li>w=1, x=0, y=0, z=0</li>
+<li>w=1, x=1, with y and z free: four assignments (y,z) = 00, 01, 10, 11.</li>
+</ol>
+<p>That is 6 satisfying assignments in total out of 16. Why w=0 forces the rest: with w=0, clause 2 forces x=0; then clause 1 forces y=0 and clause 3 forces z=0.</p>
+<div class="drawit"><b>On paper:</b> draw the state-space tree with the residual formula written in every node, label leaves "success" or "fail" (empty clause), and list all solutions at the bottom.</div>
+<p>Chapter: <a href="../np/03-backtracking.html">Backtracking state-space trees</a>.</p>
+</div></details></div>
+
+<div class="exam"><div class="exam-src">Q8(c) · 5 marks</div><div class="exam-q"><p>Explain how we can prove that an optimization problem is NP-complete.</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<ol>
+<li>NP-completeness is defined for <b>decision</b> problems (yes/no). So first turn the optimization problem into its decision version: "is there a solution of value \(\le k\)" (minimization) or "\(\ge k\)" (maximization). Example: TSP becomes "is there a tour of cost \(\le k\)".</li>
+<li>Show the decision version is in NP: a certificate (the solution itself) can be checked in polynomial time, including that its value meets \(k\).</li>
+<li>Show it is NP-hard: reduce a known NP-complete problem to it in polynomial time (yes-instances map to yes-instances and no-instances to no-instances).</li>
+<li>Then the decision version is NP-complete and the optimization problem is NP-hard: if we could optimize in polynomial time, we could decide by comparing the optimum with \(k\).</li>
+</ol>
+<p>Chapter: <a href="../np/02-reductions.html">Reductions, with proof templates</a>.</p>
+</div></details></div>
+
+<div class="exam"><div class="exam-src">Q8(d) · 5 marks</div><div class="exam-q"><p>A binomial heap has 19 nodes. Find out the binomial trees this binomial heap has.</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p>A binomial heap has one tree \(B_i\) for every 1 bit in the binary form of \(n\) (tree \(B_i\) has \(2^i\) nodes).</p>
+<ol>
+<li>\(19=10011_2=16+2+1\).</li>
+<li>So the heap has <b>three trees: \(B_4\) (16 nodes), \(B_1\) (2 nodes) and \(B_0\) (1 node)</b>. Root list in increasing degree: \(B_0, B_1, B_4\).</li>
+</ol>
+<p>Chapter: <a href="../heap/02-binomial-trees.html">Binomial trees and their proofs</a>.</p>
+</div></details></div>
+
+<h2>Mandatory</h2>
+<p>Do this with a timer and pen and paper. Nothing in the paper helps if you only read the answers.</p>
+<div id="r1"></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/algo.js"></script>
+<script src="../assets/dsa.js"></script>
+<script>
+trace('#t1', { kind: 'dijkstra', input: 'A>B 5, A>C 4, B>D 1, B>E 4, C>E 4, C>F 7, D>G 8, D>H 6, E>H 6, E>I 9, F>I 9, F>J 6, G>T 0, H>T 0, I>T 0, J>T 0', s: 'A' });
+trace('#t2', { kind: 'kruskal', input: 'a-b 5, b-c 5, v-a 1, v-c 1' });
+treeFig('#f1', '240B(150R(120B(80R(50B,100B),140B),190B(170B,210R(200B(195R,),220B))),390B(280R(260B,360B),450B))');
+trace('#t3', { kind: 'rb', input: '240B(150R(120B(80R(50B,100B),140B),190B(170B,210R(200B(195R,),220B))),390B(280R(260B,360B),450B)) ; del 150' });
+treeFig('#f2', '240B(170R(120B(80R(50B,100B),140B),210B(195R(190B,200B),220B)),390B(280R(260B,360B),450B))');
+treeFig('#f3', '60(40(30,),70(65,))');
+trace('#t4', { kind: 'avl', input: '60(40(30,),70(65,)) ; 20 68' });
+forestFig('#f4', '17(163*(382*) 350(575) 479) 129(849) 90 110 min=17');
+trace('#t5', { kind: 'fib', input: '17(163*(382*) 350(575) 479) 129(849) 90 110 min=17 ; ext' });
+forestFig('#f5', '90(110 129(849) 163(382* 350(575))) 479 min=90');
+trace('#t6', { kind: 'sat', input: "(x v y') (x' v w) (x v y v z') (x' v w v z)", opts: { all: true } });
+recall('#r1', { id: 'r1', marks: 35, q: 'Attempt one full question group in the time limit, then mark it. Pick a whole question (all its parts) from this paper, set a timer for about 35 minutes, write it on paper, then mark it against the answers above.', points: ['Set a timer and wrote the whole group, not only the easy parts', 'Every tree/table was drawn at every step, not only the final one', 'Proofs were written as numbered steps', 'Marked it against the solution and noted the first place I went wrong'] });
+</script>
+</body>
+</html>

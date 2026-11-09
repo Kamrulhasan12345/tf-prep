@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RB Gauntlet · CSE 207 Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Balanced trees · exam drill · after chapters 01 to 04</div>
+<h1>RB and AVL Gauntlet</h1>
+<p class="lede">Full exam runs, a one-page case table, the mistakes that lose marks, and mixed practice. 2024–25 Q5 was compulsory: 25 marks of red-black insert and delete plus 10 marks of AVL, 35 marks from this topic alone. Do the timed drill on paper before you open any step.</p>
+
+<h2>1. Timed drill: 2024–25 Q5(a), 25 minutes</h2>
+<p><i>"Starting from an empty red-black tree, insert 41, 38, 31, 12, 19, 8, 25, 32 in this order. Using the resulting tree, delete 8, 12 and 19 in that order. Show the tree after each operation, including the colour of every node." (25 marks)</i></p>
+<p>Budget: eight inserts at about 1.5 minutes (12 minutes), three deletes at about 3 minutes (9 minutes), 4 minutes to check colours and black counts. 11 trees in total.</p>
+<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:8px 0">
+<button id="tm-b" type="button" style="font:600 14px var(--mono);padding:6px 14px;cursor:pointer">Start 25:00</button>
+<span id="tm-t" style="font:600 22px var(--mono)">25:00</span>
+<span id="tm-n" class="lbl" style="font:12px var(--mono)"></span>
+</div>
+<div class="method"><h4>Method · how to run the drill</h4><ol>
+<li>Start the timer. Draw on paper only. Keep this page below the fold.</li>
+<li>After each operation, name the case aloud ("uncle red, case 1") before you draw.</li>
+<li>When time ends, compare tree by tree with the list below. Mark the <b>first</b> tree that differs, then use the stepper to see which case you misread.</li>
+<li>Do it a second time without the timer, fixing the cases you missed.</li>
+</ol></div>
+<h3>Answer list (nested notation: key, colour, then (left, right))</h3>
+<table class="mat"><tr><th>#</th><th>Operation</th><th>Tree after it (and the case used)</th></tr>
+<tr><td>1</td><td>insert 41</td><td>41B (root recoloured black)</td></tr>
+<tr><td>2</td><td>insert 38</td><td>41B(38R,)</td></tr>
+<tr><td>3</td><td>insert 31</td><td>38B(31R,41R) (uncle NIL, outer: case 3, right rotate at 41)</td></tr>
+<tr><td>4</td><td>insert 12</td><td>38B(31B(12R,),41B) (uncle 41 red: case 1)</td></tr>
+<tr><td>5</td><td>insert 19</td><td>38B(19B(12R,31R),41B) (uncle NIL, inner: case 2 then case 3)</td></tr>
+<tr><td>6</td><td>insert 8</td><td>38B(19R(12B(8R,),31B),41B) (uncle 31 red: case 1)</td></tr>
+<tr><td>7</td><td>insert 25</td><td>38B(19R(12B(8R,),31B(25R,)),41B) (parent black: nothing to fix)</td></tr>
+<tr><td>8</td><td>insert 32</td><td>38B(19R(12B(8R,),31B(25R,32R)),41B) (parent black)</td></tr>
+<tr><td>9</td><td>delete 8</td><td>38B(19R(12B,31B(25R,32R)),41B) (red leaf, no fix)</td></tr>
+<tr><td>10</td><td>delete 12</td><td>38B(31R(19B(,25R),32B),41B) (black leaf, sibling 31 black, far child 32 red: case 4)</td></tr>
+<tr><td>11</td><td>delete 19</td><td>38B(31R(25B,32B),41B) (child 25 red takes its place, becomes black)</td></tr></table>
+<div id="t1"></div>
+<div class="drawit"><b>On paper:</b> 11 trees, numbered, each with colours (R written beside red keys), the case name next to every fix, and for rotations the line "rotate right at 41". Draw NIL boxes only when an extra black sits on one.</div>
+
+<h3>Second drill, same format</h3>
+<p>Insert 50, 20, 70, 10, 30, 60, 80, 25, 35, then delete 10, 20, 70. Needs case 1 (insert), case 4 (delete), red x, and a two-child delete with a successor. Check with the stepper afterwards.</p>
+<div id="t2"></div>
+
+<h2>2. One-page recognition table</h2>
+<p>Read the situation, jump to the case. Never decide before you have named the nodes.</p>
+<h3>Red-black insertion (new node z is red)</h3>
+<table class="mat"><tr><th>What you see</th><th>Case</th><th>Do</th></tr>
+<tr><td>Parent is black, or z is the root</td><td>none</td><td>Done. Root: colour black</td></tr>
+<tr><td>Parent red, uncle red</td><td>1</td><td>Parent and uncle black, grandparent red, z = grandparent, check again</td></tr>
+<tr><td>Parent red, uncle black or NIL, z on the inner side (bend)</td><td>2</td><td>Rotate at parent to straighten, then case 3</td></tr>
+<tr><td>Parent red, uncle black or NIL, z on the outer side (line)</td><td>3</td><td>Parent black, grandparent red, rotate at grandparent. Stop</td></tr></table>
+<h3>Red-black deletion (x = node with the extra black; w = its sibling)</h3>
+<table class="mat"><tr><th>What you see</th><th>Case</th><th>Do</th></tr>
+<tr><td>Spliced-out node was red</td><td>none</td><td>Done</td></tr>
+<tr><td>x is red, or x is the root</td><td>none</td><td>Colour x black. Done</td></tr>
+<tr><td>w red</td><td>1</td><td>w black, p red, rotate at p towards x. Then 2, 3 or 4</td></tr>
+<tr><td>w black, both children black</td><td>2</td><td>w red, extra black up to p. p red: black, stop. p black: repeat</td></tr>
+<tr><td>w black, far child black, near child red</td><td>3</td><td>near child black, w red, rotate at w away from x. Then case 4</td></tr>
+<tr><td>w black, far child red</td><td>4</td><td>w takes p's colour, p and far child black, rotate at p towards x. Stop</td></tr></table>
+<h3>AVL (bf = height of left minus height of right)</h3>
+<table class="mat"><tr><th>Lowest unbalanced A</th><th>Heavy child B</th><th>Case</th><th>Do</th></tr>
+<tr><td>+2</td><td>+1 or 0</td><td>LL</td><td>Right rotate at A</td></tr>
+<tr><td>+2</td><td>−1</td><td>LR</td><td>Left rotate at B, then right rotate at A</td></tr>
+<tr><td>−2</td><td>−1 or 0</td><td>RR</td><td>Left rotate at A</td></tr>
+<tr><td>−2</td><td>+1</td><td>RL</td><td>Right rotate at B, then left rotate at A</td></tr></table>
+<p>AVL insertion stops after the first rotation. AVL deletion continues up to the root.</p>
+
+<h2>3. Common errors, all of them</h2>
+<div class="trap"><h4>Where marks go</h4><ul>
+<li><b>Colours missing.</b> If your trees do not show every colour, you lose marks even if the shape is right.</li>
+<li><b>Uncle NIL treated as "no uncle".</b> NIL is black. It selects case 2 or 3, not case 1.</li>
+<li><b>Case 2 stopping early.</b> After the bend rotation you must still apply case 3.</li>
+<li><b>Case 1 without a re-check.</b> z moves to the grandparent. That node may now have a red parent.</li>
+<li><b>Root left red.</b> Recolour the root black at the end.</li>
+<li><b>Deleting a red node and then "fixing".</b> Red removal needs no fix.</li>
+<li><b>Using the key's colour instead of the successor's original colour.</b> The fix-up depends on the colour of the node that moved.</li>
+<li><b>Successor forgets to take the deleted node's colour.</b></li>
+<li><b>Mirror errors in deletion</b> when x is the right child.</li>
+<li><b>Case 1 and case 3 finished as if complete.</b> Both continue.</li>
+<li><b>AVL: sign mix-up.</b> Write "bf = h(left) − h(right)" first.</li>
+<li><b>AVL: single rotation for an LR or RL case.</b> A zig-zag needs two rotations.</li>
+<li><b>AVL deletion: stopping after one rotation.</b> Keep walking to the root.</li>
+<li><b>AVL: rotating at the wrong node.</b> Double rotation first rotates at the child B, then at A. One student solution to the 2023–24 paper rotated the wrong node.</li>
+</ul></div>
+
+<h2>4. Mixed practice</h2>
+<p>Four kinds, in the order the exam is likely to mix them. Do not use the steppers until you have written your answer.</p>
+<div id="r1"></div>
+<div id="p1"></div>
+<div id="p2"></div>
+<div id="p3"></div>
+<div id="p4"></div>
+<p class="drawit">Done here, you are ready for the tree questions. <a href="06-splay.html">Splay trees</a> are a short extra.</p>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/algo.js"></script>
+<script src="../assets/dsa.js"></script>
+<script>
+trace('#t1', { kind: 'rb', input: '41 38 31 12 19 8 25 32 del 8 12 19' });
+trace('#t2', { kind: 'rb', input: '50 20 70 10 30 60 80 25 35 del 10 20 70' });
+(() => { let left = 1500, id = null; const b = document.getElementById('tm-b'), t = document.getElementById('tm-t'), n = document.getElementById('tm-n');
+  const show = () => { t.textContent = String(Math.floor(left / 60)).padStart(2, '0') + ':' + String(left % 60).padStart(2, '0'); n.textContent = left <= 600 ? 'by now you should be deleting' : left <= 780 ? 'inserts should be done' : ''; };
+  b.onclick = () => { if (id) { clearInterval(id); id = null; b.textContent = 'Resume'; return; } b.textContent = 'Pause'; id = setInterval(() => { if (left > 0) left--; else { clearInterval(id); id = null; b.textContent = 'Time up'; } show(); }, 1000); };
+  show(); })();
+recall('#r1', { id: 'r1', marks: 15, q: 'From memory, write the case table for red-black insertion and for red-black deletion (when each applies, the action, and whether it stops), and the AVL case table with rotations. (2022–23 Q4c style)', points: ['Insert: uncle red case 1, bend case 2 then case 3, line case 3', 'Insert stops after case 3; case 1 moves z up two levels', 'Delete: sibling red case 1; sibling black both nephews black case 2; near red far black case 3; far red case 4', 'Delete: case 4 stops; case 2 stops if parent red', 'AVL: LL right rotate at A; LR left at B then right at A; RR left at A; RL right at B then left at A', 'AVL insert one fix; AVL delete up to the root'], model: 'Insert (z red): parent black: done. Uncle red: case 1, recolour parent and uncle black and grandparent red, move z to grandparent. Uncle black and z inner: case 2, rotate at parent, then case 3. Uncle black and z outer: case 3, parent black, grandparent red, rotate at grandparent, stop. Root black at the end. <br>Delete (x has an extra black, w is its sibling): w red: case 1, recolour w black and p red, rotate at p, continue. w black with two black children: case 2, w red, extra black to p, stop if p is red. w black, near child red, far child black: case 3, rotate at w, continue. w black, far child red: case 4, w takes p\'s colour, p and far child black, rotate at p, stop. <br>AVL (bf = left − right): +2 with B +1 or 0: LL, right rotate at A. +2 with B −1: LR, left rotate at B then right at A. −2 with B −1 or 0: RR, left rotate at A. −2 with B +1: RL, right at B then left at A.' });
+practice('#p1', { id: 'p1', kind: 'rb-insert-mix', n: 2 });
+practice('#p2', { id: 'p2', kind: 'rb-delete', n: 3 });
+practice('#p3', { id: 'p3', kind: 'avl-insert', n: 1 });
+practice('#p4', { id: 'p4', kind: 'avl-delete', n: 1 });
+</script>
+</body>
+</html>

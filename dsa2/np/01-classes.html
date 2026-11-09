@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>P, NP, co-NP · CSE 207 Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Computational complexity · CLRS §34.1–34.3 · Bayzid sir L9–12 · must-know</div>
+<h1>P, NP, co-NP, NP-complete</h1>
+<p class="lede">Asked every year. 2024–25: Q1(a) P = NP ⇒ NP = co-NP (12), Q1(b) P = NP ∩ co-NP prove or disprove (8), Q2(c) "P ≠ NP yet NP = co-NP" (8). 2023–24 Q4(a): define P, NP, NP-complete and draw the Venn diagram (9+6). 2022–23 Q5(a): NP vs NP-hard vs NP-complete (6, compulsory). 2019–20 Q3(a): X ∈ NPC, X ∈ P iff P = NP (8). 2018–19 Q7(a) is the same proof as 2024–25 Q1(a), and Q7(b) is TAUTOLOGY. All of these are short proofs. You can learn each in ten minutes.</p>
+
+<h2>1. Decision problems, and why we only study them</h2>
+<p>A <b>decision problem</b> has a YES/NO answer. An <b>optimization problem</b> asks for the best value. Complexity classes are defined only for decision problems, so every optimization problem gets a decision twin by adding a bound.</p>
+<div class="tbl"><table>
+<tr><th>Optimization</th><th>Decision twin</th></tr>
+<tr><td>Find the shortest path from s to t</td><td>Is there a path from s to t of length ≤ x?</td></tr>
+<tr><td>Find the smallest vertex cover</td><td>Is there a vertex cover of size ≤ k?</td></tr>
+<tr><td>Find the largest independent set</td><td>Is there an independent set of size ≥ k?</td></tr>
+<tr><td>Find a satisfying assignment (SAT)</td><td>Is the formula satisfiable? (already YES/NO)</td></tr>
+</table></div>
+<div class="key"><p><b>The two twins are equally hard.</b> Solve the optimization problem and you read off the decision answer: compute the optimum, compare it with the bound. Solve the decision problem and you get the optimum by asking "is it ≤ 1? ≤ 2? ..." (or binary search). So "decision is hard" and "optimization is hard" mean the same thing. The bound x is needed in the decision version, otherwise there is nothing to say YES or NO to.</p></div>
+
+<h2>2. P and NP</h2>
+<dl class="def">
+<dt>P</dt><dd>Decision problems solvable by an algorithm that runs in polynomial time, \(O(n^c)\) for some constant c. "Efficiently solvable."</dd>
+<dt>NP</dt><dd>Decision problems with a <b>polynomial-time verifier for YES answers</b>. Given an instance I and a claimed solution S (the <b>certificate</b>), we can check in polynomial time that S really proves the answer is YES. Easy to check, not necessarily easy to find. (The name means non-deterministic polynomial: a machine that guesses S and then checks it.)</dd>
+<dt>Certificate</dt><dd>The short proof. It must have polynomial size and the checking must take polynomial time.</dd>
+</dl>
+<div class="tbl"><table>
+<tr><th>Problem</th><th>Instance</th><th>Certificate for YES</th><th>Verifier does</th></tr>
+<tr><td>SAT</td><td>a CNF formula</td><td>an assignment</td><td>evaluate every clause: O(size of formula)</td></tr>
+<tr><td>Vertex cover ≤ k</td><td>graph G, number k</td><td>a vertex set S</td><td>check |S| ≤ k and every edge has an endpoint in S</td></tr>
+<tr><td>Independent set ≥ k</td><td>graph G, number k</td><td>a vertex set S</td><td>check |S| ≥ k and no edge has both ends in S</td></tr>
+<tr><td>Hamiltonian cycle</td><td>graph G</td><td>an ordering of the vertices</td><td>check it is a cycle through every vertex once</td></tr>
+</table></div>
+<p>SAT is in NP, yet nobody knows a polynomial algorithm for it. Trying all \(2^n\) assignments is exponential. Checking one assignment is quick. There is no obvious short certificate for a NO answer ("unsatisfiable"): that needs a "for all assignments" statement, while YES needs only "there exists".</p>
+
+<div class="method"><h4>Method · show that a problem is in NP (use this every time)</h4><ol>
+<li>Say what the certificate is (for example "a set S of at most k vertices"). Say its size is polynomial.</li>
+<li>Write the check as a few steps and count the time (for example "for each edge test two memberships: O(|E|)").</li>
+<li>Conclude: polynomial verifier, so the problem is in NP.</li>
+</ol></div>
+
+<h3>P ⊆ NP</h3>
+<p>Let X ∈ P with algorithm A. The verifier ignores the certificate, runs A on the instance, and returns A's answer. That is polynomial, so X ∈ NP. Whether NP ⊆ P (that is, P = NP) is the famous open question. Most people believe P ≠ NP. To show P ≠ NP it is enough to find one problem that is in NP but not in P, and that is exactly why such a find would be important (18 CT4 6b).</p>
+
+<h2>3. Complements and co-NP</h2>
+<p>The <b>complement</b> X′ of a decision problem X answers YES exactly when X answers NO. SAT and UNSAT are complements.</p>
+<dl class="def">
+<dt>co-NP</dt><dd>\(\text{co-NP} = \{X' : X \in NP\}\). Equivalently: decision problems with a polynomial verifier for <b>NO</b> answers. UNSAT, TAUTOLOGY and PRIME are in co-NP.</dd>
+</dl>
+<div class="key"><p><b>P is closed under complement.</b> If X ∈ P with algorithm A, run A and flip the answer: X′ ∈ P. Nobody knows if NP is closed under complement. A certifier for X does not give a certifier for X′, because YES uses "there exists" and NO uses "for all". That open question is "NP = co-NP?".</p></div>
+<p>Example for "if X is in NP then X′ is in co-NP" (20-21 7b): SAT ∈ NP, so UNSAT ∈ co-NP by definition. A NO answer to UNSAT is a satisfying assignment, which is easy to check.</p>
+<p><b>P ⊆ co-NP.</b> A problem in P can verify its NO answers too, by solving the problem. So P sits in the overlap of NP and co-NP.</p>
+
+<h2>4. The Venn diagrams</h2>
+<p>Draw both. The first is what 2023–24 Q4(a) asked (P, NP, NP-complete), with NP-hard added because 2022–23 Q5(a) asks you to compare all three.</p>
+<figure>
+<svg viewBox="0 0 560 250" role="img" aria-label="Venn diagram of P, NP, NP-hard and NP-complete" width="560">
+<defs><clipPath id="clipNP"><ellipse cx="190" cy="125" rx="170" ry="100"/></clipPath></defs>
+<ellipse cx="190" cy="125" rx="170" ry="100" class="cell-plain"/>
+<ellipse cx="370" cy="125" rx="170" ry="100" class="cell-plain"/>
+<ellipse cx="370" cy="125" rx="170" ry="100" class="cell-new" clip-path="url(#clipNP)"/>
+<ellipse cx="190" cy="125" rx="170" ry="100" class="s-fg"/>
+<ellipse cx="370" cy="125" rx="170" ry="100" class="s-fg"/>
+<ellipse cx="105" cy="125" rx="62" ry="48" class="cell"/>
+<text x="105" y="130" text-anchor="middle" class="big">P</text>
+<text x="105" y="28" text-anchor="middle" class="big">NP</text>
+<text x="455" y="28" text-anchor="middle" class="big">NP-hard</text>
+<text x="280" y="122" text-anchor="middle" class="big">NP-complete</text>
+<text x="280" y="140" text-anchor="middle" class="lbl">in NP and NP-hard</text>
+<text x="448" y="132" text-anchor="middle" class="lbl">optimization versions,</text>
+<text x="448" y="146" text-anchor="middle" class="lbl">not in NP</text>
+</svg>
+<figcaption><b>Believed picture (P ≠ NP).</b> P is inside NP. NP-complete is exactly the overlap of NP and NP-hard. NP-hard also reaches outside NP (optimization problems, which are not decision problems). If P = NP, P and NP-complete would be the same region.</figcaption>
+</figure>
+<figure>
+<svg viewBox="0 0 560 250" role="img" aria-label="Venn diagram of P, NP and co-NP" width="560">
+<ellipse cx="205" cy="125" rx="165" ry="100" class="cell-plain"/>
+<ellipse cx="355" cy="125" rx="165" ry="100" class="cell-plain"/>
+<ellipse cx="205" cy="125" rx="165" ry="100" class="s-fg"/>
+<ellipse cx="355" cy="125" rx="165" ry="100" class="s-fg"/>
+<ellipse cx="280" cy="125" rx="52" ry="40" class="cell"/>
+<text x="280" y="130" text-anchor="middle" class="big">P</text>
+<text x="110" y="28" text-anchor="middle" class="big">NP</text>
+<text x="450" y="28" text-anchor="middle" class="big">co-NP</text>
+<text x="280" y="193" text-anchor="middle" class="lbl">NP ∩ co-NP</text>
+<text x="280" y="209" text-anchor="middle" class="lbl">(equal to P? open)</text>
+<text x="118" y="122" text-anchor="middle" class="big">NP-complete</text>
+<text x="118" y="140" text-anchor="middle" class="lbl">e.g. SAT</text>
+<text x="442" y="122" text-anchor="middle" class="big">co-NP-complete</text>
+<text x="442" y="140" text-anchor="middle" class="lbl">e.g. TAUTOLOGY</text>
+</svg>
+<figcaption><b>Believed picture (NP ≠ co-NP).</b> P is inside the overlap. SAT-like problems sit on the NP side only. Whether the overlap is bigger than P is open.</figcaption>
+</figure>
+
+<h2>5. P = NP ⇒ NP = co-NP (2024–25 Q1(a), 12 marks; 2018–19 Q7(a))</h2>
+<p>Exam-ready, two inclusions. We use two facts: P is closed under complement, and "NP = co-NP" means NP ⊆ co-NP and co-NP ⊆ NP.</p>
+<div class="method"><h4>Proof · assume P = NP</h4><ol>
+<li><b>NP ⊆ co-NP.</b> Let X ∈ NP.</li>
+<li>Since P = NP, X ∈ P.</li>
+<li>P is closed under complement (run X's algorithm and flip the answer), so X′ ∈ P.</li>
+<li>Since P = NP, X′ ∈ NP.</li>
+<li>X′ ∈ NP means X = (X′)′ ∈ co-NP by the definition of co-NP. So NP ⊆ co-NP.</li>
+<li><b>co-NP ⊆ NP.</b> Let X ∈ co-NP. By definition X′ ∈ NP.</li>
+<li>Since P = NP, X′ ∈ P. By closure under complement, X ∈ P.</li>
+<li>Since P ⊆ NP, X ∈ NP. So co-NP ⊆ NP.</li>
+<li>Both inclusions hold, so NP = co-NP. ∎</li>
+</ol></div>
+<p>The contrapositive is the form people quote: <b>NP ≠ co-NP ⇒ P ≠ NP</b>. It is a stronger-looking route to P ≠ NP, because if you could show NP ≠ co-NP you would get P ≠ NP for free.</p>
+
+<h2>6. "Prove or disprove: P = NP ∩ co-NP" (2024–25 Q1(b), 8 marks)</h2>
+<p>This is a trick question. <b>It is an open problem, so neither a proof nor a disproof is known, and you cannot give one.</b> The marks are for showing what is provable and why the rest is stuck.</p>
+<div class="method"><h4>Answer · in four steps</h4><ol>
+<li><b>P ⊆ NP ∩ co-NP is provable.</b> P ⊆ NP (certifier ignores the certificate). P ⊆ co-NP (P is closed under complement, so X ∈ P gives X′ ∈ P ⊆ NP, so X ∈ co-NP).</li>
+<li>The other direction, NP ∩ co-NP ⊆ P, is <b>not known</b>.</li>
+<li><b>Why it cannot be disproved today.</b> If P = NP then NP = co-NP (section 5), so NP ∩ co-NP = NP = P and the statement is true. Taking the contrapositive: if the statement were false, then P ≠ NP. So a disproof would also prove P ≠ NP, which nobody has done.</li>
+<li><b>Why it cannot be proved today.</b> A proof would need a polynomial algorithm for every problem in NP ∩ co-NP. Nobody has one for all of them. History: PRIME sat in NP ∩ co-NP for years before the AKS algorithm put it in P, and the same status question is open for other problems in the overlap.</li>
+</ol></div>
+<div class="trap"><h4>Where marks go</h4><ul>
+<li>Writing "true" or "false" with a made-up proof. State "open" and prove the half that is provable.</li>
+<li>Forgetting that P is closed under complement is what puts P inside co-NP.</li>
+</ul></div>
+
+<h2>7. "P ≠ NP yet NP = co-NP is possible" (2024–25 Q2(c), 8 marks)</h2>
+<p><b>Agree.</b> There are four combinations of the two questions. D is impossible. A, B and C are all not ruled out:</p>
+<div class="tbl"><table>
+<tr><th>World</th><th>P vs NP</th><th>NP vs co-NP</th><th>Status</th></tr>
+<tr><td>A</td><td>P = NP</td><td>NP = co-NP (forced by section 5)</td><td>possible</td></tr>
+<tr><td>B</td><td>P ≠ NP</td><td>NP = co-NP</td><td>not ruled out</td></tr>
+<tr><td>C</td><td>P ≠ NP</td><td>NP ≠ co-NP</td><td>what most people believe</td></tr>
+<tr><td>D</td><td>P = NP</td><td>NP ≠ co-NP</td><td><b>impossible</b> (section 5)</td></tr>
+</table></div>
+<p>The only implication proved is P = NP ⇒ NP = co-NP. Its converse "NP = co-NP ⇒ P = NP" has not been proved, so world B is not contradicted by anything we know. The statement in the question is therefore consistent. It would only be false if someone proved NP = co-NP ⇒ P = NP.</p>
+
+<h2>8. TAUTOLOGY is in co-NP (2018–19 Q7(b))</h2>
+<p>TAUTOLOGY: is a Boolean formula true for <b>every</b> assignment?</p>
+<div class="method"><h4>Proof</h4><ol>
+<li>The complement is NON-TAUTOLOGY: is there at least one assignment that makes the formula false?</li>
+<li>NON-TAUTOLOGY ∈ NP. Certificate: a falsifying assignment. Verifier: evaluate the formula under it, in time linear in the formula size, and accept if the value is false.</li>
+<li>So the complement of TAUTOLOGY is in NP, hence TAUTOLOGY ∈ co-NP by the definition. ∎</li>
+</ol></div>
+<p>Connection: a formula F is a tautology iff ¬F is unsatisfiable, so TAUTOLOGY is just UNSAT in disguise.</p>
+
+<h2>9. NP-hard, NP-complete, and the three-way comparison (2022–23 Q5(a), 6 marks)</h2>
+<dl class="def">
+<dt>NP-hard</dt><dd>X is NP-hard if <b>every</b> problem Y in NP reduces to it: \(Y \le_p X\). It need not be a decision problem and need not be in NP. A polynomial algorithm for X would solve all of NP in polynomial time.</dd>
+<dt>NP-complete</dt><dd>X is in NP <b>and</b> NP-hard. The hardest problems inside NP. Two NP-complete problems are equally hard (each reduces to the other).</dd>
+</dl>
+<div class="tbl"><table>
+<tr><th></th><th>NP</th><th>NP-hard</th><th>NP-complete</th></tr>
+<tr><td>Decision problems only?</td><td>yes</td><td>no</td><td>yes</td></tr>
+<tr><td>Must be verifiable in poly time?</td><td>yes (that is the definition)</td><td>no</td><td>yes</td></tr>
+<tr><td>Everything in NP reduces to it?</td><td>no</td><td>yes</td><td>yes</td></tr>
+<tr><td>Examples</td><td>SAT, Hamiltonian cycle, and every problem in P</td><td>TSP optimization, optimization version of vertex cover, plus all of NPC</td><td>SAT, 3-SAT, independent set, vertex cover, set cover, clique</td></tr>
+</table></div>
+<p>If a decision problem is NP-complete, its optimization version is NP-hard but is not NP-complete (it is not a decision problem, so it is not in NP). The chapter on reductions shows why.</p>
+<p>Proving a new problem NP-complete directly means reducing <i>all</i> of NP to it, which is impossible to do each time. Cook proved SAT NP-complete once. After that you only need one reduction from a known NPC problem. That is the whole content of the reductions chapter.</p>
+
+<h2>10. X ∈ NP-complete: X ∈ P ⇔ P = NP (2019–20 Q3(a), 8 marks)</h2>
+<div class="method"><h4>Proof · both directions</h4><ol>
+<li><b>(⇐) Assume P = NP.</b> X is NP-complete, so X ∈ NP = P. Hence X ∈ P.</li>
+<li><b>(⇒) Assume X ∈ P</b> with a polynomial algorithm \(A\) running in time \(O(n^c)\).</li>
+<li>Take any Y ∈ NP. Because X is NP-hard, \(Y \le_p X\): there is a polynomial-time map f taking an instance I of Y to an instance f(I) of X with the same answer. Say f runs in \(O(n^d)\), so |f(I)| is \(O(n^d)\).</li>
+<li>Algorithm for Y: compute f(I), run A on it, return A's answer. Time \(O(n^d) + O((n^d)^c) = O(n^{cd})\), polynomial. So Y ∈ P.</li>
+<li>Y was arbitrary, so NP ⊆ P. Together with P ⊆ NP we get P = NP. ∎</li>
+</ol></div>
+<p>The step that gets marks: a polynomial of a polynomial is still a polynomial, so the composed algorithm is polynomial. Same idea answers 17-18 4d ("your friend has a polynomial algorithm for set packing, what happens?"): set packing is NP-complete, so P = NP.</p>
+<div class="key"><p><b>Quick consequences of "Y ≤<sub>p</sub> X" (use in MCQs).</b> If X ∈ P then Y ∈ P. If Y is NP-hard then X is NP-hard. Nothing else follows: it does <i>not</i> say P = NP, and it does not make Y and X equally hard.</p></div>
+
+<h2>11. The fallacy question (18 CT4 6c, 4 marks)</h2>
+<p>"To see if a 3-SAT formula is satisfiable we must look at \(2^n\) assignments. That takes exponential time, so 3-SAT is not in P. But it is in NP, so P ≠ NP." Find the fallacy.</p>
+<ul>
+<li>Looking at \(2^n\) assignments is <b>one</b> algorithm. P ≠ NP needs a proof that <b>every</b> possible algorithm is super-polynomial. A lower bound on one algorithm proves nothing. (Compare: brute-force shortest path over all paths is exponential, yet shortest path is in P.)</li>
+<li>Being in NP does not separate it from P, because P ⊆ NP. You would need "in NP and not in P". The "not in P" half was never proved.</li>
+</ul>
+
+<h2>12. Quick MCQs (CT4 question bank)</h2>
+<p>The question bank gives no answer key. These are my answers with the reason. Check the last two reasons especially.</p>
+<div id="q1"></div>
+
+<h2>Mandatory practice</h2>
+<p>Write each answer on paper first, then open the model answer and tick the points you hit.</p>
+<div id="r1"></div>
+<div id="r2"></div>
+<div id="r3"></div>
+<div id="r4"></div>
+<div id="r5"></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/algo.js"></script>
+<script src="../assets/dsa.js"></script>
+<script>
+quiz('#q1', [
+ { q: 'The class NP is the set of all decision problems that (18 CT4 1):', opts: ['can be solved by polynomial-time algorithms', 'can definitely not be solved in polynomial time', 'have polynomial-time algorithms that can verify potential solutions', 'both (b) and (c)', 'none of the above'], a: 2, why: 'NP is defined by fast verification of a YES certificate. Polynomial-time solvable problems are in NP too, so (b) is wrong.' },
+ { q: 'The class NP-complete is the set of all decision problems that (18 CT4 2):', opts: ['can be solved by polynomial-time algorithms', 'can definitely not be solved by polynomial-time algorithms', 'have polynomial-time algorithms that can verify potential solutions', 'all of the above', 'none of the above'], a: 4, why: 'My reading: (c) describes all of NP, not only the NP-complete ones, and NPC needs NP-hardness as well, so (c) alone does not define the class. (a) and (b) are not known. So (e). No key is given in the bank; ask if your class key says (c).' },
+ { q: 'A and B are NP-hard. Which must be true (18 CT4 5)?', opts: ['A and B are the hardest problems in NP', 'A and B have the same level of complexity', 'A is as hard as B', 'B is as hard as A', 'A and B are as hard as the problems in NP'], a: 4, why: 'NP-hard means every NP problem reduces to it. NP-hard problems need not be in NP, one may be much harder than the other, so (a) to (d) can fail.' },
+ { q: 'X is in P, Y is in NP, and Y ≤p X (18 CT4 4). Which must be true?', opts: ['Y is in P', 'Y is NP-complete', 'P ≠ NP', 'both (a) and (c)', 'none of the above'], a: 0, why: 'Solve Y by reducing to X and running the polynomial algorithm for X. Nothing here says Y is NP-hard, and P ≠ NP is not implied.' },
+ { q: 'X ≤p Y (18 CT4 3). Which must be true?', opts: ['X is polynomial-time reducible to Y', 'Y is polynomial-time reducible to X', 'X and Y are equally hard', 'both (a) and (c)', 'none of the above'], a: 0, why: '(a) just reads the notation. A reduction one way does not give the other way, so (b) and (c) are not forced.' }
+]);
+recall('#r1', { id: 'r1', marks: 12, q: 'Prove that P = NP ⇒ NP = co-NP. (2024–25 Q1(a); 2018–19 Q7(a))', points: ['Show NP ⊆ co-NP and co-NP ⊆ NP separately', 'X ∈ NP ⇒ X ∈ P (assumption)', 'P closed under complement: run the algorithm and flip the answer, so X′ ∈ P', 'X′ ∈ P ⇒ X′ ∈ NP (P ⊆ NP or the assumption)', 'X′ ∈ NP ⇒ X ∈ co-NP by definition of co-NP', 'Other direction: X ∈ co-NP ⇒ X′ ∈ NP ⇒ X′ ∈ P ⇒ X ∈ P ⇒ X ∈ NP', 'Conclude NP = co-NP'], model: '<p>Assume P = NP.</p><p><b>NP ⊆ co-NP.</b> Let X ∈ NP. Then X ∈ P. P is closed under complement (run X\'s algorithm, flip its answer), so X′ ∈ P. Then X′ ∈ NP because P = NP. By definition of co-NP, X ∈ co-NP.</p><p><b>co-NP ⊆ NP.</b> Let X ∈ co-NP, so X′ ∈ NP. Then X′ ∈ P. By closure under complement X ∈ P, so X ∈ NP.</p><p>Both inclusions hold, NP = co-NP. ∎</p>' });
+recall('#r2', { id: 'r2', marks: 8, q: 'Suppose X is NP-complete. Prove that X ∈ P if and only if P = NP. (2019–20 Q3(a))', points: ['(⇐) P = NP and X ∈ NP so X ∈ P', '(⇒) X ∈ P with a polynomial algorithm', 'Take any Y ∈ NP; Y ≤p X because X is NP-hard', 'Compose: reduce in polynomial time, then run X\'s algorithm', 'Polynomial of a polynomial is polynomial, so Y ∈ P', 'So NP ⊆ P, and P ⊆ NP, therefore P = NP'], model: '<p>(⇐) If P = NP, X ∈ NP = P.</p><p>(⇒) Let A solve X in O(n<sup>c</sup>). Let Y ∈ NP. As X is NP-hard there is a poly-time f (O(n<sup>d</sup>)) with Y-instance I a YES iff f(I) is a YES of X. Compute f(I) (size O(n<sup>d</sup>)) and run A: total O(n<sup>d</sup> + n<sup>cd</sup>), polynomial. So Y ∈ P. Hence NP ⊆ P; with P ⊆ NP, P = NP. ∎</p>' });
+recall('#r3', { id: 'r3', marks: 15, q: 'Define P, NP and NP-complete, and draw the Venn diagram showing the believed relationship. Then differentiate NP, NP-hard and NP-complete. (2023–24 Q4(a) 9+6; 2022–23 Q5(a))', points: ['P: decision problems solvable in polynomial time', 'NP: YES answer checkable in polynomial time given a certificate', 'NP-complete: in NP and NP-hard', 'NP-hard: every NP problem reduces to it, need not be a decision problem or in NP', 'Diagram: P inside NP, NPC = overlap of NP and NP-hard, NP-hard reaches outside NP', 'P ⊆ NP, and P ≠ NP is believed, not proved'], model: '<p>P: decision problems with a polynomial-time algorithm. NP: decision problems for which a YES answer has a certificate that can be checked in polynomial time. NP-hard: X such that Y ≤<sub>p</sub> X for every Y ∈ NP (X may be an optimization problem and need not be in NP). NP-complete: X ∈ NP and X is NP-hard.</p><p>Diagram: draw an ellipse NP with a small ellipse P inside it; draw an ellipse NP-hard overlapping NP; the overlap is NP-complete. Say: believed P ≠ NP; if P = NP all three coincide inside the same region.</p>' });
+recall('#r4', { id: 'r4', marks: 16, q: 'Two statements. (i) Prove or disprove P = NP ∩ co-NP. (ii) "It is possible that P ≠ NP, yet NP = co-NP." Do you agree? (2024–25 Q1(b) 8, Q2(c) 8)', points: ['(i) P ⊆ NP ∩ co-NP is provable (closure under complement)', '(i) The reverse inclusion is open', '(i) Disproving would prove P ≠ NP (because P = NP gives NP = co-NP so NP ∩ co-NP = P), so no disproof is known', '(i) Proving needs poly algorithms for every problem in the overlap, unknown', '(ii) Agree: only P = NP ⇒ NP = co-NP is proved', '(ii) The converse is not proved, so P ≠ NP with NP = co-NP is not ruled out', '(ii) NP ≠ co-NP ⇒ P ≠ NP is the contrapositive; direction matters'], model: '<p>(i) The statement is an open problem. P ⊆ NP ∩ co-NP is easy: P ⊆ NP, and if X ∈ P then X′ ∈ P ⊆ NP so X ∈ co-NP. The other direction is unknown. If P = NP then NP = co-NP and NP ∩ co-NP = P, so a disproof would show P ≠ NP, which is open. A proof would need polynomial algorithms for everything in NP ∩ co-NP. So neither can be given today.</p><p>(ii) Agree. We only know P = NP ⇒ NP = co-NP, equivalently NP ≠ co-NP ⇒ P ≠ NP. Nothing proves NP = co-NP ⇒ P = NP, so the world with P ≠ NP and NP = co-NP is not excluded.</p>' });
+recall('#r5', { id: 'r5', marks: 10, q: 'Prove that TAUTOLOGY is in co-NP. Then point out the fallacy in: "3-SAT needs 2^n assignments, so it is not in P, but it is in NP, so P ≠ NP." (2018–19 Q7(b); 18 CT4 6c)', points: ['Complement of TAUTOLOGY: exists an assignment making the formula false', 'Certificate: a falsifying assignment', 'Verifier evaluates the formula in polynomial time', 'So the complement is in NP, hence TAUTOLOGY ∈ co-NP', 'Fallacy: 2^n is one algorithm, not a lower bound for all algorithms', 'Being in NP does not separate it from P since P ⊆ NP'], model: '<p>The complement is "is there an assignment under which F is false?". Certificate: such an assignment; check by evaluating F in linear time. So the complement ∈ NP, so TAUTOLOGY ∈ co-NP.</p><p>Fallacy: brute force over 2<sup>n</sup> assignments is one algorithm. P ≠ NP needs a proof that no polynomial algorithm exists at all. And "in NP" does not help, since P ⊆ NP.</p>' });
+</script>
+</body>
+</html>

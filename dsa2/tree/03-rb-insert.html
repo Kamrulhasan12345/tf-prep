@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RB Insertion · CSE 207 Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Balanced trees · CLRS §13.3 · Monirul Islam sir L19, slides 19 · must-know</div>
+<h1>RB Insertion: the 3 Cases</h1>
+<p class="lede">Asked in 2024–25 (compulsory, 25 marks with deletion), 2022–23 (15), and earlier as "insert 11 into this tree" (15). You get marks for showing every tree with every colour, so the skill here is doing it by hand without errors.</p>
+
+<h2>1. The idea in one paragraph</h2>
+<p>Insert the new key as in any BST and colour it <b>red</b>. A red node adds no black to any path, so black-height stays correct. The only rule it can break is "a red node has no red child". The fix looks at the new node's <b>uncle</b>, the other child of the grandparent.</p>
+<div class="key"><p><b>Why red and not black?</b> A black node adds 1 to the black-height of every path through it and breaks the black-height rule everywhere above. A red node can only cause one local red-red conflict, and that is cheap to repair. This exact question was asked in earlier papers.</p></div>
+
+<h2>2. Name the four nodes first</h2>
+<p>Every step, before anything else, name <b>z</b> (the red node with the problem), <b>p</b> (its parent, also red), <b>g</b> (grandparent, always black, because p is red and the tree was valid) and <b>u</b> (uncle). NIL counts as black.</p>
+<div class="method"><h4>Method · while z's parent is red</h4><ol>
+<li><b>Uncle red → Case 1.</b> Colour p and u black, g red. Set z = g and repeat from there. No rotation.</li>
+<li><b>Uncle black, z is an inner child (g–p–z bends) → Case 2.</b> Rotate at p, away from z's side, so the bend becomes a straight line. The old p is now the lower node: call it z. Go straight to case 3.</li>
+<li><b>Uncle black, z is an outer child (g–p–z straight) → Case 3.</b> Colour p black, g red, rotate at g in the opposite direction. Finished: no further loop.</li>
+<li>When the loop ends, <b>colour the root black</b>.</li>
+</ol></div>
+<p>Slides 19 use the same numbering: case 1 "uncle red", case 2 "uncle not red and path to g not straight", case 3 "uncle not red and path straight".</p>
+<pre class="code">RB-INSERT-FIXUP(T, z)
+ while z.p.color == RED
+   if z.p == z.p.p.left
+     y = z.p.p.right              // uncle
+     if y.color == RED            // case 1
+       z.p.color = BLACK; y.color = BLACK
+       z.p.p.color = RED; z = z.p.p
+     else
+       if z == z.p.right          // case 2
+         z = z.p; LEFT-ROTATE(T, z)
+       z.p.color = BLACK          // case 3
+       z.p.p.color = RED
+       RIGHT-ROTATE(T, z.p.p)
+   else (same with left and right exchanged)
+ T.root.color = BLACK</pre>
+
+<h2>3. Watch the 2024–25 question</h2>
+<p>Keys 41, 38, 31, 12, 19, 8, 25, 32. Press <b>Next</b> and say the case aloud before reading the caption. You can type your own keys too.</p>
+<div id="t1"></div>
+<div class="drawit"><b>On paper:</b> draw a fresh tree after every insert. Write red nodes as a circle with an R beside the key (or use a red pen and still write R). Next to each fix write the case number and the rotation, for example "Case 3: recolour 38, 41; right-rotate at 41". The last tree of each insert is the one the examiner marks.</div>
+
+<h2>4. Insert into a given tree</h2>
+<p>The older form of the question gives you a tree. Same steps. This is the 11-into-this-tree question: cases 1, 2 and 3 all appear, in that order.</p>
+<div id="t2"></div>
+
+<h2>5. Traps</h2>
+<div class="trap"><h4>Where marks go</h4><ul>
+<li>Checking the uncle's colour when the uncle is NIL: NIL is black.</li>
+<li>Case 2 alone does not finish. It always runs straight into case 3.</li>
+<li>Case 1 moves z up by two levels, and you must re-check from the new z.</li>
+<li>Forgetting to blacken the root after case 1 reaches it.</li>
+<li>Rotating at the wrong node: case 2 rotates at p, case 3 rotates at g.</li>
+</ul></div>
+
+<h2>6. Mandatory practice</h2>
+<p>Do these with pen and paper. The next chapter opens once they are done.</p>
+<div id="r1"></div>
+<div id="p1"></div>
+<div id="p2"></div>
+<p class="drawit"><b>If you got one wrong:</b> open the steps and find the first frame where your tree differs. That frame names the case you misapplied.</p>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/algo.js"></script>
+<script src="../assets/dsa.js"></script>
+<script>
+trace('#t1', { kind: 'rb', input: '41 38 31 12 19 8 25 32' });
+trace('#t2', { kind: 'rb', input: '23B(8R(6B,15B(13R,19R)),27B(,29R)) ; 11' });
+recall('#r1', { id: 'r1', marks: 15, q: 'Write the insertion fix-up cases with a small sketch of each, and explain why a new node is coloured red. (2022–23 Q4c)', points: ['New node is red; only the red-red rule can break', 'Case 1: uncle red: recolour p, u, g; z moves to g', 'Case 2: uncle black, bent: rotate at p to straighten, then case 3', 'Case 3: uncle black, straight: recolour p and g, rotate at g, stop', 'Root is coloured black at the end', 'At most 2 rotations per insert; O(log n) total'] });
+practice('#p1', { id: 'p1', kind: 'rb-insert', n: 3 });
+practice('#p2', { id: 'p2', kind: 'rb-insert-mix', n: 1 });
+</script>
+</body>
+</html>

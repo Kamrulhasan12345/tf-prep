@@ -1,0 +1,382 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Class tests · CSE 207 Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Class tests · CT1 to CT4 · solved</div>
+<h1>Class tests</h1>
+<p class="lede">Short tests, 20 marks and 25 minutes each. This page holds the class-test questions that are <b>not</b> already in a term-final paper (the question banks tag the repeated ones with a term-final year, and those are solved on the term-final pages). Sources: the CT papers (CT-1 AMR, January 2026; CT-3 ART, February 2026; CT-4 MSB; CT2, August 2026) and the CT1, CT3 and CT4 question banks. Try each question on paper first, then open the answer.</p>
+
+<div class="trap"><h4>Source notes</h4><ul>
+<li><b>Syllabus.</b> Bayzid sir's "reduction will not come" was boxed as the CT syllabus. Term finals ask reductions nearly every year, so the NP question here is solved fully anyway. The Fibonacci heap questions in the CT3 bank are marked "not in the CT syllabus" there, but they are asked in term finals.</li>
+<li><b>Missing figures.</b> The question-bank items tagged <code>18 CT1(A..D) 1</code> ("cost of its MST", "how many MSTs") and <code>22 CT1 3</code> (reweight a graph) refer to a figure that is not in the sources. Method only for those.</li>
+<li>CT-1 Q1: the edge 1→2 is printed small; I read it as 5. The method is identical if it is 6.</li>
+<li>The tags such as <code>18 CT1(A) 2</code> are copied from the question banks.</li>
+</ul></div>
+
+<h2>Part 1 · CT1: MST and shortest paths</h2>
+
+<div class="exam"><div class="exam-src">CT-1 (AMR) Q1 · 6 marks</div><div class="exam-q"><p>Run the Floyd-Warshall algorithm on the weighted, directed graph given below and show the distance matrices of all steps.</p>
+<p><b>Graph read from scan:</b> 1→2 (5), 2→3 (1), 3→4 (3), 4→1 (2), 3→1 (8).</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p>\(D^{(k)}[i][j]=\min\big(D^{(k-1)}[i][j],\ D^{(k-1)}[i][k]+D^{(k-1)}[k][j]\big)\). Row and column \(k\) do not change in round \(k\). Draw four matrices \(D^{(1)}..D^{(4)}\) after \(D^{(0)}\).</p>
+<ol>
+<li>\(D^{(0)}\): the weight matrix (diagonal 0, \(\infty\) for no edge).</li>
+<li>\(k=1\): through vertex 1: \(d[3,2]=8+5=13\), \(d[4,2]=2+5=7\).</li>
+<li>\(k=2\): through 2: \(d[1,3]=5+1=6\), \(d[4,3]=7+1=8\).</li>
+<li>\(k=3\): through 3: \(d[1,4]=6+3=9\), \(d[2,1]=1+8=9\), \(d[2,4]=1+3=4\).</li>
+<li>\(k=4\): through 4: \(d[2,1]=4+2=6\), \(d[3,1]=3+2=5\), \(d[3,2]=3+7=10\).</li>
+</ol>
+<p><b>Final matrix</b> (rows = from, columns = to, order 1..4): row 1: 0, 5, 6, 9. Row 2: 6, 0, 1, 4. Row 3: 5, 10, 0, 3. Row 4: 2, 7, 8, 0. No diagonal entry is negative, so there is no negative cycle.</p>
+<div id="t1"></div>
+<div class="drawit"><b>On paper:</b> draw all five 4×4 matrices. Circle the entries that changed in each round and write the sum beside it, as in the list above.</div>
+<p>Chapter: <a href="../graph/04-apsp.html">Matrix squaring, Floyd-Warshall, closure</a>.</p>
+</div></details></div>
+
+<div class="exam"><div class="exam-src">CT-1 (AMR) Q2 · 4 marks</div><div class="exam-q"><p>Analyze and compare the time complexity of Dijkstra's algorithm when implemented using a binary heap versus a simple array.</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p>Dijkstra does \(V\) extract-mins and up to \(E\) decrease-keys.</p>
+<table class="mat"><tr><th>Queue</th><th>Extract-min</th><th>Decrease-key</th><th>Total</th></tr>
+<tr><th>Simple array (scan for min)</th><td>\(O(V)\)</td><td>\(O(1)\)</td><td>\(O(V^2+E)=O(V^2)\)</td></tr>
+<tr><th>Binary heap</th><td>\(O(\log V)\)</td><td>\(O(\log V)\)</td><td>\(O((V+E)\log V)\)</td></tr></table>
+<ol>
+<li>Sparse graph (\(E=O(V)\)): heap gives \(O(V\log V)\), much better than \(O(V^2)\).</li>
+<li>Dense graph (\(E\approx V^2\)): array gives \(O(V^2)\); heap gives \(O(V^2\log V)\), which is worse. So the simple array wins on dense graphs.</li>
+</ol>
+<p>Chapter: <a href="../graph/03-dijkstra.html">Dijkstra: trace, proof, variants</a>.</p>
+</div></details></div>
+
+<div class="exam"><div class="exam-src">CT-1 (AMR) Q3 · 4 marks</div><div class="exam-q"><p>"Dijkstra's algorithm is very centralized but Bellman-Ford algorithm can be used in a distributed fashion" - explain the significance of this statement in no more than 25 words.</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<blockquote>Dijkstra needs a global view to choose the minimum vertex; Bellman-Ford only needs neighbours' estimates, so each node can run it locally (distance-vector routing).</blockquote>
+<p>24 words. Real use: RIP routers run Bellman-Ford, each exchanging distance tables with neighbours only; OSPF routers flood the whole map and run Dijkstra.</p>
+<p>Chapter: <a href="../graph/02-bellman-dag.html">Relaxation, Bellman-Ford, DAG</a>.</p>
+</div></details></div>
+
+<div class="exam"><div class="exam-src">CT-1 (AMR) Q4 · 4 marks</div><div class="exam-q"><p>You are given a weighted graph, but it only contains edge weights 1, 2 and 3. Of course, you can use Dijkstra's algorithm to find shortest paths but can you do faster than that? Just outline the solution and complexity.</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<ol>
+<li><b>Subdivide.</b> Replace each edge of weight \(w\in\{1,2,3\}\) by a chain of \(w\) unit edges (add \(w-1\) dummy vertices). At most \(2E\) dummy vertices and \(3E\) edges.</li>
+<li>Run <b>BFS</b> from the source. BFS distance on the new graph = weighted distance on the old one.</li>
+<li>Time \(O(V+E)\) (more exactly \(O(V+3E)\)), faster than Dijkstra's \(O(E\log V)\).</li>
+<li>Same idea without dummy vertices: keep 4 circular buckets for distances \(d,d+1,d+2,d+3\) (a bucket queue). Every relaxation lands within 3 of the current distance. Also \(O(V+E)\).</li>
+</ol>
+<p>Chapter: <a href="../graph/03-dijkstra.html">Dijkstra: trace, proof, variants</a>.</p>
+</div></details></div>
+
+<div class="exam"><div class="exam-src">CT-1 (AMR) Q5 · 2 marks</div><div class="exam-q"><p>2 free marks for you. You've earned this reward! Write anything for this question relevant to this course - it can be a concept, a fun fact or anything else.</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p>Any correct, relevant fact earns it. Keep one ready, for example: "Dijkstra fails with negative edges because a vertex already extracted can later get a shorter path through a negative edge, so its distance was not final. Bellman-Ford relaxes all edges \(V-1\) times and also detects negative cycles."</p>
+</div></details></div>
+
+<div class="exam"><div class="exam-src">CT1 bank · tag 18 CT1(B) 3</div><div class="exam-q"><p>Show how to find the maximum spanning tree of a graph, that is, the spanning tree of largest total weight.</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<ol>
+<li><b>Kruskal with the order reversed:</b> sort edges by weight <b>decreasing</b>, then run the same union-find loop. Or <b>Prim with a max-heap</b> (take the largest key each step).</li>
+<li><b>By negation:</b> replace every weight \(w\) by \(-w\) (or by \(W_{max}-w\), non-negative), run any MST algorithm, and keep the chosen edges. A spanning tree has exactly \(V-1\) edges, so it minimises \(\sum(-w)\) iff it maximises \(\sum w\). Negative weights are fine for Kruskal and Prim.</li>
+<li>Correctness: the cut property flips: the <b>heaviest</b> edge crossing any cut is in some maximum spanning tree.</li>
+</ol>
+<p>Chapter: <a href="../graph/01-mst.html">Cut property, Kruskal, Prim, uniqueness</a>.</p>
+</div></details></div>
+
+<div class="exam"><div class="exam-src">CT1 bank · tag 18 CT1(A) 2</div><div class="exam-q"><p>The following statements may or may not be correct. In each case, either prove it (if it is correct) or give a counterexample (if it isn't correct). Always assume that the graph G = (V, E) is undirected. Do not assume that edge weights are distinct unless this is specifically stated.</p>
+<p>If graph G has more than |V| − 1 edges, and there is a unique heaviest edge, then this edge cannot be part of a minimum spanning tree.</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p><b>False.</b> A unique heaviest edge can be a bridge, and a bridge is in every spanning tree.</p>
+<p>Counterexample: triangle x, y, z with all three edges of weight 1, plus a pendant edge z–w of weight 9. \(|E|=4>|V|-1=3\), and z–w is the unique heaviest edge. But w has only that edge, so every spanning tree (hence every MST) contains it.</p>
+<div id="f20"></div>
+<p><b>What is true:</b> a unique heaviest edge is in no MST <i>if it lies on a cycle</i> (cycle property).</p>
+<p>Chapter: <a href="../graph/01-mst.html">Cut property, Kruskal, Prim, uniqueness</a>.</p>
+</div></details></div>
+
+<div class="exam"><div class="exam-src">CT1 bank · tag 18 CT1(B) 2</div><div class="exam-q"><p>(Same instructions as above.) For any r &gt; 0, define an r-path to be a path whose edges all have weight &lt; r. If G contains an r-path from node s to t, then every MST of G must also contain an r-path from node s to node t.</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p><b>True.</b></p>
+<ol>
+<li>Let \(T\) be an MST and \(Q\) an r-path from \(s\) to \(t\) in \(G\). Suppose \(T\) has no r-path from \(s\) to \(t\).</li>
+<li>The \(s\)–\(t\) path in \(T\) then has an edge \(e\) with \(w(e)\ge r\).</li>
+<li>Remove \(e\) from \(T\). It splits into two components, with \(s\) and \(t\) on different sides.</li>
+<li>\(Q\) joins \(s\) to \(t\), so it has an edge \(f\) crossing between the two components. \(f\) is on an r-path, so \(w(f)<r\le w(e)\).</li>
+<li>\(T-e+f\) is a spanning tree with weight \(w(T)-w(e)+w(f)<w(T)\). This contradicts that \(T\) is minimum.</li>
+<li>So \(T\) contains an r-path from \(s\) to \(t\). \(\blacksquare\)</li>
+</ol>
+<p>Chapter: <a href="../graph/01-mst.html">Cut property, Kruskal, Prim, uniqueness</a>.</p>
+</div></details></div>
+
+<div class="exam"><div class="exam-src">CT1 bank · tag 18 CT1(C) 2</div><div class="exam-q"><p>(Same instructions.) Prim's algorithm works correctly when there are negative edges.</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p><b>True.</b></p>
+<ol>
+<li>Prim's correctness rests on the cut property: the lightest edge crossing a cut is in some MST. The proof compares weights of edges only (exchange argument); it never uses the sign of a weight.</li>
+<li>Another way: add a constant \(c\) large enough to make every weight non-negative. Every spanning tree has exactly \(V-1\) edges, so every tree's weight rises by the same \((V-1)c\). The ranking of trees does not change, so the MST is the same. Prim only compares weights, so it behaves identically on the shifted graph.</li>
+<li>Contrast: Dijkstra fails with negative edges, because a path's total length matters and extending a path can lower it.</li>
+</ol>
+<p>Chapter: <a href="../graph/01-mst.html">Cut property, Kruskal, Prim, uniqueness</a>.</p>
+</div></details></div>
+
+<div class="exam"><div class="exam-src">CT1 bank · tag 18 CT1(D) 2</div><div class="exam-q"><p>(Same instructions.) The shortest path between two nodes is necessarily part of some MST.</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p><b>False.</b> Counterexample: triangle a, b, c with a–b = 2, b–c = 2, a–c = 3.</p>
+<div id="f23"></div>
+<ul>
+<li>The shortest path from a to c is the direct edge a–c (length 3), because the path a–b–c has length 4.</li>
+<li>The only MST is {a–b, b–c} (weight 4). The edge a–c is not in it (a–c is the unique heaviest edge on the cycle).</li>
+<li>So this shortest path is in no MST. MST minimises total weight; shortest path minimises the length of one path.</li>
+</ul>
+<p>Chapter: <a href="../graph/01-mst.html">Cut property, Kruskal, Prim, uniqueness</a>.</p>
+</div></details></div>
+
+<div class="exam"><div class="exam-src">CT1 bank · tag 18 CT2(B) 1</div><div class="exam-q"><p>Both in Dijkstra and in Prim we have a set of nodes S (that initially contains only s), and we add one additional node in each iteration. Prove or disprove that in both algorithms the nodes are added to S in the same order.</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p><b>Disprove.</b> Prim picks the vertex joined by the lightest <b>single edge</b>; Dijkstra picks the vertex with the smallest <b>total path length</b> from \(s\).</p>
+<p>Counterexample: s–a 3, s–c 4, a–b 2, all distinct.</p>
+<ul>
+<li><b>Prim from s:</b> keys a = 3, c = 4: take a. Then b = 2 (edge a–b), c = 4: take b. Then c. Order: s, a, b, c.</li>
+<li><b>Dijkstra from s:</b> d[a] = 3, d[c] = 4: take a. Then d[b] = 3+2 = 5, d[c] = 4: take c. Then b. Order: s, a, c, b.</li>
+</ul>
+<p>The orders differ (b and c swapped). The two algorithms look alike but use different keys. They agree only on the first step (and on some graphs).</p>
+<div id="t4"></div>
+<div id="t4b"></div>
+<p>Chapter: <a href="../graph/03-dijkstra.html">Dijkstra</a> and <a href="../graph/01-mst.html">MST</a>.</p>
+</div></details></div>
+
+<div class="exam"><div class="exam-src">CT1 bank · tag 18 CT1(A) 3</div><div class="exam-q"><p>Suppose you are given a weighted graph G = (V, E) with a distinguished vertex s and where all edge weights are positive and distinct. Is it possible for a tree of shortest paths from s and a minimum spanning tree in G to not share any edges? If so, give an example. If not, give a reason.</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p><b>Not possible: they always share at least one edge.</b> The shared edge is the lightest edge at \(s\).</p>
+<ol>
+<li>Let \(e=(s,u)\) be the lightest edge incident to \(s\). Weights are distinct, so \(e\) is the unique lightest.</li>
+<li><b>\(e\in\) MST.</b> Apply the cut property to the cut \((\{s\},V\setminus\{s\})\): the lightest crossing edge is \(e\), and with distinct weights it is in the (unique) MST.</li>
+<li><b>\(e\in\) shortest-path tree.</b> Any path from \(s\) to \(u\) other than \(e\) starts with an edge \((s,x)\), \(x\ne u\), of weight \(>w(e)\), and then has more positive edges. So its length \(>w(e)\). Hence \(e\) is the unique shortest path to \(u\), and the shortest-path tree contains it.</li>
+<li>So both trees contain \(e\). \(\blacksquare\)</li>
+</ol>
+<p>Chapter: <a href="../graph/01-mst.html">Cut property, Kruskal, Prim, uniqueness</a>.</p>
+</div></details></div>
+
+<div class="exam"><div class="exam-src">CT1 bank · tag 22 CT1 1 · 6 marks</div><div class="exam-q"><p>For the following scenarios, which algorithm should you use in order to minimize the runtime? What will be the runtime in each scenario?</p>
+<p>(a) Finding shortest pairwise distance between all vertices in an unweighted graph<br>(b) Finding shortest distance from one source to all vertices in an undirected graph with negative edges<br>(c) Finding shortest distance between all vertices in a directed sparse graph</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<ol>
+<li><b>(a) BFS from every vertex:</b> \(V\) runs of \(O(V+E)\): \(O(V(V+E))\) (\(O(VE)\) for connected graphs). Faster than Floyd-Warshall's \(O(V^3)\) on sparse graphs.</li>
+<li><b>(b) Bellman-Ford</b> from the source: \(O(VE)\). Note: in an <b>undirected</b> graph a negative edge \(\{u,v\}\) is itself a negative cycle (walk \(u\to v\to u\)), so if such an edge is reachable the shortest distances are not defined, and Bellman-Ford reports a negative cycle. If the answer is wanted for "negative edges allowed" in the directed sense, Bellman-Ford is the algorithm and \(O(VE)\) the time.</li>
+<li><b>(c) Johnson's algorithm</b> (works with negative edges, no negative cycle): \(O(V^2\log V+VE)\) with Fibonacci heaps, \(O(VE\log V)\) with binary heaps. For a sparse graph \(E=O(V)\) this is \(O(V^2\log V)\), better than Floyd-Warshall's \(O(V^3)\). If all weights are non-negative, run Dijkstra from every vertex: same bound.</li>
+</ol>
+<p>Chapters: <a href="../graph/04-apsp.html">Floyd-Warshall</a>, <a href="../graph/05-johnson.html">Johnson's algorithm</a>.</p>
+</div></details></div>
+
+<div class="exam"><div class="exam-src">CT1 bank · tag 18 CT2(A) 2</div><div class="exam-q"><p>Consider a directed graph with positive weights. Give an algorithm that receives a node s and prints the shortest cycle that contains s.</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<pre class="code">SHORTEST-CYCLE-THROUGH(G, s)
+ run DIJKSTRA(G, s)                      // d[v], pi[v] from s
+ best = INF;  last = NIL
+ for each edge (v, s) entering s          // the cycle must come back to s
+    if d[v] + w(v,s) &lt; best
+        best = d[v] + w(v,s);  last = v
+ if best == INF: print "no cycle through s"
+ else: print the path s ... last using pi, then s again</pre>
+<ol>
+<li>A cycle through \(s\) is a path \(s\leadsto v\) plus an edge \((v,s)\). The best choice for a fixed \(v\) is the shortest path \(s\leadsto v\), \(d[v]\).</li>
+<li>Take the minimum over all in-neighbours \(v\) of \(s\). Weights are positive so Dijkstra is valid.</li>
+<li>Time \(O(E\log V)\).</li>
+</ol>
+<p>Chapter: <a href="../graph/03-dijkstra.html">Dijkstra: trace, proof, variants</a>.</p>
+</div></details></div>
+
+<div class="exam"><div class="exam-src">CT1 bank · tag 22 CT1 3 · 9 marks</div><div class="exam-q"><p>Modify the weights of the following graph so that no negative weights remain and shortest paths between any two vertices are preserved. You must use an algorithm that works on any such graphs.</p>
+<p><i>The graph is not in the sources.</i></p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p>This is <b>Johnson's reweighting</b>. The figure is not available, so here is the method with a worked small example.</p>
+<ol>
+<li>Add a new vertex \(q\) with 0-weight edges to every vertex.</li>
+<li>Run Bellman-Ford from \(q\); \(h(v)=\delta(q,v)\). (If it reports a negative cycle, stop: shortest paths are undefined.)</li>
+<li>New weight \(\hat w(u,v)=w(u,v)+h(u)-h(v)\ge0\) for every edge.</li>
+<li>Every path from \(a\) to \(b\) changes by the same constant \(h(a)-h(b)\), so shortest paths stay shortest.</li>
+</ol>
+<p>Example: A→B 2, B→C −3, C→A 4, A→C 5. \(h(A)=0,h(B)=0,h(C)=-3\). New weights: A→B 2, B→C 0, C→A 1, A→C 8.</p>
+<div id="t5"></div>
+<p>Chapter: <a href="../graph/05-johnson.html">Johnson's algorithm</a>.</p>
+</div></details></div>
+
+<h2>Part 2 · CT2: maximum flow</h2>
+
+<div class="exam"><div class="exam-src">CT2 Q1 · 10 marks</div><div class="exam-q"><p>The flow network given beside shows flow/capacity values in each edge. Show each step of the simulation of Edmonds-Karp algorithm from this state of the network. Also verify that shortest path distances of each vertex from the source monotonically increases for each successive augmentation.</p>
+<p><b>Network read from scan</b> (flow/capacity, a bare number is capacity with flow 0): s→v1 4/16, s→v2 13, v1→v3 4/12, v2→v1 4, v3→v2 4/9, v4→v3 7, v2→v4 4/14, v3→t 20, v4→t 4/4. The current flow value is 4.</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p><b>Start from the given flow.</b> The residual network has, for each edge, forward capacity \(c-f\) and backward capacity \(f\):</p>
+<ul>
+<li>s→v1 12 (back 4); s→v2 13; v1→v3 8 (back 4); v2→v1 4; v3→v2 5 (back 4); v4→v3 7; v2→v4 10 (back 4); v3→t 20; v4→t 0 (back 4).</li>
+</ul>
+<p>Initial BFS distances from s: \(s=0,\ v_1=1,\ v_2=1,\ v_3=2,\ v_4=2,\ t=3\).</p>
+<div class="method"><h4>Edmonds-Karp (the trace below runs it on this residual network)</h4><ol>
+<li><b>Augmentation 1:</b> shortest path s→v1→v3→t (3 edges), bottleneck \(\min(12,8,20)=8\). Flow 4 + 8 = 12. Edge v1→v3 saturated.</li>
+<li><b>Augmentation 2:</b> s→v2→v3→t (3 edges, v2→v3 is the backward edge of v3→v2 with 4), bottleneck \(\min(13,4,12)=4\). Flow 16. That backward edge is used up.</li>
+<li><b>Augmentation 3:</b> s→v2→v4→v3→t (4 edges), bottleneck \(\min(9,10,7,8)=7\). Flow 23.</li>
+<li>No path remains from s to t. <b>Maximum flow = 23</b> (the starting 4 plus 8 + 4 + 7). The min cut is checked below.</li>
+</ol></div>
+<div id="t2"></div>
+<p><b>Min cut check.</b> Reachable from s after the last augmentation: \(\{s,v_1,v_2,v_4\}\). Edges from this set to \(\{v_3,t\}\): v1→v3 (12), v4→v3 (7), v4→t (4). Capacity \(12+7+4=23\) ✓. (v3→v2 goes the other way and is not counted.)</p>
+<p><b>Distances after each augmentation</b> (BFS in the residual network, computed by script):</p>
+<table class="mat"><tr><th></th><th>s</th><th>v1</th><th>v2</th><th>v3</th><th>v4</th><th>t</th></tr>
+<tr><th>start</th><td>0</td><td>1</td><td>1</td><td>2</td><td>2</td><td>3</td></tr>
+<tr><th>after aug 1</th><td>0</td><td>1</td><td>1</td><td>2</td><td>2</td><td>3</td></tr>
+<tr><th>after aug 2</th><td>0</td><td>1</td><td>1</td><td>3</td><td>2</td><td>4</td></tr>
+<tr><th>after aug 3</th><td>0</td><td>1</td><td>1</td><td>&infin;</td><td>2</td><td>&infin;</td></tr></table>
+<p>Every column is non-decreasing from top to bottom (\(v_3\): 2, 2, 3, ∞; \(t\): 3, 3, 4, ∞; the others stay the same). This is the Edmonds-Karp lemma: the BFS distance of every vertex never decreases. Augmentation 2 made \(v_3\) farther because the short edge v2→v3 was used up; augmentation 3 cut \(v_3\) and \(t\) off from \(s\) completely.</p>
+<div class="drawit"><b>On paper:</b> redraw the residual network after each augmentation, write the BFS level (distance) in a box next to every vertex, and underline the path used. Then fill in the distance table.</div>
+<p>Chapter: <a href="../graph/07-mincut-ek.html">Max-flow min-cut, Edmonds-Karp</a>.</p>
+</div></details></div>
+
+<div class="exam"><div class="exam-src">CT2 Q2 · 10 marks</div><div class="exam-q"><p>You know how to convert a flow network with multiple sources and sinks into a single-source, single-sink network by adding edges with infinite capacity. Can you replace this infinite capacities by finite values if the edges of the original network with multiple sources and sinks have finite capacity? Justify your solution. Also prove that any flow in the resulting network has a finite flow value even if the additional edges have infinite capacities, provided the edges of the original network with multiple sources and sinks have finite capacity.</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p><b>Setup.</b> Sources \(s_1..s_p\), sinks \(t_1..t_q\). Add a super-source \(s^*\) with edges \(s^*\to s_i\) and a super-sink \(t^*\) with edges \(t_j\to t^*\).</p>
+<p><b>(1) Yes, finite capacities work.</b></p>
+<ol>
+<li>Set \(c(s^*,s_i)=\sum_{(s_i,v)\in E}c(s_i,v)\) (the total capacity of the edges leaving \(s_i\)).</li>
+<li>Set \(c(t_j,t^*)=\sum_{(u,t_j)\in E}c(u,t_j)\) (the total capacity entering \(t_j\)).</li>
+<li>These are finite because the original capacities are finite (and the graph has finitely many edges).</li>
+<li><b>Why nothing is lost.</b> Any flow in the original network sends out of \(s_i\) at most \(\sum c(s_i,v)\), so the new capacity on \(s^*\to s_i\) never limits any flow that the original network could carry. The same holds on the sink side. So the max-flow values of the infinite-capacity and finite-capacity versions are equal.</li>
+</ol>
+<p><b>(2) Every flow in the infinite network has finite value.</b></p>
+<ol>
+<li>The value of a flow is \(|f|=\sum_if(s^*,s_i)\), the flow leaving \(s^*\).</li>
+<li>Conservation at \(s_i\) (it is an ordinary vertex now): \(f(s^*,s_i)+\text{inflow from original edges}=\text{outflow on original edges}\). So \(f(s^*,s_i)\le\text{outflow}(s_i)\le\sum_{(s_i,v)\in E}c(s_i,v)<\infty\).</li>
+<li>Sum over the finitely many sources: \(|f|\le\sum_i\sum_{(s_i,v)}c(s_i,v)<\infty\).</li>
+<li>So every flow value is finite, whatever capacity the added edges have. (A flow value is at most the capacity of any cut, and the cut that isolates the original sources has a finite capacity.) \(\blacksquare\)</li>
+</ol>
+<p>Chapter: <a href="../graph/06-flow.html">Flow networks, residuals, Ford-Fulkerson</a>.</p>
+</div></details></div>
+
+<h2>Part 3 · CT3: hashing and binomial heaps</h2>
+
+<div class="exam"><div class="exam-src">CT-3 (ART) Q1 · 20 marks</div><div class="exam-q"><p>Consider the insert sequence: 10, 20, 30, 40, 50, 60, 70, 80, 90. The hash values of the insert sequence are 8, 9, 9, 10, 5, 5, 6, 7, 5 respectively for a certain hash function. Now fill out the following table for a hashtable of size 13. Here each column indicates the hashtable state after inserting the element stated on the header cell. Note if an element cannot be inserted even after using the collision resolution technique, the hashtable simply ignores that element.</p>
+<p>(a) Use the double hashing technique for collision resolution. The second hash function is h<sub>2</sub>(x) = 13 − (x%13). (10)</p>
+<p>(b) Use the quadratic probing technique for collision resolution. The quadratic probing function is f(i) = 3 * i². (10)</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p>Home slots are the given hash values, not \(k\bmod13\). Probe \(i\) goes to \((h+i\cdot h_2(k))\bmod13\) for (a) and \((h+3i^2)\bmod13\) for (b). "# unsuccessful probes" is the number of occupied slots tried before the key was placed (that insertion's own count). A new key in a column is shaded.</p>
+<p><b>(a) Double hashing.</b></p>
+<ul>
+<li>30: home 9 is taken by 20. \(h_2=13-4=9\). Next \(9+9=18\bmod13=5\): free. Placed at 5 (1 unsuccessful).</li>
+<li>50: home 5 taken (30). \(h_2=13-11=2\). \(5+2=7\): placed at 7 (1).</li>
+<li>60: home 5 taken. \(h_2=13-8=5\). 10 taken (40). \(5+10=15\bmod13=2\): placed at 2 (2).</li>
+<li>80: home 7 taken (50). \(h_2=13-2=11\). \(7+11=18\to5\) taken (30). \(5+11=16\to3\): placed at 3 (2).</li>
+<li>90: home 5 taken. \(h_2=13-12=1\). Probes 6 (70), 7, 8, 9, 10 taken; 11 is free. Placed at 11 (6).</li>
+</ul>
+<table class="mat"><caption>(a) double hashing, h2(x) = 13 - (x mod 13)</caption><tr><th></th><th>10</th><th>20</th><th>30</th><th>40</th><th>50</th><th>60</th><th>70</th><th>80</th><th>90</th></tr><tr><th>0</th><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr><tr><th>1</th><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr><tr><th>2</th><td></td><td></td><td></td><td></td><td></td><td class="hl">60</td><td>60</td><td>60</td><td>60</td></tr><tr><th>3</th><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td class="hl">80</td><td>80</td></tr><tr><th>4</th><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr><tr><th>5</th><td></td><td></td><td class="hl">30</td><td>30</td><td>30</td><td>30</td><td>30</td><td>30</td><td>30</td></tr><tr><th>6</th><td></td><td></td><td></td><td></td><td></td><td></td><td class="hl">70</td><td>70</td><td>70</td></tr><tr><th>7</th><td></td><td></td><td></td><td></td><td class="hl">50</td><td>50</td><td>50</td><td>50</td><td>50</td></tr><tr><th>8</th><td class="hl">10</td><td>10</td><td>10</td><td>10</td><td>10</td><td>10</td><td>10</td><td>10</td><td>10</td></tr><tr><th>9</th><td></td><td class="hl">20</td><td>20</td><td>20</td><td>20</td><td>20</td><td>20</td><td>20</td><td>20</td></tr><tr><th>10</th><td></td><td></td><td></td><td class="hl">40</td><td>40</td><td>40</td><td>40</td><td>40</td><td>40</td></tr><tr><th>11</th><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td class="hl">90</td></tr><tr><th>12</th><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr><tr><th># unsuccessful probes</th><td>0</td><td>0</td><td>1</td><td>0</td><td>1</td><td>2</td><td>0</td><td>2</td><td>6</td></tr></table>
+<p><b>(b) Quadratic probing</b> with \(f(i)=3i^2\): offsets \(0,3,12,27\equiv1,48\equiv9\).</p>
+<ul>
+<li>30: home 9 taken. \(9+3=12\): placed at 12 (1).</li>
+<li>60: home 5 taken (50). \(5+3=8\) taken (10). \(5+12=17\to4\): placed at 4 (2).</li>
+<li>90: home 5 taken, \(5+3=8\) taken, \(5+12\to4\) taken (60), \(5+1=6\) taken (70), \(5+9=14\to1\): free. Placed at 1 (4).</li>
+</ul>
+<table class="mat"><caption>(b) quadratic probing, f(i) = 3i^2</caption><tr><th></th><th>10</th><th>20</th><th>30</th><th>40</th><th>50</th><th>60</th><th>70</th><th>80</th><th>90</th></tr><tr><th>0</th><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr><tr><th>1</th><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td class="hl">90</td></tr><tr><th>2</th><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr><tr><th>3</th><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr><tr><th>4</th><td></td><td></td><td></td><td></td><td></td><td class="hl">60</td><td>60</td><td>60</td><td>60</td></tr><tr><th>5</th><td></td><td></td><td></td><td></td><td class="hl">50</td><td>50</td><td>50</td><td>50</td><td>50</td></tr><tr><th>6</th><td></td><td></td><td></td><td></td><td></td><td></td><td class="hl">70</td><td>70</td><td>70</td></tr><tr><th>7</th><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td class="hl">80</td><td>80</td></tr><tr><th>8</th><td class="hl">10</td><td>10</td><td>10</td><td>10</td><td>10</td><td>10</td><td>10</td><td>10</td><td>10</td></tr><tr><th>9</th><td></td><td class="hl">20</td><td>20</td><td>20</td><td>20</td><td>20</td><td>20</td><td>20</td><td>20</td></tr><tr><th>10</th><td></td><td></td><td></td><td class="hl">40</td><td>40</td><td>40</td><td>40</td><td>40</td><td>40</td></tr><tr><th>11</th><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr><tr><th>12</th><td></td><td></td><td class="hl">30</td><td>30</td><td>30</td><td>30</td><td>30</td><td>30</td><td>30</td></tr><tr><th># unsuccessful probes</th><td>0</td><td>0</td><td>1</td><td>0</td><td>0</td><td>2</td><td>0</td><td>0</td><td>4</td></tr></table>
+<p>Totals: double hashing 12 unsuccessful probes, quadratic 7. The table is wrong if it shows no collisions: 30 collides with 20, 50 and 60 with each other, 80 with 50, 90 with several.</p>
+<div class="drawit"><b>On paper:</b> redraw the 13-row, 9-column grid for each part. In the unsuccessful-probes row write a number for every column, including 0.</div>
+<p>Chapter: <a href="../heap/01-hashing.html">Chaining and open addressing</a>.</p>
+</div></details></div>
+
+<div class="exam"><div class="exam-src">CT-4 (MSB) Q1 · 10 marks</div><div class="exam-q"><p>Insert the values 3, 13, 7, 15, 21, 24, 10 and make a min priority queue using binomial heap. Show intermediary steps as well as the final heap H1 too.</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p>Insert one key at a time: make a one-node heap \(B_0\) and union it in. It works like adding 1 to a binary counter: whenever two trees of the same degree meet, link them (the larger root goes under the smaller, as the leftmost child).</p>
+<div id="t3"></div>
+<table class="mat"><tr><th>after inserting</th><th>count</th><th>root list (degree increasing)</th></tr>
+<tr><td>3</td><td>1 = 1₂</td><td>3</td></tr>
+<tr><td>13</td><td>2 = 10₂</td><td>3(13)  (link: 13 under 3)</td></tr>
+<tr><td>7</td><td>3 = 11₂</td><td>7, 3(13)</td></tr>
+<tr><td>15</td><td>4 = 100₂</td><td>3(7(15) 13)  (15 under 7, then 7 under 3)</td></tr>
+<tr><td>21</td><td>5 = 101₂</td><td>21, 3(7(15) 13)</td></tr>
+<tr><td>24</td><td>6 = 110₂</td><td>21(24), 3(7(15) 13)  (24 under 21)</td></tr>
+<tr><td>10</td><td>7 = 111₂</td><td>10, 21(24), 3(7(15) 13)</td></tr></table>
+<p><b>Final heap H1:</b> three trees \(B_0\), \(B_1\), \(B_2\): <code>10</code>, <code>21(24)</code>, <code>3(7(15) 13)</code>. Seven keys = 111 in binary, so one tree of each degree 0, 1, 2. The minimum is 3.</p>
+<div id="f3"></div>
+<div class="drawit"><b>On paper:</b> draw the root list after every insert (7 pictures), with the binary count beside it. Write each link as "21 &gt; 7: 21 under 7".</div>
+<p>Chapter: <a href="../heap/03-binomial-heap.html">Binomial heap operations</a>.</p>
+</div></details></div>
+
+<div class="exam"><div class="exam-src">CT-4 (MSB) Q2 · 10 marks</div><div class="exam-q"><p>Let H1 have a binomial tree of maximum order m and H2 have a binomial tree of max degree m+1. Prove or disprove the statement that H2 must have more nodes than H1, regardless of the fact of the count of trees in those heaps.</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p><b>True (prove).</b></p>
+<ol>
+<li>A binomial tree \(B_k\) has exactly \(2^k\) nodes.</li>
+<li>A binomial heap has at most one tree of each order. If its largest tree has order \(m\), its trees are among \(B_0,\dots,B_m\), so \(|H_1|\le\sum_{k=0}^{m}2^k=2^{m+1}-1\).</li>
+<li>\(H_2\) contains a \(B_{m+1}\) (maximum order \(m+1\)), which alone has \(2^{m+1}\) nodes. So \(|H_2|\ge2^{m+1}\).</li>
+<li>\(|H_2|\ge2^{m+1}>2^{m+1}-1\ge|H_1|\). \(\blacksquare\)</li>
+</ol>
+<p>The number of trees does not matter: even if \(H_1\) has every possible tree and \(H_2\) only the one tree \(B_{m+1}\), \(H_2\) still has one more node.</p>
+<p>Chapter: <a href="../heap/02-binomial-trees.html">Binomial trees and their proofs</a>.</p>
+</div></details></div>
+
+<h2>Part 4 · CT4: P, NP and reductions</h2>
+
+<div class="exam"><div class="exam-src">CT4 bank · tag 18 CT4 1 to 5 and 4 (multiple choice) · 2 marks each</div><div class="exam-q">
+<p><b>1.</b> The class NP is the set of all decision problems that: a. Can be solved by polynomial-time algorithms. b. Can definitely not be solved by polynomial-time algorithms. c. Have polynomial-time algorithms that can verify potential solutions. d. Both (b) and (c). e. None of the above.</p>
+<p><b>2.</b> The class NP-complete is the set of all decision problems that: a. Can be solved by polynomial-time algorithms. b. Can definitely not be solved by polynomial-time algorithms. c. Have polynomial-time algorithms that can verify potential solutions. d. All of the above. e. None of the above.</p>
+<p><b>3.</b> Consider two NP-hard problems A and B. Which of the following statement must be true? a. A and B are the hardest problems in NP. b. Both A and B are of same level of complexity. c. A is as hard as B. d. B is as hard as A. e. A and B are as hard as the problems in NP.</p>
+<p><b>4.</b> Suppose problem X is in class P, problem Y is in class NP, and Y ≤<sub>p</sub> X. Which must be true? a. Problem Y is in class P. b. Problem Y is NP-complete. c. P ≠ NP. d. Both (a) and (c). e. None of the above.</p>
+<p><b>5.</b> Suppose X ≤<sub>p</sub> Y. Which must be true? a. Problem X is polynomial-time reducible to problem Y. b. Problem Y is polynomial-time reducible to problem X. c. Problems X and Y are equivalent in terms of computational complexity. d. Both (a) and (c). e. None of the above.</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p>The question bank gives no key. These are my answers, with the reason.</p>
+<ol>
+<li><b>c.</b> That is the definition of NP (verifiable in polynomial time). (a) is wrong because NP includes problems not known to be in P; (b) is wrong because P is inside NP.</li>
+<li><b>e (none of the above).</b> NP-complete means "in NP and NP-hard". Option c describes all of NP, not just NP-complete. (a) and (b) are not known. So no option describes the class exactly. If the setter wanted the "closest" option it would be c, so write "e, because c describes NP; NP-complete also needs NP-hardness".</li>
+<li><b>e.</b> NP-hard means every problem in NP reduces to it, i.e. "as hard as the problems in NP". (a) is false: NP-hard problems need not be in NP. (c) and (d): two NP-hard problems need not be comparable (one may be much harder, even undecidable).</li>
+<li><b>a.</b> \(Y\le_pX\) and \(X\in P\) give a polynomial algorithm for \(Y\): reduce, then solve. (b) no: Y need not be NP-complete. (c) P ≠ NP: not implied.</li>
+<li><b>a.</b> It is the definition of \(X\le_pY\). (b) is the reverse direction, (c) equivalence needs both directions.</li>
+</ol>
+<p>Chapter: <a href="../np/01-classes.html">P, NP, co-NP, NP-complete</a>.</p>
+</div></details></div>
+
+<div class="exam"><div class="exam-src">CT4 bank · tag 18 CT4 6b · 3 marks</div><div class="exam-q"><p>Suppose you have found a problem which is in NP but not in P. Why do you think your finding is important?</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p>It would prove <b>P ≠ NP</b>, since the problem is in NP but not in P, so \(P\subsetneq NP\). That settles the biggest open problem of the field (a Clay Millennium Prize problem). It would also confirm that no polynomial algorithm exists for any NP-complete problem (SAT, TSP, ...), and that cryptography based on such hardness has a rigorous basis.</p>
+<p>Chapter: <a href="../np/01-classes.html">P, NP, co-NP, NP-complete</a>.</p>
+</div></details></div>
+
+<div class="exam"><div class="exam-src">CT4 bank · tag 18 CT4 6c · 4 marks</div><div class="exam-q"><p>Point out and briefly discuss the fallacy in the following "proof" that P ≠ NP: "To see if a 3-SAT formula is satisfiable, we need to look at 2<sup>n</sup> possible truth assignments. This takes exponential time, so 3-SAT is not in P. But it is in NP, so P ≠ NP."</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<ol>
+<li><b>The fallacy:</b> "this algorithm takes exponential time, so 3-SAT is not in P". Brute force is <i>one</i> algorithm. A problem is in P if <b>some</b> polynomial algorithm exists. The existence of a slow algorithm says nothing about the existence of a fast one.</li>
+<li>To show 3-SAT is not in P you must prove a <b>lower bound for every possible algorithm</b>: none runs in polynomial time. Nobody knows how.</li>
+<li>The last step is fine: if 3-SAT were in NP but not in P, then P ≠ NP. The error is the unproved middle step.</li>
+</ol>
+<p>Chapter: <a href="../np/01-classes.html">P, NP, co-NP, NP-complete</a>.</p>
+</div></details></div>
+
+<div class="exam"><div class="exam-src">CT4 bank · tag 22 CT3 2 · 10 marks</div><div class="exam-q"><p>The Set Partition Problem takes as input a multiset S of numbers. The question is whether the numbers can be partitioned into two subsets A and A′ = S − A such that Σ<sub>x∈A</sub> x = Σ<sub>x∈A′</sub> x. Show that the Set Partition Problem is NP-complete. Hint: The Subset Sum Problem takes as input a multiset S of numbers and a target sum T. The question is to decide whether there exists a subset S′ ⊆ S whose elements sum to T. The Subset Sum Problem is known to be NP-complete.</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<div class="method"><h4>Method (two parts: in NP, and NP-hard by reduction)</h4><ol>
+<li><b>In NP.</b> Certificate: the subset \(A\). The verifier adds up both sides and compares: polynomial time.</li>
+<li><b>NP-hard: Subset Sum \(\le_p\) Set Partition.</b> Instance \((S,T)\) of subset sum. Let \(\sigma=\sum_{x\in S}x\). If \(T>\sigma\), output a fixed no-instance (for example \(\{1\}\)). Otherwise build \(S'=S\cup\{u,v\}\) with \(u=2\sigma-T\) and \(v=\sigma+T\).</li>
+<li>Total of \(S'\): \(\sigma+(2\sigma-T)+(\sigma+T)=4\sigma\). Each side must sum to \(2\sigma\).</li>
+<li>(⇒) If some \(X\subseteq S\) sums to \(T\): side A = \(X\cup\{u\}\) has \(T+2\sigma-T=2\sigma\); side B = \((S\setminus X)\cup\{v\}\) has \((\sigma-T)+(\sigma+T)=2\sigma\). A valid partition.</li>
+<li>(⇐) Suppose a partition into two sides of sum \(2\sigma\) exists. \(u+v=3\sigma>2\sigma\), so \(u\) and \(v\) are on different sides. The side containing \(u\) is \(\{u\}\cup X\) for some \(X\subseteq S\), with sum \(2\sigma-T+\sum X=2\sigma\), so \(\sum X=T\). The subset \(X\) solves subset sum.</li>
+<li>The construction takes linear time. So Set Partition is NP-hard, and in NP, so <b>NP-complete</b>. \(\blacksquare\)</li>
+</ol></div>
+<p>Chapter: <a href="../np/02-reductions.html">Reductions, with proof templates</a>.</p>
+</div></details></div>
+
+<h2>Mandatory</h2>
+<p>Do this with a timer and pen and paper. Nothing in the page helps if you only read the answers.</p>
+<div id="r1"></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/algo.js"></script>
+<script src="../assets/dsa.js"></script>
+<script>
+trace('#t1', { kind: 'fw', input: '1>2 5, 2>3 1, 3>4 3, 4>1 2, 3>1 8' });
+graphFig('#f20', 'x-y 1, y-z 1, x-z 1, z-w 9');
+graphFig('#f23', 'a-b 2, b-c 2, a-c 3');
+trace('#t4', { kind: 'prim', input: 's-a 3, s-c 4, a-b 2', s: 's' });
+trace('#t4b', { kind: 'dijkstra', input: 's-a 3, s-c 4, a-b 2', s: 's' });
+trace('#t5', { kind: 'johnson', input: 'A>B 2, B>C -3, C>A 4, A>C 5' });
+trace('#t2', { kind: 'ek', input: 's>v1 12, s>v2 13, v1>v3 8, v3>v1 4, v3>v2 5, v2>v3 4, v2>v1 4, v2>v4 10, v4>v2 4, v4>v3 7, v3>t 20', s: 's', t: 't' });
+trace('#t3', { kind: 'binomial', input: '3 13 7 15 21 24 10' });
+forestFig('#f3', '10 21(24) 3(7(15) 13)');
+recall('#r1', { id: 'r1', marks: 20, q: 'Attempt one full question group in the time limit, then mark it. Class tests are 25 minutes for 20 marks. Pick two questions from this page, set a 25-minute timer, write both on paper, then mark them against the answers above.', points: ['Set a 25-minute timer and wrote complete answers', 'Every matrix, tree or table was drawn at every step, not only the final one', 'Proofs were written as numbered steps', 'Marked it against the solution and noted the first place I went wrong'] });
+</script>
+</body>
+</html>

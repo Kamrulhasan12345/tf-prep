@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Flow Networks and Ford-Fulkerson · CSE 207 Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Maximum flow · CLRS §26.1–26.2 · Monirul Islam sir L13–L16, slides 13–15 · must-know</div>
+<h1>Flow Networks, Residual Networks, Ford-Fulkerson</h1>
+<p class="lede">Flow appears in almost every paper. 2017–18 Q2 (define a flow network and an augmenting path, 3+3; run Ford-Fulkerson, 10). 2018–19 (b) (max flow by drawing the residual network at every step, 15). 2021–22 Q4(a) (define the max-flow problem, 8). 2023–24 Q11 (runtimes of Ford-Fulkerson and Edmonds-Karp). 2024–25 Q8(a) (relief warehouse, 20; that one is in chapter 08). CT2 also asked the super source and sink question.</p>
+
+<h2>1. What a flow network is</h2>
+<p>Think of pipes. Each pipe has a maximum amount of water per second. Water enters at one place (the <b>source</b> s) and leaves at another (the <b>sink</b> t). Every other junction just passes water on: what comes in goes out. The question is how much water can reach t.</p>
+<dl class="def">
+<dt>Flow network</dt>
+<dd>A directed graph \(G=(V,E)\) with a capacity \(c(u,v)\ge 0\) on every edge, one source \(s\) and one sink \(t\). If there is no edge from u to v, then \(c(u,v)=0\). Every vertex lies on some path from s to t (so the graph is connected).</dd>
+<dt>Flow</dt>
+<dd>A function \(f(u,v)\) on the edges with two rules.<br>
+<b>Capacity constraint:</b> \(0\le f(u,v)\le c(u,v)\).<br>
+<b>Conservation:</b> for every \(u\in V-\{s,t\}\): \(\sum_{v} f(v,u)=\sum_{v} f(u,v)\) (flow in = flow out).</dd>
+<dt>Value of a flow</dt>
+<dd>\(|f|=\sum_v f(s,v)-\sum_v f(v,s)\), the net flow leaving s. With no edge entering s this is just the sum of flows on the edges out of s. It equals the net flow entering t.</dd>
+<dt>Max-flow problem</dt>
+<dd>Find a flow of maximum value \(|f|\). (This is the 8-mark definition from 2021–22 Q4a.)</dd>
+</dl>
+<p>Labels in this book are written <b>flow/capacity</b>, so an edge labelled 4/9 carries 4 and can take 9. The teacher's notes use the same format.</p>
+<p>Example network used through the next two chapters:</p>
+<div id="f1"></div>
+<div class="key"><p>Easy upper bound: the flow through any single path is its smallest capacity (the bottleneck). A path with edges 16, 12, 20 can carry at most 12.</p></div>
+
+<h2>2. Making a problem fit: three standard fixes</h2>
+<p>The definitions above are strict. Real problems break them, so you patch the graph first. The notes (slide 14, p31) show all three.</p>
+<h3>2.1 Anti-parallel edges</h3>
+<p>The definition does not allow both u→v and v→u. If you have u→v (capacity 4) and v→u (capacity 10), keep the first and replace the second by a detour through a new vertex w: v→w (10) and w→u (10). The new vertex only passes flow on, so max-flow does not change.</p>
+<div id="f2"></div>
+<p>Why bother? The residual network and the augmentation lemma below are cleaner when each pair of vertices has at most one edge. (The engine here copes without the fix, but write the fix on paper when the question has such edges.)</p>
+<h3>2.2 Many sources, many sinks</h3>
+<p>Add a <b>super source</b> \(s^*\) with an edge to every source, and a <b>super sink</b> \(t^*\) with an edge from every sink. Give these new edges infinite capacity (use 9999 in the engine). Then solve a normal single-source single-sink problem.</p>
+<div id="f3"></div>
+<h3>2.3 Can the infinite capacities be finite? (CT2 Q2)</h3>
+<p>Yes, when every original edge is finite. Set the capacity of \(s^*\to s_i\) to the sum of the capacities of the edges leaving \(s_i\), and the capacity of \(t_j\to t^*\) to the sum of the capacities of the edges entering \(t_j\). No flow could ever use more than that anyway, so the max-flow value does not change.</p>
+<p><b>Why the value is finite even with infinite edges.</b></p>
+<ol>
+<li>The value of any flow is the net flow leaving \(s^*\), which is \(\sum_i f(s^*,s_i)\).</li>
+<li>At each source \(s_i\), conservation gives: flow in from \(s^*\) = flow out of \(s_i\) minus flow into \(s_i\) from other original vertices. So \(f(s^*,s_i)\le\) flow out of \(s_i\le\) (sum of capacities of original edges leaving \(s_i\)).</li>
+<li>That sum is finite, there are finitely many sources, so \(|f|\) is at most a finite number.</li>
+</ol>
+<h3>2.4 Limits on a vertex</h3>
+<p>If a vertex v can pass only k units, split it into \(v_{in}\to v_{out}\) with capacity k. All edges that entered v now enter \(v_{in}\), all edges that left v now leave \(v_{out}\). When the limit sits on a depot next to the source or a zone next to the sink, you can put it on the edge from s or to t instead (chapter 08 does this).</p>
+
+<h2>3. The residual network</h2>
+<p>The idea: given the current flow, the residual network \(G_f\) shows where you can still push more, <b>and</b> where you can take flow back. Taking flow back is what lets the algorithm fix an early bad choice.</p>
+<dl class="def"><dt>Residual capacity</dt>
+<dd>\(c_f(u,v)=c(u,v)-f(u,v)\) if \((u,v)\in E\) (room left);<br>
+\(c_f(u,v)=f(v,u)\) if \((v,u)\in E\) (flow that can be cancelled);<br>
+\(c_f(u,v)=0\) otherwise.<br>
+\(G_f\) has an edge wherever \(c_f>0\). The teacher calls it the "residue network".</dd></dl>
+<div class="method"><h4>Method · draw the residual network</h4><ol>
+<li>Take the network with current labels f/c.</li>
+<li>For every edge u→v with label f/c, draw <b>u→v with value c − f</b> if c − f &gt; 0. This is the room left.</li>
+<li>For the same edge draw <b>v→u with value f</b> if f &gt; 0. This is the flow you may cancel.</li>
+<li>Edges whose value would be 0 are not drawn.</li>
+<li>A saturated edge (f = c) shows only its backward edge. An empty edge (f = 0) shows only its forward edge.</li>
+</ol></div>
+<p>Slide example: edge u→v labelled 4/9 becomes u→v with 5 and v→u with 4.</p>
+<div id="f4"></div>
+<div class="key"><p>The residual network has at most 2|E| edges. Its edges are <b>not</b> edges of G. An augmenting path may use a backward edge. That means "reduce the flow on the real edge in the opposite direction".</p></div>
+
+<h2>4. Augmenting paths and the augmentation lemma</h2>
+<dl class="def"><dt>Augmenting path</dt>
+<dd>A simple path p from s to t in the residual network \(G_f\). Its <b>residual capacity</b> is \(c_f(p)=\min\{c_f(u,v):(u,v)\in p\}\), the bottleneck. Always \(c_f(p)>0\).</dd></dl>
+<p>Pushing \(c_f(p)\) units along p is the same as adding a small flow \(f_p\) (value \(c_f(p)\) on the edges of p, 0 elsewhere) to f. Adding flows in a graph with backward edges needs a careful definition.</p>
+<dl class="def"><dt>Augmentation</dt>
+<dd>For \(f'\) a flow in \(G_f\): \((f\uparrow f')(u,v)=f(u,v)+f'(u,v)-f'(v,u)\) for \((u,v)\in E\), and 0 otherwise. In words: add what f' pushes forward, subtract what f' pushes back.</dd></dl>
+<h3>Lemma: \(f\uparrow f'\) is a flow in G and \(|f\uparrow f'|=|f|+|f'|\)</h3>
+<p>Proof. Take any edge \((u,v)\in E\). Then \((v,u)\notin E\) (no anti-parallel edges), so \(c_f(v,u)=f(u,v)\) and \(c_f(u,v)=c(u,v)-f(u,v)\).</p>
+<ol>
+<li><b>Lower bound.</b> \(f'(v,u)\le c_f(v,u)=f(u,v)\). So \((f\uparrow f')(u,v)\ge f(u,v)+f'(u,v)-f(u,v)=f'(u,v)\ge0\).</li>
+<li><b>Upper bound.</b> \((f\uparrow f')(u,v)\le f(u,v)+f'(u,v)\le f(u,v)+c_f(u,v)=c(u,v)\). So the capacity constraint holds.</li>
+<li><b>Conservation.</b> Fix a vertex u. Every neighbour v of u has exactly one of the edges (u,v) or (v,u) in E. If \((u,v)\in E\), the edge adds \(f'(u,v)-f'(v,u)\) to the net outflow of u under \(f\uparrow f'\) (compared with f). If \((v,u)\in E\), the edge \((v,u)\) has value \(f(v,u)+f'(v,u)-f'(u,v)\); it enters u, so it adds \(-(f'(v,u)-f'(u,v))=f'(u,v)-f'(v,u)\) to the net outflow. In both cases the extra amount is \(f'(u,v)-f'(v,u)\), the net outflow of \(f'\) over that neighbour. Summing over all neighbours:
+\[\text{netout}_{f\uparrow f'}(u)=\text{netout}_f(u)+\text{netout}_{f'}(u).\]</li>
+<li>For \(u\ne s,t\) both terms on the right are 0, so conservation holds.</li>
+<li>For \(u=s\) the equation reads \(|f\uparrow f'|=|f|+|f'|\). \(\blacksquare\)</li>
+</ol>
+<div class="key"><p>Since an augmenting path gives \(|f_p|=c_f(p)>0\), every augmentation strictly increases the flow value. This is why Ford-Fulkerson makes progress.</p></div>
+
+<h2>5. Ford-Fulkerson</h2>
+<div class="method"><h4>Method · Ford-Fulkerson by hand (2018–19 (b), 2017–18 Q2(b))</h4><ol>
+<li>Start with flow 0 on every edge.</li>
+<li>Draw the residual network (rules in section 3).</li>
+<li>Find any path s to t in it. Write it down, with its bottleneck.</li>
+<li>Push the bottleneck. Along a forward residual edge, add to the real edge. Along a backward residual edge, subtract from the real edge in the opposite direction.</li>
+<li>Redraw the flow network with new labels and the residual network. Write the flow value.</li>
+<li>Stop when s cannot reach t in the residual network. The value is the max flow. (The set of vertices s can still reach gives the min cut: chapter 07.)</li>
+</ol></div>
+<pre class="code">FORD-FULKERSON(G, s, t)
+ for each edge (u,v) in E
+   f(u,v) = 0
+ while there is a path p from s to t in the residual network G_f
+   c_f(p) = min { c_f(u,v) : (u,v) in p }
+   for each edge (u,v) in p
+     if (u,v) in E
+       f(u,v) = f(u,v) + c_f(p)      // forward edge: push
+     else
+       f(v,u) = f(v,u) - c_f(p)      // backward edge: cancel
+ return f</pre>
+<p>Ford-Fulkerson is a <b>method</b>, not one algorithm: it does not say which path to pick. Edmonds-Karp (next chapter) picks the shortest.</p>
+<p>Watch it on the example network. Here the engine searches with DFS in alphabetical order. Look at the second picture in each step: it is the residual network. Notice the path that uses a backward edge.</p>
+<div id="t1"></div>
+<div class="drawit"><b>On paper:</b> for every iteration draw two pictures side by side. Left: the flow network with every edge labelled f/c and the augmenting path in a heavier line. Right: the residual network. Under them write "path s a c t, bottleneck 12, |f| = 12". Finish with a clean drawing of the final flow network with all labels and the value. This is how the 15-mark 2018–19 question is marked.</div>
+
+<h2>6. Runtime</h2>
+<ol>
+<li><b>Termination.</b> With integer capacities each augmentation adds at least 1 to the value. The value cannot exceed \(|f^*|\), the max flow. So there are at most \(|f^*|\) iterations.</li>
+<li><b>One iteration.</b> Finding a path by BFS or DFS and updating costs \(O(V+E)=O(E)\), since the graph is connected (so \(E\ge V-1\)).</li>
+<li><b>Total:</b> \(O(E\cdot|f^*|)\). With integer capacities the result is an integer flow on every edge.</li>
+</ol>
+<div class="trap"><h4>Where marks go</h4><ul>
+<li>This bound depends on the <b>value</b> of the flow, not on the size of the graph. Example: s→a, s→b, a→t, b→t with capacity 100 each and a→b with capacity 1. If you keep choosing s a b t, then s b a t (through the backward edge), each path pushes only 1, so 200 augmentations for a 5-edge graph. (DFS in alphabetical order does not walk into this, but the method allows it.)</li>
+<li>With irrational capacities, an unlucky choice of paths may never terminate. That is why a rule for choosing paths (Edmonds-Karp) is needed.</li>
+<li>Writing the runtime as \(O(VE^2)\) for plain Ford-Fulkerson. That is Edmonds-Karp. Plain FF is \(O(E|f^*|)\) (2023–24 Q11).</li>
+<li>Forgetting backward edges in the residual network. Without them FF can get stuck below the max flow.</li>
+<li>Drawing a residual edge with value 0, or forgetting that a partly used edge shows both a forward and a backward edge.</li>
+</ul></div>
+
+<h2>7. Mandatory practice</h2>
+<p>Do all of these on paper. Chapter 07 uses the same network again.</p>
+<div id="r1"></div>
+<div id="r2"></div>
+<div id="p1"></div>
+<p class="drawit"><b>If you got one wrong:</b> open the steps and find the first residual network that differs from yours. The mistake is almost always a missing backward edge.</p>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/algo.js"></script>
+<script src="../assets/dsa.js"></script>
+<script>
+graphFig('#f1', 's>a 16, s>b 13, b>a 4, a>c 12, c>b 9, b>d 14, d>c 7, c>t 20, d>t 4', { layer: true });
+graphFig('#f2', 'u>v 4, v>w 10, w>u 10', {});
+graphFig('#f3', 'S>s1 9999, S>s2 9999, s1>a 5, s2>a 7, a>t1 6, a>t2 8, t1>T 9999, t2>T 9999', { layer: true });
+graphFig('#f4', 'u>v 5, v>u 4', {});
+trace('#t1', { kind: 'ff', input: 's>a 16, s>b 13, b>a 4, a>c 12, c>b 9, b>d 14, d>c 7, c>t 20, d>t 4', s: 's', t: 't' });
+recall('#r1', { id: 'r1', marks: 8, q: 'Define a flow network, a flow, the value of a flow and the max-flow problem. What is a residual network and what is an augmenting path? Draw an example. (2017–18 Q2(a), 2021–22 Q4(a))', points: ['Directed graph, capacity c(u,v) at least 0, source s, sink t', 'Capacity constraint 0 <= f(u,v) <= c(u,v)', 'Conservation at every vertex except s and t: flow in = flow out', 'Value |f| = net flow out of s', 'Max flow = flow of largest value', 'Residual capacity: c - f forward, f backward', 'Augmenting path = simple s to t path in the residual network; bottleneck is its smallest residual capacity', 'A drawn example: edge 4/9 gives forward 5 and backward 4'], model: '<p>A <b>flow network</b> is a directed graph \\(G=(V,E)\\) with capacity \\(c(u,v)\\ge0\\) on each edge, a source s and a sink t, every vertex on some s–t path.</p><p>A <b>flow</b> is \\(f:E\\to\\mathbb R\\) with \\(0\\le f(u,v)\\le c(u,v)\\) and, for every \\(u\\ne s,t\\), \\(\\sum_v f(v,u)=\\sum_v f(u,v)\\). Its <b>value</b> is \\(|f|=\\sum_v f(s,v)-\\sum_v f(v,s)\\). The <b>max-flow problem</b> asks for a flow of maximum value.</p><p>The <b>residual network</b> \\(G_f\\) has \\(c_f(u,v)=c(u,v)-f(u,v)\\) for an edge of G and \\(c_f(v,u)=f(u,v)\\) for its reverse; only positive values are drawn. An <b>augmenting path</b> is a simple path from s to t in \\(G_f\\); its residual capacity is the smallest \\(c_f\\) on it. Example: an edge u→v labelled 4/9 gives u→v with 5 and v→u with 4 in \\(G_f\\).</p>' });
+recall('#r2', { id: 'r2', marks: 10, q: 'Prove the augmentation lemma: if f is a flow in G and f\' is a flow in the residual network G_f, then f up-arrow f\' is a flow in G with value |f| + |f\'|. Then write the Ford-Fulkerson pseudocode and its running time.', points: ['Definition (f up f\')(u,v) = f(u,v) + f\'(u,v) - f\'(v,u)', 'No anti-parallel edges, so c_f(v,u) = f(u,v), hence f\'(v,u) <= f(u,v)', 'Lower bound: result >= f\'(u,v) >= 0', 'Upper bound: result <= f + c_f = c', 'Conservation: net outflow adds: netout of f plus netout of f\'', 'At s this gives |f| + |f\'|', 'Pseudocode: zero flow, while augmenting path, push bottleneck, forward add, backward subtract', 'Runtime O(E |f*|) for integer capacities'], model: '<p>For \\((u,v)\\in E\\) we have \\((v,u)\\notin E\\), so \\(c_f(v,u)=f(u,v)\\) and \\(c_f(u,v)=c(u,v)-f(u,v)\\).</p><ol><li>\\(f\'(v,u)\\le f(u,v)\\), so \\((f\\uparrow f\')(u,v)\\ge f\'(u,v)\\ge0\\).</li><li>\\((f\\uparrow f\')(u,v)\\le f(u,v)+f\'(u,v)\\le f(u,v)+c_f(u,v)=c(u,v)\\).</li><li>For a vertex u and a neighbour v, the pair contributes \\(f\'(u,v)-f\'(v,u)\\) to the net outflow of u under \\(f\\uparrow f\'\\) on top of f, whichever of (u,v), (v,u) is the real edge. Summing, \\(\\text{netout}_{f\\uparrow f\'}(u)=\\text{netout}_f(u)+\\text{netout}_{f\'}(u)\\).</li><li>For \\(u\\ne s,t\\) both are 0: conservation. At \\(u=s\\): \\(|f\\uparrow f\'|=|f|+|f\'|\\).</li></ol><pre class="code">FORD-FULKERSON(G,s,t)\n for each (u,v) in E: f(u,v)=0\n while a path p from s to t exists in G_f\n   c_f(p)=min residual on p\n   for each (u,v) in p\n     if (u,v) in E: f(u,v)+=c_f(p)\n     else f(v,u)-=c_f(p)\n return f</pre><p>Each round adds at least 1 and costs O(E), so \\(O(E|f^*|)\\).</p>' });
+practice('#p1', { id: 'p1', kind: 'flow', n: 3 });
+</script>
+</body>
+</html>

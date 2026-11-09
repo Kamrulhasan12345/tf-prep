@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bellman-Ford and DAG Shortest Paths · CSE 207 Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Shortest paths · CLRS §22.2, §24.1–24.2, §24.5 · Monirul Islam sir L1, L5–L7, slides 06–07, 11 · must-know</div>
+<h1>Single-Source Shortest Paths: Relaxation, Bellman-Ford, DAGs and BFS Tricks</h1>
+<p class="lede">Asked in 2023–24 (Q8, 8+7: the currency exchange anomaly), 2022–23 (Q2: equal weights 8, positive weights 12, negative weights and negative cycles 15), 2019–20 (Q5a 13: weights 1 to 5 by BFS; Q6c 10: SSSP as a matrix product; Q7b 10: shortest negative cycle; Q7c 12: paths through a given vertex), 2020–21 (Q1a 8: longest path in a DAG; Q2a 12: single destination), 2017–18 (Q8a 5, Q8b 6+2), 2024–25 (Q8b: negative cycle, done in chapter 4), and CT-1 (AMR) Q3 and Q4 (4 marks each).</p>
+
+<div class="key"><p><b>Syllabus note.</b> Bayzid sir's boxed "reduction will not come" is for the CT only. Term finals ask reductions nearly every year (negative cycle by log weights, weights 1 to 5 by BFS, vertex-cover and set-cover). Treat the reduction tricks in sections 8 and 9 as examinable.</p></div>
+
+<h2>1. The problem and the vocabulary</h2>
+<p>Directed graph \(G=(V,E)\), weight \(w(u,v)\) on each edge (may be negative). The weight of a path is the sum of its edge weights. The <b>shortest-path weight</b> \(\delta(s,v)\) is the minimum over all paths from \(s\) to \(v\), or \(\infty\) if there is none, or \(-\infty\) if a negative cycle can be reached on the way.</p>
+<p>Each vertex stores <code>v.d</code> (current estimate, never below the truth) and <code>v.π</code> (predecessor). The edges \((v.\pi,v)\) form the <b>shortest-path tree</b> rooted at \(s\).</p>
+<h3>Optimal substructure (L5 proof)</h3>
+<ol>
+<li>Let \(P=\langle v_0,\dots,v_k\rangle\) be a shortest path from \(v_0\) to \(v_k\). Take any sub-path \(P_{ij}\) from \(v_i\) to \(v_j\). Then \(w(P)=w(P_{0i})+w(P_{ij})+w(P_{jk})\).</li>
+<li>If some path \(P'_{ij}\) were shorter than \(P_{ij}\), replace \(P_{ij}\) by it. The new path from \(v_0\) to \(v_k\) is shorter than \(P\). Contradiction.</li>
+<li>So every sub-path of a shortest path is a shortest path. \(\blacksquare\)</li>
+</ol>
+<p><b>Shortest paths are simple</b> when no negative cycle is reachable. A positive-weight cycle only adds cost, a zero cycle adds nothing, and a negative cycle makes \(\delta=-\infty\) (go round again and again). So a shortest path has at most \(|V|-1\) edges.</p>
+<div class="key"><p><b>Triangle inequality.</b> For every edge \((u,v)\): \(\delta(s,v)\le\delta(s,u)+w(u,v)\). (Go to \(u\) the best way, then take the edge.)</p></div>
+
+<h2>2. Relaxation and its properties</h2>
+<pre class="code">INITIALIZE-SINGLE-SOURCE(G, s)            // O(V)
+  for each v in V:  v.d = ∞;  v.π = NIL
+  s.d = 0
+
+RELAX(u, v, w)                            // O(1)
+  if v.d > u.d + w(u,v)
+      v.d = u.d + w(u,v)
+      v.π = u</pre>
+<p>All algorithms in this chapter and the next differ only in <i>which edges they relax and in what order</i>. These are the properties they use (the teacher's list):</p>
+<ol>
+<li><b>Triangle inequality</b> (above).</li>
+<li><b>Upper-bound property.</b> \(v.d\ge\delta(s,v)\) always. Once \(v.d=\delta(s,v)\) it never changes ("most relaxed").</li>
+<li><b>No-path property.</b> If no path \(s\to v\) exists, \(v.d=\infty\) always.</li>
+<li><b>Convergence property.</b> If \(s\leadsto u\to v\) is a shortest path, \(u.d=\delta(s,u)\) before we relax \((u,v)\), then \(v.d=\delta(s,v)\) afterwards.</li>
+<li><b>Path-relaxation property.</b> If \(p=\langle v_0=s,v_1,\dots,v_k\rangle\) is a shortest path and its edges are relaxed in the order \((v_0,v_1),(v_1,v_2),\dots\), possibly with other relaxations in between, then \(v_k.d=\delta(s,v_k)\).</li>
+</ol>
+<div class="method"><h4>Proofs of properties 2, 4 and 5 (CLRS 24.5, the slide "SSSP properties proof")</h4><ol>
+<li><b>Upper bound, by induction on the number of relaxations.</b> At the start \(s.d=0=\delta(s,s)\) and the rest are \(\infty\). Suppose RELAX\((u,v)\) is the first step that makes some \(v.d<\delta(s,v)\). Then \(v.d=u.d+w(u,v)\ge\delta(s,u)+w(u,v)\ge\delta(s,v)\), using the hypothesis for \(u\) and then the triangle inequality. Contradiction. Estimates only decrease and never go below \(\delta\), so once equal they stay equal.</li>
+<li><b>Convergence.</b> After relaxing, \(v.d\le u.d+w(u,v)=\delta(s,u)+w(u,v)=\delta(s,v)\) (the last equality because \((u,v)\) lies on a shortest path). With the upper bound, \(v.d=\delta(s,v)\).</li>
+<li><b>Path relaxation, by induction on \(i\).</b> Claim: after \((v_{i-1},v_i)\) is relaxed, \(v_i.d=\delta(s,v_i)\), and it stays so. For \(i=0\): \(s.d=0=\delta(s,s)\). For \(i>0\): by hypothesis \(v_{i-1}.d=\delta(s,v_{i-1})\) when \((v_{i-1},v_i)\) is relaxed, so convergence gives the claim. \(\blacksquare\)</li>
+</ol></div>
+<table class="tbl"><tr><th>Algorithm</th><th>Negative edges?</th><th>Negative cycles?</th><th>Time</th></tr>
+<tr><td>BFS</td><td>no (all weights equal)</td><td>no</td><td>\(O(V+E)\)</td></tr>
+<tr><td>Dijkstra (chapter 3)</td><td>no</td><td>no</td><td>\(O(E+V\log V)\) with a Fibonacci heap</td></tr>
+<tr><td>DAG relaxation</td><td>yes</td><td>impossible (acyclic)</td><td>\(\Theta(V+E)\)</td></tr>
+<tr><td>Bellman-Ford</td><td>yes</td><td>detects them</td><td>\(O(VE)\)</td></tr></table>
+
+<h2>3. Bellman-Ford</h2>
+<p>Idea: a shortest path has at most \(V-1\) edges. So relax <b>every edge</b>, \(V-1\) times, in any order. Pass \(i\) fixes every vertex whose shortest path has \(i\) edges. Then do one more pass: if any edge still relaxes, a negative cycle is reachable from \(s\).</p>
+<pre class="code">BELLMAN-FORD(G, w, s)
+  INITIALIZE-SINGLE-SOURCE(G, s)
+  for i = 1 to |V| - 1
+      for each edge (u,v) in E
+          RELAX(u, v, w)
+  for each edge (u,v) in E                 // detection pass
+      if v.d > u.d + w(u,v)
+          return FALSE                     // negative cycle reachable from s
+  return TRUE</pre>
+<div class="method"><h4>Method · Bellman-Ford by hand</h4><ol>
+<li>Fix an edge order and write it down. Without a fixed order two students get different intermediate tables, and the marker cannot follow.</li>
+<li>Make a table with one column per vertex and one row per pass. Row 0: \(0\) for the source, \(\infty\) elsewhere.</li>
+<li>In each pass go through every edge once in the written order. Copy the table row, update the cells that change, and note \(\pi\).</li>
+<li>Stop after \(|V|-1\) passes (you may stop early if a pass changes nothing).</li>
+<li>Do the detection pass: check every edge once. Any edge that can still relax means "negative cycle".</li>
+</ol></div>
+<h3>Complexity</h3>
+<p>Initialisation \(O(V)\). The double loop does \((V-1)\cdot E\) relaxations at \(O(1)\) each: \(O(VE)\). The detection pass is \(O(E)\). Total \(O(VE)\); space \(O(V)\).</p>
+<h3>Correctness</h3>
+<div class="method"><h4>Proof (CLRS Lemma 24.2 and Theorem 24.4)</h4><ol>
+<li><b>No negative cycle reachable.</b> Every reachable vertex \(v\) has a simple shortest path \(\langle v_0=s,\dots,v_k=v\rangle\), \(k\le V-1\).</li>
+<li>Pass \(i\) relaxes every edge, so it relaxes \((v_{i-1},v_i)\). Edges of the path are therefore relaxed in order across passes 1, 2, \(\dots\), \(k\).</li>
+<li>By the path-relaxation property \(v.d=\delta(s,v)\) after \(V-1\) passes. Unreachable vertices keep \(\infty\) (no-path property).</li>
+<li>Now every edge satisfies \(v.d=\delta(s,v)\le\delta(s,u)+w(u,v)=u.d+w(u,v)\) (triangle inequality), so the detection pass finds nothing and returns TRUE.</li>
+<li><b>Negative cycle reachable.</b> Let \(c=\langle v_0,\dots,v_k=v_0\rangle\) with \(\sum w(v_{i-1},v_i)<0\). Suppose the detection pass returned TRUE. Then \(v_i.d\le v_{i-1}.d+w(v_{i-1},v_i)\) for all \(i\). Add these \(k\) inequalities: \(\sum v_i.d\le\sum v_{i-1}.d+w(c)\). Both sums are the same finite number (the cycle is reachable, so every \(d\) is finite, and each vertex appears once in each sum). So \(0\le w(c)\). Contradiction. So it returns FALSE. \(\blacksquare\)</li>
+</ol></div>
+<div class="key"><p><b>Intuitive idea in two lines (2017–18 Q8b, 6+2).</b> "A shortest path has at most \(V-1\) edges, so relaxing all edges \(V-1\) times gives every shortest path. If after that an edge can still be relaxed, the distances are still dropping, which only a negative cycle can cause." Detection of the cycle itself: from the last relaxed vertex follow \(\pi\) back \(V\) times (you are then inside the cycle), then keep following until you return.</p></div>
+
+<h3>Trace: the 2024–25 graph (a negative cycle)</h3>
+<p>Edges A→B 3, B→C 2, C→D 2, D→B −8, A→D 10, B→D 5. The cycle B→C→D→B has weight \(2+2-8=-4\). Watch the values fall in every pass, and the extra pass still relaxing D→B.</p>
+<div id="t1"></div>
+<h3>Trace: a graph with negative edges but no negative cycle</h3>
+<p>Edges A→B 6, A→C 7, B→C 8, B→D 5, B→E −4, C→D −3, C→E 9, D→B −2, E→D 7, E→A 2. The cycle B→D→B costs \(5-2=3>0\), so the distances settle: final \(d\) = A 0, B 2, C 7, D 4, E −2.</p>
+<div id="t2"></div>
+<div class="drawit"><b>On paper:</b> draw the graph with edge weights. Write the edge order. Draw a table: rows pass 0, 1, 2, 3, check, columns the vertices. Circle every changed cell. Draw the final shortest-path tree with bold edges from \(\pi\), and write "negative cycle" or "no negative cycle" with the failing edge named.</div>
+
+<h2>4. Negative cycles: what to answer when asked to "handle" them (2022–23 Q2c, 15 marks)</h2>
+<p>"Develop an efficient algorithm when edge weights can be negative and there can be negative cycles." Answer in four steps:</p>
+<div class="method"><h4>Method</h4><ol>
+<li>Run Bellman-Ford from \(s\) with \(V-1\) passes.</li>
+<li>Run the detection pass. Collect every vertex \(v\) for which an edge \((u,v)\) still relaxes.</li>
+<li>Do a BFS or DFS from those vertices. Every vertex reached has \(\delta(s,v)=-\infty\).</li>
+<li>All other reachable vertices have the final \(d\) values as their distances. Unreachable ones stay \(\infty\).</li>
+</ol></div>
+<p>Cost \(O(VE)+O(V+E)=O(VE)\). A complete answer also says why Dijkstra cannot be used (chapter 3) and gives the pseudocode above.</p>
+
+<h2>5. The currency exchange question (2023–24 Q8, 8+7)</h2>
+<p>Rates \(r_{ij}\): one unit of \(c_i\) buys \(r_{ij}\) units of \(c_j\). (i) Best way to convert \(s\) into \(t\). (ii) Detect an anomaly: a cycle with \(r_{i_1i_2}\cdots r_{i_ki_1}>1\).</p>
+<div class="method"><h4>Method · turn a product into a sum</h4><ol>
+<li>Graph: one vertex per currency, an edge \(i\to j\) for every rate.</li>
+<li>Edge weight \(w(i,j)=-\ln r_{ij}\). For a path, \(\sum w=-\ln\prod r\). Maximising the product is the same as minimising the sum, because \(-\ln\) is decreasing.</li>
+<li><b>(i)</b> Run Bellman-Ford from \(s\). The best sequence is the \(\pi\)-path to \(t\). Amount obtained from 1 unit is \(e^{-d[t]}\). With \(n\) currencies the graph has \(n^2\) edges, so \(O(n\cdot n^2)=O(n^3)\) (Floyd-Warshall, chapter 4, is the same cost).</li>
+<li><b>(ii)</b> \(\prod r>1\iff\sum(-\ln r)<0\), so the anomaly is exactly a <b>negative-weight cycle</b>. Run Bellman-Ford from any currency (the graph is complete, all vertices are reachable) and look at the extra pass. If any edge relaxes, the anomaly exists. \(O(n^3)\).</li>
+<li>Check by hand: rates A→B 0.9, B→C 0.9, C→A 1.3 give product \(1.053>1\). The weights are \(0.105,\ 0.105,\ -0.262\), cycle sum \(-0.052<0\). Bellman-Ford finds it.</li>
+</ol></div>
+<div class="trap"><h4>Where marks go</h4><ul>
+<li><b>Student solution "Dijkstra with multiply and max" is wrong in general.</b> It works only if every rate \(r\le1\) (then \(-\ln r\ge0\)). The question only promises \(r_{ij}r_{ji}<1\), so single rates can exceed 1 and long cycles can be profitable. Use \(-\ln r\) and Bellman-Ford. (This error is in "DSA 23-24 solve" Q8(i).)</li>
+<li>If part (i) has an anomaly reachable from \(s\), "best" is unbounded; say you assume none, or run (ii) first.</li>
+<li>Say what you put on the diagonal if you use Floyd-Warshall: \(d_{ii}=0\) (that is \(r_{ii}=1\)), then a negative diagonal means anomaly.</li>
+</ul></div>
+
+<h2>6. Shortest paths in a DAG</h2>
+<p>If the graph has no cycles you do not need Bellman-Ford. Negative edges are allowed because no cycle can be negative.</p>
+<pre class="code">DAG-SHORTEST-PATHS(G, w, s)
+  topologically sort the vertices of G          // DFS finish times, reversed
+  INITIALIZE-SINGLE-SOURCE(G, s)
+  for each vertex u, taken in topological order
+      for each v in Adj[u]
+          RELAX(u, v, w)</pre>
+<div class="method"><h4>Correctness and complexity</h4><ol>
+<li>Every path in a DAG follows the topological order. So when we process the vertices in that order, the edges of any path \(s=v_0,\dots,v_k\) are relaxed in the order \((v_0,v_1),(v_1,v_2),\dots\)</li>
+<li>By the path-relaxation property, \(v_k.d=\delta(s,v_k)\). Equivalently: when \(u\) is processed, all its predecessors are already final.</li>
+<li>Time: topological sort \(\Theta(V+E)\); initialise \(\Theta(V)\); each edge relaxed once, \(\Theta(E)\). Total <b>\(\Theta(V+E)\)</b>.</li>
+<li>Vertices that come <b>before \(s\)</b> in the order cannot be reached from \(s\); they stay \(\infty\).</li>
+</ol></div>
+<h3>Longest path in a DAG (2020–21 Q1a, 8 marks)</h3>
+<p>Same algorithm, two changes: start with \(d=-\infty\) (source 0) and relax with <code>if v.d &lt; u.d + w</code>. Or negate every weight, run the shortest-path version, and negate the answer. Still \(\Theta(V+E)\). This is how critical-path scheduling works. (The longest path in a graph with cycles is NP-hard, which is why the DAG matters.)</p>
+<h3>Trace</h3>
+<p>Edges A→B 5, A→C 3, B→C 2, B→D 6, C→D 7, C→E 4, C→F 2, D→E −1, D→F 1, E→F −2, source A. The engine sorts topologically (A, B, C, D, E, F) and relaxes vertex by vertex.</p>
+<div id="t3"></div>
+<div class="drawit"><b>On paper:</b> write the topological order as a row of boxes. Under each box write the vertex's final \(d\). Draw each relaxation as an arrow that goes left to right only, and bold the edges that end up in the shortest-path tree.</div>
+
+<h2>7. Unit weights: BFS (2022–23 Q2a 8, 2017–18 Q8a 5)</h2>
+<div class="method"><h4>Method · all weights equal</h4><ol>
+<li>BFS from \(s\) with a queue. \(d[s]=0\). When you dequeue \(u\) and see an unvisited \(v\): \(d[v]=d[u]+1\), \(\pi[v]=u\), enqueue.</li>
+<li>Path weight is (number of edges) \(\times\) (the common weight \(c\)), so multiply the BFS distance by \(c\).</li>
+<li>Correctness: the queue always holds vertices with \(d\) values \(k,\dots,k,k+1,\dots,k+1\) in order. So vertices leave the queue in non-decreasing order of true distance (induction on \(k\)).</li>
+<li>Time \(O(V+E)\) with adjacency lists.</li>
+</ol></div>
+<pre class="code">BFS(G, s)
+  for each v: d[v] = ∞;  d[s] = 0;  Q = [s]
+  while Q not empty
+      u = dequeue(Q)
+      for each v in Adj[u]
+          if d[v] == ∞:  d[v] = d[u] + 1;  π[v] = u;  enqueue(Q, v)</pre>
+
+<h2>8. Reductions to BFS (2019–20 Q5a, 13 marks; 2017–18 Q8a; CT-1 Q4)</h2>
+<div class="method"><h4>Method · integer weights between 1 and \(W\) (here \(W=5\) or \(W=3\))</h4><ol>
+<li>Replace each edge \((u,v)\) of weight \(w\) by a path of \(w\) unit edges through \(w-1\) new dummy vertices \(u\to x_1\to\cdots\to x_{w-1}\to v\).</li>
+<li>A path of weight \(L\) in the old graph becomes a path of exactly \(L\) edges in the new graph, and conversely. So shortest weighted path = shortest unweighted path.</li>
+<li>Run BFS from \(s\) in the new graph. Read the answer at \(t\); ignore dummies in the printed path.</li>
+<li>Size of the new graph: at most \(V+(W-1)E\) vertices and \(WE\) edges. BFS time \(O(V+WE)\), and since \(W\) is a constant (5 or 3), \(O(V+E)\). That beats Dijkstra's \(O(E+V\log V)\) (CT-1 Q4: "outline and give complexity").</li>
+</ol></div>
+<p>Alternative with no dummy vertices: <b>Dial's buckets</b>. Keep an array of queues indexed by distance \(0,\dots,W\cdot(V-1)\). Scan the buckets in order. Same \(O(V+WE)\).</p>
+<p>This works only for <b>integer</b> weights. For general positive weights the trick needs too many dummies; that is why the 2017–18 Q8a question (BFS with unequal weights) has the answer "split the edges, but the cost depends on the weights, so use Dijkstra".</p>
+
+<h2>9. More variants that were asked</h2>
+<div class="method"><h4>Method · each answer in a few lines</h4><ol>
+<li><b>SSSP as a matrix-vector product (2019–20 Q6c, 10 marks).</b> Let \(W\) be the weight matrix with \(w_{ii}=0\) and \(\infty\) where no edge. Let \(d^{(0)}=(0,\infty,\dots,\infty)\) (source first). Define the min-plus product \(d^{(m)}_j=\min_i\bigl(d^{(m-1)}_i+w_{ij}\bigr)\). Then \(d^{(m)}_j\) is the shortest weight of a path from \(s\) to \(j\) using at most \(m\) edges (induction: the last edge is \((i,j)\), the rest is a path with at most \(m-1\) edges; \(w_{jj}=0\) keeps "at most"). After \(V-1\) products, \(d^{(V-1)}=d^{(0)}\otimes W^{\otimes(V-1)}\) is the answer. Each product relaxes all edges once, which is exactly one Bellman-Ford pass. Cost: \(V-1\) products, each \(O(E)\) if you only use real edges, giving \(O(VE)\) (or \(O(V^3)\) dense with a full matrix). One more product that changes \(d\) means a negative cycle.</li>
+<li><b>Length (edge count) of a shortest negative cycle (2019–20 Q7b, 10 marks).</b> Use the min-plus matrix powers of chapter 4: \(L^{(m)}_{ii}\) is the cheapest closed walk of at most \(m\) edges through \(i\). The answer is the smallest \(m\ge1\) with some \(L^{(m)}_{ii}<0\). Compute \(L^{(1)},L^{(2)},\dots\) one multiplication at a time, \(O(V^4)\), or square to find the range then binary search, \(O(V^3\log V)\). Since a shortest negative cycle is simple, \(m\le V\).</li>
+<li><b>Shortest paths that must pass through \(v_0\) (2019–20 Q7c, 12 marks).</b> The best \(u\to v\) path through \(v_0\) costs \(\delta(u,v_0)+\delta(v_0,v)\). Run Dijkstra from \(v_0\) in \(G\) (gives \(\delta(v_0,v)\) for all \(v\)). Run Dijkstra from \(v_0\) in the <b>reversed</b> graph (gives \(\delta(u,v_0)\) for all \(u\)). Combine for each pair in \(O(V^2)\). Total \(O(E\log V+V^2)\). Paths need not be simple; that is allowed because the question asks only for paths through \(v_0\).</li>
+<li><b>Single destination with vertex weights (2020–21 Q2a, 12 marks).</b> Reverse all edges, make the destination the source, and run Dijkstra on the reversed graph. If vertices also have costs \(c(v)\ge0\) and a path pays for the vertices it visits, charge the vertex when you arrive at it: in the reversed graph give edge \((v\to u)\) the weight \(w(u,v)+c(u)\), and start with \(d[t]=c(t)\). Non-negative, so Dijkstra is valid. (The question statement is brief; say your reading of "path cost" first.)</li>
+<li><b>Distributed use (CT-1 Q3, 4 marks).</b> Bellman-Ford needs only each vertex's own estimate and its neighbours', so every router can run it on its own (distance-vector routing). Dijkstra repeatedly needs the global minimum over all unfinished vertices, which needs one machine to know everything.</li>
+<li><b>Which algorithm? (class test).</b> Unweighted all pairs: BFS from every vertex, \(O(V(V+E))\). One source, negative edges, undirected graph: an undirected negative edge can be walked back and forth, so it acts as a negative cycle and shortest walks are not defined; the expected answer is Bellman-Ford, \(O(VE)\), treating each edge as two directed edges, which reports the cycle. Directed sparse all pairs: Johnson (chapter 5).</li>
+</ol></div>
+
+<h2>10. Mandatory practice</h2>
+<p>Do these with pen and paper.</p>
+<div id="r1"></div>
+<div id="r2"></div>
+<div id="r3"></div>
+<div id="r4"></div>
+<div id="p1"></div>
+<div id="p2"></div>
+<p class="drawit"><b>If you got one wrong:</b> open the steps and find the first pass where your table differs. Usually the edge order was different or you used a value updated in the same pass (which is allowed, and the engine does it too).</p>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/algo.js"></script>
+<script src="../assets/dsa.js"></script>
+<script>
+trace('#t1', { kind: 'bellman', input: 'A>B 3, B>C 2, C>D 2, D>B -8, A>D 10, B>D 5', s: 'A' });
+trace('#t2', { kind: 'bellman', input: 'A>B 6, A>C 7, B>C 8, B>D 5, B>E -4, C>D -3, C>E 9, D>B -2, E>D 7, E>A 2', s: 'A' });
+trace('#t3', { kind: 'dag', input: 'A>B 5, A>C 3, B>C 2, B>D 6, C>D 7, C>E 4, C>F 2, D>E -1, D>F 1, E>F -2', s: 'A' });
+recall('#r1', { id: 'r1', marks: 8, q: 'Explain the intuition behind Bellman-Ford, write the pseudocode, and show how it detects a negative cycle. (2017–18 Q8b)', points: ['A shortest path has at most V-1 edges', 'Relax all edges V-1 times, any order', 'Pseudocode with INITIALIZE-SINGLE-SOURCE, double loop, RELAX', 'Extra pass: if an edge still relaxes, a negative cycle is reachable from s', 'Time O(VE)', 'Proof sketch of detection (summing the inequalities around the cycle gives 0 <= w(c))'], model: '<p>Pseudocode as in section 3. A shortest path has at most \\(V-1\\) edges, and pass \\(i\\) fixes all vertices whose shortest path has \\(i\\) edges (path-relaxation). After \\(V-1\\) passes every \\(d\\) is final when no negative cycle is reachable, so no edge can relax in pass \\(V\\). If a negative cycle \\(c\\) is reachable and no edge relaxed in the extra pass, then for each cycle edge \\(v_i.d\\le v_{i-1}.d+w\\); summing around the cycle gives \\(0\\le w(c)\\), contradiction. So some edge still relaxes: negative cycle. Time \\(O(VE)\\).</p>' });
+recall('#r2', { id: 'r2', marks: 15, q: 'Currency exchange: given rates r_ij, (i) find the best way to convert s into t, (ii) detect an arbitrage cycle. State complexity and why Dijkstra with multiplication is not safe. (2023–24 Q8)', points: ['Graph: vertices currencies, edges i to j with weight -ln r_ij', 'Product of rates becomes sum of weights; maximise product = minimise sum', '(i) Bellman-Ford from s, path from pi, amount = exp(-d[t])', '(ii) arbitrage = product > 1 = negative cycle; extra pass of Bellman-Ford', 'O(n^3) for n currencies (n^2 edges)', 'Dijkstra with max-product only valid when all r <= 1'], model: '<p>Weight \\(w_{ij}=-\\ln r_{ij}\\). Then \\(\\prod r>1\\iff\\sum w<0\\). (i) Bellman-Ford from \\(s\\); follow \\(\\pi\\) from \\(t\\); money out \\(=e^{-d[t]}\\). (ii) Run Bellman-Ford from any vertex; if the \\(n\\)-th pass still relaxes an edge, a negative cycle (arbitrage) exists. Both \\(O(n\\cdot n^2)=O(n^3)\\). Dijkstra needs non-negative weights, i.e. \\(r\\le1\\), which is not guaranteed.</p>' });
+recall('#r3', { id: 'r3', marks: 8, q: 'Design an efficient algorithm for the longest path in a DAG. Prove it and give the running time. (2020–21 Q1a)', points: ['Topological sort', 'Initialise d = -inf, source 0', 'Relax in topological order with max instead of min (or negate weights)', 'Correct because every path follows the topological order (path-relaxation)', 'Theta(V+E)'], model: '<p>Topologically sort. Set \\(d[s]=0\\), others \\(-\\infty\\). For each \\(u\\) in order and each edge \\((u,v)\\): if \\(d[v]<d[u]+w(u,v)\\) set \\(d[v]=d[u]+w(u,v)\\). Every path is traversed in topological order, so its edges are relaxed in order and \\(d[v]\\) is the longest path weight (the same argument as for shortest paths with signs flipped). Time \\(\\Theta(V+E)\\).</p>' });
+recall('#r4', { id: 'r4', marks: 13, q: 'Edge weights are integers from 1 to 5. Reduce the shortest weighted path to the unweighted problem and solve it with BFS. State the cost. (2019–20 Q5a)', points: ['Replace edge of weight w by a path of w unit edges (w-1 dummy vertices)', 'Path lengths are preserved exactly', 'Run BFS from s', 'Graph size V+4E vertices, 5E edges', 'Time O(V+E) since 5 is a constant'], model: '<p>Replace each edge \\((u,v)\\) of weight \\(w\\in\\{1,\\dots,5\\}\\) by a chain \\(u\\to x_1\\to\\cdots\\to x_{w-1}\\to v\\) of \\(w\\) unit edges. A weighted path of weight \\(L\\) maps to an unweighted path of exactly \\(L\\) edges and back, so the shortest ones correspond. BFS from \\(s\\) gives the distance to \\(t\\). The new graph has at most \\(V+4E\\) vertices and \\(5E\\) edges, so BFS takes \\(O(V+E)\\).</p>' });
+practice('#p1', { id: 'p1', kind: 'bellman', n: 2 });
+practice('#p2', { id: 'p2', kind: 'bellman', n: 1 });
+</script>
+</body>
+</html>

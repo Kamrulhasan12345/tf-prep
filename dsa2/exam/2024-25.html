@@ -1,0 +1,403 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Term Final 2024–25 · CSE 207 Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Past papers · L-2/T-1 CSE 207 · term final 2024–25 · paper dated 07/05/2026</div>
+<h1>Term Final 2024–25, solved</h1>
+<p class="lede">Full marks 210, time 3 hours. Section A: four questions, answer any THREE (Q1 to Q4). Section B: four questions, Q5 is <b>compulsory</b>, answer any TWO of Q6, Q7, Q8. Every question is worth 35 marks. Try each part on paper first, then open the answer. All trees, tables and traces below were produced by the same engine as the chapters, not worked by hand.</p>
+
+<div class="key"><p><b>This paper in one line:</b> reductions and proofs in Section A, a compulsory red-black insert and delete in Section B (25 marks), plus branch and bound, backtracking, hashing with four methods, MST uniqueness, a Dijkstra construction, max flow and Floyd-Warshall. The scan was readable; the handwritten notes on the pages are ignored. Q3(a) reads as success probability at least \(1/n^2\) in the scan.</p></div>
+
+<h2>Section A</h2>
+
+<h3>Question 1 (35)</h3>
+
+<div class="exam"><div class="exam-src">2024–25 · Q1(a) · 12 marks</div>
+<div class="exam-q"><p>Prove that \(P = NP \Rightarrow NP = \text{co-NP}\).</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p>Chapter: <a href="../np/01-classes.html">P, NP, co-NP, NP-complete</a>.</p>
+<ol>
+<li>Assume \(P = NP\).</li>
+<li>P is closed under complement: if a poly-time machine decides \(L\), swap its accept and reject answers to decide \(\bar L\). So \(L \in P \Rightarrow \bar L \in P\).</li>
+<li><b>NP ⊆ co-NP.</b> Take \(L \in NP\). Then \(L \in P\) (assumption). So \(\bar L \in P = NP\). By definition of co-NP (\(L \in\) co-NP iff \(\bar L \in NP\)), \(L \in\) co-NP.</li>
+<li><b>co-NP ⊆ NP.</b> Take \(L \in\) co-NP. Then \(\bar L \in NP = P\). So \(L \in P\) (closure, step 2). Hence \(L \in P = NP\).</li>
+<li>Steps 3 and 4 give \(NP = \text{co-NP}\). ∎</li>
+</ol>
+<p><b>Say this too:</b> the converse is not known. \(NP = \text{co-NP}\) does not force \(P = NP\) (see Q2(c)).</p>
+</div></details></div>
+
+<div class="exam"><div class="exam-src">2024–25 · Q1(b) · 8 marks</div>
+<div class="exam-q"><p>Prove or disprove that \(P = NP \cap \text{co-NP}\).</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p>Chapter: <a href="../np/01-classes.html">P, NP, co-NP, NP-complete</a>.</p>
+<p>Neither can be done today. The honest answer earns the marks: prove the easy half, state that the other half is an open problem, and say what it would imply.</p>
+<ol>
+<li><b>\(P \subseteq NP \cap \text{co-NP}\) (provable).</b> \(P \subseteq NP\) because a poly-time decider is a verifier that ignores the certificate. \(L \in P \Rightarrow \bar L \in P \subseteq NP\), so \(L \in\) co-NP.</li>
+<li><b>\(NP \cap \text{co-NP} \subseteq P\) (open).</b> No proof and no counterexample is known. Both are open problems. If \(P = NP\), the equality holds (Q1(a): everything collapses into P). If \(P \ne NP\), the equality can still go either way.</li>
+<li>Evidence that people suspect it is false: factoring (the decision version) and, before AKS in 2002, PRIMES were in \(NP \cap \text{co-NP}\) with no poly algorithm known. PRIMES then moved into P; factoring has not.</li>
+</ol>
+<div class="trap"><h4>Where marks go</h4><ul><li>Writing "true" or "false" with a fake proof. Write: "inclusion one way is proved, the other way is open".</li></ul></div>
+</div></details></div>
+
+<div class="exam"><div class="exam-src">2024–25 · Q1(c) · 15 marks</div>
+<div class="exam-q"><p>Independent set: \(I \subseteq V\) with no edge between any two vertices of \(I\). Clique: \(C \subseteq V\) where every two distinct vertices are adjacent. INDEPENDENT SET (is there an independent set of size at least \(K\)?) is NP-complete. CLIQUE asks whether \(G\) has a clique of size at least \(K\). Prove that the clique problem is as hard as the independent set problem.</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p>Chapter: <a href="../np/02-reductions.html">Reductions, with proof templates</a>. "As hard as" means we must show IS \(\le_p\) CLIQUE, so CLIQUE is NP-hard.</p>
+<ol>
+<li><b>Direction.</b> Reduce the known hard problem (IS) to the new one (CLIQUE). Never the other way.</li>
+<li><b>Map.</b> Given an IS instance \((G=(V,E), K)\), build \(\bar G = (V, \bar E)\) where \(\bar E = \{\{u,v\} : u \ne v,\ \{u,v\} \notin E\}\). Output the CLIQUE instance \((\bar G, K)\).</li>
+<li><b>Poly time.</b> Checking all \(\binom{|V|}{2}\) pairs takes \(O(|V|^2)\).</li>
+<li><b>Correctness, forward.</b> If \(I\) is independent in \(G\) with \(|I| \ge K\): for any two distinct \(u,v \in I\), \(\{u,v\} \notin E\), so \(\{u,v\} \in \bar E\). So \(I\) is a clique of size at least \(K\) in \(\bar G\).</li>
+<li><b>Correctness, backward.</b> If \(C\) is a clique in \(\bar G\) with \(|C| \ge K\): any two distinct \(u,v \in C\) have \(\{u,v\} \in \bar E\), so \(\{u,v\} \notin E\). So \(C\) is independent in \(G\).</li>
+<li>Steps 4 and 5: \((G,K) \in\) IS iff \((\bar G,K) \in\) CLIQUE. The map is poly-time, so IS \(\le_p\) CLIQUE. IS is NP-hard, so CLIQUE is NP-hard. ∎</li>
+<li>To call CLIQUE NP-complete also add: it is in NP (certificate = the \(K\) vertices, check all pairs in \(O(K^2)\)). The question only asks "as hard as", so this line is a bonus.</li>
+</ol>
+<div id="g1c"></div>
+<p class="drawit"><b>On paper:</b> draw a small \(G\) (a path A-B-C), then \(\bar G\) next to it (only A-C), and mark \(\{A,C\}\) as independent in \(G\) and a clique in \(\bar G\).</p>
+</div></details></div>
+
+<h3>Question 2 (35)</h3>
+
+<div class="exam"><div class="exam-src">2024–25 · Q2(a) · 15 marks</div>
+<div class="exam-q"><p>Give an approximation algorithm for the vertex cover problem. Analyze the approximation ratio of your algorithm.</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p>Chapter: <a href="../np/06-approximation.html">Approximation algorithms</a>. <b>Syllabus note:</b> Bayzid sir's notes say vertex cover is "not in syllabus", but it was asked here and in 2022–23 (15 marks each). Learn it.</p>
+<pre class="code">APPROX-VERTEX-COVER(G)
+  C = empty set
+  E' = G.E
+  while E' is not empty
+     pick any edge (u, v) in E'
+     C = C + {u, v}
+     remove from E' every edge incident on u or v
+  return C</pre>
+<p><b>Claim:</b> \(C\) is a vertex cover and \(|C| \le 2\,|OPT|\). Time \(O(V+E)\) with adjacency lists.</p>
+<ol>
+<li>Let \(A\) be the set of edges picked in the loop. Each pick removes all edges at \(u\) and \(v\), so no later pick shares an endpoint with an earlier one. \(A\) is a <b>matching</b>.</li>
+<li><b>Valid cover.</b> The loop ends only when \(E'\) is empty. Every edge was either picked (both ends in \(C\)) or removed because it touched a picked vertex. So every edge has an endpoint in \(C\).</li>
+<li><b>Size.</b> Each pick adds exactly 2 new vertices (they are new because earlier picks removed their edges). So \(|C| = 2|A|\).</li>
+<li><b>Lower bound on OPT.</b> Any vertex cover must contain an endpoint of every edge of \(A\). The edges of \(A\) share no endpoints, so these endpoints are all different. So \(|OPT| \ge |A|\).</li>
+<li>Combine: \(|C| = 2|A| \le 2|OPT|\). The ratio is at most 2. ∎</li>
+</ol>
+<p><b>Tight example.</b> Path A-B-C-D-E, picking A-B and C-D gives \(C=\{A,B,C,D\}\), size 4. The optimum is \(\{B,D\}\), size 2. Ratio exactly 2.</p>
+<div id="g2a"></div>
+<p class="drawit"><b>On paper:</b> draw the 5-vertex path, circle the two picked edges (the matching), colour their four endpoints, then circle B and D in a different colour as the optimum.</p>
+</div></details></div>
+
+<div class="exam"><div class="exam-src">2024–25 · Q2(b) · 12 marks</div>
+<div class="exam-q"><p>Analyze the running time of the randomized quick sort algorithm.</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p>Chapter: <a href="../np/05-randomized.html">Randomized quicksort, Monte Carlo, Karger</a>. Result: expected \(O(n\log n)\) for every input; worst case \(O(n^2)\).</p>
+<ol>
+<li><b>Setup.</b> Let \(z_1 < z_2 < \dots < z_n\) be the keys in sorted order. The pivot is chosen uniformly at random. Running time is dominated by the number of comparisons \(X\) (each partition step compares each element with the pivot once).</li>
+<li><b>Each pair is compared at most once.</b> Two keys are compared only when one of them is the pivot, and the pivot is then removed from all later calls.</li>
+<li><b>When are \(z_i\) and \(z_j\) (\(i<j\)) compared?</b> Let \(Z_{ij} = \{z_i,\dots,z_j\}\). While no element of \(Z_{ij}\) has been picked as pivot, they stay together in one sublist. The first pivot picked from \(Z_{ij}\) decides: if it is \(z_i\) or \(z_j\), they are compared. If it is strictly between, they are split apart and never compared.</li>
+<li>All \(j-i+1\) elements of \(Z_{ij}\) are equally likely to be the first pivot from \(Z_{ij}\). So \(\Pr[z_i, z_j \text{ compared}] = \dfrac{2}{j-i+1}\).</li>
+<li><b>Expectation (linearity).</b> \[E[X] = \sum_{i=1}^{n-1}\sum_{j=i+1}^{n} \frac{2}{j-i+1} = \sum_{i=1}^{n-1}\sum_{k=2}^{n-i+1}\frac{2}{k} < 2\sum_{i=1}^{n-1} H_n \le 2n H_n = O(n\log n).\]</li>
+<li><b>Worst case.</b> Pivot is always the smallest or largest: \(T(n) = T(n-1) + \Theta(n) = \Theta(n^2)\). Randomization makes this happen with very small probability on any fixed input, so no input is bad. ∎</li>
+</ol>
+</div></details></div>
+
+<div class="exam"><div class="exam-src">2024–25 · Q2(c) · 8 marks</div>
+<div class="exam-q"><p>"It is possible that \(P \ne NP\), yet \(NP = \text{co-NP}\)." Do you agree with this statement? Justify your answer.</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p>Chapter: <a href="../np/01-classes.html">P, NP, co-NP, NP-complete</a>.</p>
+<ol>
+<li><b>Agree.</b> It is consistent with everything known: no theorem links the two statements in that direction.</li>
+<li>What is proved is Q1(a): \(P = NP \Rightarrow NP = \text{co-NP}\). Its contrapositive is \(NP \ne \text{co-NP} \Rightarrow P \ne NP\). So if someone proves \(NP \ne \text{co-NP}\), then \(P\ne NP\) follows.</li>
+<li>The statement in the question is the <em>converse</em> direction: \(P \ne NP\) together with \(NP = \text{co-NP}\). An implication does not give its converse for free. To rule the case out one would have to prove \(NP = \text{co-NP} \Rightarrow P = NP\), and nobody has.</li>
+<li>So the case "\(P \ne NP\) but \(NP = \text{co-NP}\)" cannot be excluded. Most researchers believe \(NP \ne \text{co-NP}\), but that is a belief, not a proof.</li>
+</ol>
+</div></details></div>
+
+<h3>Question 3 (35)</h3>
+
+<div class="exam"><div class="exam-src">2024–25 · Q3(a) · 10 marks</div>
+<div class="exam-q"><p>Suppose you have designed a Monte Carlo algorithm for a given problem which succeeds with probability \(\ge 1/n^2\) (as read from the scan). Your boss has asked you to achieve at least \(1 - 1/n\) success probability. Explain how you can achieve this.</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p>Chapter: <a href="../np/05-randomized.html">Randomized quicksort, Monte Carlo, Karger</a>. Idea: repeat with fresh random bits and keep the best verified answer.</p>
+<ol>
+<li><b>Assumption (state it).</b> A returned answer can be recognised as correct (one-sided error, or the answer can be checked). Then the repeated run can keep any correct answer it sees.</li>
+<li>Run the algorithm \(t\) times, each time with independent random choices.</li>
+<li>All \(t\) runs fail with probability at most \(\left(1-\frac1{n^2}\right)^t\).</li>
+<li>Use \(1 - x \le e^{-x}\): \(\left(1-\frac1{n^2}\right)^t \le e^{-t/n^2}\).</li>
+<li>Choose \(t = n^2\ln n\). Then the failure probability is at most \(e^{-\ln n} = 1/n\).</li>
+<li>So the success probability is at least \(1 - 1/n\). The cost is \(n^2 \ln n\) times the cost of one run, i.e. \(O(n^2\log n)\cdot T(n)\). (The handwritten "\(n^2\log n\)" in the margin of the scan agrees.) ∎</li>
+</ol>
+</div></details></div>
+
+<div class="exam"><div class="exam-src">2024–25 · Q3(b) · 15 marks</div>
+<div class="exam-q"><p>Solve this instance of the 0-1 knapsack problem using branch and bound. Show the branch and bound tree. Capacity = 10. Items (weight, value): 1 (4, 40), 2 (3, 50), 3 (5, 70), 4 (3, 45).</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p>Chapter: <a href="../np/04-branch-bound.html">Branch and bound; TSP by DP</a>. Method: sort by value/weight, bound = fractional knapsack of the rest, expand the node with the largest upper bound first (Bayzid sir), prune when bound \(\le\) best so far.</p>
+<p>Ratios: item 2 \(=50/3=16.67\), item 4 \(=15\), item 3 \(=14\), item 1 \(=10\). Order: 2, 4, 3, 1.</p>
+<div id="t3b"></div>
+<p><b>Answer:</b> pick items 1, 2, 4. Weight \(4+3+3=10\), value \(40+50+45=135\). Optimal value 135.</p>
+<p class="drawit"><b>On paper:</b> root box "W=0 V=0 ub=…". Two edges per level, "take item" and "skip item". In each box write W, V and ub. Cross out a box when it is infeasible (W &gt; 10) or ub \(\le\) best. Circle the leaf with value 135.</p>
+</div></details></div>
+
+<div class="exam"><div class="exam-src">2024–25 · Q3(c) · 10 marks</div>
+<div class="exam-q"><p>Boolean formula \((x'\vee y')\wedge(x'\vee y)\wedge(x\vee y'\vee z)\wedge(x\vee y\vee z)\). Use a backtracking algorithm to decide whether it is satisfiable. Show the backtracking tree.</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p>Chapter: <a href="../np/03-backtracking.html">Backtracking state-space trees</a>. Method: branch on \(x\), then \(y\), then \(z\), trying 0 before 1. Each node holds the residual formula. An empty clause = Failure leaf. All clauses satisfied = Success leaf.</p>
+<div id="t3c"></div>
+<p><b>Answer: satisfiable.</b> First solution found: \(x=0,\,y=0,\,z=1\). (With \(x=0\) the first two clauses are true and the last two need \(z=1\) whatever \(y\) is; so \(x=0,y=1,z=1\) also works. Every assignment with \(x=1\) fails: it forces \(y'\) and \(y\) both true.)</p>
+</div></details></div>
+
+<h3>Question 4 (35)</h3>
+
+<div class="exam"><div class="exam-src">2024–25 · Q4(a) · 8 marks</div>
+<div class="exam-q"><p>Prove that there are \(\binom{k}{i}\) nodes at depth \(i\) in a binomial heap \(B_k\) of order \(k\).</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p>Chapter: <a href="../heap/02-binomial-trees.html">Binomial trees and their proofs</a>.</p>
+<ol>
+<li><b>Definition used.</b> \(B_0\) is one node. \(B_k\) is two copies of \(B_{k-1}\), where the root of one becomes the leftmost child of the root of the other.</li>
+<li><b>Induction on \(k\).</b> Claim: \(B_k\) has \(\binom{k}{i}\) nodes at depth \(i\) for \(0\le i\le k\).</li>
+<li><b>Base \(k=0\).</b> One node at depth 0. \(\binom00=1\). ✓</li>
+<li><b>Step.</b> Assume the claim for \(B_{k-1}\). In \(B_k\), a node at depth \(i\) is either in the copy that kept its root (same depth \(i\) as inside \(B_{k-1}\)): \(\binom{k-1}{i}\) of them, or in the copy that was attached below the root (depth shifts by +1, so depth \(i-1\) inside \(B_{k-1}\)): \(\binom{k-1}{i-1}\) of them.</li>
+<li>Total: \(\binom{k-1}{i}+\binom{k-1}{i-1}=\binom{k}{i}\) by Pascal's rule. ∎</li>
+</ol>
+<p>This is why the name is "binomial": row \(k\) of Pascal's triangle is the number of nodes per level. Check \(B_3\): levels 1, 3, 3, 1.</p>
+</div></details></div>
+
+<div class="exam"><div class="exam-src">2024–25 · Q4(b) · 8 marks</div>
+<div class="exam-q"><p>Draw the maximally damaged tree resulting from \(B_6\).</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p>Chapter: <a href="../heap/05-amortized.html">Potential method and damaged trees</a>. Rule from the notes: keep root degree 6 and cut as much as the Fibonacci-heap rule allows. A non-root node may lose at most one child; the \(i\)-th child linked to a node keeps degree at least \(i-2\). The shape is the Fibonacci tree \(f_6\): its root has children \(f_0, f_0, f_1, f_2, f_3, f_4\), and \(|f_k| = |f_{k-1}| + |f_{k-2}|\).</p>
+<p>Sizes: \(f_0=1,\ f_1=2,\ f_2=3,\ f_3=5,\ f_4=8,\ f_5=13,\ f_6=21\). So \(B_6\) (64 nodes) shrinks to 21 nodes. (Sir's notes write \(f_0=f_1=1\) and shift the index by one; the shape is the same, count the root degree 6.)</p>
+<div id="f4b"></div>
+<p class="drawit"><b>On paper:</b> draw the root with six children from left to right of degrees 0, 0, 1, 2, 3, 4, each child itself drawn as a smaller \(f_k\) the same way. Label the root degree 6. Write "21 nodes" and the recurrence.</p>
+</div></details></div>
+
+<div class="exam"><div class="exam-src">2024–25 · Q4(c) · 7 marks</div>
+<div class="exam-q"><p>Let \(H_1\) and \(H_2\) be binomial heaps. Suppose the highest order tree in \(H_1\) is of order \(m\), and the highest order tree in \(H_2\) has degree \(m+1\). Prove or disprove: "\(H_2\) must have more nodes than \(H_1\), regardless of how many trees are present in \(H_1\) and \(H_2\)."</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p>Chapter: <a href="../heap/02-binomial-trees.html">Binomial trees and their proofs</a>. <b>The statement is true.</b></p>
+<ol>
+<li>A binomial heap has at most one tree of each order (it mirrors the binary form of \(n\)). \(B_j\) has \(2^j\) nodes.</li>
+<li><b>Most nodes \(H_1\) can have.</b> One tree of each order \(0,\dots,m\): \(\sum_{j=0}^{m}2^j = 2^{m+1}-1\).</li>
+<li><b>Fewest nodes \(H_2\) can have.</b> It contains \(B_{m+1}\), which alone has \(2^{m+1}\) nodes. Any other trees only add nodes.</li>
+<li>So \(|H_2| \ge 2^{m+1} > 2^{m+1}-1 \ge |H_1|\). ∎</li>
+</ol>
+<p>Short form: the number of nodes has top bit \(m\) in \(H_1\), and \(H_2\) has a top bit \(m+1\), so \(n_2 \ge 2^{m+1} > n_1\).</p>
+</div></details></div>
+
+<div class="exam"><div class="exam-src">2024–25 · Q4(d) · 12 marks</div>
+<div class="exam-q"><p>Show the Fibonacci heap that results when the minimum node (5) is deleted from the Fibonacci heap in the figure. Show the intermediate steps. Figure: roots 7(30), 24(26(35), 46), 23(51), 17, 5(18, 52, 41(44)), min = 5. No node is marked.</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p>Chapter: <a href="../heap/04-fibonacci.html">Fibonacci heap</a>. Method: children of 5 go to the root list (marks cleared), remove 5, then consolidate with the degree table \(A[\,]\). Rule used in this book (matches Bayzid sir's slide): the children take the removed min's place and consolidation starts at the root to its right.</p>
+<div id="t4d"></div>
+<p><b>Result:</b> root list \(7,\ 52,\ 17\), min \(=7\).</p>
+<pre class="code">7 ( 30, 23(51), 24(26(35), 46) )     degree 3
+52                                    degree 0
+17 ( 18, 41(44) )                     degree 2</pre>
+<div id="f4d"></div>
+<p class="drawit"><b>On paper:</b> draw (1) the heap after removing 5 with all seven roots on one line; (2) one drawing per link, with a small table \(A[0..3]\) beside it; (3) the final three trees with the min arrow on 7. Say the degrees aloud: 7 and 24 and 23 and 17 and 18, 52, 41.</p>
+</div></details></div>
+
+<h2>Section B</h2>
+
+<h3>Question 5 (35) · compulsory</h3>
+
+<div class="exam comp"><span class="comp-badge">COMPULSORY</span><div class="exam-src">2024–25 · Q5(a) · 25 marks</div>
+<div class="exam-q"><p>Starting from an empty red-black tree, perform the insertion operation of the keys 41, 38, 31, 12, 19, 8, 25 and 32 in the given order while maintaining the red-black properties. After completing all insertions, use the resulting tree and perform deletions of the keys 8, 12 and 19 in that order. You must show the tree after each operation, including the colour of every node.</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p>Chapters: <a href="../tree/03-rb-insert.html">RB insertion: the 3 cases</a>, <a href="../tree/04-rb-delete.html">RB deletion: the 4 cases</a>, <a href="../tree/05-rb-gauntlet.html">RB gauntlet</a>. Press Next and read the case name before the caption.</p>
+<div id="t5a"></div>
+<p><b>After all insertions:</b></p>
+<div id="f5a1"></div>
+<p><b>After deleting 8, 12, 19</b> (the three deletions, one per frame group above): delete 8 = red leaf, splice it out; delete 12 = black leaf, extra black, <b>case 4</b> (sibling 31 black, far child 32 red), left-rotate at 19; delete 19 = black node with one red child 25, colour 25 black. Final tree:</p>
+<div id="f5a2"></div>
+<ol>
+<li><b>Insert 41:</b> root, recolour black. <b>Insert 38</b>: red child, fine. <b>Insert 31:</b> uncle NIL (black), outer child: case 3, right-rotate at 41. Tree 38B(31R, 41R).</li>
+<li><b>Insert 12:</b> uncle 41 red: case 1, recolour 31, 41 black and 38 red, then root black.</li>
+<li><b>Insert 19:</b> uncle NIL, inner child: case 2 (left-rotate at 12) then case 3 (recolour, right-rotate at 31). Tree 38B(19B(12R,31R), 41B).</li>
+<li><b>Insert 8:</b> uncle 31 red: case 1. 19 becomes red (its parent 38 is black, so it stops).</li>
+<li><b>Insert 25</b> and <b>32:</b> parent 31 is black, nothing to fix.</li>
+<li><b>Delete 8</b> (red leaf): remove it, no black lost. <b>Delete 12</b> (black leaf): a black is lost, so the NIL carries an extra black. Sibling 31 is black with a red far child 32: <b>case 4</b>, sibling takes parent's colour (red), parent 19 and far child 32 turn black, left-rotate at 19. <b>Delete 19</b> (black with a single red child 25): splice, 25 takes its place, the extra black lands on a red node, so recolour 25 black.</li>
+</ol>
+<div class="trap"><h4>Where marks go</h4><ul>
+<li>Not writing the colour of every node in every tree.</li>
+<li>In deletion, the sibling's <em>far</em> child decides case 4. Near red, far black is case 3.</li>
+<li>Case 4 fixes everything; do not continue the loop.</li>
+<li>Delete with two children uses the successor (CLRS). Not needed here: every deleted node had at most one child.</li>
+</ul></div>
+</div></details></div>
+
+<div class="exam comp"><span class="comp-badge">COMPULSORY</span><div class="exam-src">2024–25 · Q5(b) · 10 marks</div>
+<div class="exam-q"><p>After inserting a key into an AVL tree, a node A becomes unbalanced such that its balance factor becomes +2, while its left child B has a balance factor of −1. Based on this information, determine the exact type of imbalance that has occurred and describe the precise sequence of rotations required to restore balance. Your answer must include a clear transformation of the subtree rooted at A, showing its structure before and after applying the rotations, along with the final balance factors of all nodes involved.</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p>Chapter: <a href="../tree/01-rotations-avl.html">Rotations and AVL trees</a>. Balance factor = height(left) minus height(right).</p>
+<ol>
+<li><b>Type: Left-Right (LR) case.</b> A is left-heavy (+2), but its left child B is right-heavy (−1). The new key went into B's <b>right</b> subtree. A single right rotation would only move the problem.</li>
+<li>Let C be B's right child. Subtrees: \(T_1\) = B's left, \(T_2, T_3\) = C's left and right, \(T_4\) = A's right.</li>
+<li><b>Rotation 1: left rotation at B.</b> C moves up to B's place, B becomes C's left child, \(T_2\) moves to B's right. Now the tree is a straight left line A-C-B (LL shape).</li>
+<li><b>Rotation 2: right rotation at A.</b> C becomes the root of the subtree, B its left child, A its right child, \(T_3\) becomes A's left child.</li>
+<li><b>Result:</b> C(B(\(T_1\),\(T_2\)), A(\(T_3\),\(T_4\))). Height is back to what it was before the insertion, so no ancestor changes.</li>
+</ol>
+<p><b>Heights.</b> Let \(h = \) height of \(T_4\). Then B has height \(h+2\), \(T_1\) has \(h\), C has \(h+1\).</p>
+<div class="tbl"><table class="mat"><tr><th>C's bf before</th><th>C after</th><th>B after</th><th>A after</th></tr>
+<tr><td>0 (C is the new leaf)</td><td>0</td><td>0</td><td>0</td></tr>
+<tr><td>+1 (\(T_3\) shorter)</td><td>0</td><td>0</td><td>−1</td></tr>
+<tr><td>−1 (\(T_2\) shorter)</td><td>0</td><td>+1</td><td>0</td></tr></table></div>
+<p>Concrete case: insert 30, 10, 20. The imbalance is at 30 (bf +2) with left child 10 (bf −1).</p>
+<div id="t5b"></div>
+<p class="drawit"><b>On paper:</b> draw A with bf +2, B below-left with bf −1, C below B to the right, and the four subtrees. Draw the arrow "left-rotate B", the intermediate straight line, the arrow "right-rotate A", then C on top with B and A below it. Write the final balance factors next to each node.</p>
+</div></details></div>
+
+<h3>Question 6 (35)</h3>
+
+<div class="exam"><div class="exam-src">2024–25 · Q6(a) · 25 marks</div>
+<div class="exam-q"><p>A hash table of size 11 into which the keys 10, 22, 31, 4, 15, 28, 17, 88 and 59 are inserted in the given order. Primary hash \(h(k)=k \bmod 11\). Four strategies: separate chaining; linear probing \(h(k,i)=(h(k)+2i) \bmod 11\); quadratic probing \(h(k,i)=(h(k)+3i^2)\bmod 11\); double hashing with \(h_1(k)=k\bmod 11\), \(h_2(k)=7-(k \bmod 7)\). For each method construct the final table so that probe sequences are followed exactly, and compute the total number of unsuccessful probes during insertion.</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p>Chapter: <a href="../heap/01-hashing.html">Chaining and open addressing</a>. Slots 0 to 10. An unsuccessful probe is a probe that lands on an occupied slot.</p>
+<p><b>Home slots:</b> 10→10, 22→0, 31→9, 4→4, 15→4, 28→6, 17→6, 88→0, 59→4.</p>
+<h4>1. Separate chaining (append at the tail)</h4>
+<div id="th1"></div>
+<p>Slot 0: 22→88. Slot 4: 4→15→59. Slot 6: 28→17. Slot 9: 31. Slot 10: 10. Others empty. Collisions: 15, 17, 88, 59 land in a non-empty chain, <b>4</b> collisions. If you count chain nodes passed instead, it is \(1+1+1+2=5\). Say which one you count.</p>
+<h4>2. Linear probing, step 2</h4>
+<div id="th2"></div>
+<p>Table: [0]=22, [1]=17, [2]=88, [3]=59, [4]=4, [5]=empty, [6]=15, [7]=empty, [8]=28, [9]=31, [10]=10. Unsuccessful probes: 15:1, 28:1, 17:3, 88:1, 59:5. Total <b>11</b>.</p>
+<h4>3. Quadratic probing, \(3i^2\)</h4>
+<div id="th3"></div>
+<p>Table: [0]=22, [3]=88, [4]=4, [5]=59, [6]=28, [7]=15, [9]=31, [10]=10, others empty. Unsuccessful probes of the keys that are placed: 15:1, 88:1, 59:2, total <b>4</b>.</p>
+<div class="trap"><h4>Where marks go: key 17 cannot be inserted</h4><ul>
+<li>\(3i^2 \bmod 11\) only takes the values 0, 3, 1, 5, 4, 9. Starting from slot 6, 17 can only reach slots 6, 9, 7, 0, 10, 4. All six are already full (28, 31, 15, 22, 10, 4), and the sequence repeats forever.</li>
+<li>So the table "must be uniquely determined" except that 17 fails: write "17: insertion fails after 6 unsuccessful probes (the cycle 6,9,7,0,10,4), table is full for it". The six failed probes make the quadratic total \(4+6=10\).</li>
+<li>Reason: with a prime size 11, \(i^2\) reaches only \((11+1)/2=6\) distinct slots, and \(3i^2\) the same six. Only about half the table is reachable.</li>
+</ul></div>
+<h4>4. Double hashing, \(h_2(k)=7-(k \bmod 7)\)</h4>
+<div id="th4"></div>
+<p>Step size is \(h_2(k)=7-(k \bmod 7)\): for 15 it is 6, so 15 probes 4, 10, 5. The trace lists every probe sequence. Table: [0]=22, [1]=88, [3]=17, [4]=4, [5]=15, [6]=28, [8]=59, [9]=31, [10]=10, slots 2 and 7 empty. Unsuccessful probes: 15:2, 17:2, 88:4, 59:1. Total <b>9</b>.</p>
+<table class="mat"><tr><th>Method</th><th>Unsuccessful probes</th><th>Note</th></tr>
+<tr><td>Chaining</td><td>4 collisions (5 chain nodes passed)</td><td>never fails</td></tr>
+<tr><td>Linear, step 2</td><td>11</td><td>primary clustering, 11 is prime so every slot is reachable</td></tr>
+<tr><td>Quadratic, \(3i^2\)</td><td>4 (+6 for 17 which fails)</td><td>only 6 of 11 slots reachable</td></tr>
+<tr><td>Double hashing</td><td>9</td><td>step \(1..7\) is coprime to 11, so every slot is reachable</td></tr></table>
+</div></details></div>
+
+<div class="exam"><div class="exam-src">2024–25 · Q6(b) · 10 marks</div>
+<div class="exam-q"><p>Construct an AVL tree with the minimum number of nodes when the tree height is 5.</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p>Chapter: <a href="../tree/01-rotations-avl.html">Rotations and AVL trees</a>. Convention (teacher's): height of a leaf is 0.</p>
+<ol>
+<li>Let \(N(h)\) be the fewest nodes in an AVL tree of height \(h\). The root has one subtree of height \(h-1\) and, to be as small as possible, the other of height \(h-2\) (the two differ by exactly 1).</li>
+<li>\(N(h) = N(h-1) + N(h-2) + 1\), with \(N(0)=1,\ N(1)=2\).</li>
+<li>\(N(2)=4,\ N(3)=7,\ N(4)=12,\ N(5)=\mathbf{20}\).</li>
+<li>Build it by the same recursion: \(T_5\) = root with left \(T_4\) and right \(T_3\); \(T_4\) = root with \(T_3\) and \(T_2\); and so on; \(T_1\) = root with a left child, \(T_0\) = one node.</li>
+</ol>
+<p>The tree below holds keys 1 to 20 in BST order. Every non-leaf node has balance factor +1 (left subtree one taller) and every leaf has 0. Removing any node would break the balance or lower the height, which is why 20 is the minimum.</p>
+<div id="f6b"></div>
+<p class="drawit"><b>On paper:</b> write the recurrence and the numbers 1, 2, 4, 7, 12, 20 first. Then draw the tree with 20 nodes and write the height of every node. If your course counts height in nodes (leaf = 1), this is a "height 6" tree; say which convention you use.</p>
+</div></details></div>
+
+<h3>Question 7 (35)</h3>
+
+<div class="exam"><div class="exam-src">2024–25 · Q7(a) · 20 marks</div>
+<div class="exam-q"><p>Undirected weighted graph, vertices A to F, edges (weight): A-B(1), A-C(3), A-D(4), B-C(2), B-D(6), C-D(5), C-E(7), D-E(8), E-F(9), D-F(10), C-F(11). Determine whether the MST is unique. Justify rigorously using MST properties such as the cut property or the cycle property. If not unique, construct two MSTs of equal weight. If unique, give a formal justification why no alternative MST of the same weight can exist.</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p>Chapter: <a href="../graph/01-mst.html">Cut property, Kruskal, Prim, uniqueness</a>.</p>
+<div id="g7a"></div>
+<p><b>The MST is unique.</b> Reason: all eleven edge weights are distinct (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11).</p>
+<ol>
+<li><b>Find the MST (Kruskal).</b> Sorted: AB1, BC2, AC3, AD4, CD5, BD6, CE7, DE8, EF9, DF10, CF11. Accept AB, BC, reject AC (cycle), accept AD, reject CD and BD, accept CE, reject DE, accept EF, reject DF and CF. Tree: <b>AB, BC, AD, CE, EF</b>, weight \(1+2+4+7+9=23\).</li>
+<li><b>Theorem.</b> If all weights are distinct, the MST is unique.</li>
+<li><b>Proof by exchange.</b> Suppose two different MSTs \(T\) and \(T'\). Among the edges in exactly one of them, let \(e\) be the lightest (unique, because weights are distinct). Say \(e\in T\), \(e\notin T'\).</li>
+<li>\(T'+e\) contains a cycle. That cycle has some edge \(f\notin T\) (otherwise \(T\) would contain a cycle). \(f\in T'\setminus T\), so \(f\) is in the symmetric difference, and \(w(f)>w(e)\) because \(e\) was the lightest and weights are distinct.</li>
+<li>\(T''=T'+e-f\) is a spanning tree with \(w(T'')<w(T')\). That contradicts \(T'\) being minimum. So \(T=T'\). ∎</li>
+<li><b>Cycle-property check on the graph.</b> Every non-tree edge is the unique heaviest edge on the cycle it makes with the tree: AC3 (cycle A-B-C: 1, 2, 3), CD5 (path C-B-A-D has max 4), BD6 (path B-A-D max 4), DE8 (path D-A-B-C-E max 7), DF10 (path D-A-B-C-E-F max 9), CF11 (path C-E-F max 9). A unique heaviest edge on a cycle belongs to no MST, so none of them can appear in any MST.</li>
+<li><b>Cut-property check.</b> Each tree edge is the unique lightest edge across some cut, hence in every MST. For example AB1: the cut \(\{A\}\) versus the rest has edges 1, 3, 4, and 1 is the lightest. EF9: cut \(\{F\}\) versus the rest has edges 9, 10, 11; lightest is 9. CE7: cut \(\{A,B,C,D\}\) versus \(\{E,F\}\) has edges CE7, DE8, DF10, CF11; lightest is 7.</li>
+</ol>
+<div id="t7a"></div>
+<div class="trap"><h4>Where marks go</h4><ul><li>"Distinct weights, so unique" without proof earns little. Write the exchange proof or the cycle property check.</li><li>Distinct weights are sufficient, not necessary. A graph with ties may still have a unique MST.</li></ul></div>
+</div></details></div>
+
+<div class="exam"><div class="exam-src">2024–25 · Q7(b) · 15 marks</div>
+<div class="exam-q"><p>Let S be a source vertex in a directed graph with non-negative edge weights. After Dijkstra's algorithm the distances from S are: S=0, A=2, B=4, C=5, D=7, E=8, F=9, G=11. Construct a directed weighted graph with non-negative integer edge weights such that Dijkstra from S produces exactly these distances, and justify. Conditions: every vertex reachable from S; at least two edges not part of any shortest path from S; the shortest path to each vertex is uniquely determined.</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p>Chapter: <a href="../graph/03-dijkstra.html">Dijkstra: trace, proof, variants</a>. Method: build a shortest-path tree first so that each distance is parent distance plus edge weight, then add extra edges that are strictly too long.</p>
+<ol>
+<li><b>Tree edges (these make the distances).</b> S→A 2, A→B 2 (4), A→C 3 (5), B→D 3 (7), C→E 3 (8), D→F 2 (9), E→G 3 (11).</li>
+<li><b>Extra edges (strictly longer than the existing distance).</b> S→B 5 (gives 5 &gt; 4), S→C 6 (6 &gt; 5), C→D 4 (5+4=9 &gt; 7), B→F 6 (4+6=10 &gt; 9). Four edges are on no shortest path.</li>
+<li><b>Why Dijkstra gives these distances.</b> Dijkstra is correct for non-negative weights, so it outputs the true distances. Every vertex has the tree path of the right length. No extra edge gives a shorter path (each is strictly longer). So the distances are exactly 0, 2, 4, 5, 7, 8, 9, 11.</li>
+<li><b>Unique shortest paths.</b> For each vertex the tree path has length equal to the distance and every other incoming edge gives a strictly larger value (rows above), so no tie exists. All weights are non-negative integers and every vertex is reachable.</li>
+</ol>
+<div id="g7b"></div>
+<div id="t7b"></div>
+<div class="trap"><h4>Where marks go</h4><ul><li>Using equal-length alternatives (ties) breaks "uniquely determined". Make the extra edges strictly longer.</li><li>Show the table of each vertex: distance, parent, and the competing edge with its larger value.</li></ul></div>
+</div></details></div>
+
+<h3>Question 8 (35)</h3>
+
+<div class="exam"><div class="exam-src">2024–25 · Q8(a) · 20 marks</div>
+<div class="exam-q"><p>A central warehouse supplies relief packages to three depots D1, D2, D3. Daily sending capacity: D1 = 15, D2 = 20, D3 = 10. Four zones Z1 to Z4 with receiving limits Z1 = 10, Z2 = 15, Z3 = 10, Z4 = 10. Routes: D1→{Z1, Z2}, D2→{Z1, Z3, Z4}, D3→{Z2, Z4}. Warehouse supply is unlimited. Determine the maximum number of relief packages delivered per day. Model it as a flow network (source, sink, intermediate nodes, edge capacities). Apply Ford-Fulkerson.</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p>Chapters: <a href="../graph/06-flow.html">Flow networks, residuals, Ford-Fulkerson</a>, <a href="../graph/07-mincut-ek.html">Max-flow min-cut, Edmonds-Karp</a>.</p>
+<p><b>Model.</b> Source \(s\) = warehouse. Sink \(t\) = a super-sink that all zones feed. Intermediate nodes D1, D2, D3, Z1, Z2, Z3, Z4.</p>
+<ul>
+<li>\(s\to D_i\) with capacity = depot sending capacity: 15, 20, 10 (warehouse supply is unlimited so the depot limit is the only limit).</li>
+<li>\(D_i\to Z_j\) only for the listed routes, capacity unlimited (the tool below uses 9999).</li>
+<li>\(Z_j\to t\) with capacity = receiving limit: 10, 15, 10, 10.</li>
+</ul>
+<div id="t8a"></div>
+<p><b>Answer: maximum flow = 45 packages per day.</b></p>
+<p>Final flow (flow per edge): D1→Z1 10, D1→Z2 5, D2→Z3 10, D2→Z4 10, D3→Z2 10, D2→Z1 0, D3→Z4 0. Check depots: D1 15, D2 20, D3 10. Check zones: Z1 10, Z2 15, Z3 10, Z4 10.</p>
+<p><b>Proof it is maximum (min cut).</b> Cut \(S=\{s\}\): capacity \(15+20+10=45\). The flow is 45 and no flow can exceed the capacity of any cut, so 45 is optimal. The cut \(T\) side \(\{t\}\) gives \(10+15+10+10=45\) too, so both total demand and total supply are met.</p>
+<p class="drawit"><b>On paper:</b> draw \(s\), three D nodes, four Z nodes, \(t\). Label every edge flow/capacity. Show the residual network at least for the first and the last augmenting path, write each bottleneck, and the running flow value 10, 15, 25, 35, 45.</p>
+</div></details></div>
+
+<div class="exam"><div class="exam-src">2024–25 · Q8(b) · 15 marks</div>
+<div class="exam-q"><p>Directed weighted graph on {A, B, C, D}, edges: A→B (3), B→C (2), C→D (2), D→B (−8), A→D (10), B→D (5). Determine whether it contains a negative weight cycle by applying the Floyd-Warshall algorithm. If so, identify the vertices involved.</p></div>
+<details><summary>Show answer</summary><div class="exam-a">
+<p>Chapter: <a href="../graph/04-apsp.html">Matrix squaring, Floyd-Warshall, closure</a>. Rule: after the algorithm, if any diagonal entry \(d[i][i]<0\), a negative cycle goes through \(i\).</p>
+<div id="t8b"></div>
+<ol>
+<li>\(D^{(0)}\): diagonal 0, edge weights where edges exist, \(\infty\) otherwise.</li>
+<li>\(k=A\): nothing enters A, no improvement.</li>
+<li>\(k=B\): \(d[A,C]=3+2=5\), \(d[A,D]=3+5=8\), \(d[D,C]=-8+2=-6\), and \(d[D,D]=-8+5=-3\). <b>The diagonal at D is already negative</b>: the cycle D→B→D has weight \(-8+5=-3\).</li>
+<li>\(k=C\) and \(k=D\): the diagonal entries get more negative at B, C and D.</li>
+<li><b>Answer.</b> Yes, there is a negative cycle. The simple cycles are D→B→D (\(-3\)) and B→C→D→B (\(2+2-8=-4\)). The vertices on negative cycles are <b>B, C and D</b>. A is not on any cycle (no edge enters A); it only reaches the cycle.</li>
+</ol>
+<p>Because of the cycle, shortest-path distances through B, C, D are not defined (they go to \(-\infty\)); the final matrix values are not real distances.</p>
+</div></details></div>
+
+<h2>Mandatory</h2>
+<p>The compulsory question is the one exam marks hide in. Time yourself.</p>
+<div id="r1"></div>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/algo.js"></script>
+<script src="../assets/dsa.js"></script>
+<script>
+graphFig('#g1c', 'A-B 1, B-C 1');
+graphFig('#g2a', 'A-B 1, B-C 1, C-D 1, D-E 1');
+trace('#t3b', { kind: 'knapsack', input: '4:40 3:50 5:70 3:45 ; 10' });
+trace('#t3c', { kind: 'sat', input: "(x' v y') (x' v y) (x v y' v z) (x v y v z)" });
+forestFig('#f4b', '1(2 3 4(5) 6(7 8) 9(10 11 12(13)) 14(15 16 17(18) 19(20 21))) min=1');
+trace('#t4d', { kind: 'fib', input: '7(30) 24(26(35) 46) 23(51) 17 5(18 52 41(44)) min=5 ; ext' });
+forestFig('#f4d', '7(30 23(51) 24(26(35) 46)) 52 17(18 41(44)) min=7');
+trace('#t5a', { kind: 'rb', input: '41 38 31 12 19 8 25 32 del 8 12 19' });
+treeFig('#f5a1', '38B(19R(12B(8R,),31B(25R,32R)),41B)');
+treeFig('#f5a2', '38B(31R(25B,32B),41B)');
+trace('#t5b', { kind: 'avl', input: '30 10 20' });
+trace('#th1', { kind: 'hash', input: '10 22 31 4 15 28 17 88 59 ; 11', opts: { mode: 'chain', h: k => k % 11 } });
+trace('#th2', { kind: 'hash', input: '10 22 31 4 15 28 17 88 59 ; 11', opts: { mode: 'linear', h: k => k % 11, f: (k, i) => ((k % 11) + 2 * i) % 11 } });
+trace('#th3', { kind: 'hash', input: '10 22 31 4 15 28 17 88 59 ; 11', opts: { mode: 'quad', h: k => k % 11, f: (k, i) => ((k % 11) + 3 * i * i) % 11 } });
+trace('#th4', { kind: 'hash', input: '10 22 31 4 15 28 17 88 59 ; 11', opts: { mode: 'double', h: k => k % 11, f: (k, i) => ((k % 11) + i * (7 - (k % 7))) % 11 } });
+treeFig('#f6b', '13(8(5(3(2(1,),4),7(6,)),11(10(9,),12)),18(16(15(14,),17),20(19,)))');
+graphFig('#g7a', 'A-B 1, A-C 3, A-D 4, B-C 2, B-D 6, C-D 5, C-E 7, D-E 8, E-F 9, D-F 10, C-F 11');
+trace('#t7a', { kind: 'kruskal', input: 'A-B 1, A-C 3, A-D 4, B-C 2, B-D 6, C-D 5, C-E 7, D-E 8, E-F 9, D-F 10, C-F 11' });
+graphFig('#g7b', 'S>A 2, A>B 2, A>C 3, B>D 3, C>E 3, D>F 2, E>G 3, S>B 5, S>C 6, C>D 4, B>F 6');
+trace('#t7b', { kind: 'dijkstra', input: 'S>A 2, A>B 2, A>C 3, B>D 3, C>E 3, D>F 2, E>G 3, S>B 5, S>C 6, C>D 4, B>F 6', s: 'S' });
+trace('#t8a', { kind: 'ff', input: 's>D1 15, s>D2 20, s>D3 10, D1>Z1 9999, D1>Z2 9999, D2>Z1 9999, D2>Z3 9999, D2>Z4 9999, D3>Z2 9999, D3>Z4 9999, Z1>t 10, Z2>t 15, Z3>t 10, Z4>t 10', s: 's', t: 't' });
+trace('#t8b', { kind: 'fw', input: 'A>B 3, B>C 2, C>D 2, D>B -8, A>D 10, B>D 5' });
+recall('#r1', { id: 'r1', marks: 35, q: 'Attempt this paper\'s compulsory question in the time limit (about 40 minutes for 35 marks), then mark it. Q5(a): insert 41, 38, 31, 12, 19, 8, 25, 32 into an empty red-black tree, then delete 8, 12, 19, showing every tree with colours. Q5(b): the AVL +2 / −1 imbalance.', points: ['Every insert drawn as its own tree with a colour on every node', 'Case numbers named: 41 38 31 case 3; 12 case 1; 19 cases 2 then 3; 8 case 1; 25 and 32 need nothing', 'Tree after all inserts: 38B(19R(12B(8R,),31B(25R,32R)),41B)', 'Delete 8: red leaf removed, nothing else', 'Delete 12: extra black, sibling 31 black with red far child 32: case 4, left-rotate at 19', 'Delete 19: extra black lands on red 25, recolour it black; final tree 38B(31R(25B,32B),41B)', 'AVL: Left-Right case, left rotate at B then right rotate at A', 'Final balance factors: new root C is 0, and A and B are 0 / −1 / +1 according to C\'s old factor (table)'], model: '<p>Insert: 41B, 38R, 31 case 3 gives 38B(31R,41R); 12 case 1 gives root recoloured; 19 case 2 then 3 gives 38B(19B(12R,31R),41B); 8 case 1; 25 and 32 free. Delete 8, 12 (case 4), 19 (recolour 25). Final 38B(31R(25B,32B),41B). AVL LR: left-rotate at B, right-rotate at A, subtree becomes C(B(T1,T2),A(T3,T4)).</p>' });
+</script>
+</body>
+</html>

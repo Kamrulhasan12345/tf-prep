@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>4-Day Plan · CSE 207 Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Plan · your daily page</div>
+<h1>The 4-Day Plan</h1>
+<p class="key"><b>Exam: Saturday 14 November 2026.</b></p>
+<p class="lede">About 8 hours a day in blocks. Red-black trees come first, while you are fresh. Do the blocks in order, one at a time. A block ends when its mandatory practice is done, not when the timer ends.</p>
+<p class="key"><b>Next up:</b> <span id="next">loading</span></p>
+<p class="tracer-hint" id="sum"></p>
+<div class="drawit"><b>Block rule:</b> phone away, open the block, read, trace, then do the practice on paper. Break 10 minutes between blocks. Stuck more than 10 minutes? Open the steps, find your first wrong frame, and move on.</div>
+<div id="days"></div>
+<h2>Debts</h2><p id="debts">None yet.</p>
+<h2>If you lose time</h2>
+<ol>
+<li>Lost half a day: skip the blocks marked <b>optional</b>.</li>
+<li>Lost a full day: drop the Johnson block's proof, amortized, splay and randomized; do their <a href="last-night.html">last-night summaries</a> instead.</li>
+<li>Never drop: RB insert and delete, binomial heap, max flow, Floyd-Warshall, NP definitions and reductions.</li>
+</ol>
+</main>
+<script src="assets/book.js"></script><script src="assets/algo.js"></script><script src="assets/dsa.js"></script>
+<script>
+const PLAN = [
+ ['Today · Mon 9 Nov · Head start', [
+  ['start/01-exam-map.html','What the exam asks',10],['tree/01-rotations-avl.html','Rotations and AVL',60],['tree/02-rb-properties.html','Red-black from zero',45]]],
+ ['Day 1 · Tue 10 Nov · Balanced trees (your weakest area)', [
+  ['tree/03-rb-insert.html','RB insertion',75],['tree/04-rb-delete.html','RB deletion',90],['tree/05-rb-gauntlet.html','RB gauntlet (timed)',50],['tree/06-splay.html','Splay',30],['heap/01-hashing.html','Hashing',60],['exam/2024-25.html','Evening test: 2024–25 Q5 and Q6a only, on paper, 40 min',40,1]]],
+ ['Day 2 · Wed 11 Nov · Graphs', [
+  ['graph/01-mst.html','MST',60],['graph/02-bellman-dag.html','Bellman-Ford and DAG',50],['graph/03-dijkstra.html','Dijkstra and its proof',60],['graph/04-apsp.html','Floyd-Warshall',60],['graph/05-johnson.html','Johnson',30],['graph/06-flow.html','Max flow',60],['graph/07-mincut-ek.html','Min cut, Edmonds-Karp, proof',45],['graph/08-matching-modelling.html','Matching and modelling',60],['exam/2024-25.html','Evening test: 2024–25 Q7 and Q8, 45 min',45,1]]],
+ ['Day 3 · Thu 12 Nov · Heaps and hard problems', [
+  ['heap/02-binomial-trees.html','Binomial tree proofs',40],['heap/03-binomial-heap.html','Binomial heap',60],['heap/04-fibonacci.html','Fibonacci heap',60],['heap/05-amortized.html','Amortized and damaged trees',40],['np/01-classes.html','P, NP, co-NP',45],['np/02-reductions.html','Reductions',70],['np/03-backtracking.html','Backtracking',30],['np/04-branch-bound.html','Branch and bound, TSP',60],['np/05-randomized.html','Randomized',50],['np/06-approximation.html','Approximation',40]]],
+ ['Day 4 · Fri 13 Nov · Exam simulation and repair', [
+  ['exam/2022-23.html','Full mock: 2022–23, 3 hours, closed book',180,1],['exam/2022-23.html','Mark it against the answers',60,1],['plan.html','Repair: clear every debt and redo your two worst topics',120,1],['exam/2023-24.html','Timed: 2023–24 Q10 and Q12, 75 min',75,1],['last-night.html','Last-night plan (Fri 13 Nov, tonight)',180,1]]],
+];
+function drawPlan() {
+  const o = Must.load(); let ticks = {}; try { ticks = JSON.parse(localStorage.getItem('cse207-plan')) || {}; } catch {}
+  let total = 0, done = 0, next = null, h = '';
+  PLAN.forEach(([title, blocks], d) => {
+    h += `<h2>${title}</h2><ul class="chk" style="list-style:none;padding-left:0">`;
+    blocks.forEach(([f, t, mins, manual], i) => {
+      const id = d + '-' + i, p = o[f], auto = !manual && p && p.total > 0 && p.done >= p.total, ok = auto || ticks[id]; total++; if (ok) done++;
+      if (!ok && !next) next = `<a href="${f}">${t}</a> (${mins} min)`;
+      const prog = !manual && p && p.total ? ` · practice ${p.done}/${p.total}` : '';
+      h += `<li style="margin:.4em 0"><label><input type="checkbox" data-id="${id}" ${ok ? 'checked' : ''} ${auto ? 'disabled' : ''}> <a href="${f}">${t}</a> <span class="tracer-hint">${mins} min${prog}${manual ? '' : ' · ticks itself when practice is done'}</span></label></li>`;
+    });
+    h += '</ul>';
+  });
+  $('#days').innerHTML = h; $('#next').innerHTML = next || 'Everything is done. Sleep.'; $('#sum').textContent = `${done} of ${total} blocks done.`;
+  const debts = Object.entries(o).filter(([k, v]) => v.skipped && !(v.done >= v.total)).map(([k]) => `<a href="${k}">${k}</a>`);
+  $('#debts').innerHTML = debts.length ? debts.join(' · ') : 'None yet.';
+  $('#days').querySelectorAll('input').forEach(b => b.onchange = () => { ticks[b.dataset.id] = b.checked; try { localStorage.setItem('cse207-plan', JSON.stringify(ticks)); } catch {} drawPlan(); });
+}
+drawPlan();
+</script>
+</body></html>

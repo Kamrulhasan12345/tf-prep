@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Binomial Heap · CSE 207 Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Advanced heaps · binomial heap · Bayzid sir L5–6 · asked every year</div>
+<h1>Binomial Heap Operations</h1>
+<p class="lede">Asked in 2023–24 Q13(c) (union of 6 and 7 nodes, 10 marks), 2022–23 Q8 (23 marks: build, meld, decrease, credits; plus 12 marks for the amortized-insert proof), 2021–22 Q5 (min to max conversion 15, then 5+5+5+5), 2019–20 Q2(b) (delete a node, 17 marks), 2018–19 Q6(c) and 2019–20 Q4(a) (running times), and CT-4 (insert 3, 13, 7, 15, 21, 24, 10). Every one of these is "draw the heap after each step".</p>
+
+<h2>1. The structure</h2>
+<ul>
+<li>A binomial heap is a <b>list of binomial trees</b>. Each tree is heap-ordered: a min-heap has the smallest key at the root of every subtree.</li>
+<li>At most one tree of each order. {B<sub>3</sub>, B<sub>1</sub>, B<sub>0</sub>} is legal; {B<sub>3</sub>, B<sub>1</sub>, B<sub>1</sub>, B<sub>0</sub>} is not.</li>
+<li>Roots sit in a singly linked <b>root list</b>, in increasing order of degree. The orders present are the 1-bits of n (chapter 2): 19 nodes = 10011 = B<sub>4</sub>, B<sub>1</sub>, B<sub>0</sub>.</li>
+<li>The minimum is one of the roots. Find-min scans the root list: O(log n), because there are at most \(\lfloor\log_2 n\rfloor + 1\) roots. (Binary heap find-min is O(1); this is the only thing binomial heaps give up.)</li>
+</ul>
+<div class="key"><p><b>Link.</b> To join two trees of the same order k, compare the two roots. The <b>larger</b> root becomes the <b>leftmost child</b> of the smaller root (for a max-heap, the smaller goes under the larger). The result is a B<sub>k+1</sub>. Everything below is built from this one step.</p></div>
+
+<h2>2. Union is binary addition</h2>
+<p>To merge heaps H1 and H2, add their sizes in binary. Wherever the addition carries, you link two trees. Walk from bit 0 upward and look at the trees of order k you hold: H1's, H2's, and the carry from the bit below.</p>
+<div class="method"><h4>Method · union, one bit at a time</h4><ol>
+<li>Write both root lists by order. Write the sum of the sizes in binary: that tells you the answer's orders.</li>
+<li>At order k count how many B<sub>k</sub> you have, including the carry.</li>
+<li><b>0 or 1 tree:</b> leave it in the result.</li>
+<li><b>2 trees:</b> link them (larger root under smaller root). The result is a B<sub>k+1</sub>, the carry for the next order.</li>
+<li><b>3 trees:</b> keep any one in the result, link the other two into the carry (the notes say "keep any one of the three").</li>
+<li>Go up one order. Stop when nothing is left. The result roots are in increasing order of degree.</li>
+</ol></div>
+<pre class="code">BINOMIAL-LINK(y, z)                   // y, z roots of equal order, key[z] <= key[y]
+  y.parent = z; y.sibling = z.child; z.child = y; z.degree = z.degree + 1
+
+BINOMIAL-HEAP-UNION(H1, H2)
+  H.head = MERGE(H1, H2)              // merge the root lists by degree, no linking yet
+  x = H.head; prev = NIL; next = x.sibling
+  while next != NIL
+    if x.degree != next.degree or (next.sibling != NIL and next.sibling.degree == x.degree)
+      prev = x; x = next                       // 1 tree here, or 3 in a row: skip the first
+    else if x.key <= next.key
+      x.sibling = next.sibling; BINOMIAL-LINK(next, x)
+    else
+      if prev == NIL then H.head = next else prev.sibling = next
+      BINOMIAL-LINK(x, next); x = next
+    next = x.sibling
+  return H</pre>
+<h3>The example in the notes: B<sub>4</sub> B<sub>1</sub> B<sub>0</sub> plus B<sub>2</sub> B<sub>1</sub> B<sub>0</sub></h3>
+<p>Bayzid sir's example is H1 = 10011 (19 nodes) plus H2 = 00111 (7 nodes) = 11010 (26 nodes). The notes give no keys, so here are keys I chose, with the same shapes. H1:</p>
+<div id="u1"></div>
+<p>H2:</p>
+<div id="u2"></div>
+<div class="tbl"><table>
+<tr><th>Order</th><th>H1</th><th>H2</th><th>Carry in</th><th>Action</th><th>Carry out</th></tr>
+<tr><td>0</td><td>11</td><td>28</td><td>none</td><td>2 trees: link, 28 under 11</td><td>B<sub>1</sub> 11(28)</td></tr>
+<tr><td>1</td><td>19(31)</td><td>2(34)</td><td>11(28)</td><td>3 trees: keep 11(28); link 19 under 2</td><td>B<sub>2</sub> 2(19(31) 34)</td></tr>
+<tr><td>2</td><td>none</td><td>6(…)</td><td>2(…)</td><td>2 trees: link 6 under 2</td><td>B<sub>3</sub></td></tr>
+<tr><td>3</td><td>none</td><td>none</td><td>B<sub>3</sub></td><td>1 tree: leave it</td><td>none</td></tr>
+<tr><td>4</td><td>B<sub>4</sub> (root 3)</td><td>none</td><td>none</td><td>1 tree: leave it</td><td>none</td></tr>
+</table></div>
+<p>After the order-0 link, then the order-1 link, then the order-2 link:</p>
+<div id="u3"></div>
+<div id="u4"></div>
+<div id="u5"></div>
+<p>Result: B<sub>1</sub>, B<sub>3</sub>, B<sub>4</sub> = 2 + 8 + 16 = 26 nodes = 11010. ✓</p>
+<div class="drawit"><b>On paper:</b> write the two binary numbers one above the other and add them, writing the carries. Under each column, draw the trees you combine, and label each link with the roots ("link 28 under 11"). Finish with the root list in increasing order of degree, and the node count check.</div>
+
+<h3>2023–24 Q13(c): union of a 6-node and a 7-node min-heap, any values</h3>
+<p>6 = 110 so H1 = {B<sub>1</sub>, B<sub>2</sub>}; 7 = 111 so H2 = {B<sub>0</sub>, B<sub>1</sub>, B<sub>2</sub>}; sum 13 = 1101 so the answer is {B<sub>0</sub>, B<sub>2</sub>, B<sub>3</sub>}. With H1 keys 14, 5, 9, 20, 3, 11 and H2 keys 8, 2, 17, 6, 13, 4, 10 (my values):</p>
+<div class="figrow">
+<div><div class="figlabel">H1</div><div id="v1"></div></div>
+<div><div class="figlabel">H2</div><div id="v2"></div></div>
+</div>
+<div class="figlabel">Order 1: link 4 under 3. Order 2: three B<sub>2</sub> (5…, 2…, carry 3…): keep 3, link 5 under 2. Result:</div>
+<div id="v3"></div>
+
+<h2>3. Insert, extract-min, decrease-key, delete</h2>
+<div class="method"><h4>Method · each operation</h4><ol>
+<li><b>Insert x:</b> make a one-node heap (a B<sub>0</sub>) and union it into H. Like adding 1 to a binary counter: carries ripple while a B<sub>0</sub>, then B<sub>1</sub>, ... are already present.</li>
+<li><b>Extract-min:</b> scan the root list for the smallest root r. Remove r. Its children are B<sub>k−1</sub>, ..., B<sub>0</sub> (chapter 2, property 4). <b>Reverse</b> them so they are in increasing order, giving a heap H'. Union H (the rest) with H'.</li>
+<li><b>Decrease-key(x, new):</b> set the key, then swap with the parent while the parent is larger (bubble up), exactly as in a binary heap. The tree has height at most \(\log_2 n\).</li>
+<li><b>Delete x:</b> decrease x to \(-\infty\) (it bubbles to its root), then extract-min. You cannot "swap with the last node" as in a binary heap, because there is no last node and it would break the shape.</li>
+</ol></div>
+<h3>The CT-4 insert sequence</h3>
+<p>Insert 3, 13, 7, 15, 21, 24, 10 into an empty min-heap. Say "I am adding 1 in binary" at each step: after the 3rd insert you have B<sub>1</sub>+B<sub>0</sub>, after the 4th a single B<sub>2</sub>.</p>
+<div id="t1"></div>
+<h3>All operations on one heap</h3>
+<p>Insert 12, 7, 25, 15, 28, 33, 41, 9, 30, 4, 22, 18; extract-min; decrease 33 to 2; delete 15. Watch how extract-min links the reversed children back in.</p>
+<div id="t2"></div>
+<div class="drawit"><b>On paper:</b> redraw the whole forest after every operation, roots left to right by increasing degree. For extract-min draw three pictures: the heap with the min removed, the child heap H' (reversed), and the union result. For decrease-key draw one picture per swap.</div>
+
+<h3>2019–20 Q2(b): delete the node with key 17 (17 marks)</h3>
+<p>The figure (as transcribed) has a B<sub>4</sub> rooted at 3 and a B<sub>1</sub> rooted at 23. Inside the B<sub>4</sub> the node 15 also has a child 23, a second key 23 (a leaf), so read root and leaf carefully. The roots are drawn here in increasing order of degree.</p>
+<div id="d1"></div>
+<p><b>Step 1, decrease 17 to −∞.</b> 17 swaps with 15, then with 3, ending at the root of the B<sub>4</sub>. (0 in the figure stands for −∞, since every real key is above it.)</p>
+<div id="d2"></div>
+<p><b>Step 2, extract-min.</b> Remove the root 0. Its children, reversed, are B<sub>0</sub> 33, B<sub>1</sub> 28(30), B<sub>2</sub> 11(…), B<sub>3</sub> 3(…). The rest of the heap is just 23(89).</p>
+<div class="figrow"><div><div class="figlabel">rest of the heap</div><div id="d3"></div></div><div><div class="figlabel">children, reversed (H')</div><div id="d3b"></div></div></div>
+<p><b>Step 3, union.</b> Order 0: only 33. Order 1: 23(89) and 28(30): link 28 under 23. Order 2: that carry and 11(…): link 23 under 11. Order 3: that carry and 3(…): link 11 under 3. Result: B<sub>0</sub> and B<sub>4</sub>, 1 + 16 = 17 nodes. ✓</p>
+<div id="d4"></div>
+
+<h2>4. Max-heap versions</h2>
+<p>Swap "smaller" and "larger" everywhere. Link puts the <b>smaller</b> root under the larger. Extract-max scans for the largest root. <b>Increase-key</b> bubbles up (the max-heap twin of decrease-key). Delete raises the key to \(+\infty\), then extract-max.</p>
+<div class="trap"><h4>Where marks go: decreasing a key in a max-heap</h4><ul>
+<li>In a max-heap, <b>decreasing</b> a key moves it <b>down</b>, not up. Repeatedly swap it with its <b>largest</b> child until it is at least as large as all its children. The 2022–23 question does this to the key 20.</li>
+<li>The cost is still O(log n): the node can sink at most the height of its tree.</li>
+</ul></div>
+
+<h2>5. 2022–23 Q8(a): two max-heaps, meld, decrease, credits (23 marks)</h2>
+<p><b>(i)</b> Insert 5, 20, 4, 19, 1, −3, 6, 12, 3, 2, 18 into pq1, and 25, 21, 10, 13, 17, 9, 8, 11, 7 into pq2, both max-heaps. 11 nodes = 1011 so pq1 = B<sub>0</sub>, B<sub>1</sub>, B<sub>3</sub>; 9 nodes = 1001 so pq2 = B<sub>0</sub>, B<sub>3</sub>.</p>
+<div id="m1"></div>
+<div id="m2"></div>
+<p><b>(ii)</b> Meld pq1 and pq2: 20 nodes = 10100 = B<sub>2</sub> + B<sub>4</sub>. Max-heap, so the smaller root goes under the larger. Order 0: 18 and 7, link 7 under 18, carry B<sub>1</sub> 18(7). Order 1: pq1's 3(2) and the carry 18(7), link 3 under 18, carry B<sub>2</sub> 18(3(2) 7). Order 2: the carry is alone, it stays. Order 3: pq1's 20(…) and pq2's 25(…), link 20 under 25, giving a B<sub>4</sub>.</p>
+<div id="m3"></div>
+<p>Now decrease 20 to −20. The key 20 is the root of a B<sub>3</sub> under 25. It sinks: swap with its largest child 19, then with its largest child 4, and it stops at a leaf.</p>
+<div id="m4"></div>
+<p><b>(iii)</b> Extract-max twice and count credits. The question's rules: unlinking a node from its children costs 1 credit, a node addition costs 1, an insertion costs 1, a comparison costs 1, all else 0. The wording "two node addition operation takes one credit" is unclear in the scan; I read it as one credit per node addition. If you read it as "two additions per credit", halve the addition part and say so in the answer. Whatever rule you use, write it down first and apply it everywhere.</p>
+<p><b>Counting rule I use:</b> finding the max among r roots costs r−1 comparisons; each child of the removed root costs 1 unlink; each link costs 1 comparison (which root is larger) plus 1 node addition (hanging one root under the other).</p>
+<p><b>First extract-max.</b> Roots are 18(…) (B<sub>2</sub>) and 25(…) (B<sub>4</sub>): 1 comparison to find 25. Remove 25: its 4 children, 19(…) (B<sub>3</sub>, the tree whose root was 20 before the decrease), 17(…) (B<sub>2</sub>), 13(10) (B<sub>1</sub>) and 21 (B<sub>0</sub>), are unlinked: 4 credits. Union with the old B<sub>2</sub> 18: order 2 has two trees (18 and 17): 18 is larger, link 17 under 18: 2 credits. Order 3 now has two trees (19's and the carry 18's): link 18 under 19: 2 credits. Total <b>1 + 4 + 2 + 2 = 9</b>.</p>
+<div id="m5"></div>
+<p><b>Second extract-max.</b> Three roots 21, 13, 19: 2 comparisons to find 21. It has no children (0 unlinks), and the rest is unioned with an empty heap (0 links). Total <b>2</b>.</p>
+<div id="m6"></div>
+<p><b>Grand total: 9 + 2 = 11 credits</b> under this rule.</p>
+<p>The same pq1 and pq2 build, step by step:</p>
+<div id="t3"></div>
+<div id="t4"></div>
+<div class="drawit"><b>On paper:</b> draw pq1, pq2, the melded heap, the heap after the decrease (with each swap listed), then after each extract-max. Next to each extract write a small table: comparisons, unlinks, links (each link = comparison + addition), total. A marker can then give you method marks even if the rule differs from theirs.</div>
+
+<h2>6. 2021–22 Q5: convert a min binomial heap to a max binomial heap (15 marks)</h2>
+<p>Asked: write pseudocode that converts a min priority queue to a max priority queue in amortized O(n), and analyse it with the potential method. The scan of pq2's figure is too small to read the keys, so I show the method on the CT-4 heap instead; follow the same steps on your figure. The pq1 inserts 210, 201, 220, 202, 221, 205, 209 are readable and appear in the practice trace below.</p>
+<p><b>Idea.</b> A min-heap's tree shapes are right but its order is wrong. Do not repair it in place. Copy every key into a new, empty max-heap by n inserts. Each insert costs O(1) amortized, so n inserts are O(n).</p>
+<pre class="code">CONVERT-MIN-TO-MAX(Hmin)
+  Hmax = MAKE-BINOMIAL-HEAP()          // empty, uses "larger root on top" in LINK
+  for each tree T in Hmin.root list
+    for each node x in T                // any traversal, e.g. DFS
+      MAX-INSERT(Hmax, x.key)           // one-node heap + union
+  return Hmax</pre>
+<div class="method"><h4>Proof · amortized O(n), potential method</h4><ol>
+<li>Potential: \(\Phi(H) = t(H)\), the number of trees in the root list of the max-heap being built. \(\Phi(\text{empty}) = 0\) and \(\Phi \ge 0\) always.</li>
+<li>One insert causes c links (the carries). Actual cost \(= 1 + c\).</li>
+<li>Each link merges two trees into one, so the tree count drops by 1 per link, and the new B<sub>0</sub> adds 1: \(\Delta\Phi = 1 - c\).</li>
+<li>Amortized cost of one insert \(= (1+c) + (1-c) = 2 = O(1)\).</li>
+<li>For n inserts the amortized total is \(2n\). Actual total \(=\) amortized total \(- (\Phi_{\text{final}} - \Phi_{\text{start}}) \le 2n\), since \(\Phi_{\text{final}} \ge 0 = \Phi_{\text{start}}\).</li>
+<li>Traversing Hmin visits each of the n nodes once: O(n). Total O(n). ∎</li>
+</ol></div>
+<p>Applying it to the CT-4 min-heap (10, 21(24), 3(7(15) 13)) gives, by inserting 3, 13, 7, 15, 21, 24, 10 into a max-heap, a new max-heap. The min-heap first:</p>
+<div id="c1"></div>
+<div class="figlabel">and the max-heap that results:</div>
+<div id="c2"></div>
+<p>For 2021–22 (b)–(d) (meld pq1 and pq2, then extract-max three times) apply sections 2 and 3 with the max-heap rules. The three extract-maxes on pq1 alone:</p>
+<div id="t5"></div>
+
+<h2>7. Amortized insert and worst-case bounds (2022–23 Q8(b), 12 marks)</h2>
+<p><b>Claim.</b> In a binomial heap, INSERT has amortized cost O(1); EXTRACT-MIN and DECREASE-KEY have worst-case cost O(log n).</p>
+<div class="method"><h4>Proof</h4><ol>
+<li><b>Potential.</b> \(\Phi(H) = t(H)\), the number of trees in H. \(\Phi \ge 0\), and \(\Phi = 0\) for the empty heap.</li>
+<li><b>Insert.</b> Make a B<sub>0</sub> and union. Suppose c links happen (the carry runs through c orders). Actual cost \(= 1 + c\).</li>
+<li>Trees after \(= t(H) + 1 - c\), so \(\Delta\Phi = 1 - c\).</li>
+<li>Amortized \(= (1+c) + (1-c) = 2 = O(1)\). ∎ (the c cancels, so a long carry is paid for by the trees it removes)</li>
+<li><b>Extract-min.</b> H has n nodes, so at most \(\lfloor\log_2 n\rfloor + 1\) roots and the removed root has at most \(\lfloor\log_2 n\rfloor\) children. Scanning for the min: O(log n). Reversing the children: O(log n). Union of two heaps with O(log n) trees each: O(log n) (one pass over the merged root list). Total O(log n).</li>
+<li><b>Decrease-key.</b> The node is at depth at most the tree height \(\le \lfloor\log_2 n\rfloor\) (chapter 2, property 2). Each bubble-up step is a constant-time swap, so O(log n). ∎</li>
+</ol></div>
+
+<h2>8. Running times</h2>
+<div class="tbl"><table>
+<tr><th>Operation</th><th>Binary heap</th><th>Binomial heap</th></tr>
+<tr><td>Insert</td><td>O(log n)</td><td>O(log n) worst, <b>O(1) amortized</b></td></tr>
+<tr><td>Find-min</td><td>O(1)</td><td>O(log n) (scan roots); O(1) if you keep a min pointer</td></tr>
+<tr><td>Extract-min</td><td>O(log n)</td><td>O(log n)</td></tr>
+<tr><td>Union</td><td>O(n)</td><td><b>O(log n)</b></td></tr>
+<tr><td>Decrease-key</td><td>O(log n)</td><td>O(log n)</td></tr>
+<tr><td>Delete</td><td>O(log n)</td><td>O(log n)</td></tr>
+</table></div>
+<p>Fibonacci heaps improve this table; see chapter 4.</p>
+<div class="trap"><h4>Where marks go</h4><ul>
+<li>Linking in the wrong direction: min-heap, larger root goes <b>under</b> the smaller. Max-heap, the opposite.</li>
+<li>Forgetting to <b>reverse</b> the children in extract-min. They come out as B<sub>k−1</sub>, ..., B<sub>0</sub> and the union needs increasing order.</li>
+<li>Putting two trees of the same order in the result. After union every order appears at most once.</li>
+<li>Three trees at one order: you must keep one and link only two. Do not link all three.</li>
+<li>Writing the new child on the right. This book puts it leftmost; either is accepted if the shape is right, but be consistent.</li>
+<li>Giving only the final heap in a "show intermediate steps" question. Draw every step.</li>
+</ul></div>
+
+<h2>9. Mandatory practice</h2>
+<p>Draw every step. The union write-up and the amortized proof are the two things most likely to be asked in words.</p>
+<div id="r1"></div>
+<div id="r2"></div>
+<div id="r3"></div>
+<div id="p1"></div>
+<div id="p2"></div>
+<p class="drawit"><b>If you got one wrong:</b> open the steps and find the first frame where your forest differs. It is almost always a union with three trees at one order, or a missing reversal of the children.</p>
+</main>
+<script src="../assets/book.js"></script>
+<script src="../assets/algo.js"></script>
+<script src="../assets/dsa.js"></script>
+<script>
+const B4 = '3(5(8(17(41) 25) 12(33) 29) 14(21(38) 36) 9(27) 45)';
+forestFig('#u1', '11 19(31) ' + B4);
+forestFig('#u2', '28 2(34) 6(15(40) 23)');
+forestFig('#u3', '11(28) 19(31) 2(34) 6(15(40) 23) ' + B4);
+forestFig('#u4', '11(28) 2(19(31) 34) 6(15(40) 23) ' + B4);
+forestFig('#u5', '11(28) 2(6(15(40) 23) 19(31) 34) ' + B4);
+forestFig('#v1', '3(11) 5(9(20) 14)');
+forestFig('#v2', '10 4(13) 2(6(17) 8)');
+forestFig('#v3', '10 3(4(13) 11) 2(5(9(20) 14) 6(17) 8)');
+trace('#t1', { kind: 'binomial', input: '3 13 7 15 21 24 10' });
+trace('#t2', { kind: 'binomial', input: '12 7 25 15 28 33 41 9 30 4 22 18 ext dec 33 2 del 15' });
+forestFig('#d1', '23(89) 3(15(17(21(25) 18) 42(45) 23) 11(19(20) 16) 28(30) 33)');
+forestFig('#d2', '23(89) 0(3(15(21(25) 18) 42(45) 23) 11(19(20) 16) 28(30) 33)');
+forestFig('#d3', '23(89)');
+forestFig('#d3b', '33 28(30) 11(19(20) 16) 3(15(21(25) 18) 42(45) 23)');
+forestFig('#d4', '33 3(11(23(28(30) 89) 19(20) 16) 15(21(25) 18) 42(45) 23)');
+forestFig('#m1', '18 3(2) 20(12(1(-3) 6) 19(4) 5)');
+forestFig('#m2', '7 25(17(11(8) 9) 13(10) 21)');
+forestFig('#m3', '18(3(2) 7) 25(20(12(1(-3) 6) 19(4) 5) 17(11(8) 9) 13(10) 21)');
+forestFig('#m4', '18(3(2) 7) 25(19(12(1(-3) 6) 4(-20) 5) 17(11(8) 9) 13(10) 21)');
+forestFig('#m5', '21 13(10) 19(18(17(11(8) 9) 3(2) 7) 12(1(-3) 6) 4(-20) 5)');
+forestFig('#m6', '13(10) 19(18(17(11(8) 9) 3(2) 7) 12(1(-3) 6) 4(-20) 5)');
+trace('#t3', { kind: 'binomial', input: '5 20 4 19 1 -3 6 12 3 2 18', opts: { max: true } });
+trace('#t4', { kind: 'binomial', input: '25 21 10 13 17 9 8 11 7', opts: { max: true } });
+forestFig('#c1', '10 21(24) 3(7(15) 13)');
+forestFig('#c2', '10 24(21) 15(13(3) 7)');
+trace('#t5', { kind: 'binomial', input: '210 201 220 202 221 205 209 ext ext ext', opts: { max: true } });
+recall('#r1', { id: 'r1', marks: 15, q: 'Explain how union of two binomial heaps works and why it takes O(log n). Show it on a heap with 19 nodes and a heap with 7 nodes. (2023–24 Q13(c), notes p.16)', points: ['Heap = trees by the 1-bits of n; sizes add like binary numbers', 'Merge the root lists by degree', 'At each order: 0 or 1 tree stay, 2 trees link into a carry, 3 trees keep one and link two', 'Link: larger root under smaller root (min-heap)', '19 = 10011, 7 = 00111, sum 26 = 11010 gives B1, B3, B4', 'At most log n orders and each step is O(1), so O(log n)'], model: `<p>A binomial heap with n nodes contains B<sub>k</sub> exactly when bit k of n is 1, so union of heaps of sizes a and b gives a heap whose trees match the bits of a+b. Merge the two root lists in increasing degree. Walk up the orders. At order k hold the trees of that order, counting the carry: with none or one leave it; with two, link them (larger root becomes a child of the smaller) and carry the B<sub>k+1</sub>; with three, keep one and link the other two.</p><p>Example: 19 = 10011 (B<sub>4</sub>, B<sub>1</sub>, B<sub>0</sub>) + 7 = 00111 (B<sub>2</sub>, B<sub>1</sub>, B<sub>0</sub>). Order 0: two trees, link, carry B<sub>1</sub>. Order 1: three, keep one, link two, carry B<sub>2</sub>. Order 2: carry plus H2's B<sub>2</sub>, link, carry B<sub>3</sub>. Order 3: carry alone, stays. Order 4: stays. Result B<sub>1</sub>, B<sub>3</sub>, B<sub>4</sub> = 26 = 11010.</p><p>Each order costs O(1) (one link) and there are at most \\(\\lfloor\\log_2 n\\rfloor + 1\\) orders, so union is O(log n).</p>` });
+recall('#r2', { id: 'r2', marks: 12, q: 'Prove that in a binomial heap the amortized cost of INSERT is O(1) and the worst-case cost of EXTRACT-MIN and DECREASE-KEY is O(log n). (2022–23 Q8(b))', points: ['Potential = number of trees t(H); starts at 0, never negative', 'Insert with c links: actual 1 + c', 'Change of potential 1 − c', 'Amortized cost 2 = O(1)', 'Extract-min: at most log n + 1 roots, at most log n children, union O(log n)', 'Decrease-key: depth at most height log n, O(1) per swap'], model: `<ol><li>Let \\(\\Phi(H)=t(H)\\), the number of trees. It is 0 for the empty heap and never negative.</li><li>Insert makes a B<sub>0</sub> and unions it in. If c links happen the actual cost is \\(1+c\\).</li><li>Each link removes a tree and the new B<sub>0</sub> adds one: \\(\\Delta\\Phi = 1-c\\).</li><li>Amortized cost \\(=(1+c)+(1-c)=2=O(1)\\).</li><li>Extract-min: n nodes means at most \\(\\lfloor\\log_2 n\\rfloor+1\\) roots, so scanning for the min is O(log n); the removed root has at most \\(\\lfloor\\log_2 n\\rfloor\\) children, reversing them is O(log n); the union of two heaps with O(log n) trees each is O(log n). Total O(log n).</li><li>Decrease-key: the node lies at depth at most the tree height, which is at most \\(\\lfloor\\log_2 n\\rfloor\\); each bubble-up step is one swap. O(log n). ∎</li></ol>` });
+recall('#r3', { id: 'r3', marks: 15, q: 'Write pseudocode that converts a min binomial heap into a max binomial heap in amortized O(n) time, and analyse it with the potential method. (2021–22 Q5(a))', points: ['Create an empty max binomial heap', 'Traverse all n nodes of the min heap and MAX-INSERT each key', 'Potential = number of trees', 'Insert: actual 1 + c, delta potential 1 − c, amortized 2', 'Sum: actual total ≤ 2n since final potential ≥ 0 = initial', 'Traversal O(n), so total O(n)'], model: `<pre class="code">CONVERT-MIN-TO-MAX(Hmin)
+  Hmax = MAKE-BINOMIAL-HEAP()     // links put the LARGER root on top
+  for each node x of Hmin         // DFS over every tree
+    MAX-INSERT(Hmax, x.key)
+  return Hmax</pre><p>Potential \\(\\Phi = \\) number of trees in Hmax, \\(\\Phi(\\text{empty})=0\\). An insert with c links costs \\(1+c\\) and changes \\(\\Phi\\) by \\(1-c\\), so its amortized cost is 2. n inserts: amortized total \\(2n\\); actual total \\(\\le 2n - (\\Phi_{\\text{final}}-\\Phi_{\\text{start}}) \\le 2n\\). The traversal is O(n), so the whole conversion is O(n).</p>` });
+practice('#p1', { id: 'p1', kind: 'binomial-insert', n: 2 });
+practice('#p2', { id: 'p2', kind: 'binomial-extract', n: 2 });
+</script>
+</body>
+</html>
