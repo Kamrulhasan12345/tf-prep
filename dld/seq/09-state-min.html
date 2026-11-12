@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Equivalent states · CSE 205 Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Sequential circuits · Mano §5.7 · Adnan sir L12–13 (Sep 8, 12) · 5 of the last 8 papers</div>
+<h1>State minimisation 1: equivalent states (completely specified)</h1>
+<p class="lede">Every cell of the state table has a next state and an output. Asked in 2024–25 Q5(c) (12 marks, A–H table, 4 inputs), 2022–23 Q8(c) (11, A–E, "using implication table"), 2020–21 Q7(a) (10, A–H, x = 0/1), 2018–19 Q7(b) (8, A–F, inputs I J K) and 2017–18 Q7(a) (10; <b>the same A–H table as 2024–25 Q5(c)</b>). 2019–20, 2021–22 and 2023–24 asked the incompletely specified version instead (next chapter). Old question-bank items #218, #219, #220, #221 are solved at the end. This is an 8–12 mark question with no thinking in it: follow the procedure and you get full marks.</p>
+
+<h2>1. What "equivalent" means, and why we merge</h2>
+<div class="def"><dl>
+<dt>Equivalent states</dt><dd>Adnan sir: states S<sub>x</sub> and S<sub>y</sub> are equivalent iff for <b>every possible input sequence</b> the circuit gives the same output sequence, whichever of the two is the starting state.</dd>
+<dt>Local test</dt><dd>X and Y are equivalent if (1) their outputs are the same for every input combination, and (2) their next states are equivalent for every input combination. It is recursive, so we need a method that settles it.</dd>
+</dl></div>
+<p>Why bother (write this as one line): merging equivalent states gives (1) fewer flip-flops and (2) fewer gates in the combinational part. The external behaviour is unchanged.</p>
+<p>Equivalence is <b>reflexive, symmetric and transitive</b>. Transitive means A = B and B = C give A = C. This is the one fact that makes the answer a clean set of classes, and it is what separates this chapter from the incompletely specified one.</p>
+<div class="hint"><b>Mano vs Adnan sir.</b> Mano §5.7 reduces by matching rows: two rows with the same next states and outputs are one state, delete one, repeat. That is fine for a 4-state table but misses equivalences that only show up deeper. Adnan sir teaches two systematic methods instead: the <b>partition method</b> and the <b>implication table</b>. Use his, and write his notation (P<sub>0</sub>, P<sub>1</sub>, …).</div>
+
+<h2>2. Method A: the partition method</h2>
+<p>Idea: start with everything in one block, then split blocks until nothing splits. A block that survives has states that cannot be told apart by any input sequence.</p>
+<ol>
+<li><b>P<sub>0</sub></b> = all states in one block. (Equivalent for input sequences of length 0, trivially.)</li>
+<li><b>P<sub>1</sub></b> = split by <b>output</b>: states stay together only if their output is the same for every input column. (Equivalent for one input.)</li>
+<li><b>P<sub>k+1</sub></b>: inside each block of P<sub>k</sub>, keep two states together only if, for <b>every input</b>, their next states lie in the <b>same block of P<sub>k</sub></b>. Otherwise split.</li>
+<li>Stop when P<sub>k+1</sub> = P<sub>k</sub> ("no change, the algorithm terminates"). The blocks are the equivalence classes.</li>
+<li>Name each block with a new state (α, β, γ, …). Rewrite the table: the next state of a block is the block that contains the old next state. The output is copied.</li>
+</ol>
+<p>Adnan sir's first example (R p58–59, six states). Step through it and watch (B, D, F) lose F, then (A, C, E) lose E.</p>
+<div id="w1"></div>
+<p>His second example (R p59–60, seven states) takes one more round. The result: (A) (F) (BD) (CG) (E), five states.</p>
+<div id="w2"></div>
+
+<h2>3. Method B: the implication table</h2>
+<p>Idea: ask each pair the question "equivalent?" once, and write down what the answer depends on. Then kill pairs whose dependencies are dead.</p>
+<ol>
+<li>Draw the staircase: one cell for every pair. Rows are the second state to the last, columns are the first to the second last (rows B…H, columns A…G).</li>
+<li><b>Pass 1, fill column by column</b> (first column first). For a pair XY: if the outputs differ for any input, write <b>X</b>. Otherwise write the <b>implied pairs</b>: for each input, the pair of next states, when the two next states are different. Drop any pair equal to XY itself (self-implication, always true) and any pair of identical states. If nothing is left, write a tick.</li>
+<li><b>Pass 2 and later</b> ("DFS"): look at every uncrossed cell. If any implied pair in it sits in a crossed cell, cross this cell too. Repeat until a pass crosses nothing. (A cycle of pairs that only imply each other is not crossed: "if cycle, don't cross".)</li>
+<li>The uncrossed cells are the <b>equivalent pairs</b>.</li>
+<li>Draw the <b>merger graph</b>: one vertex per state, one edge per equivalent pair. Because equivalence is transitive, the graph falls apart into disjoint <b>complete</b> pieces (a vertex alone counts). Each piece is one class.</li>
+<li>Rename the classes and write the minimal table as in step 5 of Method A.</li>
+</ol>
+<div class="exam"><div class="exam-src">2017–18 Q7(a) = 2024–25 Q5(c) · 10 and 12 marks</div>
+<div class="exam-q"><p>For the completely specified machine below (inputs x<sub>1</sub>x<sub>2</sub>), find the equivalent partitions, write the state table of the minimal machine and name the equivalent states. (2024–25: also draw the implication table.)</p><div class="tbl"><table class="mat"><tr><th>PS</th><th>00</th><th>01</th><th>11</th><th>10</th></tr><tr><td>A</td><td>D, 0</td><td>D, 0</td><td>F, 0</td><td>A, 0</td></tr><tr><td>B</td><td>C, 1</td><td>D, 0</td><td>E, 1</td><td>F, 0</td></tr><tr><td>C</td><td>C, 1</td><td>D, 0</td><td>E, 1</td><td>A, 0</td></tr><tr><td>D</td><td>D, 0</td><td>B, 0</td><td>A, 0</td><td>F, 0</td></tr><tr><td>E</td><td>C, 1</td><td>F, 0</td><td>E, 1</td><td>A, 0</td></tr><tr><td>F</td><td>D, 0</td><td>D, 0</td><td>A, 0</td><td>F, 0</td></tr><tr><td>G</td><td>G, 0</td><td>G, 0</td><td>A, 0</td><td>A, 0</td></tr><tr><td>H</td><td>B, 1</td><td>D, 0</td><td>E, 1</td><td>A, 0</td></tr></table></div></div>
+<details><summary>Answer</summary><div class="exam-a">
+<p><b>Partition method.</b></p>
+<p class="formula">P<sub>0</sub> = (ABCDEFGH)<br>P<sub>1</sub> = (ADFG)(BCEH)<br>P<sub>2</sub> = (AFG)(D)(BCEH)<br>P<sub>3</sub> = (AF)(G)(D)(BCH)(E)<br>P<sub>4</sub> = P<sub>3</sub>, stop</p>
+<p>Reasons: P<sub>1</sub> splits by the output vector (x<sub>1</sub>x<sub>2</sub> = 00, 01, 11, 10): A, D, F, G give 0000, B, C, E, H give 1010. P<sub>2</sub>: D goes to B on 01 but A, F, G go to D or G on 01, and B is in the other block, so D leaves. P<sub>3</sub>: G leaves (AF) because on 00 it goes to G, which is in block (AFG), while A and F go to D, a block of its own. E leaves (BCH) because on 01 it goes to F, in block (AFG), while B, C, H go to D, a different block.</p>
+<div id="w3"></div>
+<p><b>Equivalent states: A = F and B = C = H.</b> D, E, G are equivalent to nothing. Eight states reduce to five.</p>
+<p><b>Implication table.</b> Pass 1 crosses (output differs): AB AC BD CD AE DE BF CF EF BG CG EG AH DH FH GH. Pass 2 crosses AD (needs BD), DF (needs BD), DG (needs BG). Pass 3 crosses BE and CE (need DF), AG and FG (need DG), EH (needs DF). Left: AF (tick, it only implies itself), BC (needs AF), BH (needs BC, AF), CH (needs BC). Step through it:</p>
+<div id="w4"></div>
+<p>Merger graph of the equivalent pairs: a pair AF and a triangle BCH, the rest isolated.</p>
+<div id="g1"></div>
+<p><b>Minimal machine</b> (α = (AF), β = (BCH), γ = D, δ = E, ε = G):</p>
+<div class="tbl"><table class="mat"><tr><th>new state</th><th>= old</th><th>00</th><th>01</th><th>11</th><th>10</th></tr><tr><td>α</td><td>(AF)</td><td>γ, 0</td><td>γ, 0</td><td>α, 0</td><td>α, 0</td></tr><tr><td>β</td><td>(BCH)</td><td>β, 1</td><td>γ, 0</td><td>δ, 1</td><td>α, 0</td></tr><tr><td>γ</td><td>(D)</td><td>γ, 0</td><td>β, 0</td><td>α, 0</td><td>α, 0</td></tr><tr><td>δ</td><td>(E)</td><td>β, 1</td><td>α, 0</td><td>δ, 1</td><td>α, 0</td></tr><tr><td>ε</td><td>(G)</td><td>ε, 0</td><td>ε, 0</td><td>α, 0</td><td>α, 0</td></tr></table></div>
+</div></details></div>
+<div class="write"><h4>What to write (partition question, 10–12 marks)</h4>
+<ol>
+<li>Copy the table, or say "table as given".</li>
+<li>P<sub>0</sub> = (all states). P<sub>1</sub> = split by outputs, with one line of reason ("outputs differ on x = …").</li>
+<li>Each next partition on its own line. For the first split, show the reason as next-state blocks (for example "D → B on 01, B is in the other block").</li>
+<li>The line "P<sub>4</sub> = P<sub>3</sub>, the algorithm terminates".</li>
+<li><b>The equivalent states, named</b>: "A ≡ F, B ≡ C ≡ H". The question asks for it, and it is a separate mark.</li>
+<li>New names α, β, … with "= (AF)" etc., then the <b>full reduced table</b> with next states in new names and the outputs.</li>
+<li>One closing line: "8 states reduced to 5: fewer rows, simpler combinational logic (still 3 flip-flops here, since ⌈log<sub>2</sub>5⌉ = 3)."</li>
+</ol></div>
+<div class="write"><h4>What to write (implication-table question, 2022–23 Q8(c) and 2024–25 Q5(c))</h4>
+<ol>
+<li>The staircase with the pair names in the cells: X for output mismatch, implied pairs otherwise, tick for none.</li>
+<li>A second picture, or the same one re-crossed with a different pen, showing the pass-2 crossings ("1st pass", "2nd pass" labels, as Adnan sir writes them).</li>
+<li>The list of surviving pairs, then the merger graph with the classes.</li>
+<li>The reduced table, exactly as above.</li>
+</ol></div>
+
+<h2>4. The other past questions</h2>
+<div class="exam"><div class="exam-src">2020–21 Q7(a) · 10 marks</div>
+<div class="exam-q"><p>Completely specified machine, find the equivalence partitions, write the minimal machine and name the equivalent states.</p><div class="tbl"><table class="mat"><tr><th>PS</th><th>x=0</th><th>x=1</th></tr><tr><td>A</td><td>B, 1</td><td>H, 1</td></tr><tr><td>B</td><td>F, 1</td><td>D, 1</td></tr><tr><td>C</td><td>D, 0</td><td>E, 1</td></tr><tr><td>D</td><td>C, 0</td><td>F, 1</td></tr><tr><td>E</td><td>D, 1</td><td>C, 1</td></tr><tr><td>F</td><td>C, 1</td><td>C, 1</td></tr><tr><td>G</td><td>C, 1</td><td>D, 1</td></tr><tr><td>H</td><td>C, 0</td><td>A, 1</td></tr></table></div></div>
+<details><summary>Answer</summary><div class="exam-a">
+<p class="formula">P<sub>0</sub> = (ABCDEFGH)<br>P<sub>1</sub> = (ABEFG)(CDH)<br>P<sub>2</sub> = (AB)(EFG)(CDH)<br>P<sub>3</sub> = (A)(B)(EFG)(CD)(H)<br>P<sub>4</sub> = P<sub>3</sub>, stop</p>
+<p>P<sub>1</sub>: the output is 1 on both inputs for A, B, E, F, G; C, D, H give 0 on x = 0. P<sub>2</sub>: A and B send x = 0 into (ABEFG) and x = 1 into (CDH); E, F, G send both inputs into (CDH). So (AB) and (EFG) separate. (C, D, H) stay together. P<sub>3</sub>: A goes to B on 0, which is in block (AB), but B goes to F on 0, in block (EFG), so A and B separate. H leaves (CD) because on 1 it goes to A, in block (AB), while C and D go to E or F, in block (EFG). P<sub>4</sub> = P<sub>3</sub>.</p>
+<div id="w5"></div>
+<p><b>Equivalent states: C = D and E = F = G.</b> A, B, H are alone. Eight states reduce to five.</p>
+<div id="w6"></div>
+<div id="g2"></div>
+<div class="tbl"><table class="mat"><tr><th>new state</th><th>= old</th><th>x=0</th><th>x=1</th></tr><tr><td>α</td><td>(A)</td><td>β, 1</td><td>ε, 1</td></tr><tr><td>β</td><td>(B)</td><td>δ, 1</td><td>γ, 1</td></tr><tr><td>γ</td><td>(CD)</td><td>γ, 0</td><td>δ, 1</td></tr><tr><td>δ</td><td>(EFG)</td><td>γ, 1</td><td>γ, 1</td></tr><tr><td>ε</td><td>(H)</td><td>γ, 0</td><td>α, 1</td></tr></table></div>
+<p>Note E, F, G all land in one block (γ) with output 1 on both inputs, so γ has next state δ on 0 (E → D) and δ on 1 (all go to C or D).</p>
+</div></details></div>
+
+<div class="exam"><div class="exam-src">2018–19 Q7(b) · 8 marks</div>
+<div class="exam-q"><p>For the state table of a completely specified circuit (inputs I, J, K) find the equivalent partitions and write the state table of the minimal machine. Name the states that are equivalent.</p><div class="tbl"><table class="mat"><tr><th>PS</th><th>I</th><th>J</th><th>K</th></tr><tr><td>A</td><td>A, 0</td><td>B, 1</td><td>E, 1</td></tr><tr><td>B</td><td>B, 0</td><td>A, 1</td><td>F, 1</td></tr><tr><td>C</td><td>A, 1</td><td>D, 0</td><td>E, 0</td></tr><tr><td>D</td><td>F, 0</td><td>C, 1</td><td>A, 0</td></tr><tr><td>E</td><td>A, 0</td><td>D, 1</td><td>E, 1</td></tr><tr><td>F</td><td>B, 0</td><td>D, 1</td><td>F, 1</td></tr></table></div><p class="sm">The scan is clear. The OCR of this table is garbled, so this was read from the image.</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<p class="formula">P<sub>0</sub> = (ABCDEF)<br>P<sub>1</sub> = (ABEF)(C)(D)<br>P<sub>2</sub> = (AB)(EF)(C)(D)<br>P<sub>3</sub> = P<sub>2</sub>, stop</p>
+<p>P<sub>1</sub>: C has outputs 1, 0, 0 and D has 0, 1, 0, so each is alone; A, B, E, F all give 0, 1, 1. P<sub>2</sub>: on J, A and B go to B and A (same block), but E and F go to D, a block of its own, so (A, B) and (E, F) separate. P<sub>3</sub>: nothing changes, because A and B go to the same blocks on all inputs, and so do E and F.</p>
+<div id="w7"></div>
+<div id="w8"></div>
+<p><b>Equivalent states: A = B and E = F.</b> Six states reduce to four.</p>
+<div class="tbl"><table class="mat"><tr><th>new state</th><th>= old</th><th>I</th><th>J</th><th>K</th></tr><tr><td>α</td><td>(AB)</td><td>α, 0</td><td>α, 1</td><td>δ, 1</td></tr><tr><td>β</td><td>(C)</td><td>α, 1</td><td>γ, 0</td><td>δ, 0</td></tr><tr><td>γ</td><td>(D)</td><td>δ, 0</td><td>β, 1</td><td>α, 0</td></tr><tr><td>δ</td><td>(EF)</td><td>α, 0</td><td>γ, 1</td><td>δ, 1</td></tr></table></div>
+</div></details></div>
+
+<div class="exam"><div class="exam-src">2022–23 Q8(c) · 11 marks</div>
+<div class="exam-q"><p>Reduce the number of states of the following state table using an implication table. Show the reduced state table. (Next state and output, X = 0 and X = 1.)</p><div class="tbl"><table class="mat"><tr><th>PS</th><th>x=0</th><th>x=1</th></tr><tr><td>A</td><td>A, 0</td><td>B, 0</td></tr><tr><td>B</td><td>C, 0</td><td>D, 1</td></tr><tr><td>C</td><td>A, 0</td><td>B, 0</td></tr><tr><td>D</td><td>E, 0</td><td>D, 1</td></tr><tr><td>E</td><td>A, 0</td><td>D, 1</td></tr></table></div></div>
+<details><summary>Answer</summary><div class="exam-a">
+<p>Pass 1 crosses AB, BC, AD, CD, AE, CE (output differs). Pass 2 crosses BD (needs CE) and DE (needs AE). Left: AC (tick: A and C are identical rows) and BE (needs AC, which is fine). So A = C and B = E; D is alone.</p>
+<div id="w9"></div>
+<p>Partition check: P<sub>0</sub> = (ABCDE)<br>P<sub>1</sub> = (AC)(BDE)<br>P<sub>2</sub> = (AC)(BE)(D)<br>P<sub>3</sub> = P<sub>2</sub>, stop</p>
+<div id="w10"></div>
+<div class="tbl"><table class="mat"><tr><th>new state</th><th>= old</th><th>x=0</th><th>x=1</th></tr><tr><td>α</td><td>(AC)</td><td>α, 0</td><td>β, 0</td></tr><tr><td>β</td><td>(BE)</td><td>α, 0</td><td>γ, 1</td></tr><tr><td>γ</td><td>(D)</td><td>β, 0</td><td>γ, 1</td></tr></table></div>
+<p>The question names the method, so draw the staircase. The partition check above is a good one-line cross-check to write beside it.</p>
+</div></details></div>
+
+<h2>5. Older bank questions (same method)</h2>
+<div class="exam"><div class="exam-src">Bank #221 · 17 marks</div>
+<div class="exam-q"><p>Using an implication table, reduce this state table to a minimum number of states and write the reduced table.</p><div class="tbl"><table class="mat"><tr><th>PS</th><th>x=0</th><th>x=1</th></tr><tr><td>A</td><td>E, 0</td><td>D, 0</td></tr><tr><td>B</td><td>A, 1</td><td>F, 0</td></tr><tr><td>C</td><td>C, 0</td><td>A, 1</td></tr><tr><td>D</td><td>B, 0</td><td>A, 0</td></tr><tr><td>E</td><td>D, 1</td><td>C, 0</td></tr><tr><td>F</td><td>C, 0</td><td>D, 1</td></tr><tr><td>G</td><td>H, 1</td><td>G, 1</td></tr><tr><td>H</td><td>C, 1</td><td>B, 1</td></tr></table></div></div>
+<details><summary>Answer</summary><div class="exam-a">
+<p>Output rows: A, D give 0, 0; B, E give 1, 0; C, F give 0, 1; G and H both give 1, 1, but they split: their cell implies the pair CH, which has different outputs. Equivalent pairs: A = D, B = E, C = F. Eight states reduce to five.</p>
+<p class="formula">P<sub>0</sub> = (ABCDEFGH)<br>P<sub>1</sub> = (AD)(BE)(CF)(GH)<br>P<sub>2</sub> = (AD)(BE)(CF)(G)(H)<br>P<sub>3</sub> = P<sub>2</sub>, stop</p>
+<div id="w11"></div>
+<div class="tbl"><table class="mat"><tr><th>new state</th><th>= old</th><th>x=0</th><th>x=1</th></tr><tr><td>α</td><td>(AD)</td><td>β, 0</td><td>α, 0</td></tr><tr><td>β</td><td>(BE)</td><td>α, 1</td><td>γ, 0</td></tr><tr><td>γ</td><td>(CF)</td><td>γ, 0</td><td>α, 1</td></tr><tr><td>δ</td><td>(G)</td><td>ε, 1</td><td>δ, 1</td></tr><tr><td>ε</td><td>(H)</td><td>γ, 1</td><td>β, 1</td></tr></table></div>
+</div></details></div>
+<div class="exam"><div class="exam-src">Bank #220 · 15 marks</div>
+<div class="exam-q"><p>Same task. Next state / output, x = 0 and x = 1.</p><div class="tbl"><table class="mat"><tr><th>PS</th><th>x=0</th><th>x=1</th></tr><tr><td>A</td><td>F, 0</td><td>B, 0</td></tr><tr><td>B</td><td>D, 0</td><td>C, 0</td></tr><tr><td>C</td><td>F, 0</td><td>E, 0</td></tr><tr><td>D</td><td>G, 1</td><td>A, 0</td></tr><tr><td>E</td><td>D, 0</td><td>C, 0</td></tr><tr><td>F</td><td>F, 1</td><td>B, 1</td></tr><tr><td>G</td><td>G, 0</td><td>H, 1</td></tr><tr><td>H</td><td>G, 1</td><td>A, 0</td></tr></table></div></div>
+<details><summary>Answer</summary><div class="exam-a">
+<p>Equivalent pairs: A = C, B = E, D = H. F and G stand alone. Eight states reduce to five.</p>
+<p class="formula">P<sub>0</sub> = (ABCDEFGH)<br>P<sub>1</sub> = (ABCE)(DH)(F)(G)<br>P<sub>2</sub> = (AC)(BE)(DH)(F)(G)<br>P<sub>3</sub> = P<sub>2</sub>, stop</p>
+<div id="w12"></div>
+<div class="tbl"><table class="mat"><tr><th>new state</th><th>= old</th><th>x=0</th><th>x=1</th></tr><tr><td>α</td><td>(AC)</td><td>δ, 0</td><td>β, 0</td></tr><tr><td>β</td><td>(BE)</td><td>γ, 0</td><td>α, 0</td></tr><tr><td>γ</td><td>(DH)</td><td>ε, 1</td><td>α, 0</td></tr><tr><td>δ</td><td>(F)</td><td>δ, 1</td><td>β, 1</td></tr><tr><td>ε</td><td>(G)</td><td>ε, 0</td><td>γ, 1</td></tr></table></div>
+</div></details></div>
+<div class="exam"><div class="exam-src">Bank #219 · 12 marks</div>
+<div class="exam-q"><p>Find the reduced state table of this synchronous circuit using the implication table.</p><div class="tbl"><table class="mat"><tr><th>PS</th><th>x=0</th><th>x=1</th></tr><tr><td>A</td><td>D, 0</td><td>B, 0</td></tr><tr><td>B</td><td>E, 0</td><td>A, 0</td></tr><tr><td>C</td><td>G, 0</td><td>F, 1</td></tr><tr><td>D</td><td>A, 1</td><td>D, 0</td></tr><tr><td>E</td><td>A, 1</td><td>D, 0</td></tr><tr><td>F</td><td>C, 0</td><td>B, 0</td></tr><tr><td>G</td><td>A, 1</td><td>E, 0</td></tr></table></div></div>
+<details><summary>Answer</summary><div class="exam-a">
+<p>Equivalent: A = B and D = E = G. C and F stand alone. Seven states reduce to four.</p>
+<p class="formula">P<sub>0</sub> = (ABCDEFG)<br>P<sub>1</sub> = (ABF)(C)(DEG)<br>P<sub>2</sub> = (AB)(F)(C)(DEG)<br>P<sub>3</sub> = P<sub>2</sub>, stop</p>
+<div class="tbl"><table class="mat"><tr><th>new state</th><th>= old</th><th>x=0</th><th>x=1</th></tr><tr><td>α</td><td>(AB)</td><td>γ, 0</td><td>α, 0</td></tr><tr><td>β</td><td>(C)</td><td>γ, 0</td><td>δ, 1</td></tr><tr><td>γ</td><td>(DEG)</td><td>α, 1</td><td>γ, 0</td></tr><tr><td>δ</td><td>(F)</td><td>β, 0</td><td>α, 0</td></tr></table></div>
+</div></details></div>
+<div class="exam"><div class="exam-src">Bank #218 · 10 marks</div>
+<div class="exam-q"><p>(i) Find the reduced state table with an implication table. (ii) Draw the equivalent minimised state diagram.</p><div class="tbl"><table class="mat"><tr><th>PS</th><th>x=0</th><th>x=1</th></tr><tr><td>A</td><td>A, 0</td><td>C, 0</td></tr><tr><td>B</td><td>D, 1</td><td>A, 0</td></tr><tr><td>C</td><td>F, 0</td><td>F, 0</td></tr><tr><td>D</td><td>E, 1</td><td>B, 0</td></tr><tr><td>E</td><td>G, 1</td><td>G, 0</td></tr><tr><td>F</td><td>C, 0</td><td>C, 0</td></tr><tr><td>G</td><td>B, 1</td><td>H, 0</td></tr><tr><td>H</td><td>H, 0</td><td>C, 0</td></tr></table></div></div>
+<details><summary>Answer</summary><div class="exam-a">
+<p>Equivalent: A = C = F = H. B, D, E, G are alone. Eight states reduce to five.</p>
+<p class="formula">P<sub>0</sub> = (ABCDEFGH)<br>P<sub>1</sub> = (ACFH)(BDEG)<br>P<sub>2</sub> = (ACFH)(BG)(DE)<br>P<sub>3</sub> = (ACFH)(B)(G)(D)(E)<br>P<sub>4</sub> = P<sub>3</sub>, stop</p>
+<div id="w13"></div>
+<div class="tbl"><table class="mat"><tr><th>new state</th><th>= old</th><th>x=0</th><th>x=1</th></tr><tr><td>α</td><td>(ACFH)</td><td>α, 0</td><td>α, 0</td></tr><tr><td>β</td><td>(B)</td><td>γ, 1</td><td>α, 0</td></tr><tr><td>γ</td><td>(D)</td><td>δ, 1</td><td>β, 0</td></tr><tr><td>δ</td><td>(E)</td><td>ε, 1</td><td>ε, 0</td></tr><tr><td>ε</td><td>(G)</td><td>β, 1</td><td>α, 0</td></tr></table></div>
+<p>For part (ii), draw five circles α…ε. On each arrow write input/output, taken straight from the minimal table.</p>
+</div></details></div>
+
+<div class="trap"><b>Traps that cost marks</b><ul>
+<li><b>Splitting against the wrong partition.</b> To build P<sub>k+1</sub> look up next states in the blocks of P<sub>k</sub> (the previous one), not in the blocks you are currently creating.</li>
+<li><b>Stopping early.</b> Stop only when a whole round changes nothing, and write that line.</li>
+<li><b>Comparing outputs for one input only.</b> Every input column must match for two states to stay together.</li>
+<li>In the implication table, a pair that implies <b>itself</b> is a tick (A–F in the 8-state table). Do not leave it as a dependency, or you will cross a good pair.</li>
+<li>Pass 2 is not optional. A cell with an implied pair in a crossed cell is crossed. Missing this keeps pairs that are not equivalent (in the 8-state table, AD survives pass 1 but not pass 2).</li>
+<li>Merging a pair without checking transitivity. If BC, BH and CH are all equivalent, the class is (BCH), not three separate merges.</li>
+<li>Forgetting to <b>rename the next-state entries</b> in the reduced table. A reduced table that still says "B" or "F" in a cell loses the marks.</li>
+<li>The question says "name the equivalent states" and the answer shows only a table. Write the classes in words.</li>
+</ul></div>
+
+<h2>Mandatory practice</h2>
+<div id="p1"></div>
+<div id="p2"></div>
+<div id="r1"></div>
+<div id="r2"></div>
+</main>
+<script src="../assets/book.js"></script><script src="../assets/logic.js"></script><script src="../assets/dld.js"></script>
+<script>
+const TXT = { t1: "A: D,0 D,0 F,0 A,0\nB: C,1 D,0 E,1 F,0\nC: C,1 D,0 E,1 A,0\nD: D,0 B,0 A,0 F,0\nE: C,1 F,0 E,1 A,0\nF: D,0 D,0 A,0 F,0\nG: G,0 G,0 A,0 A,0\nH: B,1 D,0 E,1 A,0", t2: "A: A,0 B,1 E,1\nB: B,0 A,1 F,1\nC: A,1 D,0 E,0\nD: F,0 C,1 A,0\nE: A,0 D,1 E,1\nF: B,0 D,1 F,1", t3: "A: B,1 H,1\nB: F,1 D,1\nC: D,0 E,1\nD: C,0 F,1\nE: D,1 C,1\nF: C,1 C,1\nG: C,1 D,1\nH: C,0 A,1", t4: "A: A,0 B,0\nB: C,0 D,1\nC: A,0 B,0\nD: E,0 D,1\nE: A,0 D,1", o1: "A: E,0 D,0\nB: A,1 F,0\nC: C,0 A,1\nD: B,0 A,0\nE: D,1 C,0\nF: C,0 D,1\nG: H,1 G,1\nH: C,1 B,1", o2: "A: F,0 B,0\nB: D,0 C,0\nC: F,0 E,0\nD: G,1 A,0\nE: D,0 C,0\nF: F,1 B,1\nG: G,0 H,1\nH: G,1 A,0", o4: "A: A,0 C,0\nB: D,1 A,0\nC: F,0 F,0\nD: E,1 B,0\nE: G,1 G,0\nF: C,0 C,0\nG: B,1 H,0\nH: H,0 C,0", e1: "A: E,0 D,1\nB: F,0 D,0\nC: E,0 B,1\nD: F,0 B,0\nE: C,0 F,1\nF: B,0 C,0", e2: "A: E,0 C,0\nB: C,0 A,0\nC: B,0 G,0\nD: G,0 A,0\nE: F,1 B,0\nF: E,0 D,0\nG: D,0 G,0" };
+const INP = { t1: ["00","01","11","10"], t2: ["I","J","K"], t3: ["0","1"], t4: ["0","1"], o1: ["0","1"], o2: ["0","1"], o4: ["0","1"], e1: ["0","1"], e2: ["0","1"] };
+const T = k => L.parseTable(TXT[k], INP[k]);
+function mergerSVG(key, mode, o = {}) {
+  const M = T(key), R = L.reduce(M), S = M.S, n = S.length, W = o.w || (n > 6 ? 270 : 230), c = W / 2, r = c - 34;
+  const pos = S.map((_, i) => [c + r * Math.sin(2 * Math.PI * i / n), c - r * Math.cos(2 * Math.PI * i / n)]);
+  const isC = (a, b) => R.imp.compat.some(p => (p[0] === a && p[1] === b) || (p[0] === b && p[1] === a));
+  let e = '', lb = '', nd = '';
+  for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) {
+    const comp = isC(S[i], S[j]); if ((mode === 'compat') !== comp) continue;
+    const [x1, y1] = pos[i], [x2, y2] = pos[j];
+    e += `<line class="ed ${mode === 'compat' ? 'tree' : 'cut'}" style="stroke-width:2.2" x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}"/>`;
+    if (o.labels && comp) { const p = R.imp.cell[R.imp.key(S[i], S[j])].pairs; if (p.length) { const t = 0.3 + 0.4 * ((i + j) % 3) / 2; lb += `<text class="dl" x="${(x1 + (x2 - x1) * t).toFixed(1)}" y="${(y1 + (y2 - y1) * t).toFixed(1)}">${p.map(q => q.join('')).join(',')}</text>`; } }
+  }
+  S.forEach((s, i) => { nd += `<circle class="nd" cx="${pos[i][0].toFixed(1)}" cy="${pos[i][1].toFixed(1)}" r="14"/><text class="tx" x="${pos[i][0].toFixed(1)}" y="${pos[i][1].toFixed(1)}">${s}</text>`; });
+  const cl = (mode === 'compat' ? R.maxC : R.maxI).map(x => '(' + x.join('') + ')').join(' ');
+  return `<div style="text-align:center"><div class="fg-wrap"><svg class="dsa-fig" viewBox="0 0 ${W} ${W}" width="${W}" role="img" aria-label="merger graph for ${mode === 'compat' ? 'compatibles' : 'incompatibles'}">${e}${lb}${nd}</svg></div><p style="margin:.2em 0"><b>${mode === 'compat' ? (o.eq ? 'Merger graph (equivalent pairs)' : 'Merger graph for compatibles') : 'Merger graph for incompatibles'}</b><br>maximal cliques: ${cl}</p></div>`;
+}
+function merger(sel, key, o = {}) {
+  const parts = o.only === 'compat' ? ['compat'] : ['compat', 'incompat'];
+  $(sel).innerHTML = `<div style="display:flex;flex-wrap:wrap;gap:12px 24px;justify-content:center">${parts.map(m => mergerSVG(key, m, o)).join('')}</div>`;
+}
+
+partitionAnim('#w1', { table: T('e1') });
+partitionAnim('#w2', { table: T('e2') });
+partitionAnim('#w3', { table: T('t1') });
+implication('#w4', { table: T('t1') });
+merger('#g1', 't1', { only: 'compat', eq: true });
+partitionAnim('#w5', { table: T('t3') });
+implication('#w6', { table: T('t3') });
+merger('#g2', 't3', { only: 'compat', eq: true });
+partitionAnim('#w7', { table: T('t2') });
+implication('#w8', { table: T('t2') });
+implication('#w9', { table: T('t4') });
+partitionAnim('#w10', { table: T('t4') });
+partitionAnim('#w11', { table: T('o1') });
+partitionAnim('#w12', { table: T('o2') });
+partitionAnim('#w13', { table: T('o4') });
+practice('#p1', { id: 'p1', kind: 'partition', n: 2 });
+recall('#r1', { id: 'r1', marks: 10, q: 'Find the minimal machine for the 2017–18 / 2024–25 table (A–H, inputs x1x2) by the partition method. Write what you would put on the script.', points: ['P0 = all states; P1 split by output vectors: (ADFG)(BCEH)', 'Each later partition built from the blocks of the previous one: (AFG)(D)(BCEH), then (AF)(G)(D)(BCH)(E)', 'States the stop rule: P4 = P3, algorithm terminates', 'Names the equivalent states: A = F and B = C = H', 'Gives new names with their members: alpha = (AF), beta = (BCH), gamma = D, delta = E, epsilon = G', 'Writes the reduced table with next states in new names and the outputs copied', 'Says 8 states become 5'], model: '<p>P0 = (ABCDEFGH). P1 = (ADFG)(BCEH) by outputs. P2 = (AFG)(D)(BCEH). P3 = (AF)(G)(D)(BCH)(E). P4 = P3, stop. A ≡ F, B ≡ C ≡ H. Reduced table: see section 3, 5 states.</p>' });
+recall('#r2', { id: 'r2', marks: 6, q: 'In the implication table method, how do you fill a cell, what is the second pass for, and why does the merger graph of equivalent states split into complete pieces?', points: ['A cell gets X if the outputs differ for some input', 'Otherwise it lists the implied next-state pairs, dropping identical pairs and the pair itself', 'Second and later passes: cross a cell whose implied pair is in a crossed cell; repeat until no change', 'A pair that only implies itself (or a cycle of such pairs) stays: tick', 'Equivalence is transitive, so pieces of the merger graph are complete and disjoint', 'Each piece is one new state'], model: '<p>X for an output conflict; otherwise write implied pairs (not identical, not the pair itself). Repeat crossing cells that imply crossed cells. Survivors are equivalent. Because equivalence is transitive, connected pieces are cliques and do not overlap, so each piece becomes one state.</p>' });
+</script>
+</body>
+</html>

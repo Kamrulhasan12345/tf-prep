@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Analysis of Clocked Circuits · CSE 205 Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Sequential circuits · Mano §5.4–5.5 · Adnan sir L7 and L9 (29 Aug, 1 Sep) · 3 of the last 8 papers</div>
+<h1>Analysing a given clocked circuit</h1>
+<p class="lede">Past term-final questions on this topic: <b>2019–20 Q2(b)</b> (25 marks: flip-flops A and B, inputs x1 x2, equations JA KA JB KB z; logic diagram, transition, excitation and state tables, state diagram), <b>2021–22 Q7(a)</b> (20, the same equations again), <b>2023–24 Q7(b)</b> (12, a T flip-flop plus a J-K flip-flop in a figure; transition, excitation and state table). Older papers: the same A/B/x/y equations (2016–17, 4+7+4), a JK pair with state equations (2014–15, 15), "derive the state diagram from the circuit" (2012–13, 15), counter direction (2015–16, 7) and a latch timing question (2011–17 bank, 6). This is mechanical marks: every cell can be computed, and the same equations came twice within three years.</p>
+
+<h2>1. Analysis is design run backwards</h2>
+<p>In design you start from words and end at a circuit. In analysis you start from the <b>circuit</b> (or its equations) and end at the <b>state diagram</b>. Adnan sir's list, from the circuit upward:</p>
+<ol>
+<li><b>Equations.</b> Read the flip-flop input equations and the output equation off the circuit (J1 = x y2, K1 = x', …, Z = …).</li>
+<li><b>Excitation table.</b> For every present state and input, evaluate each equation. Result: the J, K (or S R, T, D) values.</li>
+<li><b>Transition table.</b> Apply the flip-flop's behaviour (section 2) to get the next state. Result: PS → NS with the output.</li>
+<li><b>State table.</b> Give the binary states names (A, B, C, D) and write the same table with the names.</li>
+<li><b>State diagram.</b> Draw the circles and arrows from the state table.</li>
+</ol>
+<p>The exam wording often lists "transition table, excitation table, state table". Order on paper does not matter, but you can only fill the transition table <i>after</i> the excitation values, so do the excitation table first and say so. Textbook names: Adnan's <i>excitation table</i> = the flip-flop-input columns in Mano's state table; his <i>transition table</i> = Mano's binary state table.</p>
+
+<h2>2. What each flip-flop does (needed in step 3)</h2>
+<div class="tbl"><table class="mat"><tr><th>Flip-flop</th><th>inputs</th><th>effect on Q</th></tr>
+<tr><td>J-K</td><td>00 · 01 · 10 · 11</td><td>hold · reset to 0 · set to 1 · toggle. Q⁺ = JQ' + K'Q</td></tr>
+<tr><td>T</td><td>0 · 1</td><td>hold · toggle. Q⁺ = T ⊕ Q</td></tr>
+<tr><td>D</td><td>0 · 1</td><td>Q⁺ = D</td></tr>
+<tr><td>S-R</td><td>00 · 01 · 10 · 11</td><td>hold · 0 · 1 · forbidden. Q⁺ = S + R'Q</td></tr></table></div>
+
+<h2>3. Adnan sir's worked analysis: the JK circuit</h2>
+<p>His example (L9): input x; J1 = x y2, K1 = x'; J2 = x, K2 = x' + y1'; output Z = x y1 y2. Below, the lab computes every table from the equations. The states are named by their code: S0 = 00, S1 = 01, S2 = 10, S3 = 11 (y2 y1). His names: A = 00, B = 01, C = 11, D = 10.</p>
+<div id="a0"></div>
+<p><b>Reading the diagram:</b> any state on x = 0 goes to 00 (his A). On x = 1 the machine walks A → D → B → C and then stays in C, where Z = 1. So Z becomes 1 on the fourth consecutive 1 and stays 1 while 1s continue: an overlapping <b>1111 detector</b>. His notes never say this; say it in one line if the question asks "what does the circuit do".</p>
+
+<h2>4. 2019–20 Q2(b) and 2021–22 Q7(a): two flip-flops, two inputs, 16 rows</h2>
+<div class="exam"><div class="exam-src">2019–20 Q2(b) · 25 marks · 2021–22 Q7(a) · 20 marks</div><div class="exam-q"><p>A sequential circuit has two J-K flip-flops A and B, two inputs x1 and x2 and one output z. The flip-flop input equations and the output equation are:</p>
+<p>J<sub>A</sub> = y<sub>A</sub>x1 + y<sub>B</sub>x2 &nbsp; K<sub>A</sub> = y<sub>A</sub>y<sub>B</sub> + x1x2 &nbsp; J<sub>B</sub> = y<sub>A</sub>x1 &nbsp; K<sub>B</sub> = y<sub>A</sub>y<sub>B</sub>x1 + y<sub>B</sub>x2 &nbsp; z = y<sub>A</sub>x1x2 + y<sub>B</sub>x1x2</p>
+<p>(i) Draw the logic diagram. (ii) Derive the transition table, excitation table and state table. (iii) Draw the state diagram. (2021–22 asks the same, with a different wording and 20 marks.)</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<p>Two flip-flops and two inputs give 4 × 4 = 16 rows. The lab evaluates all of them with the engine (L.analyze with labels A, B). Input x1x2 is written as a 2-bit number with x1 first.</p>
+<div id="a1"></div>
+<p><b>What the diagram shows.</b> State 00 is absorbing: in that state J<sub>A</sub> = J<sub>B</sub> = 0 for every input, so neither flip-flop can be set and the machine stays in 00. z = 1 only when x1x2 = 11 <i>and</i> the state is not 00, so z is a Mealy output (the arrows carry it). From 11 the machine drops to 00 on any input except 00, which takes it to 01.</p>
+<p><b>Logic diagram (i).</b> Two J-K flip-flops sharing one clock. Gate drawings for the five equations are in the lab above (open "Gate drawing"). Feed y<sub>A</sub> = Q of A, y<sub>B</sub> = Q of B, and use the Q' outputs where an equation needs a complement.</p>
+</div></details></div>
+
+<h2>5. 2023–24 Q7(b): a T flip-flop and a J-K flip-flop</h2>
+<div class="exam"><div class="exam-src">2023–24 Q7(b) · 12 marks</div><div class="exam-q"><p>Analyse the sequential circuit in the figure (a T flip-flop with output Q1 and a J-K flip-flop with output Q0; an AND gate, an OR gate, and an OR gate for the output y). Derive the transition table, excitation table and state table.</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<p><b>The reading used (the scan is dark in places; this is read from the original page 3 at 300 dpi).</b></p>
+<ul>
+<li>T input of the first flip-flop = x. Its outputs Q1 and Q1'.</li>
+<li>AND gate: inputs Q1 and Q0' (the wire from the AND's lower input runs down and joins the Q' output of the J-K flip-flop, the line along the bottom). Output goes to <b>J</b>. So <b>J = Q1·Q0'</b>.</li>
+<li>OR gate: inputs Q1' and Q0' (same vertical wire). Output goes to <b>K</b>. So <b>K = Q1' + Q0'</b>.</li>
+<li>Output OR gate: inputs Q1 (the wire along the top of the figure) and Q0. So <b>y = Q1 + Q0</b>.</li>
+<li>Both flip-flops share clk. State variables Q1 Q0, Q1 the MSB.</li>
+</ul>
+<p>If your reading of a connection differs, only the equations change; the method below does not. State your reading at the top of the answer in one sentence.</p>
+<div id="a2"></div>
+<p><b>Observations.</b> y depends on the state only (y = 0 only in state 00), so write y inside the circles: it is a Moore-type output. State 11 with x = 0 holds itself (J = K = 0). With x = 1 the T flip-flop toggles Q1 every clock. Timing for the input 1 1 0 1 0 0 1, starting in 00:</p>
+<div id="tm2"></div>
+</div></details></div>
+
+<div class="write"><h4>What to write: an analysis question (12–25 marks)</h4>
+<ol>
+<li><b>One line per equation:</b> J<sub>A</sub> = …, K<sub>A</sub> = …, J<sub>B</sub> = …, K<sub>B</sub> = …, z = … (read from the circuit; state the reading if the figure is unclear).</li>
+<li><b>Excitation table:</b> columns present state (y<sub>A</sub>y<sub>B</sub>), inputs, then J<sub>A</sub>K<sub>A</sub> J<sub>B</sub>K<sub>B</sub> and z. Every combination of PS and inputs gets a row.</li>
+<li><b>Transition table:</b> present state against each input value, cell = next state, output. State the rule used ("J-K: 00 hold, 01 reset, 10 set, 11 toggle").</li>
+<li><b>State table:</b> name the states (A = 00, B = 01, …) and rewrite the transition table with the names.</li>
+<li><b>State diagram:</b> circle per state, arrow per (state, input) labelled <i>input / output</i> for a Mealy output, or output inside the circle for a Moore output.</li>
+<li><b>Logic diagram</b> if asked: flip-flops on one clock, one gate network per input equation.</li>
+<li>If asked, one sentence on what the circuit does.</li>
+</ol></div>
+
+<h2>6. Older items: state equations, counter direction, a timing question</h2>
+<div class="exam"><div class="exam-src">2014–15 · 15 marks · and 2016–17 · 4+7+4 marks</div><div class="exam-q"><p>(2014–15) Two J-K flip-flops A and B, inputs x and y, output z. J<sub>A</sub> = Bx + B'y', K<sub>A</sub> = B'xy', J<sub>B</sub> = A'x, K<sub>B</sub> = A + xy'. Draw the logic diagram, tabulate the state table and derive the state equations for A and B. (2016–17) The 2019–20 equations again with A, B, x, y: logic diagram, state table, state diagram.</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<p>The 2016–17 item is the same as the one in section 4 with x1 = x, x2 = y, so use that solution. For 2014–15 the extra task is the <b>state equations</b> A⁺ and B⁺. Method: build the transition table (section 1), read the next A and next B as functions of A, B, x, y, and minimise with a K-map. (The OCR of the paper's output equation is unclear, so only the state equations are given.)</p>
+<div id="a3"></div><div id="a3k"></div>
+<p>The shortcut that gives the same answer: A⁺ = J<sub>A</sub>A' + K<sub>A</sub>'A.</p>
+</div></details></div>
+
+<div class="exam"><div class="exam-src">2015–16 · 7 marks · counter direction</div><div class="exam-q"><p>A counter has two J-K flip-flops. The least significant flip-flop Q0 has J = K = 1 (V<sub>DD</sub>). The current values are Q0 = 0 and Q1 = 1. In which direction does the next clock pulse take the count, up or down? What would you change to count the other way?</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<p>The figure is partly lost in the scan: the only thing that matters is which output of Q0 drives J1 and K1. Rule: <b>J1 = K1 = Q0 makes it an up counter, J1 = K1 = Q0' makes it a down counter</b>. Flip-flop 1 toggles when the lower bit is 1 (up) or 0 (down). Both versions, started from Q1Q0 = 10:</p>
+<div id="a4"></div>
+<div id="a5"></div>
+<p>With Q0 driving J1 K1 the next state from 10 is 11 (up). With Q0' it is 01 (down). To make it count the other way, move the connection from Q0 to Q0' (or the reverse). Use the lab's tables as your answer layout. State which connection your figure shows.</p>
+</div></details></div>
+
+<div class="exam"><div class="exam-src">2011–17 bank · 6 marks · timing</div><div class="exam-q"><p>A gated S-R latch is driven by D (S = D·CLK, R = D'·CLK). CLK = 1, D = 1, Q = 1, Q' = 0. D changes from 1 to 0 after the hold time, with CLK still 1. What are Q and Q'?</p></div>
+<details><summary>Answer</summary><div class="exam-a"><p>CLK = 1 means a latch is <b>transparent</b>: Q follows D for the whole time CLK is high. So when D falls to 0, S = 0 and R = 1, and the latch resets: <b>Q = 0, Q' = 1</b>. (An edge-triggered flip-flop would not change, because the clock edge is already past. Say which of the two the figure is. A latch with a gate input is level sensitive; the question's "after the hold time" hint is meant to test this.)</p></div></details></div>
+
+<div class="trap"><h4>Traps that cost marks</h4><ul>
+<li>Reading the input pair x1x2 as a number the wrong way round. Say "x1 is the first (left) bit".</li>
+<li>Using the characteristic equation inconsistently: for J-K the next state is JQ' + K'Q, not J + KQ.</li>
+<li>Leaving out rows. With 2 FFs and 2 inputs there are 16 rows, with all of them filled.</li>
+<li>Forgetting the outputs in the state table and state diagram. Mealy output goes on the arrow (input/output), Moore output inside the circle.</li>
+<li>Mixing up transition table and excitation table. Excitation table = FF inputs; transition table = next states.</li>
+<li>Not stating the reading of an unclear figure.</li>
+<li>Drawing the logic diagram with different clocks. Synchronous: one clock to every flip-flop.</li>
+</ul></div>
+
+<h2>Mandatory practice</h2>
+<div id="p1"></div>
+<div id="p2"></div>
+<div id="r1"></div>
+<div id="r2"></div>
+</main>
+<script src="../assets/book.js"></script><script src="../assets/logic.js"></script><script src="../assets/dld.js"></script>
+<script>
+// seqLab: page-local helper. Runs L.synth on spec and shows the design tables, equations, K-maps and gate drawings.
+function seqLab(sel, spec, o = {}) {
+  const el = host(sel), R = L.synth(spec), { sv, iv = [], ff, ov: outs = [] } = spec, ns = sv.length, ni = iv.length, bn = (v, w) => w ? L.bin(v, w) : '';
+  const inKeys = ff.flatMap((t, b) => L.FF[t].ins.map(nm => nm + sv[b]));
+  const head = ['PS ' + sv.join(''), ...(ni ? [iv.join('')] : []), 'NS ' + sv.join(''), ...inKeys, ...outs];
+  const rows = R.table.map(r => [bn(r.ps, ns), ...(ni ? [bn(r.x || 0, ni)] : []), bn(r.ns, ns), ...inKeys.map(k => r.ex[k]), ...outs.map((_, j) => r.z && r.z[j] !== null && r.z[j] !== undefined ? r.z[j] : '–')]);
+  const keys = [...inKeys, ...outs], mp = k => R.maps[k] || R.out[k];
+  const eqs = keys.map(k => `<b>${esc(k)}</b> = ${ov(R.eq[k].sop)}`).join(' &nbsp;·&nbsp; ');
+  const maps = keys.map(k => { const m = mp(k), e = R.eq[k]; return `<div><div class="figlabel">${esc(k)} = ${ov(e.sop)}</div>${kmapSVG(R.vars, valsOf(R.n, m.ones, m.dc), (e.sols[0] || []).map((q, j) => ({ cube: q, color: COL[j % COL.length] })))}</div>`; }).join('');
+  const gl = keys.filter(k => !/^[01]$/.test(R.eq[k].sop)).map(k => `<div><div class="figlabel">${esc(k)}</div><div data-g="${esc(k)}"></div></div>`).join('');
+  let chk = '';
+  if (o.valid) {
+    const bad = L.range(1 << ns).filter(s => !o.valid.includes(s));
+    chk = `<p><b>Unused states, simulated with these equations:</b><br>${bad.map(s => { let c = s; const p = [s]; for (let t = 0; t < 9 && c !== null && !o.valid.includes(c); t++) { c = L.step(spec, R.eq, c); p.push(c); } const ok = c !== null && o.valid.includes(c); return `${s} → ${p.slice(1).map(v => v === null ? '?' : v).join(' → ')} ${ok ? '<span class="good">(enters the count)</span>' : '<span class="bad">(lock-out)</span>'}`; }).join('<br>')}</p>`;
+  }
+  el.innerHTML = `<span class="anim-tag">${o.tag || 'design lab'} · ${ff.join(', ')}</span>${tbl(head, rows)}${o.note ? `<p class="tracer-hint">${o.note}</p>` : ''}<p>${eqs}</p>${chk}<details><summary>K-maps (variables ${R.vars.join(' ')})</summary><div class="figrow">${maps}</div></details><details><summary>Gate drawing of every flip-flop input and output</summary><div class="figrow">${gl}</div></details>`;
+  el.querySelectorAll('[data-g]').forEach(d => { const k = d.dataset.g; gates(d, { expr: R.eq[k].sop, vars: R.vars, form: 'and-or' }); });
+  return R;
+}
+// machine helpers: a Mealy table {S, t:{s:[[ns,z],..]}} (inputs by index) + codes -> synth rows; text for diagram()
+const mRows = (M, codes) => M.S.flatMap(s => M.t[s].flatMap((c, x) => c ? [{ ps: codes[s], x, ns: codes[c[0]], z: c[1] === null || c[1] === undefined ? null : [].concat(c[1]) }] : []));
+const mText = (M, f = z => z) => M.S.map(s => `${s}: ${M.t[s].map(c => c ? `${c[0]},${f(c[1])}` : '-').join(' ')}`).join('\n');
+
+// analysisLab: circuit equations -> excitation table, transition table, state table, state diagram (all from L.analyze)
+function analysisLab(sel, c) {
+  const el = host(sel), R = L.analyze(c), { sv, iv = [], ff, outs = {} } = c, ns = sv.length, ni = iv.length, on = Object.keys(outs), nx = 1 << ni;
+  const lab = c.labels || sv, inKeys = ff.flatMap((t, b) => L.FF[t].ins.map(nm => nm + lab[b])), bn = (v, w) => w ? L.bin(v, w) : '';
+  const ex = tbl(['PS ' + sv.join(''), ...(ni ? [iv.join('')] : []), ...inKeys, ...on], R.map(r => [bn(r.ps, ns), ...(ni ? [bn(r.x, ni)] : []), ...inKeys.map(k => r.ins[k]), ...r.z]));
+  const col = x => ni ? bn(x, ni) : '';
+  const tr = tbl(['PS ' + sv.join(''), ...L.range(nx).map(x => ni ? `${iv.join('')} = ${col(x)}` : 'next')], L.range(1 << ns).map(ps => [bn(ps, ns), ...L.range(nx).map(x => { const r = R.find(q => q.ps === ps && q.x === x); return `${r.ns === null ? '?' : bn(r.ns, ns)}${on.length ? ', ' + r.z.join('') : ''}`; })]));
+  const nm = ps => 'S' + ps, I = L.range(nx).map(x => ni ? col(x) : '0');
+  let M;
+  if (c.moore) { M = { S: L.range(1 << ns).map(nm), I, t: {}, z: {} }; L.range(1 << ns).forEach(ps => { M.t[nm(ps)] = L.range(nx).map(x => nm(R.find(q => q.ps === ps && q.x === x).ns)); M.z[nm(ps)] = R.find(q => q.ps === ps).z.join(''); }); }
+  else M = { S: L.range(1 << ns).map(nm), I, t: Object.fromEntries(L.range(1 << ns).map(ps => [nm(ps), L.range(nx).map(x => { const r = R.find(q => q.ps === ps && q.x === x); return [nm(r.ns), r.z.join('') || null]; })])) };
+  el.innerHTML = `<span class="anim-tag">analysis · ${ff.join(', ')}</span><h4>Excitation table (equations evaluated)</h4>${ex}<h4>Transition table (next state${on.length ? ', output' : ''})</h4>${tr}<h4>State table and state diagram (S<i>n</i> = the state whose code is <i>n</i> in binary)</h4><div class="ad-d"></div><details><summary>Gate drawing of every equation (the logic diagram)</summary><div class="figrow ad-g"></div></details>`;
+  diagram(el.querySelector('.ad-d'), { M, start: c.start || 'S0' });
+  const g = el.querySelector('.ad-g'), vars = [...sv, ...iv];
+  Object.entries({ ...c.eqs, ...outs }).forEach(([k, e]) => { const d = document.createElement('div'); d.innerHTML = `<div class="figlabel">${esc(k)}</div><div></div>`; g.append(d); const sop = L.minimize(vars.length, L.onesOf(L.parse(e, vars)), [], vars).sop; if (/^[01]$/.test(sop)) d.lastChild.textContent = k + ' = ' + sop; else gates(d.lastChild, { expr: sop, vars, form: 'and-or' }); });
+  return R;
+}
+analysisLab('#a0', { sv: ['y2', 'y1'], iv: ['x'], ff: ['JK', 'JK'], labels: ['2', '1'], eqs: { J1: 'x y2', K1: "x'", J2: 'x', K2: "x' + y1'" }, outs: { Z: 'x y1 y2' } });
+analysisLab('#a1', { sv: ['yA', 'yB'], iv: ['x1', 'x2'], ff: ['JK', 'JK'], labels: ['A', 'B'], eqs: { JA: 'yA x1 + yB x2', KA: 'yA yB + x1 x2', JB: 'yA x1', KB: 'yA yB x1 + yB x2' }, outs: { z: 'yA x1 x2 + yB x1 x2' } });
+const R2 = analysisLab('#a2', { sv: ['Q1', 'Q0'], iv: ['x'], ff: ['T', 'JK'], labels: ['1', '0'], eqs: { T1: 'x', J0: "Q1 Q0'", K0: "Q1' + Q0'" }, outs: { y: 'Q1 + Q0' }, moore: true });
+{ const xs = [1, 1, 0, 1, 0, 0, 1], q1 = [], q0 = [], y = []; let s = 0;
+  xs.forEach(x => { q1.push(s >> 1); q0.push(s & 1); const r = R2.find(q => q.ps === s && q.x === x); y.push(r.z[0]); s = r.ns; });
+  timing('#tm2', { signals: { x: xs, Q1: q1, Q0: q0, y }, clock: true }); }
+// 2014-15: state equations A+ and B+
+{ const R = L.analyze({ sv: ['A', 'B'], iv: ['x', 'y'], ff: ['JK', 'JK'], eqs: { JA: "B x + B' y'", KA: "B' x y'", JB: "A' x", KB: "A + x y'" } }), vars = ['A', 'B', 'x', 'y'];
+  const an = R.filter(r => r.ns >> 1 & 1).map(r => (r.ps << 2) | r.x), bn = R.filter(r => r.ns & 1).map(r => (r.ps << 2) | r.x);
+  document.querySelector('#a3').innerHTML = `<p><b>A⁺ = ${ov(L.minimize(4, an, [], vars).sop)}</b> &nbsp; <b>B⁺ = ${ov(L.minimize(4, bn, [], vars).sop)}</b></p>`; kmap('#a3k', { vars, ones: an }); }
+analysisLab('#a4', { sv: ['Q1', 'Q0'], ff: ['JK', 'JK'], labels: ['1', '0'], eqs: { J1: 'Q0', K1: 'Q0', J0: '1', K0: '1' } });
+analysisLab('#a5', { sv: ['Q1', 'Q0'], ff: ['JK', 'JK'], labels: ['1', '0'], eqs: { J1: "Q0'", K1: "Q0'", J0: '1', K0: '1' } });
+practice('#p1', { id: 'p1', kind: 'excite', n: 2 });
+practice('#p2', { id: 'p2', kind: 'mealyrun', n: 1 });
+recall('#r1', { id: 'r1', marks: 20, q: 'Analyse a clocked circuit given by flip-flop input equations (as in 2019–20 Q2b): list in order what you write on the script. (the order of Adnan sir\'s steps, bottom up)', points: ['The equations written out: J, K for each flip-flop and the output z', 'Excitation table: every PS and input combination evaluated (16 rows for 2 FFs and 2 inputs)', 'The flip-flop behaviour rule used (J-K: hold, reset, set, toggle) to get next states', 'Transition table: PS against input, cells NS and z', 'State table with named states (A = 00, …)', 'State diagram: arrows labelled input/output (Mealy)', 'Logic diagram if asked: flip-flops on one clock, gates for each equation', 'One sentence on what the circuit does, if asked'], model: '<p>Equations first. Then the excitation table (evaluate each equation for every present state and input). Then the transition table using the flip-flop rule (J-K: 00 hold, 01 reset, 10 set, 11 toggle). Name the states for the state table, then draw the state diagram with input/output on each arrow. Draw the logic diagram with a single clock if asked.</p>' });
+recall('#r2', { id: 'r2', marks: 7, q: 'Two J-K flip-flops with J0 = K0 = 1. J1 = K1 is connected to Q0 (version 1) or to Q0\' (version 2). Which direction does each count, and what is the next state from Q1Q0 = 10?', points: ['Q0 toggles every clock (J0 = K0 = 1)', 'Version 1: Q1 toggles when Q0 = 1, so the count goes up (00,01,10,11)', 'Version 2: Q1 toggles when Q0 = 0, so the count goes down (11,10,01,00)', 'From 10: version 1 gives 11, version 2 gives 01', 'To reverse the direction, swap Q0 and Q0\' on J1 and K1'], model: '<p>Version 1 (Q0 drives J1 and K1): up counter, 10 goes to 11. Version 2 (Q0\' drives them): down counter, 10 goes to 01. Moving the connection between Q0 and Q0\' reverses the direction.</p>' });
+</script>
+</body>
+</html>

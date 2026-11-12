@@ -1,0 +1,587 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ripple counters · CSE 205 Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+
+<div class="eyebrow">Sequential circuits · Mano §6.3 · Adnan sir L10 (Sep 5), "async counter, register: 5–7 mark question" · 7 of the last 8 papers</div>
+<h1>Ripple (asynchronous) counters</h1>
+<p class="lede">Past papers: 2017–18 Q5(c) (10 marks, divide a 100 MHz clock to 50 and 25 MHz with D flip-flops, timing diagram) and Q8(c) (5, mod-12 up counter with JK), 2018–19 Q5(c) (7, BCD ripple down counter with D flip-flops), 2019–20 Q3(a) (10, mod-12 ripple counter), 2020–21 Q5(c) (5, BCD ripple down with D), 2021–22 Q6(c) (5, mod-13 ripple up/down with JK), 2022–23 Q7(a) (12, 4-bit ripple countdown with negative-edge T), 2023–24 Q6(c) (6, mod-100 ripple down with JK). Older: 4-bit ripple up with T (12), mod-6 with timing diagram and the problems of the counter (8+4+3), 4-bit ripple with D (10). Small marks, same method every time, so these are among the cheapest marks in Section B. The 2024–25 paper has none, so a ripple question is due again.</p>
+
+<h2>1. How a ripple counter works</h2>
+<p>Only the <b>first</b> flip-flop gets the external clock. The output of each flip-flop is the clock of the next one. Each flip-flop <b>toggles</b> (T = 1), so each output has half the frequency of its clock: the chain divides by 2<sup>n</sup>. <b>Asynchronous</b> because the flip-flops do not get their clock pulse at the same time. <b>Ripple</b> because the change ripples from one flip-flop to the next.</p>
+<p><b>How to get "toggle" from the flip-flop you are given</b> (his remark: "if the question gives JK, D or SR, make it a T"): T flip-flop: T = 1. JK: J = K = 1. D: D = Q' (connect Q' back to D). SR: S = Q', R = Q (this is the JK-from-SR conversion with J = K = 1).</p>
+<p><b>Which output drives the next clock</b> (this is the one thing to remember):</p>
+<div class="tbl"><table class="mat"><tr><th>Flip-flop edge</th><th>Up counter: clock of next stage</th><th>Down counter: clock of next stage</th></tr><tr><td>positive edge</td><td>Q' of the previous stage</td><td>Q of the previous stage</td></tr><tr><td>negative edge</td><td>Q of the previous stage</td><td>Q' of the previous stage</td></tr></table></div>
+<p>Reason: an up counter must toggle the next bit when the present bit goes from 1 to 0 (a carry). A falling Q is a rising Q'. A positive-edge flip-flop needs a rising signal, so it takes Q'. A negative-edge flip-flop takes Q (its falling edge). A down counter toggles the next bit when the present bit goes 0 to 1 (a borrow): that is a rising Q, or a falling Q'. <b>His words:</b> up counter passes Q-bar into the next clock (positive edge), down counter passes Q; up-down counter uses a MUX at every step.</p>
+
+<h2>2. 4-bit binary up counter, count table and timing</h2>
+<p>His table (Clk, Q4 Q3 Q2 Q1 in his numbering; Q3 Q2 Q1 Q0 here): Q0 toggles at every clock, Q1 every 2 clocks, Q2 every 4, Q3 every 8. All flip-flops positive-edge: Q' feeds the next clock.</p>
+<div class="fg-wrap"><svg class="dsa-fig" viewBox="0 0 720 190" width="720" role="img" aria-label="4-bit ripple up counter">
+<rect class="gt" x="100" y="60" width="62" height="60" rx="3"/><text class="sm" x="111" y="78">T</text><path class="gt" style="fill:none" d="M100,96 L109,102 L100,108"/><text class="sm" x="153" y="78">Q</text><text class="sm" x="153" y="102">Q'</text><circle class="gt" cx="166" cy="102" r="4"/>
+<text class="lb" x="184" y="68" style="text-anchor:start">Q0</text>
+<path class="wr" d="M162,78 L182,78"/>
+<path class="wr" d="M76,78 L100,78"/>
+<text class="lb" x="72" y="78" style="text-anchor:end">1</text>
+<rect class="gt" x="240" y="60" width="62" height="60" rx="3"/><text class="sm" x="251" y="78">T</text><path class="gt" style="fill:none" d="M240,96 L249,102 L240,108"/><text class="sm" x="293" y="78">Q</text><text class="sm" x="293" y="102">Q'</text><circle class="gt" cx="306" cy="102" r="4"/>
+<text class="lb" x="324" y="68" style="text-anchor:start">Q1</text>
+<path class="wr" d="M302,78 L322,78"/>
+<path class="wr" d="M216,78 L240,78"/>
+<text class="lb" x="212" y="78" style="text-anchor:end">1</text>
+<rect class="gt" x="380" y="60" width="62" height="60" rx="3"/><text class="sm" x="391" y="78">T</text><path class="gt" style="fill:none" d="M380,96 L389,102 L380,108"/><text class="sm" x="433" y="78">Q</text><text class="sm" x="433" y="102">Q'</text><circle class="gt" cx="446" cy="102" r="4"/>
+<text class="lb" x="464" y="68" style="text-anchor:start">Q2</text>
+<path class="wr" d="M442,78 L462,78"/>
+<path class="wr" d="M356,78 L380,78"/>
+<text class="lb" x="352" y="78" style="text-anchor:end">1</text>
+<rect class="gt" x="520" y="60" width="62" height="60" rx="3"/><text class="sm" x="531" y="78">T</text><path class="gt" style="fill:none" d="M520,96 L529,102 L520,108"/><text class="sm" x="573" y="78">Q</text><text class="sm" x="573" y="102">Q'</text><circle class="gt" cx="586" cy="102" r="4"/>
+<text class="lb" x="604" y="68" style="text-anchor:start">Q3</text>
+<path class="wr" d="M582,78 L602,78"/>
+<path class="wr" d="M496,78 L520,78"/>
+<text class="lb" x="492" y="78" style="text-anchor:end">1</text>
+<path class="wr" d="M56,102 L100,102"/>
+<text class="lb" x="50" y="102" style="text-anchor:end">CLK</text>
+<path class="wr" d="M170,102 L240,102"/>
+<path class="wr" d="M310,102 L380,102"/>
+<path class="wr" d="M450,102 L520,102"/>
+</svg><div class="figlabel">Ripple up counter, positive-edge T flip-flops (T = 1): the Q' of each stage clocks the next. Q0 is the LSB.</div></div>
+<div class="tbl"><table class="mat"><tr><th>Clk</th><th>Q3</th><th>Q2</th><th>Q1</th><th>Q0</th><th>count</th></tr><tr><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td></tr><tr><td>1</td><td>0</td><td>0</td><td>0</td><td>1</td><td>1</td></tr><tr><td>2</td><td>0</td><td>0</td><td>1</td><td>0</td><td>2</td></tr><tr><td>3</td><td>0</td><td>0</td><td>1</td><td>1</td><td>3</td></tr><tr><td>4</td><td>0</td><td>1</td><td>0</td><td>0</td><td>4</td></tr><tr><td>5</td><td>0</td><td>1</td><td>0</td><td>1</td><td>5</td></tr><tr><td>6</td><td>0</td><td>1</td><td>1</td><td>0</td><td>6</td></tr><tr><td>7</td><td>0</td><td>1</td><td>1</td><td>1</td><td>7</td></tr><tr><td>8</td><td>1</td><td>0</td><td>0</td><td>0</td><td>8</td></tr></table></div>
+<div id="t1"></div>
+<p>Each stage divides the frequency by 2: f(Q0) = f/2, f(Q1) = f/4, f(Q2) = f/8, f(Q3) = f/16. With negative-edge flip-flops use Q instead of Q' (second figure):</p>
+<div class="fg-wrap"><svg class="dsa-fig" viewBox="0 0 720 190" width="720" role="img" aria-label="ripple up counter negative edge">
+<rect class="gt" x="100" y="60" width="62" height="60" rx="3"/><text class="sm" x="111" y="78">T</text><circle class="gt" cx="96" cy="102" r="4"/><path class="gt" style="fill:none" d="M100,96 L109,102 L100,108"/><text class="sm" x="153" y="78">Q</text><text class="sm" x="153" y="102">Q'</text><circle class="gt" cx="166" cy="102" r="4"/>
+<text class="lb" x="184" y="68" style="text-anchor:start">Q0</text>
+<path class="wr" d="M162,78 L182,78"/>
+<path class="wr" d="M76,78 L100,78"/>
+<text class="lb" x="72" y="78" style="text-anchor:end">1</text>
+<rect class="gt" x="240" y="60" width="62" height="60" rx="3"/><text class="sm" x="251" y="78">T</text><circle class="gt" cx="236" cy="102" r="4"/><path class="gt" style="fill:none" d="M240,96 L249,102 L240,108"/><text class="sm" x="293" y="78">Q</text><text class="sm" x="293" y="102">Q'</text><circle class="gt" cx="306" cy="102" r="4"/>
+<text class="lb" x="324" y="68" style="text-anchor:start">Q1</text>
+<path class="wr" d="M302,78 L322,78"/>
+<path class="wr" d="M216,78 L240,78"/>
+<text class="lb" x="212" y="78" style="text-anchor:end">1</text>
+<rect class="gt" x="380" y="60" width="62" height="60" rx="3"/><text class="sm" x="391" y="78">T</text><circle class="gt" cx="376" cy="102" r="4"/><path class="gt" style="fill:none" d="M380,96 L389,102 L380,108"/><text class="sm" x="433" y="78">Q</text><text class="sm" x="433" y="102">Q'</text><circle class="gt" cx="446" cy="102" r="4"/>
+<text class="lb" x="464" y="68" style="text-anchor:start">Q2</text>
+<path class="wr" d="M442,78 L462,78"/>
+<path class="wr" d="M356,78 L380,78"/>
+<text class="lb" x="352" y="78" style="text-anchor:end">1</text>
+<rect class="gt" x="520" y="60" width="62" height="60" rx="3"/><text class="sm" x="531" y="78">T</text><circle class="gt" cx="516" cy="102" r="4"/><path class="gt" style="fill:none" d="M520,96 L529,102 L520,108"/><text class="sm" x="573" y="78">Q</text><text class="sm" x="573" y="102">Q'</text><circle class="gt" cx="586" cy="102" r="4"/>
+<text class="lb" x="604" y="68" style="text-anchor:start">Q3</text>
+<path class="wr" d="M582,78 L602,78"/>
+<path class="wr" d="M496,78 L520,78"/>
+<text class="lb" x="492" y="78" style="text-anchor:end">1</text>
+<path class="wr" d="M56,102 L92,102"/>
+<text class="lb" x="50" y="102" style="text-anchor:end">CLK</text>
+<path class="wr" d="M162,78 L176,78 L176,102 L232,102"/>
+<circle cx="176" cy="78" r="2.6" style="fill:var(--fg)"/>
+<path class="wr" d="M302,78 L316,78 L316,102 L372,102"/>
+<circle cx="316" cy="78" r="2.6" style="fill:var(--fg)"/>
+<path class="wr" d="M442,78 L456,78 L456,102 L512,102"/>
+<circle cx="456" cy="78" r="2.6" style="fill:var(--fg)"/>
+</svg><div class="figlabel">Up counter with negative-edge flip-flops: Q (not Q') clocks the next stage.</div></div>
+
+<h2>3. Down counter (2022–23 Q7(a)) and up/down counter</h2>
+<div class="exam"><div class="exam-src">2022–23 Q7(a) · 12 marks</div><div class="exam-q"><p>Show the logic diagram of a four-bit binary ripple (asynchronous) countdown counter using T flip-flops that trigger on the negative edge of the clock.</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<ol>
+<li>Four T flip-flops, T = 1, negative-edge triggered, no external gates.</li>
+<li>Clock goes to the first flip-flop. For a <b>down</b> counter with <b>negative-edge</b> flip-flops the next clock is the <b>Q'</b> of the previous stage (a borrow is Q going 0 to 1 = Q' going 1 to 0, a falling edge).</li>
+<li>Outputs Q3 Q2 Q1 Q0 count 1111, 1110, 1101, ..., 0000, 1111, ...</li>
+</ol>
+<div class="fg-wrap"><svg class="dsa-fig" viewBox="0 0 720 190" width="720" role="img" aria-label="4-bit ripple down counter">
+<rect class="gt" x="100" y="60" width="62" height="60" rx="3"/><text class="sm" x="111" y="78">T</text><circle class="gt" cx="96" cy="102" r="4"/><path class="gt" style="fill:none" d="M100,96 L109,102 L100,108"/><text class="sm" x="153" y="78">Q</text><text class="sm" x="153" y="102">Q'</text><circle class="gt" cx="166" cy="102" r="4"/>
+<text class="lb" x="184" y="68" style="text-anchor:start">Q0</text>
+<path class="wr" d="M162,78 L182,78"/>
+<path class="wr" d="M76,78 L100,78"/>
+<text class="lb" x="72" y="78" style="text-anchor:end">1</text>
+<rect class="gt" x="240" y="60" width="62" height="60" rx="3"/><text class="sm" x="251" y="78">T</text><circle class="gt" cx="236" cy="102" r="4"/><path class="gt" style="fill:none" d="M240,96 L249,102 L240,108"/><text class="sm" x="293" y="78">Q</text><text class="sm" x="293" y="102">Q'</text><circle class="gt" cx="306" cy="102" r="4"/>
+<text class="lb" x="324" y="68" style="text-anchor:start">Q1</text>
+<path class="wr" d="M302,78 L322,78"/>
+<path class="wr" d="M216,78 L240,78"/>
+<text class="lb" x="212" y="78" style="text-anchor:end">1</text>
+<rect class="gt" x="380" y="60" width="62" height="60" rx="3"/><text class="sm" x="391" y="78">T</text><circle class="gt" cx="376" cy="102" r="4"/><path class="gt" style="fill:none" d="M380,96 L389,102 L380,108"/><text class="sm" x="433" y="78">Q</text><text class="sm" x="433" y="102">Q'</text><circle class="gt" cx="446" cy="102" r="4"/>
+<text class="lb" x="464" y="68" style="text-anchor:start">Q2</text>
+<path class="wr" d="M442,78 L462,78"/>
+<path class="wr" d="M356,78 L380,78"/>
+<text class="lb" x="352" y="78" style="text-anchor:end">1</text>
+<rect class="gt" x="520" y="60" width="62" height="60" rx="3"/><text class="sm" x="531" y="78">T</text><circle class="gt" cx="516" cy="102" r="4"/><path class="gt" style="fill:none" d="M520,96 L529,102 L520,108"/><text class="sm" x="573" y="78">Q</text><text class="sm" x="573" y="102">Q'</text><circle class="gt" cx="586" cy="102" r="4"/>
+<text class="lb" x="604" y="68" style="text-anchor:start">Q3</text>
+<path class="wr" d="M582,78 L602,78"/>
+<path class="wr" d="M496,78 L520,78"/>
+<text class="lb" x="492" y="78" style="text-anchor:end">1</text>
+<path class="wr" d="M56,102 L92,102"/>
+<text class="lb" x="50" y="102" style="text-anchor:end">CLK</text>
+<path class="wr" d="M170,102 L232,102"/>
+<path class="wr" d="M310,102 L372,102"/>
+<path class="wr" d="M450,102 L512,102"/>
+</svg><div class="figlabel">2022–23 Q7(a): 4-bit ripple down counter, negative-edge T flip-flops: Q' of each stage clocks the next.</div></div>
+<div class="tbl"><table class="mat"><tr><th>Clk</th><th>Q3</th><th>Q2</th><th>Q1</th><th>Q0</th><th>count</th></tr><tr><td>0</td><td>1</td><td>1</td><td>1</td><td>1</td><td>15</td></tr><tr><td>1</td><td>1</td><td>1</td><td>1</td><td>0</td><td>14</td></tr><tr><td>2</td><td>1</td><td>1</td><td>0</td><td>1</td><td>13</td></tr><tr><td>3</td><td>1</td><td>1</td><td>0</td><td>0</td><td>12</td></tr><tr><td>4</td><td>1</td><td>0</td><td>1</td><td>1</td><td>11</td></tr><tr><td>5</td><td>1</td><td>0</td><td>1</td><td>0</td><td>10</td></tr></table></div>
+<div id="t2"></div>
+<p>Initial state 1111: preset all four flip-flops (or note that after reset it counts down from whatever state it is in).</p>
+</div></details></div>
+<h3>Up/down</h3>
+<p>Put a <b>2×1 MUX in front of each clock input</b>, selecting Q' (up) or Q (down) of the previous stage, with one control line UP (positive-edge flip-flops):</p>
+<div class="fg-wrap"><svg class="dsa-fig" viewBox="0 0 920 220" width="920" role="img" aria-label="ripple up/down counter">
+<rect class="gt" x="100" y="60" width="62" height="84" rx="3"/><text class="sm" x="111" y="78">J</text><path class="gt" style="fill:none" d="M100,96 L109,102 L100,108"/><text class="sm" x="111" y="126">K</text><text class="sm" x="153" y="78">Q</text><text class="sm" x="153" y="126">Q'</text><circle class="gt" cx="166" cy="126" r="4"/>
+<text class="lb" x="184" y="68" style="text-anchor:start">Q0</text>
+<path class="wr" d="M162,78 L182,78"/>
+<path class="wr" d="M76,78 L100,78"/>
+<text class="lb" x="72" y="78" style="text-anchor:end">1</text>
+<path class="wr" d="M76,126 L100,126"/>
+<text class="lb" x="72" y="126" style="text-anchor:end">1</text>
+<rect class="gt" x="290" y="60" width="62" height="84" rx="3"/><text class="sm" x="301" y="78">J</text><path class="gt" style="fill:none" d="M290,96 L299,102 L290,108"/><text class="sm" x="301" y="126">K</text><text class="sm" x="343" y="78">Q</text><text class="sm" x="343" y="126">Q'</text><circle class="gt" cx="356" cy="126" r="4"/>
+<text class="lb" x="374" y="68" style="text-anchor:start">Q1</text>
+<path class="wr" d="M352,78 L372,78"/>
+<path class="wr" d="M266,78 L290,78"/>
+<text class="lb" x="262" y="78" style="text-anchor:end">1</text>
+<path class="wr" d="M266,126 L290,126"/>
+<text class="lb" x="262" y="126" style="text-anchor:end">1</text>
+<rect class="gt" x="480" y="60" width="62" height="84" rx="3"/><text class="sm" x="491" y="78">J</text><path class="gt" style="fill:none" d="M480,96 L489,102 L480,108"/><text class="sm" x="491" y="126">K</text><text class="sm" x="533" y="78">Q</text><text class="sm" x="533" y="126">Q'</text><circle class="gt" cx="546" cy="126" r="4"/>
+<text class="lb" x="564" y="68" style="text-anchor:start">Q2</text>
+<path class="wr" d="M542,78 L562,78"/>
+<path class="wr" d="M456,78 L480,78"/>
+<text class="lb" x="452" y="78" style="text-anchor:end">1</text>
+<path class="wr" d="M456,126 L480,126"/>
+<text class="lb" x="452" y="126" style="text-anchor:end">1</text>
+<rect class="gt" x="670" y="60" width="62" height="84" rx="3"/><text class="sm" x="681" y="78">J</text><path class="gt" style="fill:none" d="M670,96 L679,102 L670,108"/><text class="sm" x="681" y="126">K</text><text class="sm" x="723" y="78">Q</text><text class="sm" x="723" y="126">Q'</text><circle class="gt" cx="736" cy="126" r="4"/>
+<text class="lb" x="754" y="68" style="text-anchor:start">Q3</text>
+<path class="wr" d="M732,78 L752,78"/>
+<path class="wr" d="M646,78 L670,78"/>
+<text class="lb" x="642" y="78" style="text-anchor:end">1</text>
+<path class="wr" d="M646,126 L670,126"/>
+<text class="lb" x="642" y="126" style="text-anchor:end">1</text>
+<path class="wr" d="M56,102 L100,102"/>
+<text class="lb" x="50" y="102" style="text-anchor:end">CLK</text>
+<path class="gt" d="M224,74 L250,84 L250,120 L224,130 z"/><text class="sm" x="228" y="88" style="text-anchor:start">I0</text><text class="sm" x="228" y="116" style="text-anchor:start">I1</text><text class="sm" x="237" y="123"></text><path class="wr" d="M162,78 L176,78 L176,88 L224,88"/>
+<circle cx="176" cy="78" r="2.6" style="fill:var(--fg)"/>
+<path class="wr" d="M170,126 L176,126 L176,116 L224,116"/>
+<text class="sm" x="220" y="79" style="text-anchor:end">Q</text>
+<text class="sm" x="220" y="127" style="text-anchor:end">Q'</text>
+<path class="wr" d="M250,102 L280,102 L280,102 L290,102"/>
+<path class="wr" d="M237,130 L237,196"/>
+<circle cx="237" cy="196" r="2.6" style="fill:var(--fg)"/>
+<path class="gt" d="M414,74 L440,84 L440,120 L414,130 z"/><text class="sm" x="418" y="88" style="text-anchor:start">I0</text><text class="sm" x="418" y="116" style="text-anchor:start">I1</text><text class="sm" x="427" y="123"></text><path class="wr" d="M352,78 L366,78 L366,88 L414,88"/>
+<circle cx="366" cy="78" r="2.6" style="fill:var(--fg)"/>
+<path class="wr" d="M360,126 L366,126 L366,116 L414,116"/>
+<text class="sm" x="410" y="79" style="text-anchor:end">Q</text>
+<text class="sm" x="410" y="127" style="text-anchor:end">Q'</text>
+<path class="wr" d="M440,102 L470,102 L470,102 L480,102"/>
+<path class="wr" d="M427,130 L427,196"/>
+<circle cx="427" cy="196" r="2.6" style="fill:var(--fg)"/>
+<path class="gt" d="M604,74 L630,84 L630,120 L604,130 z"/><text class="sm" x="608" y="88" style="text-anchor:start">I0</text><text class="sm" x="608" y="116" style="text-anchor:start">I1</text><text class="sm" x="617" y="123"></text><path class="wr" d="M542,78 L556,78 L556,88 L604,88"/>
+<circle cx="556" cy="78" r="2.6" style="fill:var(--fg)"/>
+<path class="wr" d="M550,126 L556,126 L556,116 L604,116"/>
+<text class="sm" x="600" y="79" style="text-anchor:end">Q</text>
+<text class="sm" x="600" y="127" style="text-anchor:end">Q'</text>
+<path class="wr" d="M630,102 L660,102 L660,102 L670,102"/>
+<path class="wr" d="M617,130 L617,196"/>
+<circle cx="617" cy="196" r="2.6" style="fill:var(--fg)"/>
+<path class="wr" d="M24,196 L670,196"/>
+<text class="sm" x="18" y="196" style="text-anchor:start">UP (1 = up, 0 = down)</text>
+<path class="wr" d="M24,196 L24,196"/>
+</svg><div class="figlabel">Up/down ripple counter (positive-edge JK, J = K = 1): a 2×1 MUX in front of every clock input chooses Q' (UP = 1) or Q (UP = 0) of the previous stage.</div></div>
+
+<h2>4. Mod-N counters: reset when the count reaches N</h2>
+<p>If N is not a power of two, let the counter run to N, then <b>clear every flip-flop</b> with the asynchronous CLEAR input. The detector is a <b>NAND</b> of the bits that are 1 at N (CLEAR is active-low). Use only as many bits as needed: the first count that makes all those bits 1 must be N itself. Computed by the engine's rule for each N:</p>
+<div class="tbl"><table class="mat"><tr><th>N</th><th>binary of N</th><th>NAND inputs</th><th>why not fewer</th></tr><tr><td>6</td><td>0110</td><td>Q2 Q1</td><td>Q2 alone would fire at 4</td></tr><tr><td>10</td><td>1010</td><td>Q3 Q1</td><td>Q3 alone would fire at 8</td></tr><tr><td>12</td><td>1100</td><td>Q3 Q2</td><td>Q3 alone would fire at 8</td></tr><tr><td>13</td><td>1101</td><td>Q3 Q2 Q0</td><td>Q3 Q2 alone would fire at 12</td></tr></table></div>
+<p>His note: with N = 12 the counter shows state 1100 for a very short time (the reset glitch). The valid count is 0 to 11. He draws the NAND from Q3 and Q2 only, because 1100 is the first state with both set.</p>
+<div class="exam"><div class="exam-src">2017–18 Q8(c) · 5 marks · 2019–20 Q3(a) · 10 marks</div><div class="exam-q"><p>A MOD-12 counter counts from 0000 to 1011. Design the MOD-12 ripple counter with positive-edge triggered JK flip-flops and basic gates. (2017–18: 4-bit modulo-12 asynchronous up counter using JK.)</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<ol>
+<li>Four JK flip-flops, J = K = 1 (toggle), positive edge. Up counter: Q' of each stage clocks the next.</li>
+<li>Natural count goes 0 to 15. We want 0 to 11, so after 11 the next state 12 (1100) must reset the counter to 0000.</li>
+<li>State 12 is the first with Q3 = Q2 = 1. A 2-input NAND of Q3 and Q2 goes low at count 12 and drives the active-low CLEAR of <b>all four</b> flip-flops.</li>
+</ol>
+<div class="fg-wrap"><svg class="dsa-fig" viewBox="0 0 720 270" width="720" role="img" aria-label="mod-12 ripple counter">
+<rect class="gt" x="100" y="60" width="62" height="84" rx="3"/><text class="sm" x="111" y="78">J</text><path class="gt" style="fill:none" d="M100,96 L109,102 L100,108"/><text class="sm" x="111" y="126">K</text><text class="sm" x="153" y="78">Q</text><text class="sm" x="153" y="126">Q'</text><circle class="gt" cx="166" cy="126" r="4"/><circle class="gt" cx="131" cy="148" r="4"/><text class="sm" x="131" y="135">CLR</text>
+<text class="lb" x="184" y="68" style="text-anchor:start">Q0</text>
+<path class="wr" d="M162,78 L182,78"/>
+<path class="wr" d="M76,78 L100,78"/>
+<text class="lb" x="72" y="78" style="text-anchor:end">1</text>
+<path class="wr" d="M76,126 L100,126"/>
+<text class="lb" x="72" y="126" style="text-anchor:end">1</text>
+<rect class="gt" x="240" y="60" width="62" height="84" rx="3"/><text class="sm" x="251" y="78">J</text><path class="gt" style="fill:none" d="M240,96 L249,102 L240,108"/><text class="sm" x="251" y="126">K</text><text class="sm" x="293" y="78">Q</text><text class="sm" x="293" y="126">Q'</text><circle class="gt" cx="306" cy="126" r="4"/><circle class="gt" cx="271" cy="148" r="4"/><text class="sm" x="271" y="135">CLR</text>
+<text class="lb" x="324" y="68" style="text-anchor:start">Q1</text>
+<path class="wr" d="M302,78 L322,78"/>
+<path class="wr" d="M216,78 L240,78"/>
+<text class="lb" x="212" y="78" style="text-anchor:end">1</text>
+<path class="wr" d="M216,126 L240,126"/>
+<text class="lb" x="212" y="126" style="text-anchor:end">1</text>
+<rect class="gt" x="380" y="60" width="62" height="84" rx="3"/><text class="sm" x="391" y="78">J</text><path class="gt" style="fill:none" d="M380,96 L389,102 L380,108"/><text class="sm" x="391" y="126">K</text><text class="sm" x="433" y="78">Q</text><text class="sm" x="433" y="126">Q'</text><circle class="gt" cx="446" cy="126" r="4"/><circle class="gt" cx="411" cy="148" r="4"/><text class="sm" x="411" y="135">CLR</text>
+<text class="lb" x="464" y="68" style="text-anchor:start">Q2</text>
+<path class="wr" d="M442,78 L462,78"/>
+<path class="wr" d="M356,78 L380,78"/>
+<text class="lb" x="352" y="78" style="text-anchor:end">1</text>
+<path class="wr" d="M356,126 L380,126"/>
+<text class="lb" x="352" y="126" style="text-anchor:end">1</text>
+<rect class="gt" x="520" y="60" width="62" height="84" rx="3"/><text class="sm" x="531" y="78">J</text><path class="gt" style="fill:none" d="M520,96 L529,102 L520,108"/><text class="sm" x="531" y="126">K</text><text class="sm" x="573" y="78">Q</text><text class="sm" x="573" y="126">Q'</text><circle class="gt" cx="586" cy="126" r="4"/><circle class="gt" cx="551" cy="148" r="4"/><text class="sm" x="551" y="135">CLR</text>
+<text class="lb" x="604" y="68" style="text-anchor:start">Q3</text>
+<path class="wr" d="M582,78 L602,78"/>
+<path class="wr" d="M496,78 L520,78"/>
+<text class="lb" x="492" y="78" style="text-anchor:end">1</text>
+<path class="wr" d="M496,126 L520,126"/>
+<text class="lb" x="492" y="126" style="text-anchor:end">1</text>
+<path class="wr" d="M56,102 L100,102"/>
+<text class="lb" x="50" y="102" style="text-anchor:end">CLK</text>
+<path class="wr" d="M170,126 L184,126 L184,102 L240,102"/>
+<path class="wr" d="M310,126 L324,126 L324,102 L380,102"/>
+<path class="wr" d="M450,126 L464,126 L464,102 L520,102"/>
+<path class="gt" d="M80,184 h20 a16,16 0 0 1 0,32 h-20 z"/><circle class="gt" cx="124" cy="200" r="4"/>
+<path class="wr" d="M54,192 L80,192"/>
+<text class="lb" x="50" y="192" style="text-anchor:end">Q2</text>
+<path class="wr" d="M54,208 L80,208"/>
+<text class="lb" x="50" y="208" style="text-anchor:end">Q3</text>
+<path class="wr" d="M128,200 L138,200 L138,220 L551,220"/>
+<path class="wr" d="M131,220 L131,152"/>
+<circle cx="131" cy="220" r="2.6" style="fill:var(--fg)"/>
+<path class="wr" d="M271,220 L271,152"/>
+<circle cx="271" cy="220" r="2.6" style="fill:var(--fg)"/>
+<path class="wr" d="M411,220 L411,152"/>
+<circle cx="411" cy="220" r="2.6" style="fill:var(--fg)"/>
+<path class="wr" d="M551,220 L551,152"/>
+<text class="sm" x="144" y="190" style="text-anchor:start">NAND → CLEAR (active low)</text>
+</svg><div class="figlabel">Mod-12 ripple up counter, positive-edge JK (J = K = 1). When Q3 Q2 = 11 (count 12) the NAND output goes low and clears all four flip-flops.</div></div>
+<div class="tbl"><table class="mat"><tr><th>Clk</th><th>Q3</th><th>Q2</th><th>Q1</th><th>Q0</th><th>count</th></tr><tr><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td></tr><tr><td>1</td><td>0</td><td>0</td><td>0</td><td>1</td><td>1</td></tr><tr><td>2</td><td>0</td><td>0</td><td>1</td><td>0</td><td>2</td></tr><tr><td>3</td><td>0</td><td>0</td><td>1</td><td>1</td><td>3</td></tr><tr><td>4</td><td>0</td><td>1</td><td>0</td><td>0</td><td>4</td></tr><tr><td>5</td><td>0</td><td>1</td><td>0</td><td>1</td><td>5</td></tr><tr><td>6</td><td>0</td><td>1</td><td>1</td><td>0</td><td>6</td></tr><tr><td>7</td><td>0</td><td>1</td><td>1</td><td>1</td><td>7</td></tr><tr><td>8</td><td>1</td><td>0</td><td>0</td><td>0</td><td>8</td></tr><tr><td>9</td><td>1</td><td>0</td><td>0</td><td>1</td><td>9</td></tr><tr><td>10</td><td>1</td><td>0</td><td>1</td><td>0</td><td>10</td></tr><tr><td>11</td><td>1</td><td>0</td><td>1</td><td>1</td><td>11</td></tr><tr><td>12</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td></tr><tr><td>13</td><td>0</td><td>0</td><td>0</td><td>1</td><td>1</td></tr></table></div>
+<div id="t3"></div>
+<p><b>Glitch</b> (marks in the older question: "problems of this counter"): 11 → 0 passes through 1010 → 1000 → 1100 → 0000. The state 1100 lasts only for the NAND and CLEAR delay, but it is a real, wrong state. Anything that decodes the count sees a short false 12 (and false 8 and 10 on the way).</p>
+</div></details></div>
+<div class="write"><h4>What to write (ripple counter, 5–10 marks)</h4>
+<ol>
+<li>One line: "T flip-flops (T = 1 or J = K = 1), positive edge, up counter: Q' of each stage clocks the next."</li>
+<li>The circuit: n flip-flops in a row, CLK on the first, Q (or Q') to the next clock, the outputs labelled Q0 (LSB) to Q<sub>n−1</sub>.</li>
+<li>For mod-N: the NAND of the bits that make N, the line to the CLEAR bubbles of the flip-flops that need clearing, and the statement "state N is the first with these bits all 1".</li>
+<li>The count table or timing diagram (CLK and every Q<sub>i</sub>) for at least one full cycle plus one clock.</li>
+<li>One sentence on the disadvantage: delay adds up (ripple), and the reset state glitches.</li>
+</ol>
+</div>
+
+<h2>5. Mod-13 up/down (2021–22 Q6(c))</h2>
+<div class="exam"><div class="exam-src">2021–22 Q6(c) · 5 marks</div><div class="exam-q"><p>MOD-13 counter 0000 to 1100, ripple up/down counter, positive-edge JK.</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<p>Assumption: "up/down" means one counter with a control line UP (1 = count up, 0 = count down), so a MUX is used in each clock path (his method).</p>
+<ol>
+<li>Clock chain as in section 3: each stage's clock = MUX(Q for down, Q' for up).</li>
+<li><b>Up:</b> after 12 (1100) the next count is 13 (1101). Detect it with the NAND of Q3 Q2 Q0 (Q3 Q2 Q0) <b>and UP</b>, and clear all four flip-flops. Without UP the gate would also fire on 1111 while counting down.</li>
+<li><b>Down:</b> after 0 (0000) the next count is 15 (1111), but it must be 12 (1100). Detect 1111 with a NAND of Q3 Q2 Q1 Q0 and <b>clear only Q1 and Q0</b>, which leaves 1100 = 12. In up mode 1111 is never reached.</li>
+<li>CLEAR of Q3, Q2 = gate A. CLEAR of Q1, Q0 = A AND B (either gate low clears them).</li>
+</ol>
+<div class="fg-wrap"><svg class="dsa-fig" viewBox="0 0 920 420" width="920" role="img" aria-label="mod-13 up/down">
+<rect class="gt" x="100" y="60" width="62" height="84" rx="3"/><text class="sm" x="111" y="78">J</text><path class="gt" style="fill:none" d="M100,96 L109,102 L100,108"/><text class="sm" x="111" y="126">K</text><text class="sm" x="153" y="78">Q</text><text class="sm" x="153" y="126">Q'</text><circle class="gt" cx="166" cy="126" r="4"/><circle class="gt" cx="131" cy="148" r="4"/><text class="sm" x="131" y="135">CLR</text>
+<text class="lb" x="184" y="68" style="text-anchor:start">Q0</text>
+<path class="wr" d="M162,78 L182,78"/>
+<path class="wr" d="M76,78 L100,78"/>
+<text class="lb" x="72" y="78" style="text-anchor:end">1</text>
+<path class="wr" d="M76,126 L100,126"/>
+<text class="lb" x="72" y="126" style="text-anchor:end">1</text>
+<rect class="gt" x="290" y="60" width="62" height="84" rx="3"/><text class="sm" x="301" y="78">J</text><path class="gt" style="fill:none" d="M290,96 L299,102 L290,108"/><text class="sm" x="301" y="126">K</text><text class="sm" x="343" y="78">Q</text><text class="sm" x="343" y="126">Q'</text><circle class="gt" cx="356" cy="126" r="4"/><circle class="gt" cx="321" cy="148" r="4"/><text class="sm" x="321" y="135">CLR</text>
+<text class="lb" x="374" y="68" style="text-anchor:start">Q1</text>
+<path class="wr" d="M352,78 L372,78"/>
+<path class="wr" d="M266,78 L290,78"/>
+<text class="lb" x="262" y="78" style="text-anchor:end">1</text>
+<path class="wr" d="M266,126 L290,126"/>
+<text class="lb" x="262" y="126" style="text-anchor:end">1</text>
+<rect class="gt" x="480" y="60" width="62" height="84" rx="3"/><text class="sm" x="491" y="78">J</text><path class="gt" style="fill:none" d="M480,96 L489,102 L480,108"/><text class="sm" x="491" y="126">K</text><text class="sm" x="533" y="78">Q</text><text class="sm" x="533" y="126">Q'</text><circle class="gt" cx="546" cy="126" r="4"/><circle class="gt" cx="511" cy="148" r="4"/><text class="sm" x="511" y="135">CLR</text>
+<text class="lb" x="564" y="68" style="text-anchor:start">Q2</text>
+<path class="wr" d="M542,78 L562,78"/>
+<path class="wr" d="M456,78 L480,78"/>
+<text class="lb" x="452" y="78" style="text-anchor:end">1</text>
+<path class="wr" d="M456,126 L480,126"/>
+<text class="lb" x="452" y="126" style="text-anchor:end">1</text>
+<rect class="gt" x="670" y="60" width="62" height="84" rx="3"/><text class="sm" x="681" y="78">J</text><path class="gt" style="fill:none" d="M670,96 L679,102 L670,108"/><text class="sm" x="681" y="126">K</text><text class="sm" x="723" y="78">Q</text><text class="sm" x="723" y="126">Q'</text><circle class="gt" cx="736" cy="126" r="4"/><circle class="gt" cx="701" cy="148" r="4"/><text class="sm" x="701" y="135">CLR</text>
+<text class="lb" x="754" y="68" style="text-anchor:start">Q3</text>
+<path class="wr" d="M732,78 L752,78"/>
+<path class="wr" d="M646,78 L670,78"/>
+<text class="lb" x="642" y="78" style="text-anchor:end">1</text>
+<path class="wr" d="M646,126 L670,126"/>
+<text class="lb" x="642" y="126" style="text-anchor:end">1</text>
+<path class="wr" d="M56,102 L100,102"/>
+<text class="lb" x="50" y="102" style="text-anchor:end">CLK</text>
+<path class="gt" d="M224,74 L250,84 L250,120 L224,130 z"/><text class="sm" x="228" y="88" style="text-anchor:start">I0</text><text class="sm" x="228" y="116" style="text-anchor:start">I1</text><text class="sm" x="237" y="123"></text><path class="wr" d="M162,78 L176,78 L176,88 L224,88"/>
+<circle cx="176" cy="78" r="2.6" style="fill:var(--fg)"/>
+<path class="wr" d="M170,126 L176,126 L176,116 L224,116"/>
+<text class="sm" x="220" y="79" style="text-anchor:end">Q</text>
+<text class="sm" x="220" y="127" style="text-anchor:end">Q'</text>
+<path class="wr" d="M250,102 L280,102 L280,102 L290,102"/>
+<path class="wr" d="M237,130 L237,196"/>
+<circle cx="237" cy="196" r="2.6" style="fill:var(--fg)"/>
+<path class="gt" d="M414,74 L440,84 L440,120 L414,130 z"/><text class="sm" x="418" y="88" style="text-anchor:start">I0</text><text class="sm" x="418" y="116" style="text-anchor:start">I1</text><text class="sm" x="427" y="123"></text><path class="wr" d="M352,78 L366,78 L366,88 L414,88"/>
+<circle cx="366" cy="78" r="2.6" style="fill:var(--fg)"/>
+<path class="wr" d="M360,126 L366,126 L366,116 L414,116"/>
+<text class="sm" x="410" y="79" style="text-anchor:end">Q</text>
+<text class="sm" x="410" y="127" style="text-anchor:end">Q'</text>
+<path class="wr" d="M440,102 L470,102 L470,102 L480,102"/>
+<path class="wr" d="M427,130 L427,196"/>
+<circle cx="427" cy="196" r="2.6" style="fill:var(--fg)"/>
+<path class="gt" d="M604,74 L630,84 L630,120 L604,130 z"/><text class="sm" x="608" y="88" style="text-anchor:start">I0</text><text class="sm" x="608" y="116" style="text-anchor:start">I1</text><text class="sm" x="617" y="123"></text><path class="wr" d="M542,78 L556,78 L556,88 L604,88"/>
+<circle cx="556" cy="78" r="2.6" style="fill:var(--fg)"/>
+<path class="wr" d="M550,126 L556,126 L556,116 L604,116"/>
+<text class="sm" x="600" y="79" style="text-anchor:end">Q</text>
+<text class="sm" x="600" y="127" style="text-anchor:end">Q'</text>
+<path class="wr" d="M630,102 L660,102 L660,102 L670,102"/>
+<path class="wr" d="M617,130 L617,196"/>
+<circle cx="617" cy="196" r="2.6" style="fill:var(--fg)"/>
+<path class="wr" d="M24,196 L670,196"/>
+<text class="sm" x="18" y="196" style="text-anchor:start">UP (1 = up, 0 = down)</text>
+<path class="wr" d="M24,196 L24,196"/>
+<path class="gt" d="M90,284 h20 a26,26 0 0 1 0,52 h-20 z"/><circle class="gt" cx="134" cy="310" r="4"/>
+<path class="gt" d="M90,354 h20 a26,26 0 0 1 0,52 h-20 z"/><circle class="gt" cx="134" cy="380" r="4"/>
+<path class="gt" d="M270,364 h20 a16,16 0 0 1 0,32 h-20 z"/>
+<path class="wr" d="M64,290.5 L90,290.5"/>
+<text class="lb" x="60" y="290.5" style="text-anchor:end">Q3</text>
+<path class="wr" d="M64,303.5 L90,303.5"/>
+<text class="lb" x="60" y="303.5" style="text-anchor:end">Q2</text>
+<path class="wr" d="M64,316.5 L90,316.5"/>
+<text class="lb" x="60" y="316.5" style="text-anchor:end">Q0</text>
+<path class="wr" d="M64,329.5 L90,329.5"/>
+<text class="lb" x="60" y="329.5" style="text-anchor:end">UP</text>
+<path class="wr" d="M64,360.5 L90,360.5"/>
+<text class="lb" x="60" y="360.5" style="text-anchor:end">Q3</text>
+<path class="wr" d="M64,373.5 L90,373.5"/>
+<text class="lb" x="60" y="373.5" style="text-anchor:end">Q2</text>
+<path class="wr" d="M64,386.5 L90,386.5"/>
+<text class="lb" x="60" y="386.5" style="text-anchor:end">Q1</text>
+<path class="wr" d="M64,399.5 L90,399.5"/>
+<text class="lb" x="60" y="399.5" style="text-anchor:end">Q0</text>
+<text class="sm" x="168" y="294" style="text-anchor:start">A: up, detects 13</text>
+<text class="sm" x="152" y="360" style="text-anchor:start">B: down, detects 15</text>
+<path class="wr" d="M138,380 L270,388"/>
+<path class="wr" d="M138,310 L150,310 L150,372 L270,372"/>
+<path class="wr" d="M150,310 L150,232 L701,232"/>
+<circle cx="150" cy="310" r="2.6" style="fill:var(--fg)"/>
+<path class="wr" d="M701,152 L701,232"/>
+<circle cx="701" cy="232" r="2.6" style="fill:var(--fg)"/>
+<path class="wr" d="M511,152 L511,232"/>
+<circle cx="511" cy="232" r="2.6" style="fill:var(--fg)"/>
+<path class="wr" d="M310,380 L326,380 L326,250 L131,250"/>
+<path class="wr" d="M321,152 L321,250"/>
+<circle cx="321" cy="250" r="2.6" style="fill:var(--fg)"/>
+<path class="wr" d="M131,152 L131,250"/>
+<circle cx="131" cy="250" r="2.6" style="fill:var(--fg)"/>
+<text class="sm" x="334" y="380" style="text-anchor:start">to CLEAR of Q1, Q0 (gate A also feeds it)</text>
+</svg><div class="figlabel">Mod-13 ripple up/down counter. Gate A (NAND of Q3 Q2 Q0 UP) detects 13 while counting up and clears all four. Gate B (NAND of Q3 Q2 Q1 Q0) detects 15 while counting down. AND of A and B clears Q1 and Q0 only (down: 1111 → 1100 = 12).</div></div>
+<p>Counts: up 0, 1, ..., 12, 0, 1; down 12, 11, ..., 0, 12, 11.</p>
+<div id="t4"></div>
+</div></details></div>
+
+<h2>6. BCD ripple down counter with D flip-flops (2018–19 Q5(c), 2020–21 Q5(c))</h2>
+<div class="exam"><div class="exam-src">2018–19 Q5(c) · 7 marks · 2020–21 Q5(c) · 5 marks</div><div class="exam-q"><p>Design a BCD ripple down counter using D flip-flops.</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<ol>
+<li>BCD down counter: 9, 8, 7, ..., 0, 9, ... (1001 down to 0000).</li>
+<li>Four D flip-flops, positive edge, <b>D = Q'</b> on each so that they toggle. Down counter, positive edge: the <b>Q</b> of each stage clocks the next.</li>
+<li>After 0000 the natural next count is 1111. We want 1001. Detect 1111 with a NAND of Q3 and Q2 (the first state with both set while counting down is 1111) and use it to <b>clear Q2 and Q1</b>. Q3 and Q0 are already 1, so the result is 1001 = 9.</li>
+<li>Start-up: preset to 1001 (preset Q3 and Q0, clear Q2 and Q1).</li>
+</ol>
+<div class="fg-wrap"><svg class="dsa-fig" viewBox="0 0 720 280" width="720" role="img" aria-label="BCD ripple down counter">
+<rect class="gt" x="100" y="60" width="62" height="60" rx="3"/><text class="sm" x="111" y="78">D</text><path class="gt" style="fill:none" d="M100,96 L109,102 L100,108"/><text class="sm" x="153" y="78">Q</text><text class="sm" x="153" y="102">Q'</text><circle class="gt" cx="166" cy="102" r="4"/>
+<text class="lb" x="184" y="68" style="text-anchor:start">Q0</text>
+<path class="wr" d="M162,78 L182,78"/>
+<path class="wr" d="M170,102 L182,102 L182,138 L86,138 L86,78 L100,78"/>
+<circle cx="182" cy="102" r="2.6" style="fill:var(--fg)"/>
+<rect class="gt" x="240" y="60" width="62" height="60" rx="3"/><text class="sm" x="251" y="78">D</text><path class="gt" style="fill:none" d="M240,96 L249,102 L240,108"/><text class="sm" x="293" y="78">Q</text><text class="sm" x="293" y="102">Q'</text><circle class="gt" cx="306" cy="102" r="4"/><circle class="gt" cx="271" cy="124" r="4"/><text class="sm" x="271" y="111">CLR</text>
+<text class="lb" x="324" y="68" style="text-anchor:start">Q1</text>
+<path class="wr" d="M302,78 L322,78"/>
+<path class="wr" d="M310,102 L322,102 L322,138 L226,138 L226,78 L240,78"/>
+<circle cx="322" cy="102" r="2.6" style="fill:var(--fg)"/>
+<rect class="gt" x="380" y="60" width="62" height="60" rx="3"/><text class="sm" x="391" y="78">D</text><path class="gt" style="fill:none" d="M380,96 L389,102 L380,108"/><text class="sm" x="433" y="78">Q</text><text class="sm" x="433" y="102">Q'</text><circle class="gt" cx="446" cy="102" r="4"/><circle class="gt" cx="411" cy="124" r="4"/><text class="sm" x="411" y="111">CLR</text>
+<text class="lb" x="464" y="68" style="text-anchor:start">Q2</text>
+<path class="wr" d="M442,78 L462,78"/>
+<path class="wr" d="M450,102 L462,102 L462,138 L366,138 L366,78 L380,78"/>
+<circle cx="462" cy="102" r="2.6" style="fill:var(--fg)"/>
+<rect class="gt" x="520" y="60" width="62" height="60" rx="3"/><text class="sm" x="531" y="78">D</text><path class="gt" style="fill:none" d="M520,96 L529,102 L520,108"/><text class="sm" x="573" y="78">Q</text><text class="sm" x="573" y="102">Q'</text><circle class="gt" cx="586" cy="102" r="4"/>
+<text class="lb" x="604" y="68" style="text-anchor:start">Q3</text>
+<path class="wr" d="M582,78 L602,78"/>
+<path class="wr" d="M590,102 L602,102 L602,138 L506,138 L506,78 L520,78"/>
+<circle cx="602" cy="102" r="2.6" style="fill:var(--fg)"/>
+<path class="wr" d="M56,102 L100,102"/>
+<text class="lb" x="50" y="102" style="text-anchor:end">CLK</text>
+<path class="wr" d="M162,78 L176,78 L176,102 L240,102"/>
+<circle cx="176" cy="78" r="2.6" style="fill:var(--fg)"/>
+<path class="wr" d="M302,78 L316,78 L316,102 L380,102"/>
+<circle cx="316" cy="78" r="2.6" style="fill:var(--fg)"/>
+<path class="wr" d="M442,78 L456,78 L456,102 L520,102"/>
+<circle cx="456" cy="78" r="2.6" style="fill:var(--fg)"/>
+<path class="gt" d="M80,184 h20 a16,16 0 0 1 0,32 h-20 z"/><circle class="gt" cx="124" cy="200" r="4"/>
+<path class="wr" d="M54,192 L80,192"/>
+<text class="lb" x="50" y="192" style="text-anchor:end">Q3</text>
+<path class="wr" d="M54,208 L80,208"/>
+<text class="lb" x="50" y="208" style="text-anchor:end">Q2</text>
+<path class="wr" d="M128,200 L138,200 L138,220 L411,220"/>
+<path class="wr" d="M271,220 L271,128"/>
+<circle cx="271" cy="220" r="2.6" style="fill:var(--fg)"/>
+<path class="wr" d="M411,220 L411,128"/>
+<text class="sm" x="144" y="190" style="text-anchor:start">NAND → CLEAR (active low)</text>
+</svg><div class="figlabel">BCD ripple down counter, positive-edge D flip-flops (D = Q' so each toggles). Q of each stage clocks the next. At 1111 (count 15) the NAND clears Q1 and Q2, giving 1001 = 9.</div></div>
+<div class="tbl"><table class="mat"><tr><th>Clk</th><th>Q3</th><th>Q2</th><th>Q1</th><th>Q0</th><th>count</th></tr><tr><td>0</td><td>1</td><td>0</td><td>0</td><td>1</td><td>9</td></tr><tr><td>1</td><td>1</td><td>0</td><td>0</td><td>0</td><td>8</td></tr><tr><td>2</td><td>0</td><td>1</td><td>1</td><td>1</td><td>7</td></tr><tr><td>3</td><td>0</td><td>1</td><td>1</td><td>0</td><td>6</td></tr><tr><td>4</td><td>0</td><td>1</td><td>0</td><td>1</td><td>5</td></tr><tr><td>5</td><td>0</td><td>1</td><td>0</td><td>0</td><td>4</td></tr><tr><td>6</td><td>0</td><td>0</td><td>1</td><td>1</td><td>3</td></tr><tr><td>7</td><td>0</td><td>0</td><td>1</td><td>0</td><td>2</td></tr><tr><td>8</td><td>0</td><td>0</td><td>0</td><td>1</td><td>1</td></tr><tr><td>9</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td></tr><tr><td>10</td><td>1</td><td>0</td><td>0</td><td>1</td><td>9</td></tr></table></div>
+<div id="t5"></div>
+<div class="hint"><b>Honest caveat (one line for the script).</b> Counting down from 8 to 7 the counter ripples through 1001, 1011, 1111 before Q3 falls. The reload gate sees 1111 for a moment there too. It works only if the NAND + clear path is slower than one flip-flop delay, so the glitch is too short to act. The idealised answer above is what the exam expects. Never claim the design is glitch free.</div>
+</div></details></div>
+
+<h2>7. Mod-100 ripple down counter with JK (2023–24 Q6(c))</h2>
+<div class="exam"><div class="exam-src">2023–24 Q6(c) · 6 marks</div><div class="exam-q"><p>Modulo-100 ripple down counter with J-K flip-flops and basic gates.</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<ol>
+<li>100 states need 7 flip-flops (2<sup>6</sup> = 64 &lt; 100 ≤ 128). Count 99 down to 0. 99 = 1100011.</li>
+<li>JK with J = K = 1, positive edge, down counter: Q of each stage clocks the next.</li>
+<li>After 0000000 the natural next count is 127 = 1111111. We want 99 = 1100011. The bits Q6 Q5 Q1 Q0 are already 1, so only <b>Q4, Q3, Q2 must be cleared</b>.</li>
+<li>Detector: a 3-input NAND of Q6 Q5 Q4. Counting down from 99 no count has all three set (112 and above are never reached), so the first time Q6 Q5 Q4 = 111 is the wrap to 127. Its output drives the active-low CLEAR of Q4, Q3, Q2.</li>
+<li>Start-up: preset to 1100011.</li>
+</ol>
+<div class="fg-wrap"><svg class="dsa-fig" viewBox="0 0 986 280" width="986" role="img" aria-label="mod-100 ripple down counter">
+<rect class="gt" x="100" y="60" width="62" height="84" rx="3"/><text class="sm" x="111" y="78">J</text><path class="gt" style="fill:none" d="M100,96 L109,102 L100,108"/><text class="sm" x="111" y="126">K</text><text class="sm" x="153" y="78">Q</text><text class="sm" x="153" y="126">Q'</text><circle class="gt" cx="166" cy="126" r="4"/>
+<text class="lb" x="184" y="68" style="text-anchor:start">Q0</text>
+<path class="wr" d="M162,78 L182,78"/>
+<path class="wr" d="M76,78 L100,78"/>
+<text class="lb" x="72" y="78" style="text-anchor:end">1</text>
+<path class="wr" d="M76,126 L100,126"/>
+<text class="lb" x="72" y="126" style="text-anchor:end">1</text>
+<rect class="gt" x="218" y="60" width="62" height="84" rx="3"/><text class="sm" x="229" y="78">J</text><path class="gt" style="fill:none" d="M218,96 L227,102 L218,108"/><text class="sm" x="229" y="126">K</text><text class="sm" x="271" y="78">Q</text><text class="sm" x="271" y="126">Q'</text><circle class="gt" cx="284" cy="126" r="4"/>
+<text class="lb" x="302" y="68" style="text-anchor:start">Q1</text>
+<path class="wr" d="M280,78 L300,78"/>
+<path class="wr" d="M194,78 L218,78"/>
+<text class="lb" x="190" y="78" style="text-anchor:end">1</text>
+<path class="wr" d="M194,126 L218,126"/>
+<text class="lb" x="190" y="126" style="text-anchor:end">1</text>
+<rect class="gt" x="336" y="60" width="62" height="84" rx="3"/><text class="sm" x="347" y="78">J</text><path class="gt" style="fill:none" d="M336,96 L345,102 L336,108"/><text class="sm" x="347" y="126">K</text><text class="sm" x="389" y="78">Q</text><text class="sm" x="389" y="126">Q'</text><circle class="gt" cx="402" cy="126" r="4"/><circle class="gt" cx="367" cy="148" r="4"/><text class="sm" x="367" y="135">CLR</text>
+<text class="lb" x="420" y="68" style="text-anchor:start">Q2</text>
+<path class="wr" d="M398,78 L418,78"/>
+<path class="wr" d="M312,78 L336,78"/>
+<text class="lb" x="308" y="78" style="text-anchor:end">1</text>
+<path class="wr" d="M312,126 L336,126"/>
+<text class="lb" x="308" y="126" style="text-anchor:end">1</text>
+<rect class="gt" x="454" y="60" width="62" height="84" rx="3"/><text class="sm" x="465" y="78">J</text><path class="gt" style="fill:none" d="M454,96 L463,102 L454,108"/><text class="sm" x="465" y="126">K</text><text class="sm" x="507" y="78">Q</text><text class="sm" x="507" y="126">Q'</text><circle class="gt" cx="520" cy="126" r="4"/><circle class="gt" cx="485" cy="148" r="4"/><text class="sm" x="485" y="135">CLR</text>
+<text class="lb" x="538" y="68" style="text-anchor:start">Q3</text>
+<path class="wr" d="M516,78 L536,78"/>
+<path class="wr" d="M430,78 L454,78"/>
+<text class="lb" x="426" y="78" style="text-anchor:end">1</text>
+<path class="wr" d="M430,126 L454,126"/>
+<text class="lb" x="426" y="126" style="text-anchor:end">1</text>
+<rect class="gt" x="572" y="60" width="62" height="84" rx="3"/><text class="sm" x="583" y="78">J</text><path class="gt" style="fill:none" d="M572,96 L581,102 L572,108"/><text class="sm" x="583" y="126">K</text><text class="sm" x="625" y="78">Q</text><text class="sm" x="625" y="126">Q'</text><circle class="gt" cx="638" cy="126" r="4"/><circle class="gt" cx="603" cy="148" r="4"/><text class="sm" x="603" y="135">CLR</text>
+<text class="lb" x="656" y="68" style="text-anchor:start">Q4</text>
+<path class="wr" d="M634,78 L654,78"/>
+<path class="wr" d="M548,78 L572,78"/>
+<text class="lb" x="544" y="78" style="text-anchor:end">1</text>
+<path class="wr" d="M548,126 L572,126"/>
+<text class="lb" x="544" y="126" style="text-anchor:end">1</text>
+<rect class="gt" x="690" y="60" width="62" height="84" rx="3"/><text class="sm" x="701" y="78">J</text><path class="gt" style="fill:none" d="M690,96 L699,102 L690,108"/><text class="sm" x="701" y="126">K</text><text class="sm" x="743" y="78">Q</text><text class="sm" x="743" y="126">Q'</text><circle class="gt" cx="756" cy="126" r="4"/>
+<text class="lb" x="774" y="68" style="text-anchor:start">Q5</text>
+<path class="wr" d="M752,78 L772,78"/>
+<path class="wr" d="M666,78 L690,78"/>
+<text class="lb" x="662" y="78" style="text-anchor:end">1</text>
+<path class="wr" d="M666,126 L690,126"/>
+<text class="lb" x="662" y="126" style="text-anchor:end">1</text>
+<rect class="gt" x="808" y="60" width="62" height="84" rx="3"/><text class="sm" x="819" y="78">J</text><path class="gt" style="fill:none" d="M808,96 L817,102 L808,108"/><text class="sm" x="819" y="126">K</text><text class="sm" x="861" y="78">Q</text><text class="sm" x="861" y="126">Q'</text><circle class="gt" cx="874" cy="126" r="4"/>
+<text class="lb" x="892" y="68" style="text-anchor:start">Q6</text>
+<path class="wr" d="M870,78 L890,78"/>
+<path class="wr" d="M784,78 L808,78"/>
+<text class="lb" x="780" y="78" style="text-anchor:end">1</text>
+<path class="wr" d="M784,126 L808,126"/>
+<text class="lb" x="780" y="126" style="text-anchor:end">1</text>
+<path class="wr" d="M56,102 L100,102"/>
+<text class="lb" x="50" y="102" style="text-anchor:end">CLK</text>
+<path class="wr" d="M162,78 L176,78 L176,102 L218,102"/>
+<circle cx="176" cy="78" r="2.6" style="fill:var(--fg)"/>
+<path class="wr" d="M280,78 L294,78 L294,102 L336,102"/>
+<circle cx="294" cy="78" r="2.6" style="fill:var(--fg)"/>
+<path class="wr" d="M398,78 L412,78 L412,102 L454,102"/>
+<circle cx="412" cy="78" r="2.6" style="fill:var(--fg)"/>
+<path class="wr" d="M516,78 L530,78 L530,102 L572,102"/>
+<circle cx="530" cy="78" r="2.6" style="fill:var(--fg)"/>
+<path class="wr" d="M634,78 L648,78 L648,102 L690,102"/>
+<circle cx="648" cy="78" r="2.6" style="fill:var(--fg)"/>
+<path class="wr" d="M752,78 L766,78 L766,102 L808,102"/>
+<circle cx="766" cy="78" r="2.6" style="fill:var(--fg)"/>
+<path class="gt" d="M80,180.5 h20 a19.5,19.5 0 0 1 0,39 h-20 z"/><circle class="gt" cx="124" cy="200" r="4"/>
+<path class="wr" d="M54,187 L80,187"/>
+<text class="lb" x="50" y="187" style="text-anchor:end">Q4</text>
+<path class="wr" d="M54,200 L80,200"/>
+<text class="lb" x="50" y="200" style="text-anchor:end">Q5</text>
+<path class="wr" d="M54,213 L80,213"/>
+<text class="lb" x="50" y="213" style="text-anchor:end">Q6</text>
+<path class="wr" d="M128,200 L138,200 L138,228 L603,228"/>
+<path class="wr" d="M367,228 L367,152"/>
+<circle cx="367" cy="228" r="2.6" style="fill:var(--fg)"/>
+<path class="wr" d="M485,228 L485,152"/>
+<circle cx="485" cy="228" r="2.6" style="fill:var(--fg)"/>
+<path class="wr" d="M603,228 L603,152"/>
+<text class="sm" x="144" y="190" style="text-anchor:start">NAND → CLEAR (active low)</text>
+</svg><div class="figlabel">Mod-100 ripple down counter, 7 positive-edge JK flip-flops (J = K = 1), Q of each stage clocks the next. Count 99 down to 0. After 0 the count would go to 127 (1111111). The NAND of Q6 Q5 Q4 clears Q4, Q3, Q2, which leaves 1100011 = 99.</div></div>
+<p>Alternative accepted by some answers: two cascaded BCD (decade) down counters, units and tens, the tens stage clocked by the borrow of the units stage. The binary form above needs fewer parts.</p>
+<div class="hint">Same glitch caveat as section 6: at 64 → 63 the counter briefly passes 1111111. State it in one line.</div>
+</div></details></div>
+
+<h2>8. Frequency division (2017–18 Q5(c), 10 marks)</h2>
+<div class="exam"><div class="exam-src">2017–18 Q5(c) · 10 marks</div><div class="exam-q"><p>Given a 100 MHz clock, design a circuit using D flip-flops to generate 50 MHz and 25 MHz. Draw the timing diagram for all three signals.</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<ol>
+<li>One toggling stage halves the frequency. Two stages divide by 4.</li>
+<li>D flip-flop with D = Q' is a divide-by-2 stage (it toggles at each rising edge).</li>
+<li>Stage 1: clock = 100 MHz, output Q1 = 50 MHz. Stage 2: clock = Q1, output Q2 = 25 MHz.</li>
+</ol>
+<div class="fg-wrap"><svg class="dsa-fig" viewBox="0 0 620 220" width="620" role="img" aria-label="frequency divider">
+<rect class="gt" x="170" y="40" width="62" height="60" rx="3"/><text class="sm" x="181" y="58">D</text><path class="gt" style="fill:none" d="M170,76 L179,82 L170,88"/><text class="sm" x="223" y="58">Q</text><text class="sm" x="223" y="82">Q'</text><circle class="gt" cx="236" cy="82" r="4"/>
+<rect class="gt" x="390" y="40" width="62" height="60" rx="3"/><text class="sm" x="401" y="58">D</text><path class="gt" style="fill:none" d="M390,76 L399,82 L390,88"/><text class="sm" x="443" y="58">Q</text><text class="sm" x="443" y="82">Q'</text><circle class="gt" cx="456" cy="82" r="4"/>
+<path class="wr" d="M70,82 L170,82"/>
+<text class="lb" x="64" y="82" style="text-anchor:end">100 MHz</text>
+<path class="wr" d="M240,82 L252,82 L252,140 L156,140 L156,58 L170,58"/>
+<circle cx="252" cy="82" r="2.6" style="fill:var(--fg)"/>
+<path class="wr" d="M460,82 L472,82 L472,140 L376,140 L376,58 L390,58"/>
+<circle cx="472" cy="82" r="2.6" style="fill:var(--fg)"/>
+<path class="wr" d="M232,58 L262,58 L262,82 L390,82"/>
+<circle cx="262" cy="58" r="2.6" style="fill:var(--fg)"/>
+<text class="lb" x="268" y="46" style="text-anchor:start">Q1 = 50 MHz</text>
+<path class="wr" d="M452,58 L492,58"/>
+<text class="lb" x="496" y="58" style="text-anchor:start">Q2 = 25 MHz</text>
+</svg><div class="figlabel">Two D flip-flops, each with D = Q' (a divide-by-two stage). The first is clocked by the 100 MHz clock, the second by Q1.</div></div>
+<div class="fg-wrap"><svg class="dsa-fig timing" viewBox="0 0 636 134" width="636" role="img" aria-label="frequency division timing"><line class="tick" x1="78" y1="4" x2="78" y2="112"/><line class="tick" x1="112" y1="4" x2="112" y2="112"/><line class="tick" x1="146" y1="4" x2="146" y2="112"/><line class="tick" x1="180" y1="4" x2="180" y2="112"/><line class="tick" x1="214" y1="4" x2="214" y2="112"/><line class="tick" x1="248" y1="4" x2="248" y2="112"/><line class="tick" x1="282" y1="4" x2="282" y2="112"/><line class="tick" x1="316" y1="4" x2="316" y2="112"/><line class="tick" x1="350" y1="4" x2="350" y2="112"/><line class="tick" x1="384" y1="4" x2="384" y2="112"/><line class="tick" x1="418" y1="4" x2="418" y2="112"/><line class="tick" x1="452" y1="4" x2="452" y2="112"/><line class="tick" x1="486" y1="4" x2="486" y2="112"/><line class="tick" x1="520" y1="4" x2="520" y2="112"/><line class="tick" x1="554" y1="4" x2="554" y2="112"/><line class="tick" x1="588" y1="4" x2="588" y2="112"/><line class="tick" x1="622" y1="4" x2="622" y2="112"/><text class="lb" x="70" y="20" style="text-anchor:end">100 MHz</text><path class="wave clk" d="M78,30 L78,30 L78,30 L112,30 L112,10 L146,10 L146,30 L180,30 L180,10 L214,10 L214,30 L248,30 L248,10 L282,10 L282,30 L316,30 L316,10 L350,10 L350,30 L384,30 L384,10 L418,10 L418,30 L452,30 L452,10 L486,10 L486,30 L520,30 L520,10 L554,10 L554,30 L588,30 L588,10 L622,10 L622,30 L622,30"/><text class="lb" x="70" y="54" style="text-anchor:end">Q1 50 MHz</text><path class="wave" d="M78,64 L78,64 L78,64 L118.8,64 L118.8,44 L186.8,44 L186.8,64 L254.8,64 L254.8,44 L322.8,44 L322.8,64 L390.79999999999995,64 L390.79999999999995,44 L458.79999999999995,44 L458.79999999999995,64 L526.8,64 L526.8,44 L594.8,44 L594.8,64 L622,64"/><text class="lb" x="70" y="88" style="text-anchor:end">Q2 25 MHz</text><path class="wave" d="M78,98 L78,98 L78,98 L193.6,98 L193.6,78 L329.6,78 L329.6,98 L465.6,98 L465.6,78 L601.6,78 L601.6,98 L622,98"/></svg><div class="figlabel">Q1 toggles at every rising edge of the 100 MHz clock (period 10 ns becomes 20 ns). Q2 toggles at every rising edge of Q1 (period 40 ns = 25 MHz). Small shifts are the flip-flop delays.</div></div>
+<p>Periods: 100 MHz is 10 ns, 50 MHz is 20 ns, 25 MHz is 40 ns.</p>
+</div></details></div>
+
+<h2>9. Disadvantages: delay and glitches</h2>
+<p>Question wording: "what are the problems of this counter" (3 marks in the older paper) or "why is it slower than a synchronous counter". Write these:</p>
+<ol>
+<li><b>Accumulated propagation delay.</b> Q<sub>i</sub> settles about (i + 1) × t<sub>pd</sub> after the clock edge. For n flip-flops the count is valid only after n × t<sub>pd</sub>. The clock period must be longer than this, so the maximum frequency is about 1/(n × t<sub>pd</sub>). For four flip-flops of 10 ns each that is about 25 MHz (a synchronous counter would be limited by one flip-flop and a gate).</li>
+<div class="fg-wrap"><svg class="dsa-fig timing" viewBox="0 0 596 202" width="596" role="img" aria-label="ripple delay"><line class="tick" x1="78" y1="4" x2="78" y2="180"/><line class="tick" x1="114" y1="4" x2="114" y2="180"/><line class="tick" x1="150" y1="4" x2="150" y2="180"/><line class="tick" x1="186" y1="4" x2="186" y2="180"/><line class="tick" x1="222" y1="4" x2="222" y2="180"/><line class="tick" x1="258" y1="4" x2="258" y2="180"/><line class="tick" x1="294" y1="4" x2="294" y2="180"/><line class="tick" x1="330" y1="4" x2="330" y2="180"/><line class="tick" x1="366" y1="4" x2="366" y2="180"/><line class="tick" x1="402" y1="4" x2="402" y2="180"/><line class="tick" x1="438" y1="4" x2="438" y2="180"/><line class="tick" x1="474" y1="4" x2="474" y2="180"/><line class="tick" x1="510" y1="4" x2="510" y2="180"/><line class="tick" x1="546" y1="4" x2="546" y2="180"/><line class="tick" x1="582" y1="4" x2="582" y2="180"/><text class="lb" x="70" y="20" style="text-anchor:end">CLK</text><path class="wave clk" d="M78,30 L78,30 L78,30 L150,30 L150,10 L366,10 L366,30 L510,30 L510,10 L582,10"/><text class="lb" x="70" y="54" style="text-anchor:end">Q0</text><path class="wave" d="M78,44 L78,44 L78,44 L186,44 L186,64 L582,64"/><text class="lb" x="70" y="88" style="text-anchor:end">Q1</text><path class="wave" d="M78,78 L78,78 L78,78 L222,78 L222,98 L582,98"/><text class="lb" x="70" y="122" style="text-anchor:end">Q2</text><path class="wave" d="M78,112 L78,112 L78,112 L258,112 L258,132 L582,132"/><text class="lb" x="70" y="156" style="text-anchor:end">Q3</text><path class="wave" d="M78,166 L78,166 L78,166 L294,166 L294,146 L582,146"/></svg><div class="figlabel">Count 7 to 8 (0111 → 1000) with a delay of one unit per flip-flop. The counter passes through 0110, 0100 and 0000 before it settles at 1000: any gate that decodes these states can glitch.</div></div>
+<li><b>Wrong intermediate states (decoding glitches).</b> During 7 → 8 the counter passes 0110, 0100, 0000. A decoder or AND gate connected to the outputs can produce false short pulses. Outputs cannot be used as clean enables without a strobe.</li>
+<li><b>Reset glitch in mod-N counters.</b> State N exists briefly. For mod-12, the counter shows 1010 → 1000 → 1100 → 0000 on its way to 0.</li>
+<li><b>Not synchronous.</b> The outputs do not change together, so it cannot drive a synchronous design directly. Also it gets worse with more bits.</li>
+<li>Advantages: simple (n flip-flops, no gates for a binary count), low power, easy frequency division.</li>
+</ol>
+
+<div class="trap"><h4>Traps that cost marks</h4><ul>
+<li>Positive-edge up counter takes Q' to the next clock. Negative-edge up counter takes Q. Down counter is the opposite. Write which edge you assume.</li>
+<li>The first flip-flop gets the external clock. Do not wire the clock to every stage: that is a synchronous counter.</li>
+<li>Mod-N: the NAND goes to the <b>active-low CLEAR</b>. Clear every flip-flop for an up counter. For a down counter clear only the bits that must become 0.</li>
+<li>Count the NAND inputs: only the 1-bits of N, and stop when the first count with those bits all 1 is N.</li>
+<li>Draw J = K = 1 (or T = 1, or D tied to Q') on every flip-flop. A flip-flop with nothing on its inputs loses the marks.</li>
+<li>A down counter does not start at 0. It wraps from 0 to the top value, so the reload is the whole point of a mod-N down counter.</li>
+<li>For the timing diagram mark the counts and show the clock, the number of clocks, and one cycle plus one clock to show the wrap.</li>
+<li>Do not call the mod-N design "glitch free". Say the reset state N appears briefly.</li>
+</ul></div>
+
+<h2>Mandatory practice</h2>
+<div id="r1"></div>
+<div id="r2"></div>
+<div id="r3"></div>
+<div id="r4"></div>
+<div id="r5"></div>
+</main>
+<script src="../assets/book.js"></script><script src="../assets/logic.js"></script><script src="../assets/dld.js"></script>
+<script>
+timing('#t1', {"signals":{"Q0":[0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0],"Q1":[0,0,1,1,0,0,1,1,0,0,1,1,0,0,1,1,0,0,1],"Q2":[0,0,0,0,1,1,1,1,0,0,0,0,1,1,1,1,0,0,0],"Q3":[0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,0,0,0]},"clock":true});
+timing('#t2', {"signals":{"Q0":[1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0],"Q1":[1,1,0,0,1,1,0,0,1,1,0,0,1,1,0,0,1,1],"Q2":[1,1,1,1,0,0,0,0,1,1,1,1,0,0,0,0,1,1],"Q3":[1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,1,1]},"clock":true});
+timing('#t3', {"signals":{"Q0":[0,1,0,1,0,1,0,1,0,1,0,1,0,1,0],"Q1":[0,0,1,1,0,0,1,1,0,0,1,1,0,0,1],"Q2":[0,0,0,0,1,1,1,1,0,0,0,0,0,0,0],"Q3":[0,0,0,0,0,0,0,0,1,1,1,1,0,0,0]},"clock":true});
+timing('#t4', {"signals":{"Q0":[0,1,0,1,0,1,0,1,0,1,0,1,0,0,1],"Q1":[0,0,1,1,0,0,1,1,0,0,1,1,0,0,0],"Q2":[0,0,0,0,1,1,1,1,0,0,0,0,1,0,0],"Q3":[0,0,0,0,0,0,0,0,1,1,1,1,1,0,0]},"clock":true});
+timing('#t5', {"signals":{"Q0":[1,0,1,0,1,0,1,0,1,0,1,0,1],"Q1":[0,0,1,1,0,0,1,1,0,0,0,0,1],"Q2":[0,0,1,1,1,1,0,0,0,0,0,0,1],"Q3":[1,1,0,0,0,0,0,0,0,0,1,1,0]},"clock":true});
+recall('#r1', { id: 'r1', marks: 10, q: 'A MOD-12 counter counts from 0000 to 1011. Design the MOD-12 ripple counter with positive-edge triggered JK flip-flops and basic gates. (2019–20 Q3a)', points: ['Four JK flip-flops with J = K = 1, positive edge', 'Up counter: Q\' of each stage to the next clock', 'Count would go to 12 (1100): detect Q3 Q2 = 11 with a NAND', 'NAND output to the active-low CLEAR of all four flip-flops', 'Count table or timing diagram 0 to 11 and back to 0', 'Mentions the short glitch at 1100'], model: '<p>See section 4: NAND(Q3, Q2) to CLEAR of all four, count 0 to 11.</p>' });
+recall('#r2', { id: 'r2', marks: 7, q: 'Design a BCD ripple down counter using D flip-flops. (2018–19 Q5c)', points: ['D = Q\' on each flip-flop so it toggles', 'Down counter, positive edge: Q of each stage clocks the next', 'After 0000 the count would be 1111; want 1001', 'Detect with a NAND of Q3 Q2, clear Q2 and Q1 (CLEAR is active low)', 'Count table 9, 8, ..., 0, 9', 'Start-up preset to 1001'], model: '<p>See section 6.</p>' });
+recall('#r3', { id: 'r3', marks: 12, q: 'Show the logic diagram of a four-bit binary ripple countdown counter using T flip-flops that trigger on the negative edge of the clock. (2022–23 Q7a)', points: ['Four T flip-flops with T = 1, negative edge', 'Clock on the first flip-flop only', 'Q\' of each stage to the next clock (down counter, negative edge)', 'Outputs Q3 Q2 Q1 Q0 labelled', 'Count 1111 down to 0000 and wrap', 'Initial state preset to 1111'], model: '<p>See section 3.</p>' });
+recall('#r4', { id: 'r4', marks: 10, q: 'Given a 100 MHz clock, use D flip-flops to generate 50 MHz and 25 MHz. Draw the timing diagram of all three. (2017–18 Q5c)', points: ['Each D flip-flop has D = Q\' (toggle, divide by 2)', 'First flip-flop clocked by 100 MHz, output 50 MHz', 'Second flip-flop clocked by the first output, output 25 MHz', 'Timing diagram: clock, Q1 half the rate, Q2 quarter the rate', 'Periods 10 ns, 20 ns, 40 ns'], model: '<p>See section 8.</p>' });
+recall('#r5', { id: 'r5', marks: 6, q: 'Modulo-100 ripple down counter with JK flip-flops and basic gates. (2023–24 Q6c)', points: ['7 flip-flops (100 states, 99 = 1100011)', 'J = K = 1, down counter: Q of each stage to the next clock', 'After 0 the count would be 127 = 1111111', 'NAND of Q6 Q5 Q4 clears Q4, Q3, Q2 to give 99', 'Start-up preset to 1100011'], model: '<p>See section 7.</p>' });
+</script>
+</body>
+</html>

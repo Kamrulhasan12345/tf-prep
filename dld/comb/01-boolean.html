@@ -1,0 +1,292 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Boolean Algebra · CSE 205 Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Combinational circuits · Mano §2.2–2.8 · Tanzima ma'am L1–4 (Jun 20–23) · every year</div>
+<h1>Boolean algebra: laws, proofs, duality, canonical forms</h1>
+<p class="lede">Boolean algebra is asked in <b>every</b> paper, usually as the opening 5–12 marks. 2024–25 Q1c (7, prove and simplify xy + x'z + yz); 2023–24 Q1a (8, are the dual and the complement of F the same), Q1b (8, canonical vs standard forms), Q2a (10, (x'+y)(x+z)(y+z) in minterms), Q3b (11, simplify by algebra), Q3c (12, "consensus" circuit, exactly two inputs 1); 2022–23 Q3c (7, dual of XOR = its complement), Q4a (10, xy + x'z as a product of maxterms by the distributive law); 2021–22 Q2a (10, (A+B)'(A'+B')'), Q2c (7, A + B'C as minterms); 2019–20 Q5a (18, 3-input majority with NAND only), Q5c (10, truth-table proofs), Q7b (7, dual of XOR); 2018–19 Q1d (5) and 2017–18 Q1d (8, simplify to POS and SOP). CT1 2026: Q1 (5, simplify xy + x'z + yz), Q3 (4, complement by duality), Q4 (4, same gates, different levels). Older papers add: prove x(x+y) = x, the consensus theorem, De Morgan for 3 variables, non-associativity of NOR, XOR is not distributive over AND, a⊕b⊕c⊕d as maxterms. Treat this chapter as certain marks: all of it is short, mechanical and checkable.</p>
+
+<h2>1. The rules you may quote</h2>
+<p>Ma'am's course: a set B = {0, 1}, two operations OR (+) and AND (·), and the complement ('). Precedence: <b>( ) then ' then · then +</b>. A <b>literal</b> is one occurrence of a variable or its complement, so xy + xy'z has 5 literals.</p>
+<div class="def"><dl>
+<dt>Axioms (postulates)</dt><dd>1 Closure. 2 Identity: x + 0 = x, x·1 = x. 3 Commutative. 4 Distributive: x(y+z) = xy + xz <b>and</b> x + yz = (x+y)(x+z). 5 Complement: x + x' = 1, x·x' = 0. 6 Cardinality: B has at least two different elements.</dd>
+<dt>Theorems</dt><dd>1 Idempotency: x + x = x, x·x = x. 2 x + 1 = 1, x·0 = 0. 3 Absorption: x + xy = x, x(x+y) = x. 4 Involution: (x')' = x. 5 Associative. 6 De Morgan: (x+y)' = x'y', (xy)' = x' + y'. 7 <b>Consensus</b>: xy + x'z + yz = xy + x'z, and its dual (x+y)(x'+z)(y+z) = (x+y)(x'+z).</dd>
+</dl></div>
+<p><b>Duality principle:</b> if an identity is true, its dual is true. To take the dual: (1) swap + and ·, (2) swap 0 and 1. Literals stay as they are. Every theorem above comes in a pair because of this. Three proof techniques are accepted: algebra from the axioms, duality, truth table.</p>
+<p>Proofs from the axioms, as ma'am writes them (learn these two lines of reasoning, they are asked as "prove"):</p>
+<div class="tbl"><table class="mat"><tr><th>to prove</th><th>chain</th></tr>
+<tr><td>x + x = x</td><td>x + x = (x+x)·1 = (x+x)(x+x') = x + xx' = x + 0 = x</td></tr>
+<tr><td>x + 1 = 1</td><td>x + 1 = 1·(x+1) = (x+x')(x+1) = x + x'·1 = x + x' = 1</td></tr>
+<tr><td>x + xy = x</td><td>x·1 + xy = x(1+y) = x(y+1) = x·1 = x. The dual, x(x+y) = x, follows by duality (2011–12: "Prove x(x+y) = x", 5 marks)</td></tr>
+<tr><td>De Morgan (x+y)' = x'y'</td><td>Let X = x+y and Y = x'y'. X + Y = (x+y+x')(x+y+y') = 1·1 = 1 and XY = xx'y' + yx'y' = 0. X and Y satisfy both complement axioms, so Y is the complement of X.</td></tr></table></div>
+<p>De Morgan for <b>three</b> variables, by successive substitution (2013–14, 10 marks): (x+y+z)' = (x + (y+z))' = x'·(y+z)' = x'·y'z' = x'y'z'. Dual: (xyz)' = x' + y' + z'.</p>
+
+<h2>2. Duality and complement</h2>
+<p>These two are different things, and 2023–24 Q1a and CT1 Q3 test exactly that.</p>
+<div class="def"><dl>
+<dt>Dual of f</dt><dd>Swap + and ·, swap 0 and 1. Literals unchanged. Example: dual of x(y + z') is x + yz'.</dd>
+<dt>Complement f'</dt><dd>The function that is 1 where f is 0. By De Morgan: complement every literal <b>and</b> swap + and ·.</dd>
+</dl></div>
+<p>Why the "dual method" works (the answer to ma'am's margin question "how does this work?"): the dual satisfies <b>dual(f)(x₁…xₙ) = ( f(x₁'…xₙ') )'</b>. So if you complement every literal of the dual, you undo the inner complement and are left with f'. That is the whole method:</p>
+<ol class="steps">
+<li>Write the dual of f (swap + and ·, swap 0 and 1).</li>
+<li>Complement every literal in it.</li>
+<li>The result is f'. (Optionally simplify.)</li>
+</ol>
+<div class="exam"><div class="exam-src">CT1 2026 Q3 · 4 marks</div><div class="exam-q"><p>How can we complement a function using the duality-principle based method? Show an example.</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<p>Method: (1) take the dual of f; (2) complement each literal. Example f(x,y,z) = x(y'z' + yz).</p>
+<p>Dual: x + (y' + z')(y + z). Complement each literal: <b>f' = x' + (y + z)(y' + z')</b> = x' + yz' + y'z (since yy' = zz' = 0).</p>
+<p>Check with De Morgan: f' = x' + (y'z' + yz)' = x' + (y + z)(y' + z'). Same. Check one row: x=1, y=0, z=0 gives f = 1·(1 + 0) = 1, and f' = 0 + 0 + 0 = 0 ✓.</p>
+<p>Two more of ma'am's examples: complement of (x'+y+z')(x+y')(x+z): dual x'yz' + xy' + xz, then complement literals: <b>xy'z + x'y + x'z'</b>. Complement of xy' + x'y: (x'+y)(x+y') = <b>xy + x'y'</b>.</p>
+</div></details></div>
+<div class="write"><h4>What to write (complement by duality, 4 marks)</h4>
+<ol><li>One line naming the two steps: "complement = dual, then complement each literal".</li>
+<li>The dual, written out. Then the literal-complemented result.</li>
+<li>A one-line check (De Morgan, or one truth-table row). Examiners reward the check.</li></ol></div>
+
+<h3>Is the dual equal to the complement? (2023–24 Q1a, 8 marks)</h3>
+<p>Because dual(f)(x) = (f(x'))' and f'(x) = (f(x))', the dual equals the complement <b>exactly when f(x') = f(x) for every input</b>, that is, when f does not change if all inputs are inverted. XOR and XNOR of two variables have this property. Most functions do not.</p>
+<div class="exam"><div class="exam-src">2023–24 Q1(a) · 8 marks</div><div class="exam-q"><p>Analyze whether the dual and the complement of F = ABC + A(B+C) + A'B'C' are the same. Justify.</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<p>F = ABC + AB + AC + A'B'C' = Σ(0, 5, 6, 7).</p>
+<p>Dual: F<sup>d</sup> = (A+B+C)(A + BC)(A'+B'+C'). Complement: F' = Σ(1, 2, 3, 4).</p>
+<div id="t1"></div>
+<p>The truth tables differ. F<sup>d</sup> = Σ(3, 4, 5, 6) and F' = Σ(1, 2, 3, 4): they agree only on rows 3 and 4. <b>So they are not the same.</b> (Quick reason: F(0,0,1) = 0 but F(1,1,0) = 1, so F(x') ≠ F(x).) The highlighted rows show where they differ.</p>
+</div></details></div>
+
+<h3>Dual of XOR is its complement (2019–20 Q7b, 2022–23 Q3c, 7 marks each)</h3>
+<div class="exam"><div class="exam-src">2019–20 Q7(b) · 2022–23 Q3(c) · 7 marks</div><div class="exam-q"><p>Show that the dual of the exclusive-OR is equal to its complement.</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<p>x ⊕ y = xy' + x'y. Its dual: swap + and ·: <b>(x + y')(x' + y)</b>.</p>
+<p>Expand: (x + y')(x' + y) = xx' + xy + y'x' + y'y = 0 + xy + x'y' + 0 = <b>xy + x'y'</b>.</p>
+<p>And xy + x'y' is XNOR, the complement of XOR: (xy' + x'y)' = (x'+y)(x+y') = xy + x'y' (same expansion). So dual(XOR) = XOR' ∎</p>
+<div id="t2"></div>
+<p>Truth-table version: the third and fourth columns are identical.</p>
+</div></details></div>
+<div class="write"><h4>What to write (dual of XOR, 7 marks)</h4>
+<ol><li>x ⊕ y = xy' + x'y.</li><li>Dual = (x + y')(x' + y).</li><li>Multiply out with xx' = 0: = xy + x'y'.</li><li>State "= (x ⊕ y)' = XNOR". Add the 4-row truth table if time allows.</li></ol></div>
+
+<h2>3. XOR identities (ma'am L18, used in parity and adders)</h2>
+<ul>
+<li>x ⊕ y = xy' + x'y. XNOR: (x ⊕ y)' = xy + x'y'.</li>
+<li>x ⊕ 0 = x, x ⊕ 1 = x', x ⊕ x = 0, x ⊕ x' = 1.</li>
+<li>x ⊕ y' = x' ⊕ y = (x ⊕ y)'. Reason: complementing one input moves every row between "odd" and "even".</li>
+<li>Commutative and associative, so XOR of n variables is well defined. The output is 1 exactly when an <b>odd</b> number of inputs are 1 (so XOR is called an <i>odd function</i>).</li>
+<li>XOR is <b>not</b> distributive over AND: x ⊕ (yz) ≠ (x ⊕ y)(x ⊕ z). Counter-example x = 1, y = 1, z = 0: left side 1 ⊕ (1·0) = 1 ⊕ 0 = 1; right side (1 ⊕ 1)(1 ⊕ 0) = 0·1 = 0. They differ. (2015–16, 7 marks.)</li>
+<li>Dual of XOR of an <i>even</i> number of variables = its complement. (For an odd number of variables, the dual of XOR is XOR itself.)</li>
+</ul>
+<div class="exam"><div class="exam-src">2015–16 · 10 marks (older)</div><div class="exam-q"><p>Why is XOR called an odd function? Convert a ⊕ b ⊕ c ⊕ d to canonical maxterm form.</p></div>
+<details><summary>Answer</summary><div class="exam-a"><p>The output is 1 when an odd number of inputs are 1, so the minterms are the 8 inputs with one or three 1s: Σ(1, 2, 4, 7, 8, 11, 13, 14). The maxterms are the others: <b>Π(0, 3, 5, 6, 9, 10, 12, 15)</b> = (a+b+c+d)(a+b+c'+d')(a+b'+c+d')(a+b'+c'+d)(a'+b+c+d')(a'+b+c'+d)(a'+b'+c+d)(a'+b'+c'+d').</p></div></details></div>
+
+<h2>4. Simplifying with algebra</h2>
+<p>The procedure (numbered, use it every time):</p>
+<ol class="steps">
+<li>Remove brackets with the distributive law. Use <b>both</b> forms: x + yz = (x+y)(x+z) is the one students forget.</li>
+<li>Delete duplicates (x + x = x) and zero products (xx' = 0).</li>
+<li>Absorb: x + xy = x, x + x'y = x + y.</li>
+<li>Merge pairs: xy + xy' = x. If a pair is missing, <b>add a redundant term</b> by consensus or multiply by (z + z') so that merging becomes possible.</li>
+<li>Count literals before and after. Stop when no law applies.</li>
+</ol>
+<div class="exam"><div class="exam-src">2024–25 Q1(c) 7 marks · CT1 2026 Q1 5 marks · older 2013–14 "consensus theorem" 8 marks</div><div class="exam-q"><p>Using laws and theorems prove and simplify xy + x'z + yz = xy + x'z. (i) apply laws; (ii) prove step by step that yz is redundant.</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<p>Multiply the redundant term by (x + x') = 1:</p>
+<p>yz = yz(x + x') = xyz + x'yz.</p>
+<p>So xy + x'z + yz = xy + x'z + xyz + x'yz = xy(1 + z) + x'z(1 + y) = xy + x'z. <b>The term yz is redundant</b> ∎</p>
+<p>In words: when x = 1, yz is already covered by xy; when x = 0, it is already covered by x'z. Either way yz adds nothing. The dual: (x+y)(x'+z)(y+z) = (x+y)(x'+z).</p>
+</div></details></div>
+<div class="write"><h4>What to write (prove and simplify, 5–7 marks)</h4>
+<ol><li>The statement of the theorem: "consensus: xy + x'z + yz = xy + x'z".</li>
+<li>The trick line: yz = yz(x + x') = xyz + x'yz.</li>
+<li>The absorption line: xy + xyz = xy and x'z + x'yz = x'z.</li>
+<li>The final answer boxed, and the words "yz is redundant".</li></ol></div>
+
+<div class="exam"><div class="exam-src">2021–22 Q2(a) 10 marks · also 2013–14 · "minimum number of literals"</div><div class="exam-q"><p>Simplify (A + B)'(A' + B')' to the minimum number of literals.</p></div>
+<details><summary>Answer</summary><div class="exam-a"><p>De Morgan on each bracket: (A + B)' = A'B' and (A' + B')' = AB. So the product is A'B'·AB = (AA')(BB') = 0·0 = <b>0</b>. Zero literals. (Check with a truth table: A+B is the complement of A'B' and A'+B' is the complement of AB; A'B' and AB are never 1 together.)</p></div></details></div>
+
+<div class="exam"><div class="exam-src">2023–24 Q3(b) · 11 marks</div><div class="exam-q"><p>Show by Boolean algebra that F = xyz' + wx'y' + (x'+z+w)(x'+z+w') + xyz + wx'y simplifies to xy + wx' + x' + z (as printed).</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<ol>
+<li>(x'+z+w)(x'+z+w') = (x'+z) + ww' = x' + z. (Distributive law, x + yz = (x+y)(x+z) with the pair w, w'.)</li>
+<li>xyz' + xyz = xy(z' + z) = xy.</li>
+<li>wx'y' + wx'y = wx'(y' + y) = wx'.</li>
+<li>So F = xy + wx' + x' + z. <b>This is the printed result</b> ∎</li>
+<li>It can be reduced further: wx' + x' = x' (absorption), and then x' + xy = x' + y. So the minimum is <b>F = x' + y + z</b>. Mention this: the printed target is not minimal. The engine agrees: F is 0 only when x = 1, y = 0, z = 0 (any w).</li>
+</ol></div></details></div>
+
+<div class="exam"><div class="exam-src">2017–18 Q1(d) 8 marks · 2018–19 Q1(d) 5 marks</div><div class="exam-q"><p>Simplify to POS and SOP. (2017–18) BCD' + ABC' + ACD. (2018–19) ACD' + CD + AB' + ABCD.</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<p><b>2017–18: BCD' + ABC' + ACD.</b> SOP: add the redundant term AB. It is allowed because AB = ABC' + ABC and ABC = ABCD + ABCD', where ABCD ⊆ ACD and ABCD' ⊆ BCD' (everything in AB is already in the function). Then ABC' is absorbed by AB: <b>SOP = AB + ACD + BCD'</b> (7 literals, down from 9).</p>
+<p>POS: take the complement of the SOP of the zeros: F' = A'C' + B'C' + B'D' + A'D, so <b>F = (A + C)(B + C)(B + D)(A + D')</b> (8 literals). This is quickest on a K-map (group the 0s). The two forms have the same truth table, Σ(6, 11, 12, 13, 14, 15).</p>
+<p><b>2018–19: ACD' + CD + AB' + ABCD.</b> ACD' + CD = C(AD' + D) = C(A + D) = AC + CD. ABCD is absorbed by AC. So <b>SOP = CD + AB' + AC</b> (6 literals). POS: distribute: F = A(B' + C) + CD = (A + CD)(B' + C + CD) = (A + C)(A + D)(B' + C), because B' + C + CD = B' + C. <b>POS = (A + C)(A + D)(B' + C)</b>. Truth table Σ(3, 7, 8, 9, 10, 11, 14, 15).</p>
+</div></details></div>
+<div class="hint"><b>Quick way to get SOP and POS in the exam:</b> write the function as a truth table or K-map first (chapter 3). SOP = group the 1s. POS = group the 0s, read F' as a sum of products, then complement with De Morgan. The algebra above is the "show your working" version.</div>
+
+<h2>5. Minterms, maxterms, canonical and standard forms</h2>
+<div class="def"><dl>
+<dt>Minterm m<sub>i</sub></dt><dd>An AND term containing <b>every</b> variable once, true or complemented. It is 1 at exactly one input row. The subscript is the row number read in binary: m₃ = x'yz (011). x'y'z is m₁.</dd>
+<dt>Maxterm M<sub>i</sub></dt><dd>An OR term containing every variable once. It is 0 at exactly one row, and the complement convention is opposite: M₃ = x + y' + z' (011 → 0 means plain, 1 means complemented). m<sub>i</sub>' = M<sub>i</sub>.</dd>
+<dt>Canonical form</dt><dd>Sum of minterms (SOM, Σ) or product of maxterms (POM, Π). Every term has all variables.</dd>
+<dt>Standard form</dt><dd>SOP or POS where terms need not contain every variable. Always a two-level circuit.</dd>
+</dl></div>
+<p><b>Σ to Π:</b> keep the same function, swap the symbol, list the row numbers that are <b>missing</b>. Example Σ(0,1,2,3,6) = Π(4,5,7), because f' = Σ(4,5,7) = m₄ + m₅ + m₇, and f = (m₄ + m₅ + m₇)' = M₄M₅M₇.</p>
+
+<h3>Expanding by algebra (her method)</h3>
+<ol class="steps">
+<li><b>To minterms (SOM):</b> make it a sum of products (multiply out). For each product that is missing a variable v, multiply it by (v + v') and expand. Collect, drop duplicates.</li>
+<li><b>To maxterms (POM):</b> make it a product of sums (use x + yz = (x+y)(x+z)). For each sum missing a variable v, add vv' (= 0) to it and split: (S + vv') = (S + v)(S + v').</li>
+<li>Write the row number of every term in binary → decimal.</li>
+</ol>
+<div class="exam"><div class="exam-src">2023–24 Q2(a) · 10 marks</div><div class="exam-q"><p>Express F = (x'+y)(x+z)(y+z) in minterms.</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<p>By the dual consensus theorem, (x'+y)(x+z)(y+z) = (x'+y)(x+z), so the factor (y+z) is redundant. Multiply out: (x'+y)(x+z) = x'x + x'z + xy + yz = x'z + xy + yz = x'z + xy (consensus again).</p>
+<p>Expand each product with the missing variable: x'z = x'z(y + y') = x'yz + x'y'z = m₃ + m₁. xy = xy(z + z') = xyz + xyz' = m₇ + m₆.</p>
+<p><b>F = Σ(1, 3, 6, 7)</b> = x'y'z + x'yz + xyz' + xyz.</p>
+<div id="t3"></div>
+</div></details></div>
+<div class="exam"><div class="exam-src">2021–22 Q2(c) 7 marks · 2022–23 Q4(a) 10 marks</div><div class="exam-q"><p>(2021–22) Express F(A,B,C) = A + B'C as a sum of minterms using Boolean algebra. (2022–23) Convert F = xy + x'z to a product of maxterms using the distributive law.</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<p><b>2021–22.</b> A = A(B + B')(C + C') = ABC + ABC' + AB'C + AB'C'. B'C = B'C(A + A') = AB'C + A'B'C. Collect, remove the repeated AB'C: <b>F = Σ(1, 4, 5, 6, 7)</b> = A'B'C + AB'C' + AB'C + ABC' + ABC.</p>
+<p><b>2022–23.</b> Distribute twice: xy + x'z = (xy + x')(xy + z) = (x + x')(y + x')(x + z)(y + z) = (x' + y)(x + z)(y + z). Add the missing variable to each sum:</p>
+<p>x' + y = x' + y + zz' = (x' + y + z)(x' + y + z') → rows 100, 101 → M₄, M₅. x + z = x + z + yy' = (x + y + z)(x + y' + z) → M₀, M₂. y + z = y + z + xx' = (x + y + z)(x' + y + z) → M₀, M₄.</p>
+<p>Collect: <b>F = Π(0, 2, 4, 5)</b> = (x+y+z)(x+y'+z)(x'+y+z)(x'+y+z'). Cross-check: the minterm list is Σ(1, 3, 6, 7), and 0,2,4,5 are exactly the missing rows ✓.</p>
+</div></details></div>
+<div class="write"><h4>What to write (expansion by algebra, 7–10 marks)</h4>
+<ol><li>The function as SOP (or POS) first.</li>
+<li>For each term: the line "× (v + v')" or "+ vv'", then the expanded terms.</li>
+<li>The binary → decimal row number beside every final term.</li>
+<li>The final Σ(...) or Π(...), and one cross-check: Σ and Π lists together cover 0…2ⁿ−1 with no overlap.</li></ol></div>
+
+<h3>Canonical vs standard forms (2023–24 Q1b, 8 marks · 2011–12 style 8+4+3)</h3>
+<div class="exam"><div class="exam-src">2023–24 Q1(b) · 8 marks</div><div class="exam-q"><p>Compare the different types of canonical and standard forms with examples.</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<div class="tbl"><table class="mat"><tr><th></th><th>Canonical</th><th>Standard</th></tr>
+<tr><td>Types</td><td>SOM (Σ of minterms), POM (Π of maxterms)</td><td>SOP, POS</td></tr>
+<tr><td>Term contains</td><td>every variable, exactly once</td><td>any number of variables (not necessarily all)</td></tr>
+<tr><td>Example, F(x,y,z)</td><td>SOM: x'yz + xy'z' + xyz' + xyz = Σ(3,4,6,7)<br>POM: (x+y+z)(x+y+z')(x+y'+z)(x'+y+z') = Π(0,1,2,5)</td><td>SOP: yz + xz'  (1 level of ANDs, 1 of OR)<br>POS: (x + z)(y + z')  (the same function)</td></tr>
+<tr><td>Unique?</td><td>Yes: one SOM and one POM per function (it is the truth table).</td><td>No: many SOPs exist; the minimal one is what we want.</td></tr>
+<tr><td>Circuit</td><td>Large: more literals, wide gates.</td><td>Small, two levels (AND-OR, NAND-NAND, OR-AND, NOR-NOR).</td></tr>
+<tr><td>Read from truth table?</td><td>SOM: rows with F = 1. POM: rows with F = 0.</td><td>Obtained after simplification.</td></tr></table></div>
+<p>Remark: every canonical form is a standard form, but not every standard form is canonical. A non-standard form such as AB + C(D + E) has three levels; AB + CD + CE is the standard (two-level, faster) equivalent. When building a circuit, prefer the standard minimal form: fewer gates and inputs, lower delay.</p>
+</div></details></div>
+
+<h2>6. How many Boolean functions are there?</h2>
+<p>n variables have 2<sup>n</sup> rows (minterms). A function is decided by choosing, for each row, output 0 or 1. So there are <b>2<sup>(2ⁿ)</sup></b> functions. Another way: every function is a sum of some subset of the 2ⁿ minterms, and a set of 2ⁿ things has 2<sup>(2ⁿ)</sup> subsets.</p>
+<div class="tbl"><table class="mat"><tr><th>n</th><th>rows 2ⁿ</th><th>functions 2<sup>2ⁿ</sup></th></tr><tr><td>1</td><td>2</td><td>4 (0, 1, x, x')</td></tr><tr><td>2</td><td>4</td><td>16 (AND, OR, NAND, NOR, XOR, XNOR, constants 0 and 1, x, y, x', y', and four inhibit/implication functions such as x'y)</td></tr><tr><td>3</td><td>8</td><td>256</td></tr><tr><td>4</td><td>16</td><td>65 536</td></tr></table></div>
+
+<h2>7. Circuits from a description: majority and "exactly two"</h2>
+<p>Method (4 steps from ma'am's slides): name inputs and outputs, write the truth table, simplify (K-map), draw and verify. Both of these questions are 12–18 marks, mostly for doing the four steps in order.</p>
+<div class="exam"><div class="exam-src">2019–20 Q5(a) · 18 marks</div><div class="exam-q"><p>A majority circuit outputs 1 if the input variables have more 1s than 0s. Design a 3-input majority circuit: truth table, simplified Boolean equation, logic diagram. Use only NAND gates.</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<p>F = 1 when at least two of x, y, z are 1: F = Σ(3, 5, 6, 7).</p>
+<div id="t4"></div>
+<p>K-map: three pairs (3,7) = yz, (5,7) = xz, (6,7) = xy, all essential. <b>F = xy + yz + xz</b> (6 literals).</p>
+<p>NAND only: NAND-NAND form. F = ((xy)'(yz)'(xz)')'. Three 2-input NANDs feed one 3-input NAND. 4 gates, 9 gate inputs, 2 levels.</p>
+<div id="g1"></div>
+<p>(The three product terms are the three consensus pairs. Algebra check: xy + yz + xz = xy + z(x + y) is the full-adder carry.)</p>
+</div></details></div>
+<div class="exam"><div class="exam-src">2023–24 Q3(c) · 12 marks</div><div class="exam-q"><p>Consensus circuit: the output is 1 if exactly two of the three inputs are 1. Give the truth table, simplified equation and circuit.</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<p>Despite the name, this has nothing to do with the consensus <i>theorem</i>. Exactly two 1s: F = Σ(3, 5, 6).</p>
+<div id="t5"></div>
+<p>The three minterms 011, 101, 110 are pairwise non-adjacent on the K-map, so nothing combines. <b>F = x'yz + xy'z + xyz'</b> (9 literals). Circuit: three 3-input ANDs and one 3-input OR (inverters for x', y', z'). 4 gates + 3 NOT.</p>
+<div id="g2"></div>
+<p>A cheaper alternative uses the majority function: "at least two" AND NOT "all three": F = (xy + yz + xz)·(xyz)'. (State which one you draw.)</p>
+</div></details></div>
+
+<h2>8. Proof by truth table (2019–20 Q5c, 10 marks)</h2>
+<div class="exam"><div class="exam-src">2019–20 Q5(c) · 10 marks</div><div class="exam-q"><p>Demonstrate the validity of these identities by truth tables: (i) De Morgan for three variables, (x + y + z)' = x'y'z'. (ii) The distributive law x(y + z) = xy + xz.</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<p>(The printed question lost its primes; the intended identity is (x+y+z)' = x'y'z'.) List all 8 rows, compute both sides, show the two columns are identical.</p>
+<div id="t6"></div>
+<div id="t7"></div>
+<p>The last two columns of each table are identical on every row, so both identities hold ∎</p>
+</div></details></div>
+<div class="write"><h4>What to write (truth-table proof, 5 marks each)</h4>
+<ol><li>The identity, with the missing primes put back.</li>
+<li>A table with all 2ⁿ rows (8 for three variables). Show intermediate columns (y+z, x+y+z).</li>
+<li>Left-side column and right-side column next to each other.</li>
+<li>One sentence: "the two columns are identical for all 8 input combinations, hence proved".</li></ol></div>
+
+<h2>9. Same gates, same inputs, different levels (CT1 2026 Q4, 4 marks)</h2>
+<div class="exam"><div class="exam-src">CT1 2026 Q4 · 4 marks</div><div class="exam-q"><p>If two implementations of the same Boolean expression need the same number of logic gates with the same number of gate inputs but differ in the number of logic levels, which would you prefer? Justify.</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<p><b>Prefer the one with fewer levels.</b> The delay from input to output is the sum of the gate delays along the longest path, so fewer levels means a smaller propagation delay and a faster circuit. Cost (gates, gate inputs) is equal, so the faster one loses nothing. This is also why ma'am calls the two-level standard form "quite faster" than a multi-level form.</p>
+<p>Example: ABCD with three 2-input AND gates (3 gates, 6 inputs in both circuits):</p>
+<svg class="dsa-fig" viewBox="0 0 560 150" width="560" role="img" aria-label="AND tree with 2 levels against AND chain with 3 levels">
+<text class="sm" x="12" y="10" style="text-anchor:start">2 levels (tree)</text>
+<text class="lb" x="30" y="26" style="text-anchor:end">A</text><line class="wr" x1="34" y1="26" x2="60" y2="26"/>
+<text class="lb" x="30" y="42" style="text-anchor:end">B</text><line class="wr" x1="34" y1="42" x2="60" y2="42"/>
+<path class="gt" d="M60,18 h16 a16,16 0 0 1 0,32 h-16 z"/>
+<text class="lb" x="30" y="106" style="text-anchor:end">C</text><line class="wr" x1="34" y1="106" x2="60" y2="106"/>
+<text class="lb" x="30" y="122" style="text-anchor:end">D</text><line class="wr" x1="34" y1="122" x2="60" y2="122"/>
+<path class="gt" d="M60,98 h16 a16,16 0 0 1 0,32 h-16 z"/>
+<path class="wr" d="M92,34 H120 V66 H150"/><path class="wr" d="M92,114 H120 V84 H150"/>
+<path class="gt" d="M150,57 h14 a18,18 0 0 1 0,36 h-14 z"/>
+<line class="wr" x1="182" y1="75" x2="200" y2="75"/><text class="lb" x="210" y="75">F</text>
+<text class="sm" x="330" y="10" style="text-anchor:start">3 levels (chain)</text>
+<text class="lb" x="326" y="26" style="text-anchor:end">A</text><line class="wr" x1="330" y1="26" x2="340" y2="26"/>
+<text class="lb" x="326" y="42" style="text-anchor:end">B</text><line class="wr" x1="330" y1="42" x2="340" y2="42"/>
+<path class="gt" d="M340,18 h16 a16,16 0 0 1 0,32 h-16 z"/>
+<path class="wr" d="M372,34 H392 V66 H410"/>
+<text class="lb" x="402" y="82" style="text-anchor:end">C</text><line class="wr" x1="404" y1="82" x2="410" y2="82"/>
+<path class="gt" d="M410,58 h16 a16,16 0 0 1 0,32 h-16 z"/>
+<path class="wr" d="M442,74 H462 V106 H480"/>
+<text class="lb" x="472" y="122" style="text-anchor:end">D</text><line class="wr" x1="474" y1="122" x2="480" y2="122"/>
+<path class="gt" d="M480,98 h16 a16,16 0 0 1 0,32 h-16 z"/>
+<line class="wr" x1="512" y1="114" x2="530" y2="114"/><text class="lb" x="540" y="114">F</text>
+</svg>
+<p>The tree reaches F after 2 gate delays; the chain after 3. If a multi-level form does have <i>fewer</i> gates or inputs (factoring, e.g. AB + C(D+E) against AB + CD + CE), then it is a cost-against-speed trade-off, and you should say so.</p>
+</div></details></div>
+
+<div class="trap"><h4>Traps that cost marks</h4><ul>
+<li>Dual ≠ complement. The dual keeps the literals; the complement flips them. They coincide only when F is unchanged by inverting every input (2-input XOR).</li>
+<li>Maxterm subscripts: M₃ = x + y' + z' (1 means complemented in a maxterm). Do not copy the minterm pattern.</li>
+<li>Σ to Π lists the <b>missing</b> numbers, not the same numbers.</li>
+<li>Forgetting the second distributive law x + yz = (x+y)(x+z) when converting to a product of sums.</li>
+<li>Stopping at the printed target: 2023–24 Q3(b) goes on to x' + y + z. Show the printed form first, then say it can be reduced.</li>
+<li>A truth-table proof must list every row. "It is obvious" gets no marks.</li>
+</ul></div>
+
+<h2>Mandatory practice</h2>
+<div id="r1"></div>
+<div id="r2"></div>
+<div id="r3"></div>
+<div id="r4"></div>
+</main>
+<script src="../assets/book.js"></script><script src="../assets/logic.js"></script><script src="../assets/dld.js"></script>
+<script>
+// truth table whose cell values are computed by the engine. cols: [[heading, expression]]. o.diff = [i, j] highlights rows where those columns differ.
+function ttable(sel, vars, cols, o = {}) {
+  const n = vars.length, tt = cols.map(c => L.parse(c[1], vars));
+  let h = `<div class="tbl"><table class="mat"><tr>${o.m ? '<th>m</th>' : ''}${vars.map(v => `<th>${v}</th>`).join('')}${cols.map(c => `<th>${ov(c[0])}</th>`).join('')}</tr>`;
+  for (let i = 0; i < 1 << n; i++) {
+    const d = o.diff && tt[o.diff[0]][i] !== tt[o.diff[1]][i];
+    h += `<tr${d ? ' style="background:rgba(214,39,40,.14)"' : ''}>${o.m ? `<td>${i}</td>` : ''}${L.range(n).map(k => `<td>${(i >> (n - 1 - k)) & 1}</td>`).join('')}${tt.map(t => `<td>${t[i]}</td>`).join('')}</tr>`;
+  }
+  host(sel).innerHTML = h + '</table></div>';
+}
+const ABC = ['A', 'B', 'C'], XYZ = ['x', 'y', 'z'];
+ttable('#t1', ABC, [['F', "ABC + A(B+C) + A'B'C'"], ['dual F', "(A+B+C)(A+BC)(A'+B'+C')"], ["F'", "(ABC + A(B+C) + A'B'C')'"]], { m: true, diff: [1, 2] });
+ttable('#t2', ['x', 'y'], [['x ⊕ y', "xy' + x'y"], ['dual (x+y\')(x\'+y)', "(x+y')(x'+y)"], ["(x ⊕ y)'", "(xy' + x'y)'"], ["xy + x'y'", "xy + x'y'"]]);
+ttable('#t3', XYZ, [["(x'+y)(x+z)(y+z)", "(x'+y)(x+z)(y+z)"], ["x'z + xy", "x'z + xy"]], { m: true });
+ttable('#t4', XYZ, [['F (majority)', 'xy + yz + xz']], { m: true });
+ttable('#t5', XYZ, [['F (exactly two)', "x'yz + xy'z + xyz'"]], { m: true });
+ttable('#t6', XYZ, [['x+y+z', 'x+y+z'], ["(x+y+z)'", "(x+y+z)'"], ["x'y'z'", "x'y'z'"]]);
+ttable('#t7', XYZ, [['y+z', 'y+z'], ['x(y+z)', 'x(y+z)'], ['xy+xz', 'xy+xz']]);
+gates('#g1', { expr: 'xy + yz + xz', vars: XYZ, form: 'nand-nand' });
+gates('#g2', { expr: "x'yz + xy'z + xyz'", vars: XYZ, form: 'and-or' });
+recall('#r1', { id: 'r1', marks: 4, q: 'CT1 style: how can a function be complemented using the duality-based method? Show an example on f = x(y\'z\' + yz). Why does the method work?', points: ['Step 1: take the dual (swap + and ·, swap 0 and 1, literals unchanged)', 'Step 2: complement every literal of the dual', 'Dual written out correctly: x + (y\' + z\')(y + z)', 'Result f\' = x\' + (y + z)(y\' + z\') = x\' + yz\' + y\'z', 'A check (De Morgan or a truth-table row)', 'Reason: dual(f)(x) = (f(x\'))\', so complementing its literals leaves f\''], model: '<p>Dual of x(y\'z\' + yz) is x + (y\' + z\')(y + z). Complement each literal: x\' + (y + z)(y\' + z\'). Multiplying out with yy\' = zz\' = 0 gives f\' = x\' + yz\' + y\'z. The method works because the dual equals the complement of f evaluated on complemented inputs; flipping the literals restores the inputs.</p>' });
+recall('#r2', { id: 'r2', marks: 8, q: 'Analyse whether the dual and the complement of F = ABC + A(B+C) + A\'B\'C\' are the same. Say when a function\'s dual equals its complement.', points: ['F simplified or expanded: F = AB + AC + A\'B\'C\' = Σ(0,5,6,7)', 'Dual written: (A+B+C)(A+BC)(A\'+B\'+C\')', 'Complement written or its minterms found: Σ(1,2,3,4)', 'Truth tables compared: dual = Σ(3,4,5,6) differs', 'Conclusion: not the same', 'Condition: dual = complement exactly when F(x\') = F(x), e.g. 2-input XOR'], model: '<p>F = Σ(0,5,6,7). Dual = (A+B+C)(A+BC)(A\'+B\'+C\') = Σ(3,4,5,6). Complement = Σ(1,2,3,4). They differ (rows 5, 6, 1, 2), so not the same. dual(F)(x) = (F(x\'))\' and F\'(x) = (F(x))\', so they are equal only when F is unchanged by inverting every input.</p>' });
+recall('#r3', { id: 'r3', marks: 10, q: 'Express F = (x\'+y)(x+z)(y+z) in minterms using Boolean algebra, and then give the product-of-maxterms form. (2023–24 Q2a)', points: ['Uses consensus (or full expansion) to drop (y+z): F = (x\'+y)(x+z)', 'Multiplies out: x\'z + xy (after dropping yz)', 'Multiplies each term by the missing variable: x\'z(y+y\'), xy(z+z\')', 'Σ(1,3,6,7) with binary subscripts', 'Π(0,2,4,5): the missing numbers', 'Cross-check that the two lists are complementary'], model: '<p>F = (x\'+y)(x+z) = x\'z + xy + yz = x\'z + xy. x\'z = x\'yz + x\'y\'z = m3 + m1; xy = xyz + xyz\' = m7 + m6. F = Σ(1,3,6,7) = Π(0,2,4,5).</p>' });
+recall('#r4', { id: 'r4', marks: 7, q: 'Prove xy + x\'z + yz = xy + x\'z and show that yz is redundant (consensus theorem). Then state the dual form. (2024–25 Q1c)', points: ['Multiplies yz by (x + x\')', 'yz = xyz + x\'yz', 'xy + xyz = xy(1+z) = xy', 'x\'z + x\'yz = x\'z(1+y) = x\'z', 'States the result xy + x\'z and that yz is redundant', 'Dual: (x+y)(x\'+z)(y+z) = (x+y)(x\'+z)'], model: '<p>xy + x\'z + yz = xy + x\'z + yz(x + x\') = xy + x\'z + xyz + x\'yz = xy(1 + z) + x\'z(1 + y) = xy + x\'z. So yz is redundant. Dual: (x+y)(x\'+z)(y+z) = (x+y)(x\'+z).</p>' });
+</script>
+</body>
+</html>

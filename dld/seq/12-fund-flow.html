@@ -1,0 +1,309 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fundamental mode: flow tables · CSE 205 Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<style>
+.krow{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:flex-start}.km1{min-width:0}.kgroup{margin:.8em 0;padding:.4em .6em;border:1px solid var(--line);border-radius:6px}
+h4.step{margin:1.2em 0 .3em;font:600 13px var(--mono);text-transform:uppercase;letter-spacing:.05em;color:var(--accent)}
+.eqs{font-family:var(--mono);padding-left:1.2em}.eqs li{margin:.2em 0}.dsa-fig.kmap{max-width:100%;height:auto}
+.fm5 li{margin:.25em 0}.fm5{font-size:.97rem}
+</style>
+</head>
+<body>
+<main>
+
+<div class="eyebrow">Asynchronous circuits · Nelson Ch. 10 / Kohavi (Async) · Adnan sir L18–19 (Sep 22, 26) · "35-mark #1 question", every year</div>
+<h1>Fundamental-mode circuits: primitive and reduced flow tables</h1>
+<p class="lede">Fundamental mode was asked in <b>every one of the 8 papers</b>, always as the biggest Section B question: 2024–25 none (pulse mode instead), 2023–24 Q8a (23 marks, inputs a b c, output U), 2022–23 Q8b (12, excitation function → flow table) and Q8a (race, see next chapter), 2021–22 Q8a (20, railroad crossing: primitive + reduced), 2020–21 Q8a (25, x₁/x₂ detector: whole design to the circuit), 2019–20 Q4b (25, electrical lock: whole design), 2018–19 Q8a (20, z = 1 on x₂ rising with x₁ = 0 …), 2017–18 Q8a (20, two outputs, sequences 00-01-11 and 00-10-11). The bank has 14 fundamental-mode items (gated latch, edge-triggered T, "what is fundamental mode", output of unstable states, excitation functions). Adnan sir's hints: <b>"35 mark #1 question"</b> and <b>"TF #3: 25 → fundamental, 10 → state assignment, will definitely come"</b>. This chapter is the 25; the next chapter is the 10.</p>
+
+<div class="key"><b>The whole method on one screen</b>
+<ol>
+<li><b>Rules of the game:</b> level inputs, <b>only one input changes at a time</b> (so 00 → 11 is never allowed; columns are written in Gray order 00 01 11 10), and the circuit settles before the next change.</li>
+<li><b>Primitive flow table:</b> one row per situation, <b>exactly one stable (circled) entry per row</b>. From a stable cell, change one input: if a row with the right output is already stable in that column, point to it; else start a new row. The two double-change cells are "–". Output of an unstable cell: "–" unless quick/slow is stated.</li>
+<li><b>Reduce it</b> (even if the question does not say so): implication table → compatible pairs → maximal compatibles and incompatibles → bounds l ≤ k ≤ u → smallest closed cover → merge rows (stable entries keep their circle).</li>
+<li><b>Race-free assignment</b> (next chapter): transition diagram, add spare rows for triangles. Then the transition table, K-maps for Y and Z (D latches: Y = next state), circuit.</li>
+<li><b>Check</b> by walking the table: change one input = move sideways; if the entry is not circled, move down to that row, repeat until circled.</li>
+</ol></div>
+
+<h2>1. Words you must be able to define</h2>
+<div class="def"><dl>
+<dt>Fundamental mode (4 marks, 2015–16)</dt><dd>An asynchronous circuit with <b>level</b> inputs, no clock, in which <b>only one input changes at a time</b> and the next change comes only after the circuit has reached a stable state.</dd>
+<dt>Total state</dt><dd>The pair (input combination, internal state): a cell of the flow table.</dd>
+<dt>Stable / unstable</dt><dd>A total state is <b>stable</b> if the next-state entry equals its own row (circled). Otherwise it is <b>unstable</b>: the secondary variables change and the circuit moves vertically to the row named, in the same column, until it reaches a circled entry.</dd>
+<dt>Primitive flow table</dt><dd>One stable state per row; written straight from the words. "Analogous to a state table" (Adnan sir).</dd>
+</dl></div>
+<div class="hint"><b>Output of an unstable cell (7 marks, 2011–12).</b> Adnan sir's rule: <b>turns ON quickly → 1; turns ON slowly → 0; turns OFF quickly → 0; turns OFF slowly → 1</b>. If the question says nothing about quick or slow, write "–" (don't care) in every unstable cell where the output changes; where the output is the same before and after, write that value. Stable cells always carry the output of the state.</div>
+
+<h2>2. Reading a flow table: try it</h2>
+<p>This is the reduced table of 2018–19 Q8a (derived in section 5). Click an input value (change only one bit at a time) and watch the circuit go sideways to the new column, then down while the entry is not circled.</p>
+<div id="fl0"></div>
+
+<h2>3. Building the primitive flow table from words</h2>
+<div class="method"><h4>Primitive flow table (DFS with backtracking)</h4><ol>
+<li>Write the columns 00 01 11 10. Row 1 = the starting input, stable, with the starting output. Circle it.</li>
+<li>From a stable cell, <b>change one input</b> (move to a neighbouring column; never diagonal). Decide the output the new stable situation needs, and what the circuit must remember.</li>
+<li>If a row is already stable in that column with that output <b>and the same future</b>, write its number in this cell. Otherwise <b>make a new row</b>, circle its number in the new column, and write the new row's number in the cell you came from.</li>
+<li>Fill the unstable cell's output by the rule above.</li>
+<li>Explore every neighbour of every row (that is the DFS); when a row has been explored in all legal directions, go back. Cells for double changes (00 ↔ 11, 01 ↔ 10) stay "–". Cells the story forbids stay "–".</li>
+<li>Check: every row has <b>one</b> circled entry; every column has a stable entry for each output the question produces.</li>
+</ol></div>
+<p>The question is about <b>histories</b>: the same input pair with different outputs, or with different futures, needs different rows. That is why every question says "the first change that follows", "after the sequence", "in this order".</p>
+
+<h2>4. Reducing: merge compatible rows</h2>
+<div class="method"><h4>Reduction of a flow table</h4><ol>
+<li><b>Implication table</b> (the same as for incompletely specified machines): for each pair of rows, cross it out if some column has two <b>different specified outputs</b>. Otherwise list the pairs of next states that must also be compatible (two different next states in one column). A pair is crossed out if an implied pair is crossed out. A stable entry (own row) counts as a next state, like any other.</li>
+<li>Pairs left = <b>compatible pairs</b>. Draw the merger graph; its maximal cliques are the <b>maximal compatibles</b>. The crossed pairs give the <b>maximal incompatibles</b>.</li>
+<li>Bounds: lower l = size of the largest incompatible set; upper u = number of maximal compatibles (and at most the number of rows). So l ≤ k ≤ u.</li>
+<li><b>Closed cover</b> of the smallest size: every row in some chosen set (covering), and the next states of every set lie inside one chosen set (closed). Try size l first. Then the answer is "minimum".</li>
+<li><b>Reduced table:</b> one row per chosen set. In each column take the <b>next states</b> of its members; the entry is the chosen set that contains them. Stable entries stay circled; outputs are the specified ones of the members.</li>
+</ol></div>
+<div class="hint"><b>Differs from the textbook / from state minimisation (Section 10):</b> the machine is incompletely specified because of the "–" cells, so the same compatibles/closed-cover procedure applies. Prefer a cover whose sets do not overlap, and, if the next chapter's assignment fails, try another cover of the same size (below, the 2021–22 table has two).</div>
+
+<h2>5. 2018–19 Q8a, in full (20 marks)</h2>
+<div class="exam"><div class="exam-src">2018–19 Q8(a) · 10 + 10 marks</div><div class="exam-q"><p>Construct a primitive flow table for a fundamental mode circuit whose output Z is 0 when the two inputs x₁ and x₂ are equal. Z = 1 results when x₁ = 0 and x₂ changes from 0 to 1, and when x₁ = 1 and x₂ changes from 1 to 0. No other input change causes an output change. Determine the reduced flow table with the minimum number of rows.</p></div>
+<details open><summary>Answer</summary><div class="exam-a">
+<p><b>Think in histories.</b> At 01 the output depends on how we got there: from 00 (x₂ rose with x₁ = 0) Z = 1; from 11 (x₁ fell) Z stays 0. Likewise at 10: from 11 (x₂ fell with x₁ = 1) Z = 1; from 00 Z = 0. Rows:</p>
+<ol><li>row 1 = 00, Z = 0 (start) · row 2 = 01, Z = 1 (came from 00) · row 3 = 11, Z = 0 · row 4 = 01, Z = 0 (came from 11) · row 5 = 10, Z = 1 (came from 11) · row 6 = 10, Z = 0 (came from 00).</li></ol>
+<p><b>Primitive flow table</b> (stable entries circled, "–" = not allowed or output unspecified):</p>
+<div id="p0"></div>
+<p><b>Implication table.</b> Step through it:</p>
+<div id="i0"></div>
+<p>Compatible pairs: 1-2, 1-6, 2-5, 2-6, 3-4, 3-5, 4-5, 4-6. Maximal compatibles {1,2,6} {3,4,5} {2,5} {4,6}; maximal incompatibles {1,3} {1,4} {1,5} {2,3} {2,4} {3,6} {5,6}; l = 2, u = 4. The only closed cover of size 2 is {1,2,6} {3,4,5}: a = {1,2,6}, b = {3,4,5}.</p>
+<p><b>Reduced flow table:</b></p><div id="f0"></div>
+<p>Two rows: one state variable. Stable cells: a at 00, 01, 10; b at 01, 11, 10. A single secondary variable means <b>no race is possible</b>.</p>
+</div></details></div>
+<div class="write"><h4>What to write (primitive + reduced flow table, 10 + 10 marks)</h4><ol>
+<li>One line on the assumptions: "fundamental mode: one input changes at a time, so 00–11 and 01–10 are never adjacent".</li>
+<li>The meaning of every row in a short list ("row 2 = 01, Z = 1, came from 00").</li>
+<li>The primitive flow table: circled stable entries, one per row, "–" where not allowed, outputs next to every entry.</li>
+<li>The implication table with the crossed pairs and the implied pairs written in the cells; the list of compatible pairs; maximal compatibles and incompatibles; l ≤ k ≤ u.</li>
+<li>The chosen closed cover and the reduced table with its names (a = (1,2,6) …).</li>
+<li>Only if asked: assignment, K-maps, circuit (section 7).</li></ol></div>
+
+<h2>6. 2017–18 Q8a: two outputs (20 marks)</h2>
+<div class="exam"><div class="exam-src">2017–18 Q8(a) · 10 + 10 marks</div><div class="exam-q"><p>Fundamental mode circuit, inputs x₁x₂, outputs z₁z₂. At 00 the output is 00. Output 10 is produced after the input sequence 00-01-11 and stays 10 until the input returns to 00 (then 00). Output 01 is produced after 00-10-11 and stays until 00. Primitive flow table; minimum-row reduced flow table.</p></div>
+<details open><summary>Answer</summary><div class="exam-a">
+<p>Rows: 1 = 00 (00); 2 = 01 after 00 (00); 3 = 11 after 00-01 (<b>10</b>); 4 = 01 after 3 (10, still 10 until 00); 5 = 10 after 3 (10); 6 = 10 after 00 (00); 7 = 11 after 00-10 (<b>01</b>); 8 = 01 after 7 (01); 9 = 10 after 7 (01). Going back to 00 from any of 3–9 sends to row 1; the output drops to 00 in an unstable cell, so it is "–" there (not stated whether quickly or slowly).</p>
+<div id="p1"></div>
+<div id="i1"></div>
+<p>Maximal compatibles {3,4,5} {7,8,9} {1,2} {1,6} {2,5} {6,8}; maximal incompatibles: 17 of them, the largest of size 4; l = 4, u = 6. 7 closed covers of size 4 exist; a tidy one is {3,4,5} {7,8,9} {1,2} {6}. <b>Minimum = 4 rows</b>.</p>
+<div id="f1"></div>
+<p>Read it: a = {1,2} idle, b = {3,4,5} output 10, c = {6} "x₁ first" (00), d = {7,8,9} output 01. The next chapter shows this 4-row table has triangles (no 2-variable race-free assignment without extra rows).</p>
+</div></details></div>
+
+<h2>7. 2019–20 Q4b: electrical lock, the whole design (25 marks)</h2>
+<div class="exam"><div class="exam-src">2019–20 Q4(b) · 25 marks</div><div class="exam-q"><p>Fundamental mode electrical lock with switch inputs X₁, X₂. The open signal Z = 1 only after: (i) start with X₁ = X₂ = 0; (ii) while X₂ = 0, X₁ is turned on and then off; (iii) then, while X₁ stays off, X₂ is turned on, which opens the lock (Z = 1); (iv) any deviation leaves the lock closed (Z = 0). Give the primitive flow table, reduced flow table, race-free state assignment, K-maps and circuit diagram.</p></div>
+<details open><summary>Answer</summary><div class="exam-a">
+<p><b>Sequence of inputs:</b> 00 → 10 → 00 → 01. Anything else is a "deviation" that keeps Z = 0 until the inputs return to 00, where the lock starts again. <b>Assumption:</b> after opening, X₂ turned off (back to 00) closes the lock and restarts; X₁ turned on while open (11) is a deviation.</p>
+<p>Rows: 1 = 00 fresh · 2 = 01 deviation · 3 = 11 deviation · 4 = 10 deviation · 5 = 10 (X₁ on, correct so far) · 6 = 00 (X₁ on then off, correct so far) · 7 = 01 <b>open</b>, Z = 1.</p>
+<div id="p2"></div>
+<div id="i2"></div>
+<p>Compatibles: maximal {2,3,4} {1,2} {4,7} {5,6}; l = 4, u = 4, so k = 4: a = {1} fresh, b = {2,3,4} dead (deviated), c = {5,6} correct so far, d = {7} open.</p>
+<div id="f2"></div>
+<p><b>Race-free assignment.</b> Every pair of the four rows must be adjacent (a–b, a–c, a–d, b–c, b–d, c–d): a complete graph K₄, impossible with 2 variables. Use Adnan sir's recipe (next chapter, same as his TF #3): 3 variables, a = 000 in the middle, spare rows b′ (b–c), c′ (c–d), d′ (b–d). Then every unstable move changes one bit:</p>
+<div id="d2"></div>
+<p>Z = y₃: only the open row d = 100 has Z = 1 (the spare row d′ = 101 is a via-row; its output was "–").</p>
+<p class="tracer-hint">Verified by simulation in the build: random single-input-change walks of the specification and of these equations agree on the output after every change, and every unstable move changes one state bit.</p>
+</div></details></div>
+<div class="write"><h4>What to write (full design, 25 marks)</h4><ol>
+<li>Assumptions and the input sequence the lock needs (00 → 10 → 00 → 01).</li>
+<li>Primitive flow table (7 rows) with row meanings.</li>
+<li>Implication table, compatible pairs, maximal compatibles/incompatibles, bounds, the cover, the reduced table.</li>
+<li>Transition diagram, the extra rows, the assignment (codes) and the race-free flow table.</li>
+<li>Transition table with the output column, K-maps for Y₃ Y₂ Y₁ and Z (variables x₁ x₂ y₃ y₂ y₁, unused codes = don't care).</li>
+<li>Equations and the circuit: AND-OR for each Y, feedback of y₃ y₂ y₁ (latch or delay element), Z gate.</li></ol></div>
+
+<h2>8. 2020–21 Q8a: x₁ after x₂ (25 marks, whole design)</h2>
+<div class="exam"><div class="exam-src">2020–21 Q8(a) · 25 marks</div><div class="exam-q"><p>Two inputs x₁, x₂, one output z. z changes 0 → 1 only on the first x₁ change that follows an x₂ change. A 1 → 0 change occurs only when x₁ changes 1 → 0 while x₂ = 1. Primitive flow table, reduced flow table, race-free state assignment, K-maps and circuit.</p></div>
+<details open><summary>Answer</summary><div class="exam-a">
+<p><b>What must be remembered.</b> Whether the <i>last</i> input change was an x₂ change ("armed"), and whether z is already 1. Three situations in each column: <b>U</b> (z = 0, last change was x₁ or nothing yet), <b>A</b> (z = 0, armed: the last change was x₂), <b>O</b> (z = 1). An x₂ change always arms; an x₁ change from A makes z = 1; from U it keeps z = 0. In O, nothing changes z except x₁ falling while x₂ = 1 (11 → 01), which gives z = 0 and "unarmed" (the last change was x₁). Assumed start: 00, z = 0, unarmed.</p>
+<p>Primitive flow table (rows are numbered in the order the search finds them: 1 = 00 U, 2 = 01 A, 3 = 00 A, 4 = 10 O, 5 = 00 O, 6 = 01 O, 7 = 11 O, 8 = 01 U, 9 = 11 U, 10 = 10 A, 11 = 11 A, 12 = 10 U):</p>
+<div id="p3"></div>
+<p>12 rows. Maximal compatibles {4,5,6} {1,12} {2,3} {4,7} {8,9} {10,11}; l = u = 6. So the minimum is 6 rows, and 3 closed covers of size 6 exist. Use {5,6} {1,12} {2,3} {4,7} {8,9} {10,11} (this one needs only one spare row; for the other two covers no 3-variable assignment with up to three spare rows exists).</p>
+<div id="f3"></div>
+<p>Six rows need 3 state variables, but the six rows do not fit on a 3-cube with every unstable move one step long. One extra via-row b′ (between b and c) fixes it, 7 rows, 3 variables:</p>
+<div id="d3"></div>
+<p class="tracer-hint">Checked in the build: random single-input-change walks of the specification and of these equations give the same z after every change, and every unstable move changes one state bit.</p>
+</div></details></div>
+
+<h2>9. 2021–22 Q8a: railroad crossing (20 marks)</h2>
+<div class="exam"><div class="exam-src">2021–22 Q8(a) · 10 + 10 marks</div><div class="exam-q"><p>At a junction of a single-track railroad and a road, lights are controlled by switches pressed or released by trains. When a train approaches from either direction and is within 1500 ft, the lights change from green to red and stay red until the train is 1500 ft past the junction. A train is shorter than 3000 ft. Primitive flow table and its reduction.</p></div>
+<details open><summary>Answer</summary><div class="exam-a">
+<p><b>Model (state it).</b> Switch x₁ is 1500 ft west, x₂ is 1500 ft east, 1 = pressed by a train. Output z = 1 means red. Because a train is shorter than 3000 ft (the switches are 3000 ft apart), its tail leaves the first switch before its nose reaches the second, so <b>x₁ and x₂ are never pressed together</b>: column 11 is unspecified. West-to-east train: 00 → 10 → 00 → 01 → 00, red from the first press until the last release. East-to-west: 00 → 01 → 00 → 10 → 00.</p>
+<p>Rows: 1 = 00 green · 2 = 01 first switch (from east), red · 3 = 00 between (from east), red · 4 = 10 second switch (to west), red · 5 = 10 first switch (from west), red · 6 = 00 between, red · 7 = 01 second switch (to east), red.</p>
+<div id="p4"></div>
+<div id="i4"></div>
+<p>Maximal compatibles {2,3} {2,5} {3,6} {4,7} {5,6} {1}; l = 4, u = 6. 2 covers of size 4. The one used here, {2,5} {3,6} {4,7} {1}, treats the two directions as the same rows (a = idle, b = first switch pressed, c = between switches, d = second switch pressed); it also allows a 2-variable race-free assignment (next chapter).</p>
+<div id="f4"></div>
+</div></details></div>
+
+<h2>10. 2023–24 Q8a: inputs a, b, c, output U (23 marks)</h2>
+<div class="exam"><div class="exam-src">2023–24 Q8(a) · 23 marks</div><div class="exam-q"><p>Asynchronous fundamental-mode circuit with inputs a, b, c and output U. U = 1 only if all three inputs are 1 and they went to 1 in the order a, b, c. U returns to 0 when all inputs return to 0. Give the primitive flow table, the reduced flow table, the minimum number of states for a race-free assignment and a possible assignment.</p></div>
+<details open><summary>Answer</summary><div class="exam-a">
+<p><b>Assumptions.</b> Three inputs: 8 columns in Gray order 000 001 011 010 110 111 101 100 (only single-bit moves are neighbours). U is set when 111 is reached in the order a, b, c and <b>held</b> until abc = 000. If you read it as "U = 1 only at 111", change the output of the held rows; the table structure does not change.</p>
+<p>Situations: <b>alive</b> (the 1s so far came in the order a, then b: columns 000, 100, 110), <b>dead</b> (any wrong order: stays dead until 000), <b>open</b> (U = 1, held). Primitive table (17 rows: 1 = 000 alive; 2–8 dead at 001 011 010 110 111 101 100; 9 = 100 alive; 10 = 110 alive; 11–17 open at 111 011 001 101 100 110 010):</p>
+<div id="p5"></div>
+<p>The alive rows 1, 9, 10 are compatible, because the column itself says how far the sequence has got; all dead rows are compatible; all open rows are compatible. l = 3. <b>Minimum 3 rows:</b></p>
+<div id="f5"></div>
+<p>Race-free assignment: the unstable moves are a → b, a → c, b → a, c → a. The transition diagram is the path b – a – c, so <b>3 states, 2 variables</b>: a = 00, b = 01, c = 10 (a is adjacent to both). No extra rows.</p>
+<div id="r5"></div>
+</div></details></div>
+
+<h2>11. Older items from the bank</h2>
+<div class="exam"><div class="exam-src">Bank #250 · 2011–12 · 6 + 6 marks</div><div class="exam-q"><p>Gated latch with inputs G and D, output Q: Q follows D while G = 1; when G goes to 0 the value of D at that time is held. Fundamental mode. Derive the primitive flow table and the reduced flow table.</p></div>
+<details open><summary>Answer</summary><div class="exam-a"><p>Columns G D = 00 01 11 10. With G = 1 the output equals D (stable states 11 with Q = 1 and 10 with Q = 0); with G = 0 it holds, so 00 and 01 each need a row for Q = 0 and for Q = 1. That is 6 rows: 1 = 00,Q0; 2 = 01,Q0; 3 = 11,Q1; 4 = 01,Q1; 5 = 00,Q1; 6 = 10,Q0.</p><div id="p6"></div><p>Maximal compatibles {1,2,6} {3,4,5} {3,6}; l = 2. Minimum 2 rows: a = Q0 {1,2,6}, b = Q1 {3,4,5}.</p><div id="f6"></div></div></details></div>
+<div class="exam"><div class="exam-src">Bank #249 · 2015–16 · 12 marks</div><div class="exam-q"><p>Derive the primitive flow table of a negative-edge triggered T flip-flop (inputs T and clock C, output Q).</p></div>
+<details open><summary>Answer</summary><div class="exam-a"><p>Columns T C = 00 01 11 10. Q toggles only when C falls while T = 1 (11 → 10). Rows (Q = 0): 1 = 00, 2 = 01, 3 = 11, 8 = 10; (Q = 1): 4 = 10, 5 = 00, 6 = 01, 7 = 11. Changing T, or C rising, or C falling with T = 0, keeps Q.</p><div id="p7"></div><p>Four rows after reduction: {1,2,8} {4,5,6} {3} {7}.</p><div id="f7"></div></div></details></div>
+
+<h2>12. The other direction: excitation function → flow table (2022–23 Q8b, 12 marks)</h2>
+<div class="exam"><div class="exam-src">2022–23 Q8(b) · 12 marks (bank #251, #253)</div><div class="exam-q"><p>An asynchronous circuit has the excitation function y = x₁x₂' + (x₁ + x₂')y and output z = y. (i) Draw the logic diagram. (ii) Derive the transition table and the output map. (iii) Obtain a two-state flow table.</p></div>
+<details open><summary>Answer</summary><div class="exam-a">
+<ol><li><b>Logic diagram:</b> AND of x₁ and x₂', AND of (x₁ + x₂') with y, OR of the two; the output y is fed back and is also z.</li>
+<li><b>Transition table</b> (y is the present state, entries Y; a cell is stable if Y = y). Row y = 0: 00 → 0, 01 → 0, 11 → 0, 10 → 1. Row y = 1: 00 → 1, 01 → 0, 11 → 1, 10 → 1.</li>
+<li><b>Flow table:</b> call y = 0 state a and y = 1 state b. z = y gives the outputs.</li></ol>
+<div id="an1"></div>
+<p>Read the table: y = 0 is state a, y = 1 is state b. Row a (y = 0) is stable at 00, 01, 11 and unstable (goes to b) at 10. Row b (y = 1) is stable at 00, 11, 10 and unstable (goes to a) at 01. Output z = y, so z = 0 in row a and z = 1 in row b.</p>
+</div></details></div>
+<div class="exam"><div class="exam-src">Bank #252 · 2016–17 · 15 marks</div><div class="exam-q"><p>Y₁ = x₁x₂ + x₁y₂' + x₂'y₁, Y₂ = x₂ + x₁y₁'y₂ + x₁'y₁, Z = x₂ + y₁. Draw the logic diagram and derive the transition table.</p></div>
+<details open><summary>Answer</summary><div class="exam-a"><p>Evaluate Y₁Y₂/Z for every (x₁x₂, y₁y₂). Rows y₁y₂ = 00, 01, 11, 10; columns x₁x₂ = 00, 01, 11, 10. Circle (stable) the cells where Y₁Y₂ = y₁y₂.</p><div id="an2"></div></div></details></div>
+
+<div class="trap"><h4>Traps that cost marks</h4><ul>
+<li>A diagonal move in the flow table (00 → 11 or 01 → 10). Those cells are "–".</li>
+<li>Two circled entries in one row of the primitive table (that is a reduced table, not primitive). One stable state per row.</li>
+<li>Reusing a row for the same column and output although the <b>future</b> is different (the "from 00" and "from 11" 01-states in 2018–19). Add a row.</li>
+<li>Skipping the reduction because "the question did not ask": Adnan sir says state minimisation is needed even if not asked.</li>
+<li>Writing an output in an unstable cell that contradicts the stable cell it ends in. Use "–" when the output changes and the question does not say quick/slow.</li>
+<li>Merging rows whose outputs differ in some column, or whose implied pairs are crossed out. Check the implication table.</li>
+<li>Reduced table: forgetting that a merged row's stable entries keep their circles, and that every unstable entry points to the row that contains the member's next states.</li></ul></div>
+
+<h2>Mandatory practice</h2>
+<div id="r1"></div>
+<div id="r2"></div>
+<div id="r3"></div>
+</main>
+<script src="../assets/book.js"></script><script src="../assets/logic.js"></script><script src="../assets/dld.js"></script>
+<script>
+// ---- page helpers (shared by 11-13) ----
+const spx = s => s.replace(/(?<=[0-9'])(?=[A-Za-z])/g, ' ');            // y2'y1 -> y2' y1
+const eqh = s => ov(spx(s));
+const lits = (t, names) => { const ns = [...names].sort((a, b) => b.length - a.length), out = []; let i = 0; t = t.trim(); while (i < t.length) { const nm = ns.find(v => t.startsWith(v, i)); if (!nm) { i++; continue; } i += nm.length; let s = nm; if (t[i] === "'") { s += "'"; i++; } out.push(s); } return out; };
+// circuit: spec {ins, ys, fns:[{name, expr, latch}], latches:[{label, kind:'SR'|'T'|'JK'|'D', pins:[..]}], outs:[{name, expr}]}
+function sch(sel, c) {
+  const sig = [...c.ins, ...c.ys], P = 44, x0 = 40, X = {}, ymax = [];
+  sig.forEach((s, i) => { X[s] = x0 + i * P; X[s + "'"] = x0 + i * P + 22; });
+  const all = [...(c.fns || []), ...(c.outs || [])], terms = all.map(f => f.expr === '0' || f.expr === '1' ? [] : f.expr.split('+').map(t => lits(t, sig)));
+  const needN = new Set(); terms.forEach(ts => ts.forEach(t => t.forEach(l => { if (l.endsWith("'")) needN.add(l.slice(0, -1)); })));
+  const gx = x0 + sig.length * P + 10, GW = 34, ox = gx + GW + 24, OW = 34, ex = ox + OW + 22, lx = ex + 6;
+  let y = 52, s = '', gy = [], outY = [];
+  all.forEach((f, fi) => {
+    const ts = terms[fi]; const top = y; const o = [];
+    if (!ts.length) { s += `<text class="lb" x="${gx}" y="${y + 8}" style="text-anchor:start">${f.name} = ${f.expr}</text>`; outY.push(y + 8); y += 26; return; }
+    ts.forEach(t => {
+      if (t.length === 1) { const yy = y + 7; s += `<line class="wr" x1="${X[t[0]]}" y1="${yy}" x2="${ts.length > 1 ? gx + GW + 8 : ex}" y2="${yy}"/><circle cx="${X[t[0]]}" cy="${yy}" r="2.6" style="fill:var(--fg)"/>`; o.push([ts.length > 1 ? gx + GW + 8 : ex, yy]); y += 22; return; }
+      const h = Math.max(26, t.length * 13), g = gateShape('and', gx, y, GW, h); s += g.svg;
+      t.forEach((l, i) => { const yy = y + (i + .5) * h / t.length; s += `<line class="wr" x1="${X[l]}" y1="${yy}" x2="${gx}" y2="${yy}"/><circle cx="${X[l]}" cy="${yy}" r="2.6" style="fill:var(--fg)"/>`; });
+      o.push([g.out[0], y + h / 2]); y += h + 10;
+    });
+    let my;
+    if (ts.length > 1) {
+      const h = Math.max(30, ts.length * 13), t0 = (top + y - 10) / 2 - h / 2, g = gateShape('or', ox, t0, OW, h); s += g.svg;
+      o.forEach(([px, py], i) => { const ty = t0 + (i + .5) * h / o.length; s += `<path class="wr" d="M${px},${py} H${ox - 12} V${ty} H${ox + 4}"/>`; });
+      my = t0 + h / 2; s += `<line class="wr" x1="${g.out[0]}" y1="${my}" x2="${ex}" y2="${my}"/>`;
+    } else { my = o[0][1]; if (terms[fi][0].length > 1) s += `<line class="wr" x1="${o[0][0]}" y1="${my}" x2="${ex}" y2="${my}"/>`; }
+    s += `<text class="lb" x="${gx - 6}" y="${top - 2}" style="text-anchor:start;fill:var(--accent)">${f.name}</text>`;
+    outY.push(my); y += 12;
+  });
+  const H = y + 6;
+  // buses
+  sig.forEach(v => { const used = (n) => terms.some(ts => ts.some(t => t.includes(n))); if (used(v)) s += `<line class="wr" x1="${X[v]}" y1="30" x2="${X[v]}" y2="${H}"/>`; if (needN.has(v)) { s += `<line class="wr" x1="${X[v] + 22}" y1="40" x2="${X[v] + 22}" y2="${H}"/><circle cx="${X[v]}" cy="28" r="2.6" style="fill:var(--fg)"/><line class="wr" x1="${X[v]}" y1="28" x2="${X[v] + 4}" y2="28"/><path class="gt" d="M${X[v] + 4},22 L${X[v] + 4},34 L${X[v] + 13},28 z"/><circle class="gt" cx="${X[v] + 16}" cy="28" r="3"/><path class="wr" d="M${X[v] + 19},28 H${X[v] + 22} V40"/>`; }
+    s += `<text class="lb" x="${X[v]}" y="14">${v}</text>`; if (needN.has(v)) s += `<text class="lb" x="${X[v] + 22}" y="14">${ovs(v + "'")}</text>`; });
+  // latches
+  const nf = (c.fns || []).length;
+  (c.latches || []).forEach((L0, k) => {
+    const mine = (c.fns || []).map((f, i) => ({ f, i })).filter(o => o.f.latch === k), ys0 = mine.map(o => outY[o.i]), top = Math.min(...ys0) - 14, bot = Math.max(...ys0) + 14, qy = (top + bot) / 2, qx = lx + 58, ly = H + 14 + k * 11;
+    s += `<rect class="gt" x="${lx}" y="${top}" width="58" height="${bot - top}" rx="3"/><text class="tx" x="${lx + 29}" y="${qy + 4}" style="font-size:11px">${L0.kind}</text>`;
+    mine.forEach((o, i) => { s += `<line class="wr" x1="${ex}" y1="${ys0[i]}" x2="${lx}" y2="${ys0[i]}"/><text class="sm" x="${lx + 4}" y="${ys0[i] + 3}" style="text-anchor:start">${o.f.pin}</text>`; });
+    s += `<path class="wr" d="M${qx},${qy} H${qx + 16 + k * 8} V${ly} H${X[L0.label]} V${H}"/><text class="sm" x="${qx + 4}" y="${qy - 4}" style="text-anchor:start">Q = ${L0.label}</text>`;
+  });
+  (c.outs || []).forEach((f, i) => { const my = outY[nf + i]; s += `<line class="wr" x1="${ex}" y1="${my}" x2="${ex + 36}" y2="${my}"/><text class="lb" x="${ex + 42}" y="${my}" style="text-anchor:start;font-weight:700">${f.name}</text>`; });
+  const W = lx + 58 + 16 + (c.latches || []).length * 8 + 40, HH = H + 20 + (c.latches || []).length * 11;
+  host(sel).innerHTML = `<div class="fg-wrap"><svg class="dsa-fig" viewBox="0 0 ${W} ${HH}" width="${W}" role="img" aria-label="circuit sketch">${s}</svg><div class="figlabel">${c.note || 'Circuit sketch: each box is the AND-OR network of one equation; Q of each latch is fed back to its bus.'}</div></div>`;
+}
+// static flow table with optional row labels and column heads
+function ft(sel, txt, cols = ['00', '01', '11', '10'], o = {}) {
+  const F = asTable(txt);
+  host(sel).insertAdjacentHTML('beforeend', flowHTML(F, cols, {}).replace('<th>row</th>', `<th>${o.corner || 'row'}</th>`));
+}
+// one K-map (vars, ones, dc) with its minimal cover drawn
+function kmapStatic(vars, ones, dc, name) {
+  const n = vars.length, m = L.minimize(n, ones, dc, vars), vals = valsOf(n, ones, dc);
+  return `<div class="km1"><div class="figlabel"><b>${name}</b> = ${ones.length ? eqh(m.sop) : '0'}</div>${kmapSVG(vars, vals, (m.sols[0] || []).map((q, j) => ({ cube: q, color: COL[j % COL.length] })))}</div>`;
+}
+
+// flow-table design helpers (pure, no DOM): shared by node generator and pasted into pages
+function expandFlow(T, pairs) { // T parseTable obj; pairs [[r,s,name]]
+  const t = JSON.parse(JSON.stringify(T)); const S = [...T.S];
+  pairs.forEach(([r, s, nm]) => { S.push(nm); t.t[nm] = T.I.map(() => [null, null]);
+    T.I.forEach((_, j) => { if (T.t[r][j][0] === s && s !== r) { t.t[r][j] = [nm, T.t[r][j][1]]; t.t[nm][j] = [s, T.t[r][j][1]]; }
+      if (T.t[s][j][0] === r && s !== r) { t.t[s][j] = [nm, T.t[s][j][1]]; t.t[nm][j] = [r, T.t[s][j][1]]; } }); });
+  return { S, I: T.I, t: t.t };
+}
+function flowText(T) { return T.S.map(r => r + ': ' + T.t[r].map(([n, o]) => n === null ? '-' : (n === r ? `(${n})` : n) + '/' + (o === null ? '-' : o)).join(' ')).join('\n'); }
+function adjOK(T, code) { return L.flowEdges(T).every(([a, b]) => L.pc(code[a] ^ code[b]) === 1); }
+// synthesis: cols = input column strings, ins names, ys state var names (MSB first)
+function fmSynth(T, code, cols, ins, ys) {
+  const ni = ins.length, b = ys.length, vars = [...ins, ...ys], n = ni + b, used = T.S.map(s => code[s]);
+  const Y = ys.map(() => ({ ones: [], dc: [] })), Z = { ones: [], dc: [] }, seen = new Set(), table = {};
+  T.S.forEach(s => cols.forEach((c, j) => { const idx = (parseInt(c, 2) << b) | code[s], [nx, o] = T.t[s][j]; seen.add(idx);
+    if (nx === null) ys.forEach((_, k) => Y[k].dc.push(idx)); else ys.forEach((_, k) => { if ((code[nx] >> (b - 1 - k)) & 1) Y[k].ones.push(idx); });
+    if (o === null) Z.dc.push(idx); else if (o === '1') Z.ones.push(idx); }));
+  L.range(1 << n).forEach(i => { if (!seen.has(i)) { Y.forEach(y => y.dc.push(i)); Z.dc.push(i); } });
+  const f = x => ({ ...x, m: L.minimize(n, x.ones, x.dc, vars) });
+  return { vars, n, Y: Y.map(f), Z: f(Z), b };
+}
+if (typeof module !== 'undefined') module.exports = { expandFlow, flowText, adjOK, fmSynth };
+
+// ---- fundamental-mode design display ----
+// o: {X: expanded flow table text (rows incl. via rows), code:{row:int}, cols, ins, ys, base:[rows that are original], note}
+function fmShow(sel, o) {
+  const el = host(sel), T = L.parseTable(o.X.replace(/[()]/g, '')), cols = o.cols || ['00', '01', '11', '10'], b = o.ys.length, R = fmSynth(T, o.code, cols, o.ins, o.ys), bin = c => L.bin(c, b);
+  let h = `<h4 class="step">A · Race-free flow table with codes</h4><div class="t1"></div><p>${T.S.map(s => `${s} = ${bin(o.code[s])}`).join(', ')}</p>`;
+  const byCode = L.range(1 << b);
+  h += `<h4 class="step">B · Transition table (next state ${o.ys.join('')}, output) — rows in code order</h4>` + tbl(['code', 'row', ...cols.map(c => o.ins.join('') + ' = ' + c)], byCode.map(c => { const s = T.S.find(x => o.code[x] === c); return [bin(c), s || '–', ...cols.map((_, j) => { if (!s) return '–'; const [n, z] = T.t[s][j]; return n === null ? '–' : `${bin(o.code[n])}${z === null ? ', –' : ', ' + z}`; })]; }));
+  h += `<h4 class="step">C · K-maps (variables ${R.vars.join(' ')}; unused codes and unspecified cells are don't-cares)</h4><div class="krow">${R.Y.map((y, k) => kmapStatic(R.vars, y.ones, y.dc, 'Y' + o.ys[k].replace(/^y/, ''))).join('')}${kmapStatic(R.vars, R.Z.ones, R.Z.dc, o.zname || 'Z')}</div>`;
+  h += `<h4 class="step">D · Equations (D latches: the transition table is the excitation table, D = Y)</h4><ul class="eqs">${R.Y.map((y, k) => `<li><b>Y${o.ys[k].replace(/^y/, '')}</b> = ${eqh(y.m.sop)}</li>`).join('')}<li><b>${o.zname || 'Z'}</b> = ${eqh(R.Z.m.sop)}</li></ul>`;
+  h += `<h4 class="step">E · Circuit</h4><div class="ck"></div>`;
+  el.innerHTML = h; ft(el.querySelector('.t1'), flowText(T), cols, { corner: 'row' });
+  sch(el.querySelector('.ck'), { ins: o.ins, ys: o.ys, fns: R.Y.map((y, k) => ({ name: 'Y' + o.ys[k].replace(/^y/, ''), expr: y.m.sop, latch: k, pin: 'D' })), latches: o.ys.map(y => ({ label: y, kind: 'D latch' })), outs: [{ name: o.zname || 'Z', expr: R.Z.m.sop }], note: 'Circuit sketch: Y = next state from the AND-OR network, memory = the feedback delay (drawn as a D latch), y fed back.' });
+  return R;
+}
+
+const D = {"p0":"1: (1)/0 2/- - 6/0\n2: 1/- (2)/1 3/- -\n3: - 4/0 (3)/0 5/-\n4: 1/0 (4)/0 3/0 -\n5: 1/- - 3/- (5)/1\n6: 1/0 - 3/0 (6)/0","f0":"a: (a)/0 (a)/1 b/0 (a)/0\nb: a/0 (b)/0 (b)/0 (b)/1","p1":"1: (1)/00 2/00 - 6/00\n2: 1/00 (2)/00 3/- -\n3: - 4/10 (3)/10 5/10\n4: 1/- (4)/10 3/10 -\n5: 1/- - 3/10 (5)/10\n6: 1/00 - 7/- (6)/00\n7: - 8/01 (7)/01 9/01\n8: 1/- (8)/01 7/01 -\n9: 1/- - 7/01 (9)/01","f1":"a: (a)/00 (a)/00 b/- c/00\nb: a/- (b)/10 (b)/10 (b)/10\nc: a/00 - d/- (c)/00\nd: a/- (d)/01 (d)/01 (d)/01","p2":"1: (1)/0 2/0 - 5/0\n2: 1/0 (2)/0 3/0 -\n3: - 2/0 (3)/0 4/0\n4: 1/0 - 3/0 (4)/0\n5: 6/0 - 3/0 (5)/0\n6: (6)/0 7/- - 5/0\n7: 1/- (7)/1 3/- -","f2":"a: (a)/0 b/0 - c/0\nb: a/0 (b)/0 (b)/0 (b)/0\nc: (c)/0 d/- b/0 (c)/0\nd: a/- (d)/1 b/- -","p3":"1: (1)/0 2/0 - 12/0\n2: 3/0 (2)/0 7/- -\n3: (3)/0 2/0 - 4/-\n4: 5/1 - 7/1 (4)/1\n5: (5)/1 6/1 - 4/1\n6: 5/1 (6)/1 7/1 -\n7: - 8/- (7)/1 4/1\n8: 3/0 (8)/0 9/0 -\n9: - 8/0 (9)/0 10/0\n10: 5/- - 11/0 (10)/0\n11: - 6/- (11)/0 10/0\n12: 1/0 - 11/0 (12)/0","f3":"a: (a)/0 b/0 f/0 (a)/0\nb: (b)/0 (b)/0 c/- c/-\nc: d/1 e/- (c)/1 (c)/1\nd: (d)/1 (d)/1 c/1 c/1\ne: b/0 (e)/0 (e)/0 f/0\nf: d/- d/- (f)/0 (f)/0","p4":"1: (1)/0 2/- - 5/-\n2: 3/1 (2)/1 - -\n3: (3)/1 - - 4/1\n4: 1/- - - (4)/1\n5: 6/1 - - (5)/1\n6: (6)/1 7/1 - -\n7: 1/- (7)/1 - -","f4":"a: (a)/0 b/- - b/-\nb: c/1 (b)/1 - (b)/1\nc: (c)/1 d/1 - d/1\nd: a/- (d)/1 - (d)/1","p5":"1: (1)/0 2/0 - 4/0 - - - 9/0\n2: 1/0 (2)/0 3/0 - - - 7/0 -\n3: - 2/0 (3)/0 4/0 - 6/0 - -\n4: 1/0 - 3/0 (4)/0 5/0 - - -\n5: - - - 4/0 (5)/0 6/0 - 8/0\n6: - - 3/0 - 5/0 (6)/0 7/0 -\n7: - 2/0 - - - 6/0 (7)/0 8/0\n8: 1/0 - - - 5/0 - 7/0 (8)/0\n9: 1/0 - - - 10/0 - 7/0 (9)/0\n10: - - - 4/0 (10)/0 11/- - 9/0\n11: - - 12/1 - 16/1 (11)/1 14/1 -\n12: - 13/1 (12)/1 17/1 - 11/1 - -\n13: 1/- (13)/1 12/1 - - - 14/1 -\n14: - 13/1 - - - 11/1 (14)/1 15/1\n15: 1/- - - - 16/1 - 14/1 (15)/1\n16: - - - 17/1 (16)/1 11/1 - 15/1\n17: 1/- - 12/1 (17)/1 16/1 - - -","f5":"a: (a)/0 b/0 - b/0 (a)/0 c/- b/0 (a)/0\nb: a/0 (b)/0 (b)/0 (b)/0 (b)/0 (b)/0 (b)/0 (b)/0\nc: a/- (c)/1 (c)/1 (c)/1 (c)/1 (c)/1 (c)/1 (c)/1","p6":"1: (1)/0 2/0 - 6/0\n2: 1/0 (2)/0 3/- -\n3: - 4/1 (3)/1 6/-\n4: 5/1 (4)/1 3/1 -\n5: (5)/1 4/1 - 6/-\n6: 1/0 - 3/- (6)/0","f6":"a: (a)/0 (a)/0 b/- (a)/0\nb: (b)/1 (b)/1 (b)/1 a/-","p7":"1: (1)/0 2/0 - 8/0\n2: 1/0 (2)/0 3/0 -\n3: - 2/0 (3)/0 4/-\n4: 5/1 - 7/1 (4)/1\n5: (5)/1 6/1 - 4/1\n6: 5/1 (6)/1 7/1 -\n7: - 6/1 (7)/1 8/-\n8: 1/0 - 3/0 (8)/0","f7":"a: (a)/0 (a)/0 b/0 (a)/0\nb: - a/0 (b)/0 c/-\nc: (c)/1 (c)/1 d/1 (c)/1\nd: - c/1 (d)/1 a/-"};
+const C4 = ['00', '01', '11', '10'];
+function sec(id, txt) { ft('#' + id, txt); }
+flowLab('#fl0', { table: D.f0 });
+sec('p0', D.p0); implication('#i0', { table: D.p0 }); flowLab('#f0', { table: D.f0 });
+sec('p1', D.p1); implication('#i1', { table: D.p1 }); flowLab('#f1', { table: D.f1 });
+sec('p2', D.p2); implication('#i2', { table: D.p2 }); flowLab('#f2', { table: D.f2 });
+fmShow('#d2', { X: "a: (a)/0 b/0 - c/0\nb: a/0 (b)/0 (b)/0 (b)/0\nc: (c)/0 c'/- b'/0 (c)/0\nd: a/- (d)/1 d'/- -\nb': - - b/0 -\nc': - d/- - -\nd': - - b/- -", code: {"a":0,"b":1,"b'":3,"c":2,"c'":6,"d":4,"d'":5}, ins: ['x1', 'x2'], ys: ['y3', 'y2', 'y1'], zname: 'Z' });
+sec('p3', D.p3); flowLab('#f3', { table: D.f3 });
+fmShow('#d3', { X: "a: (a)/0 b/0 f/0 (a)/0\nb: (b)/0 (b)/0 b'/- b'/-\nc: d/1 e/- (c)/1 (c)/1\nd: (d)/1 (d)/1 c/1 c/1\ne: b/0 (e)/0 (e)/0 f/0\nf: d/- d/- (f)/0 (f)/0\nb': - - c/- c/-", code: {"a":0,"b":1,"c":7,"d":6,"e":3,"f":2,"b'":5}, ins: ['x1', 'x2'], ys: ['y3', 'y2', 'y1'], zname: 'z' });
+sec('p4', D.p4); implication('#i4', { table: D.p4 }); flowLab('#f4', { table: D.f4 });
+const C8 = ["000","001","011","010","110","111","101","100"];
+(function () { const el = document.getElementById('p5'); el.insertAdjacentHTML('beforeend', flowHTML(asTable(D.p5), C8)); })();
+flowLab('#f5', { table: D.f5, cols: C8 });
+raceFig('#r5', { table: D.f5.replace(/\/[01-]/g, ''), codes: { a: 0, b: 1, c: 2 }, bits: 2 });
+sec('p6', D.p6); flowLab('#f6', { table: D.f6 });
+sec('p7', D.p7); flowLab('#f7', { table: D.f7 });
+sec('an1', "a: (a)/0 (a)/0 (a)/0 b/0\nb: (b)/1 a/1 (b)/1 (b)/1");
+sec('an2', "00: (00)/0 01/1 11/1 10/0\n01: 00/0 (01)/1 11/1 (01)/0\n11: (11)/1 01/1 (11)/1 10/1\n10: 11/1 01/1 11/1 (10)/1");
+recall('#r1', { id: 'r1', marks: 20, q: 'Fundamental mode, inputs x1 x2, output z. z = 1 only after x2 changes 0 → 1 while x1 = 1, and it stays 1 until x1 falls to 0. Otherwise z = 0. Write the primitive flow table (with the meaning of every row), then reduce it.', points: ['States the assumptions: one input changes at a time, so 00–11 and 01–10 are "–"', 'Rows with histories: 11 reached from 01 (z = 0) differs from 11 reached from 10 (z = 1); 10 with z = 1 after x2 falls', 'Exactly one circled (stable) entry per row; stable cells carry the right output', 'Output "–" in unstable cells where it changes (no quick/slow stated)', 'Implication table: crossed pairs from conflicting outputs, implied pairs, compatible pairs', 'Maximal compatibles/incompatibles, bounds l ≤ k ≤ u, a closed cover', 'Reduced table with circles kept'], model: "<p>Columns x₁x₂ = 00 01 11 10. Rows: 1 = 00 (z 0); 2 = 01 (0); 3 = 11 (0, came from 01); 4 = 10 (0); 5 = 11 (<b>1</b>, x₂ rose with x₁ = 1, came from 10); 6 = 10 (1, x₂ fell with x₁ = 1). Falling x₁ always gives z = 0.</p><pre>1: (1)/0 2/0 - 4/0\n2: 1/0 (2)/0 3/0 -\n3: - 2/0 (3)/0 4/0\n4: 1/0 - 5/- (4)/0\n5: - 2/- (5)/1 6/1\n6: 1/- - 5/1 (6)/1</pre><p>Maximal compatibles {1,2,3} {1,4} {5,6}; l = 3, u = 3; reduced ({1,2,3} {5,6} {4}):</p><pre>a: (a)/0 (a)/0 (a)/0 b/0\nb: a/0 - c/- (b)/0\nc: a/- a/- (c)/1 (c)/1</pre>" });
+recall('#r2', { id: 'r2', marks: 7, q: 'Define fundamental-mode operation, total state, stable and unstable state, and state the rule for the output written in an unstable cell of a flow table.', points: ['Level inputs, no clock, one input changes at a time, circuit settles before the next change', 'Total state = (input combination, internal state) = one cell', 'Stable: next-state entry = own row (circled); unstable: the circuit moves vertically to the named row in the same column', 'ON quickly → 1, ON slowly → 0, OFF quickly → 0, OFF slowly → 1', 'No quick/slow given: "–" (don\'t care) where the output changes'], model: '<p>Fundamental mode: level inputs, no clock, one input at a time, stable before the next change. Total state: input plus internal state. Stable entry = row name (circled); unstable entry = another row: the secondary variables change until a circled entry is reached. Unstable-cell output: turns ON quickly 1, ON slowly 0, OFF quickly 0, OFF slowly 1; unspecified (–) if nothing is said.</p>' });
+recall('#r3', { id: 'r3', marks: 15, q: '2023–24 style: inputs a, b, c; output U = 1 when all three are 1 and they rose in the order a, b, c; U returns to 0 when all inputs are 0. Explain why the reduced table needs only 3 rows (what do the rows mean?) and how many state variables and which assignment are race-free.', points: ['Alive (order so far a, then b): the column itself tells the progress, so rows 000/100/110 merge', 'Dead (wrong order): all dead rows merge, they only return at 000', 'Open (U = 1 held): all open rows merge, return at 000', '3 rows → 2 variables; the transition diagram is a path b – a – c', 'a = 00, b = 01, c = 10: a adjacent to both, no extra rows'], model: '<p>Alive rows (the 1s so far came in the order a, b: columns 000, 100, 110), dead rows (wrong order) and open rows (U = 1, held until 000) each merge into one row, because inside a group the column tells everything. Reduced table: a, b, c. Unstable moves: a→b (wrong input), a→c (111 reached correctly), b→a and c→a (back at 000). That is a path b–a–c, so 2 variables: a = 00, b = 01, c = 10, with no spare row.</p>' });
+</script>
+</body>
+</html>

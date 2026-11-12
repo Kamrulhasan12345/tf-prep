@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tabulation Method · CSE 205 Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Combinational circuits · Mano §3.9–3.10 (tabulation handout) · Tanzima ma'am L10 (Jul 14, online) · 5 of 8 papers</div>
+<h1>The tabulation (Quine–McCluskey) method</h1>
+<p class="lede">The tabulation method was asked in 2019–20 Q7a (28 marks, F(A,B,C,D) = Σ(1,3,4,5,10,11,12,13,14), "first finding the essential prime implicants"), 2019–20 Q6a (15, merits and demerits against the K-map), 2021–22 Q1b (15, prime implicants of Σ(0,1,2,8,10,11,14,15)), 2022–23 Q4c (15, PIs and EPIs of Σ(0,2,3,5,7,8,9,10,11,13,15)), and 2024–25 Q2c (15, with a POS part: the purpose of tabulation against the K-map). Older papers: 2011–12 (the same Σ(0,1,2,8,10,11,14,15), 15), 2014–15 (when is tabulation preferable, 5), 2016–17 (5 variables, all PIs and EPIs, 20). Expect one 15–28 mark question or one short theory question each year. It is purely mechanical, so it is full marks if you copy ma'am's table layout and finish the PI chart.</p>
+
+<h2>1. What it is and why we need it</h2>
+<p>The tabulation method is an <b>iterative, systematic</b> way to find all prime implicants and then pick a minimum cover. It does by tables exactly what you do by eye on a K-map: combine minterms that differ in one variable, again and again, until nothing combines. Because it is a fixed procedure with no visual pattern-spotting, it works for <b>any number of variables</b> and can be programmed; ma'am's note: "good for computers".</p>
+<p><b>Differences from the textbook:</b> Mano's text writes the minterm <i>numbers</i> and the "difference power" (0,1 (1); 0,2,8,10 (2,8)). Ma'am draws the <b>binary</b> pattern with a dash for the eliminated variable, with a column per merge round and a "number of 1s" group label. The widgets below use her layout.</p>
+
+<h2>2. Procedure (her layout)</h2>
+<ol class="steps">
+<li><b>Column 1.</b> List every minterm <b>and every don't-care</b> in binary, grouped by the number of 1s ("0 ones, 1 one, 2 ones…"). Only neighbouring groups can combine.</li>
+<li><b>Compare</b> each term in a group with every term in the next group. If they differ in exactly <b>one bit</b>, write the merged term in the next column with a <b>dash</b> in that position, and tick (✓) both parents.</li>
+<li><b>Repeat</b> on the new column. Only terms with the <b>dashes in the same places</b> can merge. A term formed twice is written once. Stop when no pair merges ("no 1-bit differences, iteration stops").</li>
+<li><b>Prime implicants</b> = every term that was <b>never ticked</b>, in any column. Convert each to a product term (0 → complemented, 1 → plain, dash → variable absent).</li>
+<li><b>PI chart:</b> rows are the PIs, columns are the <b>minterms of F only</b> (never the don't-cares). Put a × where a PI covers a minterm.</li>
+<li><b>Essential PIs:</b> a column with a single × makes that row essential. Mark it, then tick off every column it covers.</li>
+<li><b>Cover the rest:</b> choose as few PIs as possible (then fewest literals) to cover the remaining columns. If the chart has no essential PI left and several choices, try the combinations (a <i>cyclic</i> chart).</li>
+<li>Write F as the sum of the essential PIs and the chosen ones.</li>
+</ol>
+<p>Don't-cares: they take part in the combining (so the PIs are larger) but are <b>not columns</b> of the chart (so they never have to be covered). Ma'am's slide says exactly this.</p>
+
+<h2>3. Worked: Σ(0,1,2,8,10,11,14,15)</h2>
+<div class="exam"><div class="exam-src">2021–22 Q1(b) · 15 marks · 2011–12 · her notes #2</div><div class="exam-q"><p>Find the prime implicants of F(w,x,y,z) = Σ(0, 1, 2, 8, 10, 11, 14, 15) by the tabulation method.</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<div id="t1"></div>
+<p><b>Column 1</b> (by number of 1s): 0000 · 0001, 0010, 1000 · 1010 · 1011, 1110 · 1111. <b>Column 2:</b> 0,1 = 000-; 0,2 = 00-0; 0,8 = -000; 2,10 = -010; 8,10 = 10-0; 10,11 = 101-; 10,14 = 1-10; 11,15 = 1-11; 14,15 = 111-. <b>Column 3:</b> 0,2,8,10 = -0-0 (formed twice, once written); 10,11,14,15 = 1-1-. Nothing combines further.</p>
+<p><b>Prime implicants</b> (never ticked): 000- (0,1) = w'x'y'; -0-0 (0,2,8,10) = x'z'; 1-1- (10,11,14,15) = wy. In the chart each is essential: 1 is only in w'x'y', 2 and 8 only in x'z', 11, 14, 15 only in wy. <b>F = w'x'y' + x'z' + wy.</b> (Ma'am calls the non-ticked terms "prime implicants"; here all happen to be essential too.)</p>
+</div></details></div>
+<div class="write"><h4>What to write (tabulation, 15 marks)</h4>
+<ol>
+<li><b>Column 1:</b> a table with group labels (0 ones, 1 one, 2 ones …), the minterm numbers and the binary strings.</li>
+<li><b>Column 2, 3 …:</b> the merged terms with minterm lists and dashes, a ✓ against every term that merged.</li>
+<li>A line "no more pairs differ in one bit, stop". Then the list of un-ticked terms = <b>prime implicants</b>, each written as a product term and with the minterms it covers.</li>
+<li><b>PI chart:</b> PIs down, minterms across, × marks, the single-× columns circled, essential PIs starred.</li>
+<li>The covering step (which PIs you add and why), and the final minimal expression.</li></ol></div>
+
+<h2>4. Essential PIs and a cyclic cover (2019–20 Q7a, 28 marks)</h2>
+<div class="exam"><div class="exam-src">2019–20 Q7(a) · 28 marks</div><div class="exam-q"><p>Using the tabulation method, simplify F(A,B,C,D) = Σ(1, 3, 4, 5, 10, 11, 12, 13, 14) by first finding the essential prime implicants.</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<div id="t2"></div>
+<p><b>Prime implicants (seven):</b> A'B'D (1, 3), A'C'D (1, 5), B'CD (3, 11), AB'C (10, 11), ACD' (10, 14), ABD' (12, 14), BC' (4, 5, 12, 13).</p>
+<p><b>Chart:</b> minterm 4 is only in BC' (and 13 only in BC' too), so <b>BC' is the only essential PI</b> (it covers 4, 5, 12, 13). That leaves 1, 3, 10, 11, 14. Each of those is in exactly two PIs: 1 in A'B'D or A'C'D; 3 in A'B'D or B'CD; 10 in AB'C or ACD'; 11 in B'CD or AB'C; 14 in ACD' or ABD'. No more essential PIs, so this is a <b>cyclic</b> chart: choose by trial. Three more PIs are enough, and fewer cannot do it, so there are several minimal answers (four of them, all with 4 terms and 11 literals):</p>
+<ul>
+<li>F = BC' + A'B'D + B'CD + ACD'</li>
+<li>F = BC' + A'B'D + AB'C + ACD'</li>
+<li>F = BC' + A'B'D + AB'C + ABD'</li>
+<li>F = BC' + A'C'D + B'CD + ACD'</li>
+</ul>
+<p>Give one, and say that the others are equally minimal. <b>Show the trial</b>: "choose A'B'D (covers 1, 3); then 10, 11, 14 remain; AB'C covers 10, 11; ACD' covers 14 and 10".</p>
+</div></details></div>
+<div class="exam"><div class="exam-src">2022–23 Q4(c) · 15 marks · 2014–15 (K-map version)</div><div class="exam-q"><p>Using the tabular method, find the prime implicants and essential prime implicants of F(A,B,C,D) = Σ(0, 2, 3, 5, 7, 8, 9, 10, 11, 13, 15).</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<div id="t3"></div>
+<p><b>PIs (six):</b> B'D' (0, 2, 8, 10), B'C (2, 3, 10, 11), CD (3, 7, 11, 15), BD (5, 7, 13, 15), AB' (8, 9, 10, 11), AD (9, 11, 13, 15). <b>EPIs:</b> B'D' (minterm 0 is only here) and BD (minterm 5 is only here). Minterms 3, 9, 11 stay; each is in two PIs, so choose one of B'C or CD for 3 and one of AB' or AD for 9; 11 is then covered. Four minimal answers, for example F = B'D' + BD + CD + AD (4 terms, 8 literals).</p>
+</div></details></div>
+
+<h2>5. Don't-cares in the table</h2>
+<p>Include the don't-cares in column 1 and let them merge. Do not put them in the chart. Ma'am's example F = Σ(1,3,7,11,15) + d(0,2,5):</p>
+<div id="t4"></div>
+<p>Column 1 holds 0, 1, 2, 3, 5, 7, 11, 15. The prime implicants are w'x' (0, 1, 2, 3), w'z (1, 3, 5, 7) and yz (3, 7, 11, 15). The chart has only the columns 1, 3, 7, 11, 15. Minterms 11 and 15 are only in yz, so yz is essential. Minterm 1 is in w'x' and w'z; either completes the cover, giving <b>F = yz + w'x'</b> or <b>F = yz + w'z</b>. The two answers differ on the don't-care inputs, which is allowed.</p>
+<p>Another of her slide examples, F = Σ(1,4,6,7,8,9,10,11,15) (no don't-cares): six PIs, the EPIs x'y'z, w'xz', wx' (each has a single-× column: 1, 4, 8/10), and the leftover 7 and 15 are both covered by xyz. <b>F = x'y'z + w'xz' + wx' + xyz.</b></p>
+<div id="t5"></div>
+
+<h2>6. POS by tabulation, and what tabulation is for (2024–25 Q2c)</h2>
+<p>To get a product of sums, run the same table on the <b>zeros</b> of F (treat the zeros as the minterms of F'), read F' as an SOP and complement. For 2024–25 Q2c, F = Σ(3,4,6,7,9,11,12,14,15) has zeros 0, 1, 2, 5, 8, 10, 13:</p>
+<div id="t6"></div>
+<p>PIs of F': B'D' (0, 2, 8, 10), A'B'C' (0, 1), A'C'D (1, 5), BC'D (5, 13). Essential: B'D' (minterms 2, 8, 10 are only here) and BC'D (13 is only here). Minterm 0 is covered by B'D', 5 by BC'D, and only 1 remains: A'B'C' or A'C'D. So F' = B'D' + BC'D + A'B'C' (or + A'C'D), and <b>F = (B + D)(B' + C + D')(A + B + C)</b>, or (B + D)(B' + C + D')(A + C + D'). Eight literals, same as the K-map answer in chapter 3.</p>
+<div class="exam"><div class="exam-src">2024–25 Q2(c), second part · 2014–15 5 marks</div><div class="exam-q"><p>What is the main purpose of the tabulation (Quine–McCluskey) method, and how does it systematically help compared to a K-map? When is it preferable?</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<p><b>Purpose:</b> to find <b>all prime implicants</b> of a function, and then a minimum cover, by a fixed step-by-step procedure instead of by looking at a diagram. <b>How it helps:</b> it is algorithmic, so it can be programmed and always gives the same, complete answer; it needs no adjacency drawing, so it works for 5, 6 or 20 variables, where a K-map becomes unmanageable (a 5-variable map needs two layers and a 6-variable map four). The grouping by number of 1s limits the comparisons (only adjacent groups are compared), and the PI chart picks essential PIs mechanically. <b>Prefer it</b> when there are more than 4 or 5 variables, when the work will be done by a program, or when you want to be sure no PI has been missed. For 2–4 variables, the K-map is faster.</p>
+</div></details></div>
+
+<h2>7. K-map against tabulation (2019–20 Q6a, 15 marks)</h2>
+<div class="exam"><div class="exam-src">2019–20 Q6(a) · 15 marks</div><div class="exam-q"><p>Compare the tabulation method and the Karnaugh map for minimising Boolean functions based on their merits and demerits.</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<div class="tbl"><table class="mat"><tr><th></th><th>K-map</th><th>Tabulation (Q-M)</th></tr>
+<tr><td>Merits</td><td>Visual and quick for 2–4 variables (5 with care). Easy to learn. You see adjacency, redundancy and don't-cares at once. No arithmetic.</td><td>Systematic and exact: always finds <b>all</b> prime implicants. Works for any number of variables. Programmable, so it is the basis of CAD minimisers. Not dependent on the person's eyesight or skill.</td></tr>
+<tr><td>Demerits</td><td>Impractical beyond 5–6 variables (the 3-D adjacency is hard to see). Depends on spotting groups by eye, so it is error-prone and can miss a PI or choose a non-minimal cover. Cannot be automated.</td><td>Tedious and slow by hand: many comparisons, and the number of minterms and terms grows quickly with the variable count. Easy to make a copying mistake in a long table. No visual feel for the function. The cyclic-cover step still needs trial (or Petrick's method).</td></tr>
+<tr><td>Use when</td><td>Few variables, quick hand work.</td><td>Many variables, or a computer does the work.</td></tr></table></div>
+<p>Conclusion line: "Both produce the same minimal result; the K-map is a manual tool for small problems and the tabulation method is the algorithmic tool for large ones."</p>
+</div></details></div>
+
+<h2>8. Five variables (2016–17, 20 marks)</h2>
+<div class="exam"><div class="exam-src">2016–17 · 20 marks (older)</div><div class="exam-q"><p>Minimise f(A,B,C,D,E) = Σ(0, 1, 2, 8, 9, 15, 17, 21, 24, 25, 27, 31) by the Q-M method. Find all PIs and the EPIs.</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<div id="t7"></div>
+<p><b>Eight PIs:</b> A'B'C'E' (0, 2), BCDE (15, 31), AB'D'E (17, 21), ABC'E (25, 27), ABDE (27, 31), A'C'D' (0, 1, 8, 9), C'D'E (1, 9, 17, 25), BC'D' (8, 9, 24, 25). <b>EPIs (four):</b> A'B'C'E' (responsible minterm 2), BCDE (15), AB'D'E (21), BC'D' (24). They cover 0, 2, 8, 9, 15, 17, 21, 24, 25, 31. Left over: <b>1 and 27</b>. Minterm 1 is in A'C'D' or C'D'E; minterm 27 is in ABC'E or ABDE. So two more terms: the minimal sum has six terms, and the 2 × 2 choices give four equally minimal answers, for example F = A'B'C'E' + BCDE + AB'D'E + BC'D' + A'C'D' + ABC'E. The animation's last frame lists the alternatives.</p>
+</div></details></div>
+
+<div class="trap"><h4>Traps that cost marks</h4><ul>
+<li>Putting don't-cares as columns in the PI chart. They are in the table, not in the chart.</li>
+<li>Merging terms whose dashes are in different positions, or terms that differ in two bits.</li>
+<li>Forgetting to tick both parents. A term left un-ticked is called a prime implicant, so a missed tick gives a wrong (non-prime) PI.</li>
+<li>Writing the same merged term twice. Write it once.</li>
+<li>Calling the un-ticked terms "essential". They are <b>prime</b>; essential ones come only from the chart.</li>
+<li>Stopping after the chart's essential PIs when some minterms are still uncovered.</li>
+<li>For POS: running the table on the 1s. Use the 0s, then complement.</li>
+</ul></div>
+
+<h2>Mandatory practice</h2>
+<div id="p1"></div>
+<div id="p2"></div>
+<div id="r1"></div>
+<div id="r2"></div>
+</main>
+<script src="../assets/book.js"></script><script src="../assets/logic.js"></script><script src="../assets/dld.js"></script>
+<script>
+const W = ['w', 'x', 'y', 'z'], A4 = ['A', 'B', 'C', 'D'];
+tabulation('#t1', { vars: W, ones: [0, 1, 2, 8, 10, 11, 14, 15] });
+tabulation('#t2', { vars: A4, ones: [1, 3, 4, 5, 10, 11, 12, 13, 14] });
+tabulation('#t3', { vars: A4, ones: [0, 2, 3, 5, 7, 8, 9, 10, 11, 13, 15] });
+tabulation('#t4', { vars: W, ones: [1, 3, 7, 11, 15], dc: [0, 2, 5] });
+tabulation('#t5', { vars: W, ones: [1, 4, 6, 7, 8, 9, 10, 11, 15] });
+tabulation('#t6', { vars: A4, ones: [0, 1, 2, 5, 8, 10, 13] });
+tabulation('#t7', { vars: ['A', 'B', 'C', 'D', 'E'], ones: [0, 1, 2, 8, 9, 15, 17, 21, 24, 25, 27, 31] });
+practice('#p1', { id: 'p1', kind: 'pis', n: 2 });
+practice('#p2', { id: 'p2', kind: 'epi', n: 1 });
+recall('#r1', { id: 'r1', marks: 15, q: 'Compare the tabulation method and the Karnaugh map for minimising Boolean functions: merits and demerits of each. When would you use tabulation? (2019–20 Q6a, 2024–25 Q2c)', points: ['K-map merit: visual, quick for 2–4 variables', 'K-map demerit: impractical beyond 5–6 variables, relies on spotting groups by eye, error-prone', 'Tabulation merit: systematic, finds all PIs, works for any number of variables', 'Tabulation merit: programmable / basis of computer minimisers', 'Tabulation demerit: tedious by hand, grows quickly with variables, easy to slip', 'Cyclic cover still needs trial (or Petrick)', 'Use tabulation for many variables or machine work; K-map for small hand problems'], model: '<p>See the comparison table in section 7: K-map is visual and fast for up to 4–5 variables but not automatable; tabulation is algorithmic, complete and scales, but is long by hand.</p>' });
+recall('#r2', { id: 'r2', marks: 15, q: 'Write the steps of the tabulation method as ma\'am draws it, including how don\'t-cares are treated, and how essential prime implicants are found. (2019–20 Q7a, 2022–23 Q4c)', points: ['Column 1: minterms and don\'t-cares in binary, grouped by number of 1s', 'Merge terms from adjacent groups that differ in one bit; dash in that position; tick both', 'Repeat; only same-dash terms merge; stop when nothing merges', 'Prime implicants = un-ticked terms', 'PI chart: rows PIs, columns minterms of F only (not don\'t-cares)', 'A column with one × makes that PI essential; tick the columns it covers', 'Cover the remaining columns with the fewest PIs; write F as the sum'], model: '<p>See section 2 for the eight numbered steps.</p>' });
+</script>
+</body>
+</html>

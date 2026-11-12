@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Synchronous Counters · CSE 205 Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Sequential circuits · Mano §5.7 · Adnan sir L4–L8 (22–30 Aug) · 4 of the last 8 papers</div>
+<h1>Synchronous counters for any sequence</h1>
+<p class="lede">Past term-final questions on this topic: <b>2017–18 Q5(a)</b> (20 marks, count 0→1→2→5→4→6 with S-R flip-flops), <b>2020–21 Q5(a)</b> (20, count 0→2→4→7→5→3 with S-R), <b>2021–22 Q5(a)</b> (20, the same sequence with one J-K, one T and one D flip-flop), <b>2022–23 Q7(b)</b> (13, count 1→2→5→7 with J-K, then analyse the unused states). Older papers asked the same thing with other sequences: T flip-flops 1,2,5,7 with invalid states going to the next state (2014–15, 15), J-K 1,2,4,7 (2013–14, 20), T 0,1,3,7,6,4 (2012–13, 15), a 3-bit Gray counter with J-K (2011–12 and 2014–15, 15), D 1,4,5,7,2 (2016–17, 10). Adnan sir also teaches the mod-N counter with T flip-flops, the up-down BCD counter and the "undefined states" problem. A synchronous-counter question has come in every paper from 2020–21 to 2022–23 and is a safe 13–20 marks.</p>
+
+<h2>1. The recipe: Adnan sir's 8 steps, applied to a counter</h2>
+<p>A counter has no input and no output. So the "state diagram" is just a ring, and the "state table" is a list of <i>present state → next state</i>. Use this exact order in the exam. The textbook name is in the third column.</p>
+<div class="tbl"><table class="mat"><tr><th>#</th><th>Adnan sir's name</th><th>Textbook name (Mano / Nelson)</th><th>For a counter</th></tr>
+<tr><td>1</td><td>State Diagram</td><td>state diagram</td><td>circles in a ring, arrows labelled "clk"</td></tr>
+<tr><td>2</td><td>State Table</td><td>state table</td><td>PS → NS for every state in the sequence</td></tr>
+<tr><td>3</td><td>#FF and state assignment</td><td>state assignment</td><td>#FF = ⌈log₂ #states⌉; the state's number in binary is its code</td></tr>
+<tr><td>4</td><td>Transition Table</td><td>state table in binary (next-state table)</td><td>the same as step 2 with binary codes Q2Q1Q0 → Q2⁺Q1⁺Q0⁺</td></tr>
+<tr><td>5</td><td>Excitation Requirement</td><td>flip-flop excitation table</td><td>the 4-row table for the chosen FF (Q → Q⁺ → inputs). Copy it from section 2.</td></tr>
+<tr><td>6</td><td>Excitation Table</td><td>flip-flop input columns of the state table</td><td>for every PS row, the FF inputs needed. Unused states: all x.</td></tr>
+<tr><td>7</td><td>K-Map</td><td>input equations</td><td>one K-map per FF input; unused states are don't-cares</td></tr>
+<tr><td>8</td><td>Circuit Diagram</td><td>logic diagram</td><td>FFs with one common clock, gates from the equations</td></tr></table></div>
+<p>Adnan sir writes the state variables as y<sub>2</sub> y<sub>1</sub> y<sub>0</sub> (present) and Y<sub>2</sub> Y<sub>1</sub> Y<sub>0</sub> (next), y<sub>2</sub> the MSB. The widgets below write Q2 Q1 Q0 (same thing). Both are fine in the exam; say which you use.</p>
+
+<h2>2. The four excitation requirement tables (memorise)</h2>
+<p>This is step 5. It answers: "to make Q go from Q to Q⁺, what must the inputs be?" An x is a don't-care and is worth a lot in the K-map.</p>
+<div class="tbl"><table class="mat"><tr><th>Q → Q⁺</th><th>S R</th><th>J K</th><th>T</th><th>D</th></tr>
+<tr><td>0 → 0</td><td>0 x</td><td>0 x</td><td>0</td><td>0</td></tr>
+<tr><td>0 → 1</td><td>1 0</td><td>1 x</td><td>1</td><td>1</td></tr>
+<tr><td>1 → 0</td><td>0 1</td><td>x 1</td><td>1</td><td>0</td></tr>
+<tr><td>1 → 1</td><td>x 0</td><td>x 0</td><td>0</td><td>1</td></tr></table></div>
+<p>How to remember: T = Q ⊕ Q⁺ (toggle only when the bit changes). D = Q⁺. J is "set", K is "reset": J = 1 sets, K = 1 clears, and the other one is x because it cannot matter. S-R is the same without the toggle row, so 0→0 and 1→1 each have one x.</p>
+<p>Try the drill: type the S R, J K, T or D values for a random Q sequence.</p>
+<div id="p2"></div>
+
+<h2>3. First example: Adnan sir's 2-bit binary counter (JK)</h2>
+<p>00 → 01 → 10 → 11 → 00. Two flip-flops. Work down the table below, then read the equations off the K-maps. His result is J₂ = K₂ = y₁ and J₁ = K₁ = 1 (his FF numbering 1, 2); here Q1 is the MSB, so J1 = K1 = Q0 and J0 = K0 = 1. Press "Clock" to watch it count.</p>
+<div id="c0"></div>
+<p>Pattern worth knowing: a JK flip-flop with J = K = 1 toggles on every clock, and with J = K = (all lower bits ANDed) it toggles only when every lower bit is 1. That is the binary up-counter, and it is why T flip-flops make the cheapest counter (section 7).</p>
+
+<h2>4. Counting with S-R flip-flops</h2>
+<div class="exam"><div class="exam-src">2017–18 Q5(a) · 20 marks</div><div class="exam-q"><p>Design a synchronous counter that counts 0 → 1 → 2 → 5 → 4 → 6 → 0 … using S-R flip-flops. Draw the circuit diagram.</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<p>Six states, so ⌈log₂ 6⌉ = 3 flip-flops. States 3 and 7 are unused: write x in every column of their rows.</p>
+<div id="c1"></div>
+<p>Equations: <b>S2 = Q2'Q1, R2 = Q2Q1, S1 = Q2'Q0 + Q2Q1'Q0', R1 = Q1, S0 = Q2'Q0', R0 = Q0</b>.</p>
+<p><b>Unused-state check (do it, it is cheap).</b> State 7 goes to 0, which is in the sequence. But state 3 = 011 gives S1 = 1 <i>and</i> R1 = 1 together, the forbidden S-R input, so Q1 is undefined if the circuit ever starts in state 3. The question did not ask for this, so most solutions skip it. Fix: send 3 to 4 instead of leaving it a don't-care. Only S1 changes, to S1 = Q2'Q1'Q0 + Q2Q1'Q0' (= Q1'(Q2 ⊕ Q0)); now 3 → 4 and 7 → 0.</p>
+<div id="s1"></div>
+</div></details></div>
+
+<div class="exam"><div class="exam-src">2020–21 Q5(a) · 20 marks</div><div class="exam-q"><p>Design a synchronous counter that counts 0 → 2 → 4 → 7 → 5 → 3 → 0 … using S-R flip-flops. Draw the circuit diagram.</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<div id="c2"></div>
+<p>Equations: <b>S2 = Q1Q0', R2 = Q1'Q0, S1 = Q1', R1 = Q1, S0 = Q2, R0 = Q2'</b>. Unused states 1 and 6 go to 2 and 5, both in the sequence, so the counter is self-starting. S and R are never both 1: S1 = Q1' and R1 = Q1 are complements, S2 = Q1Q0' and R2 = Q1'Q0 cannot both be 1, and S0 = Q2, R0 = Q2' are complements.</p>
+</div></details></div>
+
+<h2>5. Mixing flip-flop types</h2>
+<div class="exam"><div class="exam-src">2021–22 Q5(a) · 20 marks</div><div class="exam-q"><p>Design a synchronous counter 0 → 2 → 4 → 7 → 5 → 3 → 0 … using one J-K, one T and one D flip-flop. Draw the circuit.</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<p>Same sequence as above, so the same state table. The only new work is that each <i>bit</i> has its own excitation table: use the J-K rows for one bit, T rows for another, D rows for the third. <b>Any assignment of types to bits is allowed.</b> Pick the cheap one by looking at the bit patterns:</p>
+<ul>
+<li>Q1 goes 0,1,0,1,0,1: it flips on every clock. Give it the <b>T</b> flip-flop: T1 = 1, no gate at all.</li>
+<li>Q0 goes 0,0,1,1,1,0 and Q2 goes 0,1,1,1,0,0 (one step ahead): the next Q0 equals the present Q2. Give Q0 the <b>D</b> flip-flop: D0 = Q2, just a wire.</li>
+<li>Q2 gets the <b>J-K</b>.</li>
+</ul>
+<div id="c3"></div>
+<p>Equations: <b>J2 = Q1Q0', K2 = Q1'Q0, T1 = 1, D0 = Q2</b>. Five literals in total. Unused states 1 and 6 go to 2 and 5, so it self-starts.</p>
+<p><b>The assignment matters for more than gate count.</b> Swapping to T on Q2, J-K on Q1 and D on Q0 also costs 5 literals, but then unused states 1 and 6 are not rescued (lab below: it is a lock-out, 1 and 6 swap with each other). Always run the unused-state check on the final circuit.</p>
+<div id="c3b"></div>
+<div class="hint">Circuit to draw: three flip-flops on one clock line. Q2 is a J-K with J2 from an AND of Q1 and Q0' and K2 from an AND of Q1' and Q0. Q1 is a T flip-flop with T tied to logic 1. Q0 is a D flip-flop with D connected directly to Q2.</div>
+</div></details></div>
+
+<div class="write"><h4>What to write: a counter design (20 marks)</h4>
+<ol>
+<li><b>State diagram.</b> Circles labelled with the state numbers, arrows in sequence order, one arrow from the last state back to the first. Label the arrows "clk".</li>
+<li><b>State table and assignment.</b> "n states, so ⌈log₂ n⌉ = k flip-flops; state number in binary is the code, Q2 is the MSB." PS and NS columns.</li>
+<li><b>Excitation requirement</b> table for the FF type(s): the four rows (0→0, 0→1, 1→0, 1→1).</li>
+<li><b>Excitation table.</b> One row for every binary state from 000 to 111. Used states: the FF inputs. Unused states: x in every cell. Say "unused states are don't-cares".</li>
+<li><b>One K-map per FF input</b> (S2 R2 S1 R1 S0 R0, or J K, or T, or D). Mark x cells, circle groups, write the equation under each map.</li>
+<li><b>Circuit diagram:</b> flip-flops, one common clock, gates for each equation, Q and Q' lines labelled.</li>
+<li><b>Unused-state check:</b> for each unused state, plug into the equations and write where it goes. One line each.</li>
+</ol></div>
+
+<h2>6. Analysing the unused states (self-start check)</h2>
+<div class="exam"><div class="exam-src">2022–23 Q7(b) · 13 marks</div><div class="exam-q"><p>Using J-K flip-flops, design a synchronous counter that counts 1, 2, 5, 7, 1, 2, … Analyse the final circuit to ensure that if it enters any of the unused states, after a finite number of clock cycles it comes to a used state.</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<p>Four states, so two flip-flops would do for the <i>count</i>, but the codes 1, 2, 5, 7 need three bits. Unused states: 0, 3, 4, 6.</p>
+<div id="c4"></div>
+<p>Equations: <b>J2 = Q0', K2 = Q1, J1 = K1 = 1, J0 = 1, K0 = Q2'</b> (J2 = Q1 is an equally small cover; the unused-state result below is the same for both, checked with the engine).</p>
+<p><b>The analysis (the part worth the marks).</b> Put each unused state into the equations and read off the next state:</p>
+<div class="tbl"><table class="mat"><tr><th>unused state Q2Q1Q0</th><th>J2 K2</th><th>J1 K1</th><th>J0 K0</th><th>next</th><th>then</th></tr>
+<tr><td>0 = 000</td><td>1 0</td><td>1 1</td><td>1 1</td><td>111 = 7</td><td>in the sequence</td></tr>
+<tr><td>3 = 011</td><td>0 1</td><td>1 1</td><td>1 1</td><td>000 = 0</td><td>0 → 7: in the sequence after 2 clocks</td></tr>
+<tr><td>4 = 100</td><td>1 0</td><td>1 1</td><td>1 0</td><td>111 = 7</td><td>in the sequence</td></tr>
+<tr><td>6 = 110</td><td>1 1</td><td>1 1</td><td>1 0</td><td>001 = 1</td><td>in the sequence</td></tr></table></div>
+<p>So 0 → 7, 3 → 0 → 7, 4 → 7, 6 → 1. No unused state loops among the unused states, so the counter is <b>self-starting</b>: every unused state reaches the sequence within two clocks. Here is the complete 8-state diagram with the unused states added:</p>
+<div id="d4"></div>
+</div></details></div>
+
+<h2>7. Counters with T flip-flops, and mod-N</h2>
+<p>Adnan sir's mod-N counter is a T-flip-flop counter. The T inputs have a pattern, so you can write the equations without any K-map.</p>
+<div class="def"><dl>
+<dt>Binary up-counter</dt><dd>T<sub>0</sub> = 1, T<sub>1</sub> = Q0, T<sub>2</sub> = Q1Q0, … In words: <b>a bit toggles when all the bits below it are 1</b>.</dd>
+<dt>With enable x (his N = 8 example)</dt><dd>The machine counts only when x = 1. T<sub>0</sub> = x, T<sub>1</sub> = x y<sub>0</sub>, T<sub>2</sub> = x y<sub>0</sub> y<sub>1</sub>, … T<sub>i</sub> = x · y<sub>0</sub> · y<sub>1</sub> ⋯ y<sub>i−1</sub>. The Mealy output Z = x y<sub>0</sub> y<sub>1</sub> y<sub>2</sub> = 1 on the arrow S7 → S0 ("cycle complete").</dd>
+<dt>N = 2<sup>k</sup></dt><dd>Same pattern with k flip-flops. His N = 128 example: 7 flip-flops, T<sub>6</sub> = y<sub>5</sub>y<sub>4</sub>y<sub>3</sub>y<sub>2</sub>y<sub>1</sub>y<sub>0</sub>x and Z = y<sub>6</sub>…y<sub>0</sub>x.</dd>
+</dl></div>
+<p>The engine rebuilds his N = 8 table and confirms the equations:</p>
+<div id="t8"></div>
+<p><b>N not a power of 2 (his N = 12, 81, 99).</b> Use k = ⌈log₂ N⌉ flip-flops (N = 12: 4 flip-flops), count up in binary, and <b>clear everything the moment the count reaches N</b>. This needs flip-flops with an asynchronous CLEAR (and PRESET) that are active low.</p>
+<ol>
+<li>N = 12: the first state with Q3 = 1 and Q2 = 1 is 1100 = 12.</li>
+<li>A NAND gate on Q3 and Q2 gives 0 at that moment. Feed it to the CLEAR of all four flip-flops.</li>
+<li>The flip-flops return to 0000 straight away, so the valid count is 0 … 11. State 12 shows for a glitch only (his note).</li>
+</ol>
+<p>Down counter or up-down: counting down from 0 wraps to all 1s, so detect "all ones" and PRESET to N−1. His N = 99 example: clear when the count reaches 99 = 1100011 (AND of y6 y5 y4' y3' y2' y1 y0 into CLEAR), and on the way down, when all seven bits are 1, preset to 98 = 1100010 (PRESET the bits that are 1 in 98, CLEAR the bits that are 0).</p>
+<p>The synchronous alternative is also legal: treat the unused states as don't-cares and design with the 8 steps. For a mod-6 counter with T flip-flops (0 to 5):</p>
+<div id="c6"></div>
+
+<h2>8. BCD up-down counter</h2>
+<p>His example: an up-down decade counter with J-K flip-flops. x = 0 counts up, x = 1 counts down; the states are 0 to 9, states 10 to 15 are don't-cares. That is 4 flip-flops and a 5-variable K-map (x y3 y2 y1 y0), drawn as two 4×4 maps. His notes leave the K-maps empty; the engine fills them in:</p>
+<div id="b1"></div>
+<p>J3 = y2'y1'y0'x + y2y1y0x', K3 = y0'x + y0x', J2 = y1y0x' + y3y0'x, K2 = y1'y0'x + y1y0x', J1 = y3'y0x' + y2y0'x + y3y0'x, K1 = y0'x + y0x', J0 = K0 = 1. Self-start: states 10 to 15 all reach 0 to 9 within two clocks for both x = 0 and x = 1 (listed above under the table when you open the K-maps).</p>
+<p>Likely exam use: you will not be asked for all eight maps. Write the state table, the transition table and two equations, then say "the rest are found the same way".</p>
+
+<h2>9. The lock-out problem and its fix</h2>
+<p>A counter with unused states has <b>lock-out</b> when an unused state leads only to other unused states, forming a cycle. After power-up in one of them, the counter never joins the sequence. Adnan sir calls this the "undefined states" problem (his example is the 0 → 5 → 4 → 6 → 7 counter, with states 1, 2, 3 undefined).</p>
+<p>Example: count 1 → 2 → 5 → 7 with T flip-flops (this is the 2014–15 question). With don't-cares used freely the equations are T2 = Q1, T1 = 1, T0 = Q2', and the unused states form the cycle 0 → 3 → 4 → 6 → 0:</p>
+<div id="c7"></div>
+<p>Two cures, both from his notes:</p>
+<ol>
+<li><b>Synchronous cure: define the unused states.</b> Do not leave them as don't-cares; give each a next state inside the sequence (the old question said "any invalid state goes to the immediate next valid state": 0→1, 3→5, 4→5, 6→7). Redesign. Cost: more gates, and if the circuit wakes in an unused state the first clock pulse is "wasted" getting into the sequence (his "initialisation problem").</li>
+<li><b>Asynchronous cure:</b> a power-on reset line on the CLEAR/PRESET inputs that forces a valid state (his Bangla note: reset to 000 or a valid state). No extra gates in the logic, but the flip-flops need CLEAR/PRESET pins.</li>
+</ol>
+<div id="s7"></div>
+<p>The fixed equations are T2 = Q2'Q1 + Q1Q0, T1 = Q0 + Q2'Q1, T0 = Q2'Q1' + Q0'. They match the textbook answer of the old question, and the check under the table shows every unused state entering the count.</p>
+
+<h2>10. Other counter questions from the older papers</h2>
+<div class="exam"><div class="exam-src">2011–12 and 2014–15 · 15 marks · Gray-code counter</div><div class="exam-q"><p>Design a 3-bit synchronous Gray-code counter with J-K flip-flops. Show the state diagram, state table, equations and circuit.</p></div>
+<details><summary>Answer</summary><div class="exam-a"><p>Sequence 0, 1, 3, 2, 6, 7, 5, 4, back to 0 (each step changes one bit). All 8 states are used, so no don't-cares among states.</p><div id="c8"></div><p>J2 = Q1Q0', K2 = Q1'Q0', J1 = Q2'Q0, K1 = Q2Q0, J0 = Q2'Q1' + Q2Q1, K0 = Q2'Q1 + Q2Q1'.</p></div></details></div>
+
+<div class="exam"><div class="exam-src">2016–17 · 10 marks · and 2012–13 · 15 marks</div><div class="exam-q"><p>Synchronous counter 1 → 4 → 5 → 7 → 2 → 1 with D flip-flops (2016–17, "no measure for the unused states"). Synchronous counter 0, 1, 3, 7, 6, 4 with T flip-flops (2012–13).</p></div>
+<details><summary>Answer</summary><div class="exam-a"><p><b>D, 1-4-5-7-2:</b> D2 = Q1', D1 = Q2Q0, D0 = Q0' + Q2Q1'. Unused 0 → 5, 3 → 0 → 5, 6 → 1: self-starting.</p><p><b>T, 0-1-3-7-6-4:</b> T2 = Q2 ⊕ Q1, T1 = Q1 ⊕ Q0, T0 = (Q2 ⊕ Q0)'. The unused states 2 and 5 swap with each other (2 → 5 → 2): a <b>lock-out loop</b>, so say so and add the cure from section 9.</p><div id="c9"></div></div></details></div>
+
+<div class="trap"><h4>Traps that cost marks</h4><ul>
+<li>Forgetting the x rows for the unused states, or writing 0 in them. The don't-cares are what make the equations short.</li>
+<li>Using the wrong excitation table. T = Q ⊕ Q⁺, not Q⁺. D = Q⁺. J-K 1→1 is x 0, not 0 x.</li>
+<li>S-R: S = R = 1 is forbidden. Check the equations never make both 1 in a used state (and, ideally, in an unused one).</li>
+<li>K-map axis order. Rows and columns go 00, 01, 11, 10, not 00, 01, 10, 11.</li>
+<li>Skipping the unused-state check when the question says "analyse" (2022–23). It is the whole point of the question.</li>
+<li>Forgetting that all flip-flops share one clock in a synchronous counter. Draw the single clock line to every flip-flop.</li>
+<li>Calling the transition table "the excitation table". In Adnan sir's usage: <i>transition table</i> = binary PS/NS; <i>excitation requirement</i> = the 4-row FF table; <i>excitation table</i> = the FF inputs for every PS.</li>
+</ul></div>
+
+<h2>Mandatory practice</h2>
+<div id="p1"></div>
+<div id="p3"></div>
+<div id="r1"></div>
+<div id="r2"></div>
+</main>
+<script src="../assets/book.js"></script><script src="../assets/logic.js"></script><script src="../assets/dld.js"></script>
+<script>
+// seqLab: page-local helper. Runs L.synth on spec and shows the design tables, equations, K-maps and gate drawings.
+function seqLab(sel, spec, o = {}) {
+  const el = host(sel), R = L.synth(spec), { sv, iv = [], ff, ov: outs = [] } = spec, ns = sv.length, ni = iv.length, bn = (v, w) => w ? L.bin(v, w) : '';
+  const inKeys = ff.flatMap((t, b) => L.FF[t].ins.map(nm => nm + sv[b]));
+  const head = ['PS ' + sv.join(''), ...(ni ? [iv.join('')] : []), 'NS ' + sv.join(''), ...inKeys, ...outs];
+  const rows = R.table.map(r => [bn(r.ps, ns), ...(ni ? [bn(r.x || 0, ni)] : []), bn(r.ns, ns), ...inKeys.map(k => r.ex[k]), ...outs.map((_, j) => r.z && r.z[j] !== null && r.z[j] !== undefined ? r.z[j] : '–')]);
+  const keys = [...inKeys, ...outs], mp = k => R.maps[k] || R.out[k];
+  const eqs = keys.map(k => `<b>${esc(k)}</b> = ${ov(R.eq[k].sop)}`).join(' &nbsp;·&nbsp; ');
+  const maps = keys.map(k => { const m = mp(k), e = R.eq[k]; return `<div><div class="figlabel">${esc(k)} = ${ov(e.sop)}</div>${kmapSVG(R.vars, valsOf(R.n, m.ones, m.dc), (e.sols[0] || []).map((q, j) => ({ cube: q, color: COL[j % COL.length] })))}</div>`; }).join('');
+  const gl = keys.filter(k => !/^[01]$/.test(R.eq[k].sop)).map(k => `<div><div class="figlabel">${esc(k)}</div><div data-g="${esc(k)}"></div></div>`).join('');
+  let chk = '';
+  if (o.valid) {
+    const bad = L.range(1 << ns).filter(s => !o.valid.includes(s));
+    chk = `<p><b>Unused states, simulated with these equations:</b><br>${bad.map(s => { let c = s; const p = [s]; for (let t = 0; t < 9 && c !== null && !o.valid.includes(c); t++) { c = L.step(spec, R.eq, c); p.push(c); } const ok = c !== null && o.valid.includes(c); return `${s} → ${p.slice(1).map(v => v === null ? '?' : v).join(' → ')} ${ok ? '<span class="good">(enters the count)</span>' : '<span class="bad">(lock-out)</span>'}`; }).join('<br>')}</p>`;
+  }
+  el.innerHTML = `<span class="anim-tag">${o.tag || 'design lab'} · ${ff.join(', ')}</span>${tbl(head, rows)}${o.note ? `<p class="tracer-hint">${o.note}</p>` : ''}<p>${eqs}</p>${chk}<details><summary>K-maps (variables ${R.vars.join(' ')})</summary><div class="figrow">${maps}</div></details><details><summary>Gate drawing of every flip-flop input and output</summary><div class="figrow">${gl}</div></details>`;
+  el.querySelectorAll('[data-g]').forEach(d => { const k = d.dataset.g; gates(d, { expr: R.eq[k].sop, vars: R.vars, form: 'and-or' }); });
+  return R;
+}
+// machine helpers: a Mealy table {S, t:{s:[[ns,z],..]}} (inputs by index) + codes -> synth rows; text for diagram()
+const mRows = (M, codes) => M.S.flatMap(s => M.t[s].flatMap((c, x) => c ? [{ ps: codes[s], x, ns: codes[c[0]], z: c[1] === null || c[1] === undefined ? null : [].concat(c[1]) }] : []));
+const mText = (M, f = z => z) => M.S.map(s => `${s}: ${M.t[s].map(c => c ? `${c[0]},${f(c[1])}` : '-').join(' ')}`).join('\n');
+
+// full next-state diagram of a counter, including what the unused states do
+function fullDiag(sel, seq, bits, ff) {
+  const R = L.counter(seq, bits, ff), n = 1 << bits;
+  const t = L.range(n).map(s => `${s}: ${L.step(R.spec, R.eq, s)},-`).join('\n');
+  diagram(sel, { table: t, inputs: ['clk'], start: String(seq[0]) });
+}
+counterLab('#c0', { seq: [0, 1, 2, 3], bits: 2, ff: 'JK' });
+counterLab('#c1', { seq: [0, 1, 2, 5, 4, 6], bits: 3, ff: 'SR' });
+counterLab('#c2', { seq: [0, 2, 4, 7, 5, 3], bits: 3, ff: 'SR' });
+counterLab('#c3', { seq: [0, 2, 4, 7, 5, 3], bits: 3, ff: ['JK', 'T', 'D'] });
+counterLab('#c3b', { seq: [0, 2, 4, 7, 5, 3], bits: 3, ff: ['T', 'JK', 'D'] });
+counterLab('#c4', { seq: [1, 2, 5, 7], bits: 3, ff: 'JK' });
+fullDiag('#d4', [1, 2, 5, 7], 3, 'JK');
+counterLab('#c6', { seq: [0, 1, 2, 3, 4, 5], bits: 3, ff: 'T' });
+counterLab('#c7', { seq: [1, 2, 5, 7], bits: 3, ff: 'T' });
+counterLab('#c8', { seq: [0, 1, 3, 2, 6, 7, 5, 4], bits: 3, ff: 'JK' });
+counterLab('#c9', { seq: [0, 1, 3, 7, 6, 4], bits: 3, ff: 'T' });
+// 2017-18 with the unused states defined (3 -> 4, 7 -> 0)
+{ const seq = [0, 1, 2, 5, 4, 6], rows = seq.map((s, i) => ({ ps: s, ns: seq[(i + 1) % 6] })).concat([{ ps: 3, ns: 4 }, { ps: 7, ns: 0 }]);
+  seqLab('#s1', { sv: ['Q2', 'Q1', 'Q0'], ff: ['SR', 'SR', 'SR'], rows }, { tag: '2017-18 with 3 → 4 and 7 → 0 defined', valid: seq }); }
+// 1,2,5,7 with T and the unused states defined (0->1, 3->5, 4->5, 6->7)
+{ const seq = [1, 2, 5, 7], rows = seq.map((s, i) => ({ ps: s, ns: seq[(i + 1) % 4] })).concat([{ ps: 0, ns: 1 }, { ps: 3, ns: 5 }, { ps: 4, ns: 5 }, { ps: 6, ns: 7 }]);
+  seqLab('#s7', { sv: ['Q2', 'Q1', 'Q0'], ff: ['T', 'T', 'T'], rows }, { tag: 'lock-out fixed: unused states defined', valid: seq }); }
+// mod-8 with enable x and Mealy output Z (Adnan sir, N = 8)
+{ const rows = []; for (let s = 0; s < 8; s++) { rows.push({ ps: s, x: 0, ns: s, z: [0] }); rows.push({ ps: s, x: 1, ns: (s + 1) % 8, z: [s === 7 ? 1 : 0] }); }
+  seqLab('#t8', { sv: ['y2', 'y1', 'y0'], iv: ['x'], ff: ['T', 'T', 'T'], ov: ['Z'], rows }, { tag: 'mod-8 counter, enable x, output Z' }); }
+// BCD up/down, x = 0 up, x = 1 down
+{ const rows = []; for (let s = 0; s < 10; s++) { rows.push({ ps: s, x: 0, ns: (s + 1) % 10 }); rows.push({ ps: s, x: 1, ns: (s + 9) % 10 }); }
+  const sp = { sv: ['y3', 'y2', 'y1', 'y0'], iv: ['x'], ff: ['JK', 'JK', 'JK', 'JK'], rows };
+  const R = seqLab('#b1', sp, { tag: 'BCD up-down counter', note: 'Rows 10–15 are not listed: they are don\'t-cares.' });
+  const el = document.querySelector('#b1'); let u = '';
+  for (let s = 10; s < 16; s++) for (const x of [0, 1]) { let c = s; const p = [s]; for (let t = 0; t < 8 && c >= 10; t++) { c = L.step(sp, R.eq, c, x); p.push(c); } u += `${s} with x=${x}: ${p.join(' → ')}<br>`; }
+  el.insertAdjacentHTML('beforeend', `<p><b>Unused states (10–15):</b><br>${u}</p>`); }
+practice('#p1', { id: 'p1', kind: 'counter', n: 2 });
+practice('#p2', { id: 'p2', kind: 'excite', n: 2 });
+practice('#p3', { id: 'p3', kind: 'counter', n: 1 });
+recall('#r1', { id: 'r1', marks: 20, q: 'Design a synchronous counter that counts 0 → 2 → 4 → 7 → 5 → 3 → 0 … with S-R flip-flops, as you would in the exam. Write the steps in order. (2020–21 Q5a)', points: ['State diagram: ring of six states, arrows labelled clk', '3 flip-flops (⌈log2 6⌉), state number in binary is the code', 'Transition table: 000→010, 010→100, 100→111, 111→101, 101→011, 011→000', 'S-R excitation requirement table: 0→0 = 0x, 0→1 = 10, 1→0 = 01, 1→1 = x0', 'Excitation table with rows 001 and 110 marked x (unused)', 'K-maps for S2 R2 S1 R1 S0 R0 with don\'t-cares used', 'S2 = Q1Q0\', R2 = Q1\'Q0, S1 = Q1\', R1 = Q1, S0 = Q2, R0 = Q2\'', 'Circuit: three SR flip-flops on one clock, gates drawn', 'Unused states 1 and 6 go to 2 and 5 (self-starting)'], model: '<p>Six states, three flip-flops, codes 0,2,4,7,5,3. Excitation rows (S2R2 S1R1 S0R0): 000: 0x 10 0x; 010: 10 01 0x; 100: x0 10 10; 111: x0 01 x0; 101: 01 10 x0; 011: 0x 01 01; rows 001 and 110 all x. Equations: S2 = Q1Q0\', R2 = Q1\'Q0, S1 = Q1\', R1 = Q1, S0 = Q2, R0 = Q2\'. Unused 001 goes to 010 and 110 goes to 101.</p>' });
+recall('#r2', { id: 'r2', marks: 8, q: 'What is lock-out in a synchronous counter, how do you detect it, and what are the two cures? (Adnan sir: the undefined-states problem)', points: ['Unused states can lead only to other unused states (a cycle outside the sequence)', 'Detect it: plug each unused state into the final equations and follow the next states until a used state appears', 'Cure 1: define the unused states with next states in the sequence and redesign (first clock pulse is wasted: initialisation problem)', 'Cure 2: asynchronous reset or preset to a valid state at power-up (flip-flops with CLEAR/PRESET)', 'Example: T flip-flops, 1,2,5,7 leaves 0→3→4→6→0'], model: '<p>Lock-out: an unused state whose next states are all unused, so the counter never reaches the sequence (T counter 1,2,5,7: 0→3→4→6→0). Detect by simulating each unused state with the equations. Cures: (1) give every unused state a next state inside the sequence and redesign, at the price of a wasted first pulse; (2) force a valid state with an asynchronous clear or preset at power-up.</p>' });
+</script>
+</body>
+</html>

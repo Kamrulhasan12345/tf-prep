@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pulse-mode circuits · CSE 205 Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<style>
+.krow{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:flex-start}.km1{min-width:0}.kgroup{margin:.8em 0;padding:.4em .6em;border:1px solid var(--line);border-radius:6px}
+h4.step{margin:1.2em 0 .3em;font:600 13px var(--mono);text-transform:uppercase;letter-spacing:.05em;color:var(--accent)}
+.eqs{font-family:var(--mono);padding-left:1.2em}.eqs li{margin:.2em 0}.dsa-fig.kmap{max-width:100%;height:auto}
+.fm5 li{margin:.25em 0}.fm5{font-size:.97rem}
+</style>
+</head>
+<body>
+<main>
+<div class="eyebrow">Asynchronous circuits · Nelson Ch. 10 / Kohavi (not in Mano) · Adnan sir L17 (Sep 20) · 6 of the last 8 papers</div>
+<h1>Pulse-mode circuits: locks, vending machines, sequences</h1>
+<p class="lede">Pulse mode was asked in <b>6 of the 8</b> recent papers: 2024–25 Q8b (25 marks, 3 Tk vending machine, level output, SR), 2023–24 Q5a (23, sequence x1-x2-x1-x2, JK), 2022–23 Q6c (20, 15 Tk vending machine, pulse output, SR latches), 2021–22 Q6a and 2018–19 Q6a (20 each, digit lock AABABA with T latches), 2017–18 Q6a (20, the same 3 Tk vending machine as 2024–25). Older: restrictions on pulse width (4 marks). Adnan sir's hint for the final: <b>one question set is "pulse mode + counter"</b>, and he tagged the Nelson 10.4 lock "TF #1". It is a 20–25 mark question that follows one fixed recipe, so it is almost free marks if you rehearse the recipe.</p>
+
+<div class="key"><b>The whole method on one screen</b>
+<ol>
+<li><b>Output type first.</b> Output stays "after" something (level) → <b>Moore</b>, Z = f(state). Output is a pulse "while / until" a pulse → <b>Mealy</b>, Z = x·f(state).</li>
+<li><b>State diagram:</b> from every state draw one arrow for every pulse input (self-loops included). <b>State table:</b> one column per pulse input, <b>no x = 0 / x = 1 columns</b>.</li>
+<li><b>Assign codes</b> (⌈log₂ states⌉ latches), write the transition table, then the <b>excitation table</b> for the latch asked (SR / T / JK). Unused codes are don't-cares.</li>
+<li><b>One K-map per input column</b>, over the state variables only. Read each column's minimal f. Then F = x₁·f₁ + x₂·f₂ + … Never group across columns.</li>
+<li>Output equation, then the <b>circuit</b> (AND-OR per latch input, latch outputs fed back), then the <b>trace</b> of 5 pulses if asked.</li>
+</ol></div>
+
+<h2>1. What a pulse-mode circuit is</h2>
+<p>A pulse-mode circuit is an <b>asynchronous</b> sequential circuit: it has <b>no clock</b>. The input pulses themselves act as the clock. Between pulses nothing happens. Adnan sir's three assumptions:</p>
+<ol>
+<li>Pulses never occur on two inputs at the same time (a button pad: the user never presses two buttons together).</li>
+<li>Memory elements change only because of an input pulse (no clock).</li>
+<li>Each input is used in <b>one polarity only</b>: if the pulse is positive, use x; never x' as well.</li>
+</ol>
+<div class="hint"><b>4-mark recall: restrictions on the pulse (2011–12).</b> (a) Only one input pulses at a time. (b) The pulse must be <b>wide enough</b> to trigger the latch. (c) It must <b>end before</b> the changed state variables travel back through the feedback to the latch inputs; otherwise one pulse would act twice. (d) One polarity per input.</div>
+<div class="tbl"><table class="mat"><tr><th></th><th>Clocked sequential (Section 08)</th><th>Pulse mode (this chapter)</th></tr>
+<tr><td>Timing</td><td>clock edge</td><td>the input pulse</td></tr>
+<tr><td>State table columns</td><td>one per input <i>combination</i>, x = 0 and x = 1</td><td><b>one per pulse input</b> x₁, x₂, x₃ (a pulse means "this input fired")</td></tr>
+<tr><td>Memory</td><td>flip-flops</td><td>latches (SR, T, JK), no clock pin</td></tr>
+<tr><td>No pulse</td><td>clock still ticks</td><td>nothing: S = R = 0, T = 0, J = K = 0</td></tr>
+<tr><td>Equation shape</td><td>one K-map over (state, x)</td><td>F = Σ x<sub>j</sub>·f<sub>j</sub>(state): <b>one K-map per x<sub>j</sub></b></td></tr></table></div>
+
+<h2>2. Mealy or Moore: decide before you draw</h2>
+<div class="def"><dl>
+<dt>Level output → Moore</dt><dd>Keyword <b>"after"</b>: "Z becomes 1 after the sequence …", "unlocked until …". Z holds its value between pulses, so it belongs to the state. Draw Z inside the circle; Z = f(y) only.</dd>
+<dt>Pulse output → Mealy</dt><dd>Keyword <b>"pulse", "until" a pulse, "for each activation"</b>: Z is 1 only while the pulse that causes it is present. Draw it on the arrow (pulse / Z); Z = x<sub>j</sub>·f<sub>j</sub>(y), one term per pulse that produces a 1.</dd></dl></div>
+<p>Same vending machine, two readings: with a <b>level</b> output (2017–18, 2024–25) it is Moore with 5 states; with a <b>pulse</b> output it is Mealy with 3 states (section 6 shows both). State which reading you use.</p>
+
+<h2>3. The method, step by step</h2>
+<div class="method"><h4>Pulse-mode synthesis</h4><ol>
+<li>Read the conditions. Decide Moore or Mealy (section 2). Write one sentence on the assumptions: "pulses never coincide, no clock".</li>
+<li>List states by what must be remembered (progress in the sequence, amount deposited). Draw the <b>state diagram</b>: every state has one arrow per input pulse. Pulses that do nothing are self-loops.</li>
+<li>Write the <b>state table</b>: rows = states, columns = x₁ … xₙ (plus Z column for Moore).</li>
+<li>Number of latches = ⌈log₂ states⌉. <b>Assign codes</b> (any assignment works in pulse mode; no race problem because only one latch input pulses at a time).</li>
+<li><b>Transition table:</b> replace states by codes. <b>Excitation table:</b> for each latch and each entry, look up what the latch input must be (SR: 0→1 is S = 1, R = 0; 1→0 is S = 0, R = 1; 0→0 is S = 0, R = –; 1→1 is S = –, R = 0. T: 1 if the bit changes. JK: 0→0 0–, 0→1 1–, 1→0 –1, 1→1 –0).</li>
+<li>For each latch input (S₂, R₂, S₁, R₁ …) draw <b>one K-map per pulse input</b>, with the state variables on the axes (4 cells for 2 latches, 8 for 3). Fill from that input's column of the excitation table. Unused codes: don't-care. Minimise each map on its own.</li>
+<li><b>Combine:</b> S₂ = x₁·f₁ + x₂·f₂ + x₃·f₃. Write the expanded SOP.</li>
+<li><b>Output:</b> Moore: one K-map over the state variables. Mealy: one map per input column, then Z = Σ x·f.</li>
+<li><b>Circuit:</b> AND-OR network for each latch input, latches with Q fed back to the buses. <b>Trace:</b> walk the pulses on the state diagram.</li>
+</ol></div>
+<div class="hint"><b>Differs from the textbook?</b> Nelson/Kohavi write the same equations. The explicit rule "each input column gets its own K-map, no grouping across columns" is Adnan sir's way of drawing it; it is the same as one big K-map in which x₁, x₂, x₃ are one-hot (only one is 1 at a time), so the other 5 of 8 input combinations are don't-cares. If you group across columns you break this and the answer is wrong.</div>
+
+<h2>4. TF #1: Adnan sir's lock (Nelson Example 10.4), SR latches</h2>
+<div class="exam"><div class="exam-src">Adnan sir "TF #1" · Nelson Ex. 10.4 · exam-style 20 marks</div><div class="exam-q"><p>Pulse mode circuit with inputs x₁, x₂, x₃ and output Z (1 = unlocked). Z changes 0 → 1 if and only if the sequence x₁–x₂–x₃ occurs while Z = 0. Z changes 1 → 0 only after an x₂ pulse. Use SR latches.</p></div>
+<details open><summary>Answer</summary><div class="exam-a">
+<p><b>Type of output.</b> "Only <i>after</i> an x₂ pulse" is a level that holds: <b>Moore</b>. States count how much of x₁-x₂-x₃ has matched: A (0), B (1: x₁ seen), C (2: x₁x₂ seen), D (3: unlocked, Z = 1). A wrong pulse falls back: x₃ from B → A; x₂ from C → A. An x₁ from A, B or C always (re)starts the attempt, giving B. In D, x₂ locks (→ A); x₁ and x₃ leave it unlocked.</p>
+<div id="lock1"></div>
+<p><b>Check against his result:</b> S₂ = x2 <span class="ov">y2</span> y1, R₂ = x1 y1 + x2 y2, S₁ = x1 <span class="ov">y2</span>, R₁ = x2 y2 + x3, Z = y2 <span class="ov">y1</span>. The slides (Nelson) call the state variables y₁ y₂ the other way round, so S₁/S₂ look swapped there; the logic is identical.</p>
+<p><b>If 3 latches were used</b> (for example 5–8 states) each map has 8 cells: rows y₃y₂, columns y₁. You still draw 3 maps per latch input.</p>
+</div></details></div>
+<div class="write"><h4>What to write (pulse-mode design, 20–25 marks)</h4><ol>
+<li>One line: "Pulse mode: pulses never coincide, no clock. Output is a level → Moore" (or pulse → Mealy).</li>
+<li>State diagram with every arrow and the output (inside circle, or on arrow). State table, one column per pulse input.</li>
+<li>Assignment (A = 00 …) and the number of latches. Transition table, then excitation table for the named latch.</li>
+<li>The K-maps: one per input column for every latch input, drawn as separate grids with the groups circled.</li>
+<li>Equations S₂ = x₂ y₁ y₂' etc., written as F = Σ x·f. Output equation.</li>
+<li>Circuit: latch boxes, AND-OR for each input, feedback arrows, output gate. Label every input.</li>
+<li>If asked, the trace: a table with pulse, state, output for the 5 pulses.</li></ol></div>
+
+<h2>5. Digit lock AABABA with T latches (2018–19 Q6a = 2021–22 Q6a, 20 marks)</h2>
+<div class="exam"><div class="exam-src">2018–19 Q6(a) and 2021–22 Q6(a) · 20 marks (identical)</div><div class="exam-q"><p>Design a digital lock using T latches. The two push-button switches A and B give one pulse each and are interlocked mechanically, so pulses never coincide. (i) The opening sequence is AABABA. (ii) Three B pulses give an absolute reset. (iii) Any incorrect use of the A switch makes an output Z₂ ring a bell. (The bank adds: Z₁ is a single pulse when the lock opens.)</p></div>
+<details open><summary>Answer</summary><div class="exam-a">
+<p><b>Assumptions I made (write them down; the question leaves them open).</b></p>
+<ol>
+<li>Both outputs are <b>pulses</b> ("a single pulse for each activation"), so the machine is <b>Mealy</b>: Z₁ = 1 on the last A of AABABA, Z₂ = 1 on an incorrect A.</li>
+<li>The correct sequence contains only <b>two B's</b>. So "three B pulses" is read as: B's are counted cumulatively since the last reset; the <b>third B always resets</b> everything. A correct entry never reaches it.</li>
+<li>An incorrect A (an A where the sequence needs B, or an A after the sequence is already broken) rings the bell and restarts from S0. A wrong B just breaks the sequence (no bell) but is counted.</li>
+</ol>
+<p><b>States.</b> S0 start; S1 = A; S2 = AA; S3 = AAB; S4 = AABA; S5 = AABAB; S6 = sequence broken, 1 B counted; S7 = broken, 2 B's counted. Eight states = exactly 3 T latches, nothing unused.</p>
+<div class="hint"><b>Known slip in a circulating solution.</b> Some solutions send S5 + B to the "broken" state S7. S5 already has two B's in it, so the next B is the third: it must <b>reset to S0</b>, as the table below does.</div>
+<div id="lock2"></div>
+<p>Equations from the maps: T₃ = A y2 y1 + A y3 + B <span class="ov">y3</span> <span class="ov">y2</span> + B y1; T₂ = A <span class="ov">y3</span> y1 + A y2 + B <span class="ov">y3</span> <span class="ov">y2</span> + B y3 y2 y1; T₁ = A <span class="ov">y3</span> <span class="ov">y2</span> + A y1 + B <span class="ov">y2</span> y1 + B y2 <span class="ov">y1</span> + B y3; Z₁ = A y3 <span class="ov">y2</span> y1; Z₂ = A y2 <span class="ov">y1</span> + A y3 <span class="ov">y1</span> + A y3 y2.</p>
+<p><b>Full success run</b> (the 6 pulses of the opening sequence), then the 5-pulse bell trace is above:</p>
+<div id="lock2b"></div>
+</div></details></div>
+
+<h2>6. Vending machine, 3 Tk, level output, SR (2017–18 Q6a = 2024–25 Q8b, 20 and 25 marks)</h2>
+<div class="exam"><div class="exam-src">2017–18 Q6(a) 20 marks · 2024–25 Q8(b) 25 marks</div><div class="exam-q"><p>An automatic vending machine sells candy at 3 Tk. It accepts 1 Tk and 2 Tk only, coins accepted sequentially. A <b>level</b> output delivers the candy when the amount received is 3 Tk or more. The excess stays deposited for the next candy. Design a pulse-mode circuit with SR latches; draw the circuit.</p></div>
+<details open><summary>Answer</summary><div class="exam-a">
+<p><b>Reading.</b> Inputs x₁ (1 Tk) and x₂ (2 Tk) are pulses. Output is a level that stays 1 while the candy is being delivered, so <b>Moore</b>. Remember the deposit, and the fact that the candy has been delivered:</p>
+<ul><li>S0, S1, S2 = 0, 1, 2 Tk deposited (Z = 0).</li>
+<li>P0 = 3 Tk reached, nothing extra (Z = 1). P1 = 4 Tk reached: candy out, <b>1 Tk excess kept</b> (Z = 1).</li>
+<li>From P0 or P1 the <i>next coin</i> starts the next round: the candy is taken (3 Tk are used up) and the new coin is added to what is left. P0 + 1 Tk → S1; P0 + 2 Tk → S2; P1 (1 left) + 1 Tk → S2; P1 + 2 Tk → 3 Tk again → P0.</li></ul>
+<div id="v3"></div>
+<p>Equations: S₃ = x2 y2 <span class="ov">y1</span>; R₃ = x1 + x2 <span class="ov">y2</span>; S₂ = x1 <span class="ov">y2</span> y1 + x1 y3 + x2 <span class="ov">y2</span>; R₂ = x1 y2 y1 + x2 y2 <span class="ov">y1</span>; S₁ = x1 <span class="ov">y3</span> <span class="ov">y1</span> + x2 y3; R₁ = x1 <span class="ov">y2</span> y1 + x2 y2; Z = y2 y1 + y3. Z = y₃ + y₂y₁ because the paid states are 011 and 100.</p>
+<div class="hint"><b>If the question says "pulse output"</b> (or you want the short machine): the 3 states D0, D1, D2 (deposit 0, 1, 2) with the output on the arrow that reaches 3 Tk or more, new state = deposit − 3. That is a <b>Mealy</b> machine with 2 latches: Z = x1 y2 + x2 y1 + x2 y2.</div>
+<div id="v3m"></div>
+</div></details></div>
+
+<h2>7. Vending machine, 15 Tk, SR latches (2022–23 Q6c, 20 marks)</h2>
+<div class="exam"><div class="exam-src">2022–23 Q6(c) · 20 marks</div><div class="exam-q"><p>The candy costs 15 Tk; the machine accepts 5 Tk and 10 Tk. Money is accepted sequentially. The circuit produces a <b>pulse output</b> that delivers the candy whenever the amount received is 15 Tk or more. The excess stays deposited. Design a pulse-mode circuit with S-R latches.</p></div>
+<details open><summary>Answer</summary><div class="exam-a">
+<p><b>Pulse output → Mealy.</b> Remember the deposit mod the price: 0, 5 or 10 Tk. A coin that makes it 15 or more fires Z and leaves the excess: 5 + 10 → 15 → Z, deposit 0; 10 + 5 → Z, 0; 10 + 10 = 20 → Z, deposit 5. Three states, two latches, code 11 unused (don't-care).</p>
+<div id="v15"></div>
+<p>Equations: S₂ = x5 y1 + x10 <span class="ov">y2</span> <span class="ov">y1</span>; R₂ = x5 <span class="ov">y1</span> + x10 y2; S₁ = x5 <span class="ov">y2</span> <span class="ov">y1</span> + x10 y2; R₁ = x5 y1 + x10 <span class="ov">y2</span>; Z = x5 y2 + x10 y1 + x10 y2 (a sum of three AND terms, each with an input pulse, which is the Mealy shape).</p>
+</div></details></div>
+
+<h2>8. Sequence x₁–x₂–x₁–x₂ with JK latches (2023–24 Q5a, 23 marks)</h2>
+<div class="exam"><div class="exam-src">2023–24 Q5(a) · 23 marks</div><div class="exam-q"><p>Pulse-mode circuit, inputs x₁ and x₂, one level output z. z goes 0 → 1 only after the last x₂ pulse of the sequence x₁–x₂–x₁–x₂. z is reset 1 → 0 only after the first x₁ pulse that follows the 0 → 1 change. Overlapping sequences are allowed. Use JK latches; draw the circuit.</p></div>
+<details open><summary>Answer</summary><div class="exam-a">
+<p><b>Level output → Moore.</b> Keep the longest suffix of the pulses so far that is a prefix of x₁x₂x₁x₂: A (none), B (x₁), C (x₁x₂), D (x₁x₂x₁), E (x₁x₂x₁x₂, z = 1). Because z must <b>hold</b> until the next x₁, one more state is needed: F (z = 1, nothing matched), reached by x₂ from E. Overlap: from E, an x₁ pulse resets z and also gives x₁x₂x₁ again, so E –x₁→ D (the last x₁x₂ was the start of a new sequence). Other moves: B –x₁→ B, C –x₂→ A, D –x₁→ B, F –x₁→ B, F –x₂→ F.</p>
+<p>6 states → 3 JK latches; codes 110, 111 are unused. JK is the friendliest latch for don't-cares: every entry has at least one "–".</p>
+<div id="seq"></div>
+<p>Equations: J₃ = x2 y2 y1; K₃ = x1; J₂ = x1 y3 <span class="ov">y1</span> + x2 <span class="ov">y3</span> y1; K₂ = x1 y1 + x2; J₁ = x1 + x2 y3; K₁ = x2 <span class="ov">y3</span>; z = y3.</p>
+</div></details></div>
+
+<div class="trap"><h4>Traps that cost marks</h4><ul>
+<li>Using columns x = 0 and x = 1. Pulse mode has <b>one column per input</b>.</li>
+<li>Grouping 1s across two input columns. Each column is its own K-map.</li>
+<li>A state with a missing arrow. Every state needs an arrow for every pulse (self-loops count).</li>
+<li>Mealy output written inside the circle, or Moore output written on an arrow. Level/"after" = Moore; pulse = Mealy, and then the output equation has x·f terms.</li>
+<li>Forgetting that "no pulse" means all latch inputs are inactive, so the K-map entries for "no change" are S = R = 0 / T = 0 / J = K = 0 (the don't-cares in SR/JK only for the specific cases in the excitation table).</li>
+<li>Leaving unused state codes as 0 in the maps. They are don't-cares.</li>
+<li>Skipping the trace when it is asked: "5 pulses" is a table of pulse, state, output (the exam note on the TF #1 lock).</li></ul></div>
+
+<h2>Mandatory practice</h2>
+<div id="p1"></div>
+<div id="p2"></div>
+<div id="r1"></div>
+<div id="r2"></div>
+<div id="r3"></div>
+</main>
+<script src="../assets/book.js"></script><script src="../assets/logic.js"></script><script src="../assets/dld.js"></script>
+<script>
+// ---- page helpers (shared by 11-13) ----
+const spx = s => s.replace(/(?<=[0-9'])(?=[A-Za-z])/g, ' ');            // y2'y1 -> y2' y1
+const eqh = s => ov(spx(s));
+const lits = (t, names) => { const ns = [...names].sort((a, b) => b.length - a.length), out = []; let i = 0; t = t.trim(); while (i < t.length) { const nm = ns.find(v => t.startsWith(v, i)); if (!nm) { i++; continue; } i += nm.length; let s = nm; if (t[i] === "'") { s += "'"; i++; } out.push(s); } return out; };
+// circuit: spec {ins, ys, fns:[{name, expr, latch}], latches:[{label, kind:'SR'|'T'|'JK'|'D', pins:[..]}], outs:[{name, expr}]}
+function sch(sel, c) {
+  const sig = [...c.ins, ...c.ys], P = 44, x0 = 40, X = {}, ymax = [];
+  sig.forEach((s, i) => { X[s] = x0 + i * P; X[s + "'"] = x0 + i * P + 22; });
+  const all = [...(c.fns || []), ...(c.outs || [])], terms = all.map(f => f.expr === '0' || f.expr === '1' ? [] : f.expr.split('+').map(t => lits(t, sig)));
+  const needN = new Set(); terms.forEach(ts => ts.forEach(t => t.forEach(l => { if (l.endsWith("'")) needN.add(l.slice(0, -1)); })));
+  const gx = x0 + sig.length * P + 10, GW = 34, ox = gx + GW + 24, OW = 34, ex = ox + OW + 22, lx = ex + 6;
+  let y = 52, s = '', gy = [], outY = [];
+  all.forEach((f, fi) => {
+    const ts = terms[fi]; const top = y; const o = [];
+    if (!ts.length) { s += `<text class="lb" x="${gx}" y="${y + 8}" style="text-anchor:start">${f.name} = ${f.expr}</text>`; outY.push(y + 8); y += 26; return; }
+    ts.forEach(t => {
+      if (t.length === 1) { const yy = y + 7; s += `<line class="wr" x1="${X[t[0]]}" y1="${yy}" x2="${ts.length > 1 ? gx + GW + 8 : ex}" y2="${yy}"/><circle cx="${X[t[0]]}" cy="${yy}" r="2.6" style="fill:var(--fg)"/>`; o.push([ts.length > 1 ? gx + GW + 8 : ex, yy]); y += 22; return; }
+      const h = Math.max(26, t.length * 13), g = gateShape('and', gx, y, GW, h); s += g.svg;
+      t.forEach((l, i) => { const yy = y + (i + .5) * h / t.length; s += `<line class="wr" x1="${X[l]}" y1="${yy}" x2="${gx}" y2="${yy}"/><circle cx="${X[l]}" cy="${yy}" r="2.6" style="fill:var(--fg)"/>`; });
+      o.push([g.out[0], y + h / 2]); y += h + 10;
+    });
+    let my;
+    if (ts.length > 1) {
+      const h = Math.max(30, ts.length * 13), t0 = (top + y - 10) / 2 - h / 2, g = gateShape('or', ox, t0, OW, h); s += g.svg;
+      o.forEach(([px, py], i) => { const ty = t0 + (i + .5) * h / o.length; s += `<path class="wr" d="M${px},${py} H${ox - 12} V${ty} H${ox + 4}"/>`; });
+      my = t0 + h / 2; s += `<line class="wr" x1="${g.out[0]}" y1="${my}" x2="${ex}" y2="${my}"/>`;
+    } else { my = o[0][1]; if (terms[fi][0].length > 1) s += `<line class="wr" x1="${o[0][0]}" y1="${my}" x2="${ex}" y2="${my}"/>`; }
+    s += `<text class="lb" x="${gx - 6}" y="${top - 2}" style="text-anchor:start;fill:var(--accent)">${f.name}</text>`;
+    outY.push(my); y += 12;
+  });
+  const H = y + 6;
+  // buses
+  sig.forEach(v => { const used = (n) => terms.some(ts => ts.some(t => t.includes(n))); if (used(v)) s += `<line class="wr" x1="${X[v]}" y1="30" x2="${X[v]}" y2="${H}"/>`; if (needN.has(v)) { s += `<line class="wr" x1="${X[v] + 22}" y1="40" x2="${X[v] + 22}" y2="${H}"/><circle cx="${X[v]}" cy="28" r="2.6" style="fill:var(--fg)"/><line class="wr" x1="${X[v]}" y1="28" x2="${X[v] + 4}" y2="28"/><path class="gt" d="M${X[v] + 4},22 L${X[v] + 4},34 L${X[v] + 13},28 z"/><circle class="gt" cx="${X[v] + 16}" cy="28" r="3"/><path class="wr" d="M${X[v] + 19},28 H${X[v] + 22} V40"/>`; }
+    s += `<text class="lb" x="${X[v]}" y="14">${v}</text>`; if (needN.has(v)) s += `<text class="lb" x="${X[v] + 22}" y="14">${ovs(v + "'")}</text>`; });
+  // latches
+  const nf = (c.fns || []).length;
+  (c.latches || []).forEach((L0, k) => {
+    const mine = (c.fns || []).map((f, i) => ({ f, i })).filter(o => o.f.latch === k), ys0 = mine.map(o => outY[o.i]), top = Math.min(...ys0) - 14, bot = Math.max(...ys0) + 14, qy = (top + bot) / 2, qx = lx + 58, ly = H + 14 + k * 11;
+    s += `<rect class="gt" x="${lx}" y="${top}" width="58" height="${bot - top}" rx="3"/><text class="tx" x="${lx + 29}" y="${qy + 4}" style="font-size:11px">${L0.kind}</text>`;
+    mine.forEach((o, i) => { s += `<line class="wr" x1="${ex}" y1="${ys0[i]}" x2="${lx}" y2="${ys0[i]}"/><text class="sm" x="${lx + 4}" y="${ys0[i] + 3}" style="text-anchor:start">${o.f.pin}</text>`; });
+    s += `<path class="wr" d="M${qx},${qy} H${qx + 16 + k * 8} V${ly} H${X[L0.label]} V${H}"/><text class="sm" x="${qx + 4}" y="${qy - 4}" style="text-anchor:start">Q = ${L0.label}</text>`;
+  });
+  (c.outs || []).forEach((f, i) => { const my = outY[nf + i]; s += `<line class="wr" x1="${ex}" y1="${my}" x2="${ex + 36}" y2="${my}"/><text class="lb" x="${ex + 42}" y="${my}" style="text-anchor:start;font-weight:700">${f.name}</text>`; });
+  const W = lx + 58 + 16 + (c.latches || []).length * 8 + 40, HH = H + 20 + (c.latches || []).length * 11;
+  host(sel).innerHTML = `<div class="fg-wrap"><svg class="dsa-fig" viewBox="0 0 ${W} ${HH}" width="${W}" role="img" aria-label="circuit sketch">${s}</svg><div class="figlabel">${c.note || 'Circuit sketch: each box is the AND-OR network of one equation; Q of each latch is fed back to its bus.'}</div></div>`;
+}
+// static flow table with optional row labels and column heads
+function ft(sel, txt, cols = ['00', '01', '11', '10'], o = {}) {
+  const F = asTable(txt);
+  host(sel).insertAdjacentHTML('beforeend', flowHTML(F, cols, {}).replace('<th>row</th>', `<th>${o.corner || 'row'}</th>`));
+}
+// one K-map (vars, ones, dc) with its minimal cover drawn
+function kmapStatic(vars, ones, dc, name) {
+  const n = vars.length, m = L.minimize(n, ones, dc, vars), vals = valsOf(n, ones, dc);
+  return `<div class="km1"><div class="figlabel"><b>${name}</b> = ${ones.length ? eqh(m.sop) : '0'}</div>${kmapSVG(vars, vals, (m.sols[0] || []).map((q, j) => ({ cube: q, color: COL[j % COL.length] })))}</div>`;
+}
+
+// ---- pulse-mode helpers ----
+function pulseSynth(o) {
+  const b = o.ys.length, N = 1 << b, used = o.S.map(s => o.code[s]), unused = L.range(N).filter(c => !used.includes(c)), F = L.FF[o.ff], res = { vars: {}, outs: {}, eq: {}, oeq: {}, unused };
+  const bitsOf = (c, k) => (c >> (b - 1 - k)) & 1;
+  F.ins.forEach(pin => o.ys.forEach((y, k) => {
+    res.vars[pin + y.replace(/^y/, '')] = o.I.map((x, j) => { const ones = [], dc = [...unused];
+      o.S.forEach(s => { const c = o.code[s], n = o.code[o.t[s][j]], e = F.ex(bitsOf(c, k), bitsOf(n, k))[F.ins.indexOf(pin)]; if (e === 1) ones.push(c); else if (e === 'x') dc.push(c); });
+      return { ones, dc, m: L.minimize(b, ones, dc, o.ys) }; });
+  }));
+  if (o.moore) { const ones = [], dc = [...unused]; o.S.forEach(s => { if (o.moore[s] === 1) ones.push(o.code[s]); }); res.outs.Z = [{ ones, dc, m: L.minimize(b, ones, dc, o.ys) }]; }
+  else if (o.mealy) for (let q = 0; q < o.mealy.nz; q++) res.outs['Z' + (o.mealy.nz > 1 ? q + 1 : '')] = o.I.map((x, j) => { const ones = [], dc = [...unused]; o.S.forEach(s => { if (o.mealy.z[s][j][q] === '1') ones.push(o.code[s]); }); return { ones, dc, m: L.minimize(b, ones, dc, o.ys) }; });
+  const sop = cols => { const t = []; cols.forEach((c, j) => { if (!c.ones.length) return; if (c.m.sop === '1') t.push(o.I[j]); else c.m.sop.split(' + ').forEach(p => t.push(o.I[j] + ' ' + p)); }); return t.length ? t.join(' + ') : '0'; };
+  for (const k in res.vars) res.eq[k] = sop(res.vars[k]);
+  for (const k in res.outs) res.oeq[k] = o.moore ? res.outs[k][0].m.sop : sop(res.outs[k]);
+  return res;
+}
+// state diagram + table, optional animated run of pulse names
+function pdiag(sel, M, o = {}) {
+  const el = host(sel), start = o.start || M.S[0], moore = !!M.z;
+  const table = tbl(['PS', ...M.I.map(x => 'pulse ' + x), ...(moore ? ['Z'] : [])], M.S.map(s => [s, ...M.t[s].map(c => moore ? c : `${c[0]}, ${c[1]}`), ...(moore ? [M.z[s]] : [])]));
+  if (!o.run) { el.innerHTML = `<div class="figrow"><div class="fg-wrap">${diagSVG(M, { start })}</div><div>${table}</div></div>`; return; }
+  const F = [{ html: `<div class="fg-wrap">${diagSVG(M, { state: start, start })}</div>`, cap: `Start in ${start}. Pulses: ${o.run.join(', ')}.` }];
+  let s = start, outs = [];
+  o.run.forEach((x, k) => {
+    const j = M.I.indexOf(x), cell = M.t[s][j], n = moore ? cell : cell[0], z = moore ? M.z[n] : cell[1]; outs.push(z);
+    F.push({ html: `<div class="fg-wrap">${diagSVG(M, { state: s, edge: s + '>' + n, start })}</div>`, cap: `Pulse ${k + 1} = <b>${x}</b>: in ${s}, go to ${n}${moore ? `; level output of ${n} is ${z}` : `; output on this arrow: ${z}`}. Outputs so far: <b>${outs.join(' ')}</b>` });
+    s = n; F.push({ html: `<div class="fg-wrap">${diagSVG(M, { state: s, start })}</div>`, cap: `Now in ${s}. Outputs so far: <b>${outs.join(' ')}</b>` });
+  });
+  stepper(el, F, { tag: 'trace the pulses', speed: 1100 });
+}
+const dash = v => v === 'x' ? '–' : v;
+// whole design from a spec
+function pmach(o) { const M = { S: o.S, I: o.I, t: {}, z: o.moore }; if (o.moore) o.S.forEach(s => M.t[s] = o.t[s]); else { delete M.z; o.S.forEach(s => M.t[s] = o.t[s].map((n, j) => [n, o.mealy.z[s][j]])); } return M; }
+function pulseShow(sel, o) {
+  const el = host(sel), b = o.ys.length, F = L.FF[o.ff], R = pulseSynth(o), M = pmach(o);
+  const bin = c => L.bin(c, b), bitsOf = (c, k) => (c >> (b - 1 - k)) & 1;
+  let h = `<h4 class="step">1 · State diagram and state table</h4><div class="dg"></div>`;
+  h += `<h4 class="step">2 · Assignment: ${o.S.length} states → ${b} latches ${o.ys.join(' ')} (${o.ff})</h4><p>${o.S.map(s => `${s} = ${bin(o.code[s])}`).join(', ')}${R.unused.length ? `. Unused codes ${R.unused.map(bin).join(', ')} are don't-cares.` : '.'}</p>`;
+  const pins = F.ins, exHead = o.ys.map(y => pins.map(p => p + y.replace(/^y/, '')).join('')).join(' ');
+  h += `<h4 class="step">3 · Transition and excitation table (${o.ff} latch)</h4>` + tbl(['PS', 'code ' + o.ys.join(''), ...o.I.flatMap(x => [`${x}: NS`, `${x}: ${exHead}`]), ...(o.moore ? ['Z'] : o.I.map(x => `Z at ${x}`))],
+    o.S.map(s => [s, bin(o.code[s]), ...o.I.flatMap((x, j) => { const n = o.t[s][j], e = o.ys.map((y, k) => F.ex(bitsOf(o.code[s], k), bitsOf(o.code[n], k)).map(dash).join('')).join(' '); return [bin(o.code[n]), e]; }), ...(o.moore ? [o.moore[s]] : o.I.map((x, j) => o.mealy.z[s][j]))]));
+  h += `<h4 class="step">4 · One K-map per input column, over the state variables only</h4><p class="tracer-hint">Each map is for one pulse input. Do not group across maps. F = ${o.I.map(x => `${x}·f<sub>${x}</sub>`).join(' + ')}.</p>`;
+  for (const name in R.vars) { h += `<div class="kgroup"><div class="figlabel"><b>${name}</b> = ${eqh(R.eq[name])}</div><div class="krow">${R.vars[name].map((c, j) => kmapStatic(o.ys, c.ones, c.dc, `${name} · ${o.I[j]}`)).join('')}</div></div>`; }
+  for (const name in R.outs) { h += `<div class="kgroup"><div class="figlabel"><b>${name}</b> = ${eqh(R.oeq[name])}</div><div class="krow">${R.outs[name].map((c, j) => kmapStatic(o.ys, c.ones, c.dc, o.moore ? `${name} (state only)` : `${name} · ${o.I[j]}`)).join('')}</div></div>`; }
+  h += `<h4 class="step">5 · Final equations</h4><ul class="eqs">${Object.entries(R.eq).map(([k, v]) => `<li><b>${k}</b> = ${eqh(v)}</li>`).join('')}${Object.entries(R.oeq).map(([k, v]) => `<li><b>${k}</b> = ${eqh(v)}</li>`).join('')}</ul>`;
+  h += `<h4 class="step">6 · Circuit</h4><div class="ck"></div><h4 class="step">7 · Trace of ${o.run.length} pulses: ${o.run.join(', ')}</h4><div class="tr"></div>`;
+  el.innerHTML = h;
+  pdiag(el.querySelector('.dg'), M, { start: o.S[0] });
+  const fns = [], latches = o.ys.map((y, k) => ({ label: y, kind: o.ff })); F.ins.forEach(p => o.ys.forEach((y, k) => fns.push({ name: p + y.replace(/^y/, ''), expr: R.eq[p + y.replace(/^y/, '')], latch: k, pin: p })));
+  fns.sort((a, c) => a.latch - c.latch || F.ins.indexOf(a.pin) - F.ins.indexOf(c.pin));
+  sch(el.querySelector('.ck'), { ins: o.I, ys: o.ys, fns, latches, outs: Object.entries(R.oeq).map(([k, v]) => ({ name: k, expr: v })) });
+  pdiag(el.querySelector('.tr'), M, { start: o.S[0], run: o.run });
+  return R;
+}
+
+const SPEC = {"lock1":{"S":["A","B","C","D"],"code":{"A":0,"B":1,"C":3,"D":2},"ys":["y2","y1"],"I":["x1","x2","x3"],"ff":"SR","t":{"A":["B","A","A"],"B":["B","C","A"],"C":["B","A","D"],"D":["D","A","D"]},"moore":{"A":0,"B":0,"C":0,"D":1},"run":["x1","x2","x3","x1","x2"]},"lock2":{"S":["S0","S1","S2","S3","S4","S5","S6","S7"],"code":{"S0":0,"S1":1,"S2":2,"S3":3,"S4":4,"S5":5,"S6":6,"S7":7},"ys":["y3","y2","y1"],"I":["A","B"],"ff":"T","t":{"S0":["S1","S6"],"S1":["S2","S6"],"S2":["S0","S3"],"S3":["S4","S7"],"S4":["S0","S5"],"S5":["S0","S0"],"S6":["S0","S7"],"S7":["S0","S0"]},"mealy":{"nz":2,"z":{"S0":["00","00"],"S1":["00","00"],"S2":["01","00"],"S3":["00","00"],"S4":["01","00"],"S5":["10","00"],"S6":["01","00"],"S7":["01","00"]}},"run":["A","A","B","A","A"]},"v3":{"S":["S0","S1","S2","P0","P1"],"code":{"S0":0,"S1":1,"S2":2,"P0":3,"P1":4},"ys":["y3","y2","y1"],"I":["x1","x2"],"ff":"SR","t":{"S0":["S1","S2"],"S1":["S2","P0"],"S2":["P0","P1"],"P0":["S1","S2"],"P1":["S2","P0"]},"moore":{"S0":0,"S1":0,"S2":0,"P0":1,"P1":1},"run":["x1","x1","x2","x1","x2"]},"v3m":{"S":["D0","D1","D2"],"code":{"D0":0,"D1":1,"D2":2},"ys":["y2","y1"],"I":["x1","x2"],"ff":"SR","t":{"D0":["D1","D2"],"D1":["D2","D0"],"D2":["D0","D1"]},"mealy":{"nz":1,"z":{"D0":["0","0"],"D1":["0","1"],"D2":["1","1"]}},"run":["x1","x1","x2","x2","x1"]},"v15":{"S":["S0","S5","S10"],"code":{"S0":0,"S5":1,"S10":2},"ys":["y2","y1"],"I":["x5","x10"],"ff":"SR","t":{"S0":["S5","S10"],"S5":["S10","S0"],"S10":["S0","S5"]},"mealy":{"nz":1,"z":{"S0":["0","0"],"S5":["0","1"],"S10":["1","1"]}},"run":["x5","x10","x10","x5","x5"]},"seq":{"S":["A","B","C","D","E","F"],"code":{"A":0,"B":1,"C":2,"D":3,"E":4,"F":5},"ys":["y3","y2","y1"],"I":["x1","x2"],"ff":"JK","t":{"A":["B","A"],"B":["B","C"],"C":["D","A"],"D":["B","E"],"E":["D","F"],"F":["B","F"]},"moore":{"A":0,"B":0,"C":0,"D":0,"E":1,"F":1},"run":["x1","x2","x1","x2","x1"]},"r1":{"S":["P0","P1","P2","P3"],"code":{"P0":0,"P1":1,"P2":2,"P3":3},"ys":["y2","y1"],"I":["a","b"],"ff":"T","t":{"P0":["P1","P0"],"P1":["P1","P2"],"P2":["P1","P3"],"P3":["P1","P3"]},"moore":{"P0":0,"P1":0,"P2":0,"P3":1},"run":["a","b","b","b","a"]},"r2":{"S":["A","B"],"code":{"A":0,"B":1},"ys":["y"],"I":["x1","x2"],"ff":"SR","t":{"A":["B","A"],"B":["B","A"]},"mealy":{"nz":1,"z":{"A":["0","0"],"B":["0","1"]}},"run":["x1","x2","x1","x1","x2"]}};
+pulseShow('#lock1', SPEC.lock1);
+pulseShow('#lock2', SPEC.lock2);
+pdiag('#lock2b', pmach(SPEC.lock2), { start: 'S0', run: ["A","A","B","A","B","A"] });
+pulseShow('#v3', SPEC.v3);
+pulseShow('#v3m', SPEC.v3m);
+pulseShow('#v15', SPEC.v15);
+pulseShow('#seq', SPEC.seq);
+practice('#p1', { id: 'p1', kind: 'mealyrun', n: 2 });
+practice('#p2', { id: 'p2', kind: 'moore', n: 1 });
+recall('#r1', { id: 'r1', marks: 20, q: 'Pulse-mode circuit with inputs a and b and a level output Z. Z becomes 1 after the pulses a, b, b (in this order, nothing between); the next a pulse makes Z 0 again. Use T latches. Write the full answer: diagram, tables, maps, equations, circuit.', points: ['Says pulse mode: pulses never coincide, no clock; level output so Moore', 'State diagram: 4 states, every state has an arrow for both a and b (self-loops), Z = 1 only in the last state', 'State table with one column per pulse (a, b), not x = 0 / x = 1', 'Two latches, assignment written; transition table', 'Excitation: T = present XOR next, for each bit and each column', 'Separate K-maps for each latch input and each input column (no grouping across columns)', 'Equations written as F = Σ x·f, output Z a function of the state only', 'Circuit with two T latches, AND-OR per input, feedback drawn'], model: "<p><b>Moore</b> (Z holds, \"after\"). States P0 (nothing), P1 (a), P2 (ab), P3 (abb, Z = 1). Arrows: P0 –a→ P1, P0 –b→ P0; P1 –a→ P1, P1 –b→ P2; P2 –a→ P1, P2 –b→ P3; P3 –a→ P1 (the a resets Z and starts a new attempt), P3 –b→ P3. Two T latches, codes P0 = 00 … P3 = 11, no unused code.</p><p>One K-map per column and per latch input. Result: T2 = a y2 + b <span class=\"ov\">y2</span> y1; T1 = a <span class=\"ov\">y1</span> + b <span class=\"ov\">y2</span> y1 + b y2 <span class=\"ov\">y1</span>; Z = y2 y1.</p><p>Draw: the diagram, the table with a, b columns, transition table, T = (present bit) XOR (next bit), the 4 maps (T2·a, T2·b, T1·a, T1·b) and the circuit with two T latches.</p>" });
+recall('#r2', { id: 'r2', marks: 12, q: 'Pulse-mode machine, inputs x1 and x2, one output Z that is a pulse: Z = 1 together with an x2 pulse that comes immediately after an x1 pulse. Design it with one SR latch (Mealy).', points: ['Recognises pulse output → Mealy; outputs on the arrows', 'Two states (idle, x1 seen); every state has arrows for x1 and x2', 'Transition table and the SR excitation for each entry (0→1: S=1,R=0; 1→0: S=0,R=1; 0→0: S=0,R=–; 1→1: S=–,R=0)', 'Equations from per-column maps, Z = x2·y', 'Circuit: SR latch, AND gates, output AND with x2'], model: "<p><b>Mealy</b> (pulse output). Two states: A (idle), B (x₁ just arrived). A –x₁/0→ B, A –x₂/0→ A; B –x₁/0→ B, B –x₂/1→ A. One SR latch y, A = 0, B = 1, code none unused.</p><p>Excitation: A –x₁→ B is 0→1 so S = 1, R = 0. B –x₁→ B is 1→1 so S = –, R = 0. B –x₂→ A is 1→0 so S = 0, R = 1. A –x₂→ A is 0→0 so S = 0, R = –. Maps are 1-variable (y): S = x1; R = x2. Output Z = x2 y.</p>" });
+recall('#r3', { id: 'r3', marks: 6, q: 'Write the assumptions of a pulse-mode circuit and the restrictions on the input pulse. Then state the rule that decides Mealy or Moore for the output.', points: ['Pulses never occur on two inputs together', 'No clock; memory elements are triggered only by pulses', 'One polarity per input (x or x\', not both)', 'Pulse wide enough to trigger the latch', 'Pulse ends before the new state is fed back (shorter than the loop delay)', 'Level / "after" → Moore; pulse / "until" → Mealy'], model: '<p>Assumptions: (1) no simultaneous pulses, (2) memory changes only on input pulses, (3) one polarity per input. Pulse restrictions: wide enough to trigger the latch, and over before the changed state returns through the feedback so it acts only once. Output: level that holds ("after") is Moore, function of the state; a pulse output ("until", "for each activation") is Mealy, function of state and input pulse.</p>' });
+</script>
+</body>
+</html>

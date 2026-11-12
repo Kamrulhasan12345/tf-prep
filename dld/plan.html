@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Plan · CSE 205 Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Plan · your daily page</div>
+<h1>The plan to 19 November</h1>
+<p class="key"><b>Exam: Thursday 19 November 2026.</b> DSA 2 is on Sat 14, so DLD starts that evening. 17 and 18 Nov are busy (visa work), with 1–2 hours each.</p>
+<p class="lede">Two full days (Sun 15, Mon 16) carry most of the work. The hardest Section B topics go on Monday, while you still have a full day. The busy days get short, high-yield blocks you can finish in one sitting. A block ends when its mandatory practice is done, not when the timer ends.</p>
+<p class="key"><b>Next up:</b> <span id="next">loading</span></p>
+<p class="tracer-hint" id="sum"></p>
+<div class="hint"><b>Block rule:</b> put the phone away, open the block, read, step through the animations, then do the practice <b>on paper</b> before typing the answer. Take a 10-minute break between blocks. Stuck for more than 10 minutes? Open the steps, find your first wrong step, note it, and move on.</div>
+<div id="days"></div>
+<h2>Debts (skipped practice)</h2><p id="debts">None yet.</p>
+<h2>If you lose time</h2>
+<ol>
+<li><b>Lost a few hours on Sun or Mon:</b> skip the blocks marked <i>optional</i> and the evening timed test; do its questions on Wed instead.</li>
+<li><b>17 Nov gives only 1 hour:</b> do fundamental-mode flow tables only. Move races to the 18 Nov block and cut the timed question there.</li>
+<li><b>Never drop:</b> K-map, MUX, decoder, PLA, priority encoder, counters (sync and ripple), Mealy/Moore, state minimisation (both kinds), pulse mode. These are about 80% of past marks.</li>
+<li><b>If you must drop one Section B set,</b> drop fundamental mode, but still learn the primitive flow table (it can appear inside the compulsory Q5).</li>
+</ol>
+</main>
+<script src="assets/book.js"></script><script src="assets/logic.js"></script><script src="assets/dld.js"></script>
+<script>
+const PLAN = [
+ ['Thu 12 – Fri 13 Nov · DSA 2 days', [
+  ['start/01-exam-map.html','Optional, 15 min on Fri night only if DSA is done: what the DLD exam asks',15,1]]],
+ ['Sat 14 Nov · evening after DSA 2 (about 3 hours) · Section A foundations', [
+  ['comb/01-boolean.html','Boolean algebra, duality, XOR, forms',45],['comb/02-numbers.html','Complements and codes',30],['comb/03-kmap.html','K-maps: PI, EPI, POS',60],['comb/05-tabulation.html','Tabulation',40]]],
+ ['Sun 15 Nov · full day (about 8 hours of blocks) · rest of Section A, start of B', [
+  ['comb/04-nand-nor.html','Universal gates and two-level forms',45],['comb/06-arith.html','Adders, CLA, BCD',75],['comb/07-compare-codes.html','Comparators, converters, parity',45],['comb/08-decoder-encoder.html','Decoders and priority encoders',60],['comb/09-mux.html','MUX implementation',60],['comb/10-pla.html','PLA',45],
+  ['seq/01-latches-ff.html','Latches, master-slave, race-around',45],['seq/02-ff-conversion.html','Flip-flop conversion',30],
+  ['exam/2023-24.html','Evening test: 2023–24 Section A, Q1 + any two, 90 min on paper, then mark',120,1]]],
+ ['Mon 16 Nov · full day (about 9 hours) · Section B core', [
+  ['seq/03-registers.html','Shift registers, ring, Johnson',40],['seq/04-ripple.html','Ripple counters',35],['seq/05-sync-counter.html','Synchronous counters',60],['seq/06-analysis.html','Analysis of a clocked circuit',30],
+  ['seq/07-mealy-moore.html','Mealy and Moore, slowly (your weak spot)',75],['seq/08-sync-design.html','Detectors, vending, traffic light',75],
+  ['seq/09-state-min.html','Partitions and implication table',50],['seq/10-incomplete.html','Compatibles, bounds, closed cover',70],['seq/11-pulse.html','Pulse mode',60]]],
+ ['Tue 17 Nov · busy day (1–2 hours)', [
+  ['seq/12-fund-flow.html','Fundamental mode: primitive and reduced flow tables',60],['seq/13-fund-races.html','Races and race-free assignment',45],
+  ['exam/repeats.html','Only if you get more time: the repeat questions, one per topic on paper',60,1]]],
+ ['Wed 18 Nov · busy day, then the last night', [
+  ['exam/repeats.html','Questions that come back: redo 4 of them on paper, 40 min',40,1],['last-night.html','Last-night plan and sheet, then sleep by 1 am',80,1]]],
+];
+function drawPlan() {
+  const o = Must.load(); let ticks = {}; try { ticks = JSON.parse(localStorage.getItem('cse205-plan')) || {}; } catch {}
+  let total = 0, done = 0, next = null, h = '';
+  PLAN.forEach(([title, blocks], d) => {
+    h += `<h2>${title}</h2><ul class="chk" style="list-style:none;padding-left:0">`;
+    blocks.forEach(([f, t, mins, manual], i) => {
+      const id = d + '-' + i, p = o[f], auto = !manual && p && p.total > 0 && p.done >= p.total, ok = auto || ticks[id]; total++; if (ok) done++;
+      if (!ok && !next) next = `<a href="${f}">${t}</a> (${mins} min)`;
+      const prog = !manual && p && p.total ? ` · practice ${p.done}/${p.total}` : '';
+      h += `<li style="margin:.4em 0"><label><input type="checkbox" data-id="${id}" ${ok ? 'checked' : ''} ${auto ? 'disabled' : ''}> <a href="${f}">${t}</a> <span class="tracer-hint">${mins} min${prog}${manual ? '' : ' · ticks itself when practice is done'}</span></label></li>`;
+    });
+    h += '</ul>';
+  });
+  $('#days').innerHTML = h; $('#next').innerHTML = next || 'Everything is done. Sleep.'; $('#sum').textContent = `${done} of ${total} blocks done.`;
+  const debts = Object.entries(o).filter(([k, v]) => v.skipped && !(v.done >= v.total)).map(([k]) => `<a href="${k}">${k}</a>`);
+  $('#debts').innerHTML = debts.length ? debts.join(' · ') : 'None yet.';
+  $('#days').querySelectorAll('input').forEach(b => b.onchange = () => { ticks[b.dataset.id] = b.checked; try { localStorage.setItem('cse205-plan', JSON.stringify(ticks)); } catch {} drawPlan(); });
+}
+drawPlan();
+</script>
+</body></html>

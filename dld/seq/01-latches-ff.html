@@ -1,0 +1,545 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Latches and flip-flops · CSE 205 Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+
+<div class="eyebrow">Sequential circuits · Mano §5.3–5.4 · Adnan sir L1–3 (Aug 15–18), Nelson is his main book · 7 questions in the last 8 papers</div>
+<h1>Latches and flip-flops, master-slave, race-around</h1>
+<p class="lede">Six of the eight recent papers have a 5–12 mark theory or drawing question from this chapter: 2017–18 Q5(b) (5, why master-slave), 2018–19 Q5(b) (8, master-slave JK with NAND gates only), 2018–19 Q7(c) (7, why S = R = 1 is forbidden), 2021–22 Q5(c) (5, master-slave JK with preset and clear, NOR only), 2022–23 Q6(a) (10, negative-edge master-slave D from D latches), 2023–24 Q6(b) (6, the problem in the construction of a JK and its cure) and 2024–25 Q4(b) (12, master-slave timing and race-around with finite rise and fall time). Older papers add the SR latch table (4), the JK characteristic table (4), latch versus flip-flop (5) and contact bounce (10). The marks are small, so each answer must be short and exact. The pictures are what you get marks for.</p>
+
+<div class="key"><b>Adnan sir's words, and the textbook word next to each.</b>
+<ul>
+<li><b>Excitation table</b> (his, first row of his summary on p.16) = the <b>characteristic table</b> (function table) of the book: inputs and Q<sub>n</sub> give Q<sub>n+1</sub>.</li>
+<li><b>Excitation requirement</b> (his) = the <b>excitation table</b> of the book: for a wanted Q<sub>n</sub> → Q<sub>n+1</sub>, which inputs are needed. It is used for design and for flip-flop conversion (next chapter).</li>
+<li><b>Transition table</b> (his) = present state to next state in binary. Not needed in this chapter.</li>
+<li>Lower case y = present state, capital Y = next state. For one flip-flop, Q<sub>n</sub> = y and Q<sub>n+1</sub> = Y.</li>
+</ul></div>
+
+<h2>1. Latch or flip-flop (his definition)</h2>
+<p>A <b>sequential</b> circuit has memory: its output depends on the inputs and on the stored state. A <b>clock</b> is a train of pulses used to synchronise the memory elements. He names four things on a clock: positive level, negative level, positive edge, negative edge.</p>
+<div class="def"><dl>
+<dt>Latch</dt><dd>A memory element with <b>no clock, or a level-triggered clock</b> (called enable or C). While the level is active, the output follows the input.</dd>
+<dt>Flip-flop (FF)</dt><dd>A memory element with an <b>edge-triggered</b> clock. It samples its inputs at one instant per clock cycle.</dd>
+<dt>Types</dt><dd>D (Delay), SR (Set-Reset), JK, T (Toggle). JK and T <i>latches</i> are rarely used. Synchronous circuit: all FFs change together on the clock. Asynchronous: no common clock.</dd>
+</dl></div>
+<div class="fg-wrap"><svg class="dsa-fig timing" viewBox="0 0 488 168" width="488" role="img" aria-label="latch versus flip-flop"><line class="tick" x1="78" y1="4" x2="78" y2="146"/><line class="tick" x1="114" y1="4" x2="114" y2="146"/><line class="tick" x1="150" y1="4" x2="150" y2="146"/><line class="tick" x1="186" y1="4" x2="186" y2="146"/><line class="tick" x1="222" y1="4" x2="222" y2="146"/><line class="tick" x1="258" y1="4" x2="258" y2="146"/><line class="tick" x1="294" y1="4" x2="294" y2="146"/><line class="tick" x1="330" y1="4" x2="330" y2="146"/><line class="tick" x1="366" y1="4" x2="366" y2="146"/><line class="tick" x1="402" y1="4" x2="402" y2="146"/><line class="tick" x1="438" y1="4" x2="438" y2="146"/><line class="tick" x1="474" y1="4" x2="474" y2="146"/><text class="lb" x="70" y="20" style="text-anchor:end">CLK</text><path class="wave clk" d="M78,30 L78,30 L78,30 L114,30 L114,10 L222,10 L222,30 L330,30 L330,10 L438,10 L438,30 L474,30"/><text class="lb" x="70" y="54" style="text-anchor:end">D</text><path class="wave" d="M78,64 L78,64 L78,64 L150,64 L150,44 L204,44 L204,64 L276,64 L276,44 L474,44"/><text class="lb" x="70" y="88" style="text-anchor:end">D latch Q</text><path class="wave" d="M78,98 L78,98 L78,98 L150,98 L150,78 L204,78 L204,98 L330,98 L330,78 L474,78"/><text class="lb" x="70" y="122" style="text-anchor:end">D flip-flop Q</text><path class="wave" d="M78,132 L78,132 L78,132 L330,132 L330,112 L474,112"/></svg><div class="figlabel">Positive-level D latch against positive-edge D flip-flop. The latch copies D for the whole time CLK = 1 (it caught the glitch at t = 4 to 7). The flip-flop looks at D only at the rising edges: it saw 0 at t = 2 and 1 at t = 14.</div></div>
+<div class="tbl"><table class="mat"><tr><th></th><th>Latch</th><th>Flip-flop</th></tr><tr><td>Trigger</td><td>level (or no clock)</td><td>edge (rising or falling)</td></tr><tr><td>Output changes</td><td>any time while the clock level is active (transparent)</td><td>only at the active edge</td></tr><tr><td>Input noise</td><td>a glitch while enabled gets through</td><td>ignored between edges</td></tr><tr><td>Built from</td><td>one stage: cross-coupled gates (+ gating gates)</td><td>two latches (master-slave) or an edge-detecting circuit</td></tr><tr><td>Used for</td><td>simple storage, building block of a FF</td><td>registers, counters, state machines</td></tr></table></div>
+<p>Also asked as "write the differences between a latch and a flip-flop" (5 marks, older papers): write the table rows above, three or four of them.</p>
+
+<h2>2. SR latch (NOR) and the forbidden input</h2>
+<p>Two NOR gates, each output fed to the other. Q' is the complement of Q in every allowed state.</p>
+<div class="fg-wrap"><svg class="dsa-fig" viewBox="0 0 260 140" width="260" role="img" aria-label="NOR SR latch">
+<path class="gt" d="M90,20 q12,16 0,32 q24,0 40,-16 q-16,-16 -40,-16 z"/><circle class="gt" cx="134" cy="36" r="4"/>
+<path class="gt" d="M90,88 q12,16 0,32 q24,0 40,-16 q-16,-16 -40,-16 z"/><circle class="gt" cx="134" cy="104" r="4"/>
+<path class="wr" d="M138,36 L148,36 L148,62 L80,62 L80,96 L94,96"/>
+<path class="wr" d="M138,104 L160,104 L160,78 L68,78 L68,44 L94,44"/>
+<circle cx="148" cy="36" r="2.6" style="fill:var(--fg)"/>
+<circle cx="160" cy="104" r="2.6" style="fill:var(--fg)"/>
+<path class="wr" d="M26,28 L94,28"/>
+<text class="lb" x="20" y="28" style="text-anchor:end">R</text>
+<path class="wr" d="M26,112 L94,112"/>
+<text class="lb" x="20" y="112" style="text-anchor:end">S</text>
+<path class="wr" d="M138,36 L200,36"/>
+<text class="lb" x="208" y="36" style="text-anchor:start">Q</text>
+<path class="wr" d="M138,104 L200,104"/>
+<text class="lb" x="208" y="104" style="text-anchor:start">Q'</text>
+</svg><div class="figlabel">SR latch, two cross-coupled NOR gates (active-high S and R)</div></div>
+<p><b>Excitation table</b> (his columns: excitation input S R, present state Q<sub>n</sub>, next state Q<sub>n+1</sub>), from <code>L.FF.SR</code>:</p>
+<div class="tbl"><table class="mat"><tr><th>S</th><th>R</th><th>Q<sub>n</sub></th><th>Q<sub>n+1</sub></th><th>name</th></tr><tr><td>0</td><td>0</td><td>0</td><td>0</td><td>hold (no change)</td></tr><tr><td>0</td><td>0</td><td>1</td><td>1</td><td>hold</td></tr><tr><td>0</td><td>1</td><td>0</td><td>0</td><td>reset</td></tr><tr><td>0</td><td>1</td><td>1</td><td>0</td><td>reset</td></tr><tr><td>1</td><td>0</td><td>0</td><td>1</td><td>set</td></tr><tr><td>1</td><td>0</td><td>1</td><td>1</td><td>set</td></tr><tr><td>1</td><td>1</td><td>0</td><td>x</td><td>not allowed</td></tr><tr><td>1</td><td>1</td><td>1</td><td>x</td><td>not allowed</td></tr></table></div>
+<p class="formula">Characteristic equation (K-map with x at SR = 11): Q<sub>n+1</sub> = S + R'Q<sub>n</sub></p>
+<div class="figrow"><div class="fg-wrap"><svg class="dsa-fig" viewBox="0 0 260 130" width="260" role="img" aria-label="SR state diagram">
+<circle class="nd" cx="70" cy="70" r="24"/><text class="tx" x="70" y="70">Q=0</text><circle class="nd" cx="190" cy="70" r="24"/><text class="tx" x="190" y="70">Q=1</text>
+<path class="wr" d="M58,48 C40,12 100,12 82,48"/><path class="wr" d="M178,48 C160,12 220,12 202,48"/>
+<path class="wr" d="M94,60 C120,48 140,48 166,60"/><path class="wr" d="M166,80 C140,92 120,92 94,80"/>
+<path class="wr" d="M160,56 l6,4 l-8,3"/><path class="wr" d="M100,84 l-6,-4 l8,-3"/>
+<text class="sm" x="70" y="12">SR = 00, 01</text>
+<text class="sm" x="190" y="12">SR = 00, 10</text>
+<text class="sm" x="130" y="40">SR = 10 (set)</text>
+<text class="sm" x="130" y="108">SR = 01 (reset)</text>
+</svg><div class="figlabel">SR: 11 is not allowed</div></div></div>
+<p>Why do 00 and 01 hold the 0-state and 00 and 10 hold the 1-state? In the 0-state, R = 1 does nothing new (it asks for reset, which is already true). That is why the state diagram has two labels on each loop.</p>
+<div class="key"><b>Why S = R = 1 is not allowed</b> (2018–19 Q7(c), 7 marks). Follow his reasoning in order:
+<ol>
+<li>S = R = 1 forces both NOR outputs to 0. This state is stable, but now Q = Q' = 0, which breaks the rule that Q' is the complement of Q.</li>
+<li>Now make S and R both 0 together. Both NOR gates see 0, 0 and each tries to output 1.</li>
+<li>Each output is fed to the other gate. Whichever gate responds first wins, forces the other to 0, and the latch lands in the state of the winner. The loop can also oscillate or hang between levels (metastable).</li>
+<li>Which one wins depends on gate delays, which we cannot control. The next state is <b>unpredictable</b>, so S = R = 1 is a forbidden input: <b>race condition</b>.</li>
+<li>Cures: use a design that makes S·R = 0 impossible, or use a JK (next section), which feeds Q back so that J = K = 1 means toggle.</li>
+</ol></div>
+<div id="lab-sr"></div>
+<p>Use the bench above: press S and R together, then release them together.</p>
+
+<h2>3. SR latch with NAND, gated SR, D latch</h2>
+<div class="fg-wrap"><svg class="dsa-fig" viewBox="0 0 300 140" width="300" role="img" aria-label="NAND SR latch">
+<path class="gt" d="M130,20 h20 a16,16 0 0 1 0,32 h-20 z"/><circle class="gt" cx="174" cy="36" r="4"/>
+<path class="gt" d="M130,88 h20 a16,16 0 0 1 0,32 h-20 z"/><circle class="gt" cx="174" cy="104" r="4"/>
+<path class="wr" d="M178,36 L188,36 L188,62 L120,62 L120,96 L130,96"/>
+<path class="wr" d="M178,104 L200,104 L200,78 L108,78 L108,44 L130,44"/>
+<circle cx="188" cy="36" r="2.6" style="fill:var(--fg)"/>
+<circle cx="200" cy="104" r="2.6" style="fill:var(--fg)"/>
+<path class="gt" d="M54,16 L86,28 L54,40 z"/><circle class="gt" cx="90" cy="28" r="4"/>
+<path class="gt" d="M54,100 L86,112 L54,124 z"/><circle class="gt" cx="90" cy="112" r="4"/>
+<path class="wr" d="M24,28 L54,28"/>
+<text class="lb" x="18" y="28" style="text-anchor:end">S</text>
+<path class="wr" d="M94,28 L130,28"/>
+<path class="wr" d="M24,112 L54,112"/>
+<text class="lb" x="18" y="112" style="text-anchor:end">R</text>
+<path class="wr" d="M94,112 L130,112"/>
+<path class="wr" d="M178,36 L240,36"/>
+<text class="lb" x="248" y="36" style="text-anchor:start">Q</text>
+<path class="wr" d="M178,104 L240,104"/>
+<text class="lb" x="248" y="104" style="text-anchor:start">Q'</text>
+</svg><div class="figlabel">SR latch with NAND gates, with the two input inverters (so S and R are active-high). Remove the inverters and S' and R' are active-low.</div></div>
+<p>With NAND gates the inputs are active-low (S' and R'). He draws NOT gates in front, so the input is active-high again and the excitation table is the same as for NOR. <i>Rule he writes next to the gate: NOR, any 1 gives 0. NAND, any 0 gives 1.</i> For the NAND latch with active-low inputs the forbidden case is S' = R' = 0 (both outputs 1).</p>
+<p><b>Gated (clocked) SR latch</b>: add an enable C. C = 0 forces the front gates to their inactive output, so the latch holds. C = 1 behaves like the plain SR latch.</p>
+<div class="figrow"><div class="fg-wrap"><svg class="dsa-fig" viewBox="0 0 380 160" width="380" role="img" aria-label="gated SR latch NOR">
+<path class="gt" d="M200,22 q12,16 0,32 q24,0 40,-16 q-16,-16 -40,-16 z"/><circle class="gt" cx="244" cy="38" r="4"/>
+<path class="gt" d="M200,106 q12,16 0,32 q24,0 40,-16 q-16,-16 -40,-16 z"/><circle class="gt" cx="244" cy="122" r="4"/>
+<path class="wr" d="M248,38 L258,38 L258,72 L190,72 L190,114 L204,114"/>
+<path class="wr" d="M248,122 L270,122 L270,88 L178,88 L178,46 L204,46"/>
+<circle cx="258" cy="38" r="2.6" style="fill:var(--fg)"/>
+<circle cx="270" cy="122" r="2.6" style="fill:var(--fg)"/>
+<path class="gt" d="M120,14 h20 a16,16 0 0 1 0,32 h-20 z"/>
+<path class="gt" d="M120,114 h20 a16,16 0 0 1 0,32 h-20 z"/>
+<path class="wr" d="M160,30 L168,30"/>
+<path class="wr" d="M160,30 L204,30"/>
+<path class="wr" d="M160,130 L204,130"/>
+<path class="wr" d="M34,22 L120,22"/>
+<text class="lb" x="28" y="22" style="text-anchor:end">R</text>
+<path class="wr" d="M34,138 L120,138"/>
+<text class="lb" x="28" y="138" style="text-anchor:end">S</text>
+<path class="wr" d="M120,38 L96,38 L96,122 L120,122"/>
+<circle cx="96" cy="80" r="2.6" style="fill:var(--fg)"/>
+<path class="wr" d="M34,80 L96,80"/>
+<text class="lb" x="28" y="80" style="text-anchor:end">C</text>
+<path class="wr" d="M248,38 L292,38"/>
+<text class="lb" x="300" y="38" style="text-anchor:start">Q</text>
+<path class="wr" d="M248,122 L292,122"/>
+<text class="lb" x="300" y="122" style="text-anchor:start">Q'</text>
+</svg><div class="figlabel">Gated SR latch: two AND gates in front of the NOR latch. C = 0 forces both AND outputs to 0, so the latch holds.</div></div><div class="fg-wrap"><svg class="dsa-fig" viewBox="0 0 380 160" width="380" role="img" aria-label="gated SR latch NAND">
+<path class="gt" d="M200,22 h20 a16,16 0 0 1 0,32 h-20 z"/><circle class="gt" cx="244" cy="38" r="4"/>
+<path class="gt" d="M200,106 h20 a16,16 0 0 1 0,32 h-20 z"/><circle class="gt" cx="244" cy="122" r="4"/>
+<path class="wr" d="M248,38 L258,38 L258,72 L190,72 L190,114 L200,114"/>
+<path class="wr" d="M248,122 L270,122 L270,88 L178,88 L178,46 L200,46"/>
+<circle cx="258" cy="38" r="2.6" style="fill:var(--fg)"/>
+<circle cx="270" cy="122" r="2.6" style="fill:var(--fg)"/>
+<path class="gt" d="M110,14 h20 a16,16 0 0 1 0,32 h-20 z"/><circle class="gt" cx="154" cy="30" r="4"/>
+<path class="gt" d="M110,114 h20 a16,16 0 0 1 0,32 h-20 z"/><circle class="gt" cx="154" cy="130" r="4"/>
+<path class="wr" d="M158,30 L160,30"/>
+<path class="wr" d="M158,30 L200,30"/>
+<path class="wr" d="M158,130 L200,130"/>
+<path class="wr" d="M34,22 L110,22"/>
+<text class="lb" x="28" y="22" style="text-anchor:end">S</text>
+<path class="wr" d="M34,138 L110,138"/>
+<text class="lb" x="28" y="138" style="text-anchor:end">R</text>
+<path class="wr" d="M110,38 L90,38 L90,122 L110,122"/>
+<circle cx="90" cy="80" r="2.6" style="fill:var(--fg)"/>
+<path class="wr" d="M34,80 L90,80"/>
+<text class="lb" x="28" y="80" style="text-anchor:end">C</text>
+<path class="wr" d="M248,38 L292,38"/>
+<text class="lb" x="300" y="38" style="text-anchor:start">Q</text>
+<path class="wr" d="M248,122 L292,122"/>
+<text class="lb" x="300" y="122" style="text-anchor:start">Q'</text>
+</svg><div class="figlabel">Gated SR latch with NAND gates only (NAND-NAND). The front NANDs invert, so no extra NOT gates are needed.</div></div></div>
+<div class="tbl"><table class="mat"><tr><th>C</th><th>S R</th><th>Q<sub>n+1</sub></th></tr><tr><td>0</td><td>x x</td><td>Q<sub>n</sub> (hold, "forcefully turned off")</td></tr><tr><td>1</td><td>0 0</td><td>Q<sub>n</sub> (no change)</td></tr><tr><td>1</td><td>0 1</td><td>0 (reset)</td></tr><tr><td>1</td><td>1 0</td><td>1 (set)</td></tr><tr><td>1</td><td>1 1</td><td>x (invalid)</td></tr></table></div>
+<p class="formula">Q<sub>n+1</sub> = C'Q<sub>n</sub> + C(S + R'Q<sub>n</sub>) = SC + (C' + R')Q<sub>n</sub> = SC + (RC)'Q<sub>n</sub></p>
+<p>His board shows the last form, "SC + (RC)'Q<sub>n</sub>". Read it carefully: the bar is over the product RC. If you write R'C'Q<sub>n</sub> you lose the C'Q<sub>n</sub> term, and the equation is wrong. (The engine confirms the form above for every allowed input row.)</p>
+<p><b>D latch</b>: take a gated SR latch and make S = D, R = D' (one NOT gate). D = 1 sets, D = 0 resets, so the forbidden input never happens.</p>
+<div class="fg-wrap"><svg class="dsa-fig" viewBox="0 0 400 170" width="400" role="img" aria-label="D latch">
+<path class="gt" d="M230,24 h20 a16,16 0 0 1 0,32 h-20 z"/><circle class="gt" cx="274" cy="40" r="4"/>
+<path class="gt" d="M230,114 h20 a16,16 0 0 1 0,32 h-20 z"/><circle class="gt" cx="274" cy="130" r="4"/>
+<path class="wr" d="M278,40 L288,40 L288,77 L220,77 L220,122 L230,122"/>
+<path class="wr" d="M278,130 L300,130 L300,93 L208,93 L208,48 L230,48"/>
+<circle cx="288" cy="40" r="2.6" style="fill:var(--fg)"/>
+<circle cx="300" cy="130" r="2.6" style="fill:var(--fg)"/>
+<path class="gt" d="M140,16 h20 a16,16 0 0 1 0,32 h-20 z"/><circle class="gt" cx="184" cy="32" r="4"/>
+<path class="gt" d="M140,122 h20 a16,16 0 0 1 0,32 h-20 z"/><circle class="gt" cx="184" cy="138" r="4"/>
+<path class="wr" d="M188,32 L230,32"/>
+<path class="wr" d="M188,138 L230,138"/>
+<path class="wr" d="M30,24 L140,24"/>
+<text class="lb" x="24" y="24" style="text-anchor:end">D</text>
+<circle cx="52" cy="24" r="2.6" style="fill:var(--fg)"/>
+<path class="gt" d="M62,118 L94,130 L62,142 z"/><circle class="gt" cx="98" cy="130" r="4"/>
+<path class="wr" d="M52,24 L52,130 L62,130"/>
+<path class="wr" d="M102,130 L140,130"/>
+<path class="wr" d="M140,40 L118,40 L118,146 L140,146"/>
+<circle cx="118" cy="91" r="2.6" style="fill:var(--fg)"/>
+<path class="wr" d="M30,91 L118,91"/>
+<text class="lb" x="24" y="91" style="text-anchor:end">C</text>
+<path class="wr" d="M278,40 L330,40"/>
+<text class="lb" x="338" y="40" style="text-anchor:start">Q</text>
+<path class="wr" d="M278,130 L330,130"/>
+<text class="lb" x="338" y="130" style="text-anchor:start">Q'</text>
+</svg><div class="figlabel">D latch = gated NAND SR latch with S = D and R = D' (one NOT gate).</div></div>
+<div class="tbl"><table class="mat"><tr><th>C</th><th>D</th><th>Q<sub>n+1</sub></th></tr><tr><td>0</td><td>x</td><td>Q<sub>n</sub> (hold)</td></tr><tr><td>1</td><td>0</td><td>0 (store 0)</td></tr><tr><td>1</td><td>1</td><td>1 (store 1)</td></tr></table></div>
+<p class="formula">D latch: Q<sub>n+1</sub> = CD + C'Q<sub>n</sub> (= D when C = 1, Q<sub>n</sub> when C = 0)</p>
+<p><i>His homework: the D latch using NOR gates.</i> Use the gated SR NOR figure above with S = D and R = D' (a NOT gate on D). The output equation is the same.</p>
+<div id="lab-d"></div>
+
+<h2>4. JK, and the race-around problem</h2>
+<p>The JK is the SR with the forbidden state fixed: J is set, K is reset, and J = K = 1 means <b>toggle</b>. In the gate circuit Q' is fed back to the set gate (J·C·Q') and Q to the reset gate (K·C·Q). Only one of the two gates can be on, so S = R = 1 never reaches the latch.</p>
+<div class="fg-wrap"><svg class="dsa-fig" viewBox="0 0 470 270" width="470" role="img" aria-label="JK latch">
+<path class="gt" d="M270,64 h20 a16,16 0 0 1 0,32 h-20 z"/><circle class="gt" cx="314" cy="80" r="4"/>
+<path class="gt" d="M270,154 h20 a16,16 0 0 1 0,32 h-20 z"/><circle class="gt" cx="314" cy="170" r="4"/>
+<path class="wr" d="M318,80 L328,80 L328,117 L260,117 L260,162 L270,162"/>
+<path class="wr" d="M318,170 L340,170 L340,133 L248,133 L248,88 L270,88"/>
+<circle cx="328" cy="80" r="2.6" style="fill:var(--fg)"/>
+<circle cx="340" cy="170" r="2.6" style="fill:var(--fg)"/>
+<path class="gt" d="M150,60.5 h20 a19.5,19.5 0 0 1 0,39 h-20 z"/><circle class="gt" cx="194" cy="80" r="4"/>
+<path class="gt" d="M150,150.5 h20 a19.5,19.5 0 0 1 0,39 h-20 z"/><circle class="gt" cx="194" cy="170" r="4"/>
+<path class="wr" d="M198,80 L200,80 L200,72 L270,72"/>
+<path class="wr" d="M198,170 L200,170 L200,178 L270,178"/>
+<path class="wr" d="M30,67 L150,67"/>
+<text class="lb" x="24" y="67" style="text-anchor:end">J</text>
+<path class="wr" d="M30,183 L150,183"/>
+<text class="lb" x="24" y="183" style="text-anchor:end">K</text>
+<path class="wr" d="M150,80 L110,80 L110,170 L150,170"/>
+<circle cx="110" cy="125" r="2.6" style="fill:var(--fg)"/>
+<path class="wr" d="M30,125 L110,125"/>
+<text class="lb" x="24" y="125" style="text-anchor:end">C</text>
+<path class="wr" d="M318,80 L358,80 L358,30 L130,30 L130,157 L150,157"/>
+<circle cx="358" cy="80" r="2.6" style="fill:var(--fg)"/>
+<path class="wr" d="M318,170 L370,170 L370,235 L120,235 L120,93 L150,93"/>
+<circle cx="370" cy="170" r="2.6" style="fill:var(--fg)"/>
+<path class="wr" d="M358,80 L408,80"/>
+<text class="lb" x="416" y="80" style="text-anchor:start">Q</text>
+<path class="wr" d="M370,170 L408,170"/>
+<text class="lb" x="416" y="170" style="text-anchor:start">Q'</text>
+</svg><div class="figlabel">Level-triggered JK latch: Q' and Q are fed back into the input gates. While C = 1 and J = K = 1 the output keeps flipping: race-around.</div></div>
+<p><b>Excitation table</b> (his name; textbook: characteristic table):</p>
+<div class="tbl"><table class="mat"><tr><th>J</th><th>K</th><th>Q<sub>n</sub></th><th>Q<sub>n+1</sub></th></tr><tr><td>0</td><td>0</td><td>0</td><td>0</td></tr><tr><td>0</td><td>0</td><td>1</td><td>1</td></tr><tr><td>0</td><td>1</td><td>0</td><td>0</td></tr><tr><td>0</td><td>1</td><td>1</td><td>0</td></tr><tr><td>1</td><td>0</td><td>0</td><td>1</td></tr><tr><td>1</td><td>0</td><td>1</td><td>1</td></tr><tr><td>1</td><td>1</td><td>0</td><td>1</td></tr><tr><td>1</td><td>1</td><td>1</td><td>0</td></tr></table></div>
+<p class="formula">Q<sub>n+1</sub> = J Q<sub>n</sub>' + K' Q<sub>n</sub></p>
+<p>Check one row with the equation: J = K = 1 gives Q<sub>n</sub>' + 0 = Q<sub>n</sub>' for Q<sub>n</sub> = 0 (→ 1) and 0 + Q<sub>n</sub> for Q<sub>n</sub> = 1 (→ 0). So the next state is the complement: toggle.</p>
+
+<div class="key"><b>The problem in the construction of a JK flip-flop</b> (2023–24 Q6(b), 6 marks).
+<ol>
+<li><b>Problem:</b> with J = K = 1 the output toggles. In a level-triggered JK the toggle changes Q, the changed Q comes back through the feedback gates, and if C is still high it toggles again. Q flips again and again for as long as C = 1: the "infinite toggle", also called <b>race-around</b>. At the end of the pulse, Q is unpredictable.</li>
+<li><b>When it happens:</b> if the clock pulse width t<sub>p</sub> is longer than the propagation delay around the loop, t<sub>pd</sub> (about twice a gate delay).</li>
+<li><b>Cures</b> (his order): (a) make the clock pulse shorter than the gate delay (he marks this with a doubt: the delay is nanoseconds and varies, so it is not practical); (b) change the construction to an <b>edge-triggered</b> flip-flop; (c) use a <b>master-slave</b> flip-flop (two latches).</li>
+</ol></div>
+<div id="lab-jk"></div>
+<p>On the JK bench, set J = 1, K = 1, then raise clk. Watch Q toggle on its own until you lower the clock.</p>
+<div class="fg-wrap"><svg class="dsa-fig timing" viewBox="0 0 572 202" width="572" role="img" aria-label="race-around timing"><line class="tick" x1="78" y1="4" x2="78" y2="180"/><line class="tick" x1="110" y1="4" x2="110" y2="180"/><line class="tick" x1="142" y1="4" x2="142" y2="180"/><line class="tick" x1="174" y1="4" x2="174" y2="180"/><line class="tick" x1="206" y1="4" x2="206" y2="180"/><line class="tick" x1="238" y1="4" x2="238" y2="180"/><line class="tick" x1="270" y1="4" x2="270" y2="180"/><line class="tick" x1="302" y1="4" x2="302" y2="180"/><line class="tick" x1="334" y1="4" x2="334" y2="180"/><line class="tick" x1="366" y1="4" x2="366" y2="180"/><line class="tick" x1="398" y1="4" x2="398" y2="180"/><line class="tick" x1="430" y1="4" x2="430" y2="180"/><line class="tick" x1="462" y1="4" x2="462" y2="180"/><line class="tick" x1="494" y1="4" x2="494" y2="180"/><line class="tick" x1="526" y1="4" x2="526" y2="180"/><line class="tick" x1="558" y1="4" x2="558" y2="180"/><text class="lb" x="70" y="20" style="text-anchor:end">CLK</text><path class="wave clk" d="M78,30 L78,30 L78,30 L110,30 L110,10 L302,10 L302,30 L334,30 L334,10 L526,10 L526,30 L558,30"/><text class="lb" x="70" y="54" style="text-anchor:end">J = K</text><path class="wave" d="M78,44 L78,44 L78,44 L558,44"/><text class="lb" x="70" y="88" style="text-anchor:end">Q level JK</text><path class="wave" d="M78,98 L78,98 L78,98 L118,98 L118,78 L150,78 L150,98 L182,98 L182,78 L214,78 L214,98 L246,98 L246,78 L278,78 L278,98 L342,98 L342,78 L374,78 L374,98 L406,98 L406,78 L438,78 L438,98 L470,98 L470,78 L502,78 L502,98 L558,98"/><text class="lb" x="70" y="122" style="text-anchor:end">master Qm</text><path class="wave" d="M78,132 L78,132 L78,132 L114.8,132 L114.8,112 L338.8,112 L338.8,132 L558,132"/><text class="lb" x="70" y="156" style="text-anchor:end">slave Q</text><path class="wave" d="M78,166 L78,166 L78,166 L306.8,166 L306.8,146 L530.8,146 L530.8,166 L558,166"/></svg><div class="figlabel">J = K = 1. Level-triggered JK: Q flips once per gate-delay loop for as long as CLK = 1 (race-around). Master-slave: Q changes once per clock, at the falling edge.</div></div>
+
+<h2>5. Master-slave JK, and why it works</h2>
+<p><b>Why master-slave</b> (2017–18 Q5(b), 5 marks): the JK latch races when J = K = 1. A master-slave flip-flop is two latches in series with opposite clock levels. The master is open (copies J, K) while C = 1 and the slave is closed. At the falling edge the master closes and the slave opens and copies the master. So <b>Q can change only once per clock pulse</b>, at the edge: no race-around, and the output is the value that was present at the end of the pulse.</p>
+<p><b>Break before make.</b> The two latches are never open together. Falling edge: the master closes <i>first</i>, then the slave opens. Rising edge: the slave closes first, then the master opens. The inverter on the clock gives exactly this order.</p>
+<div class="tbl"><table class="mat"><tr><th>Clock</th><th>Master</th><th>Slave</th><th>Output Q</th></tr><tr><td>C = 1</td><td>open: follows J, K (and Q, which is frozen)</td><td>closed</td><td>does not change</td></tr><tr><td>falling edge</td><td>closes first</td><td>opens second</td><td>starts to change</td></tr><tr><td>C = 0</td><td>closed: ignores J, K</td><td>open: copies master</td><td>new value, once</td></tr><tr><td>rising edge</td><td>opens second</td><td>closes first</td><td>holds</td></tr></table></div>
+<div id="lab-ms"></div>
+<div class="exam"><div class="exam-src">2018–19 Q5(b) · 8 marks · same family 2017–18, 2021–22, 2022–23 (see below)</div><div class="exam-q"><p>Draw the circuit diagram of a master-slave J-K flip-flop using only NAND gates.</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<div class="fg-wrap"><svg class="dsa-fig" viewBox="0 0 640 310" width="640" role="img" aria-label="master-slave JK NAND">
+<rect class="gt" x="120" y="22" width="192" height="190" rx="3" stroke-dasharray="5 3"/>
+<text class="sm" x="216" y="34">MASTER</text>
+<rect class="gt" x="318" y="22" width="196" height="190" rx="3" stroke-dasharray="5 3"/>
+<text class="sm" x="416" y="34">SLAVE</text>
+<path class="gt" d="M140,50.5 h20 a19.5,19.5 0 0 1 0,39 h-20 z"/><circle class="gt" cx="184" cy="70" r="4"/>
+<path class="gt" d="M140,150.5 h20 a19.5,19.5 0 0 1 0,39 h-20 z"/><circle class="gt" cx="184" cy="170" r="4"/>
+<path class="gt" d="M236,54 h20 a16,16 0 0 1 0,32 h-20 z"/><circle class="gt" cx="280" cy="70" r="4"/>
+<path class="gt" d="M236,154 h20 a16,16 0 0 1 0,32 h-20 z"/><circle class="gt" cx="280" cy="170" r="4"/>
+<path class="wr" d="M284,70 L294,70 L294,112 L226,112 L226,162 L236,162"/>
+<path class="wr" d="M284,170 L306,170 L306,128 L214,128 L214,78 L236,78"/>
+<circle cx="294" cy="70" r="2.6" style="fill:var(--fg)"/>
+<circle cx="306" cy="170" r="2.6" style="fill:var(--fg)"/>
+<path class="wr" d="M188,70 L212,70 L212,62 L236,62"/>
+<path class="wr" d="M188,170 L212,170 L212,178 L236,178"/>
+<path class="gt" d="M336,54 h20 a16,16 0 0 1 0,32 h-20 z"/><circle class="gt" cx="380" cy="70" r="4"/>
+<path class="gt" d="M336,154 h20 a16,16 0 0 1 0,32 h-20 z"/><circle class="gt" cx="380" cy="170" r="4"/>
+<path class="gt" d="M432,54 h20 a16,16 0 0 1 0,32 h-20 z"/><circle class="gt" cx="476" cy="70" r="4"/>
+<path class="gt" d="M432,154 h20 a16,16 0 0 1 0,32 h-20 z"/><circle class="gt" cx="476" cy="170" r="4"/>
+<path class="wr" d="M480,70 L490,70 L490,112 L422,112 L422,162 L432,162"/>
+<path class="wr" d="M480,170 L502,170 L502,128 L410,128 L410,78 L432,78"/>
+<circle cx="490" cy="70" r="2.6" style="fill:var(--fg)"/>
+<circle cx="502" cy="170" r="2.6" style="fill:var(--fg)"/>
+<path class="wr" d="M384,70 L408,70 L408,62 L432,62"/>
+<path class="wr" d="M384,170 L408,170 L408,178 L432,178"/>
+<path class="wr" d="M284,70 L320,70 L320,62 L336,62"/>
+<path class="wr" d="M284,170 L326,170 L326,178 L336,178"/>
+<text class="sm" x="290" y="60">Qm</text>
+<text class="sm" x="288" y="182">Qm'</text>
+<path class="wr" d="M34,57 L140,57"/>
+<text class="lb" x="28" y="57" style="text-anchor:end">J</text>
+<path class="wr" d="M34,183 L140,183"/>
+<text class="lb" x="28" y="183" style="text-anchor:end">K</text>
+<path class="wr" d="M140,70 L104,70 L104,170 L140,170"/>
+<circle cx="104" cy="120" r="2.6" style="fill:var(--fg)"/>
+<path class="wr" d="M34,120 L104,120"/>
+<text class="lb" x="28" y="120" style="text-anchor:end">C</text>
+<path class="gt" d="M270,232 h20 a16,16 0 0 1 0,32 h-20 z"/><circle class="gt" cx="314" cy="248" r="4"/>
+<path class="wr" d="M270,240 L262,240 L262,256 L270,256"/>
+<path class="wr" d="M104,120 L104,248 L262,248"/>
+<circle cx="104" cy="120" r="2.6" style="fill:var(--fg)"/>
+<path class="wr" d="M318,248 L334,248 L334,162"/>
+<path class="wr" d="M334,162 L334,78 L336,78"/>
+<path class="wr" d="M334,162 L336,162"/>
+<circle cx="334" cy="162" r="2.6" style="fill:var(--fg)"/>
+<text class="sm" x="310" y="262">C'</text>
+<path class="wr" d="M480,70 L560,70"/>
+<text class="lb" x="568" y="70" style="text-anchor:start">Q</text>
+<path class="wr" d="M480,170 L560,170"/>
+<text class="lb" x="568" y="170" style="text-anchor:start">Q'</text>
+<path class="wr" d="M516,70 L516,10 L92,10 L92,157 L140,157"/>
+<circle cx="516" cy="70" r="2.6" style="fill:var(--fg)"/>
+<path class="wr" d="M528,170 L528,290 L84,290 L84,83 L140,83"/>
+<circle cx="528" cy="170" r="2.6" style="fill:var(--fg)"/>
+</svg><div class="figlabel">Master-slave JK flip-flop with nine NAND gates. The clock inverter is a NAND with both inputs tied. Master is open while C = 1, slave while C = 0.</div></div>
+<p>Nine NAND gates (count them: 2 + 2 master, 2 + 2 slave, 1 inverter).</p>
+<ol>
+<li>Master input gates: N1 = (J·C·Q')', N2 = (K·C·Q)'. These are 3-input NANDs. Q and Q' come back from the <b>slave</b> outputs.</li>
+<li>Master latch: two cross-coupled NANDs give Q<sub>m</sub> and Q<sub>m</sub>'.</li>
+<li>Clock inverter: a NAND with its two inputs tied together gives C'.</li>
+<li>Slave input gates: (Q<sub>m</sub>·C')' and (Q<sub>m</sub>'·C')'. Slave latch: two cross-coupled NANDs give Q and Q'.</li>
+<li>Master works at C = 1, slave at C = 0, so Q changes after the falling edge.</li>
+</ol>
+<p>Check with J = K = 1 and Q = 0: master sets (Q<sub>m</sub> = 1) while C = 1. Falling edge: slave copies Q<sub>m</sub>, so Q = 1. Next pulse: Q' = 0 blocks N1, Q = 1 enables N2, master resets, Q = 0. One toggle per pulse.</p>
+</div></details></div>
+
+<div class="exam"><div class="exam-src">2021–22 Q5(c) · 5 marks</div><div class="exam-q"><p>Draw a master-slave JK flip-flop with asynchronous preset and clear using only NOR gates.</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<div class="fg-wrap"><svg class="dsa-fig" viewBox="0 0 700 340" width="700" role="img" aria-label="master-slave JK NOR with preset and clear">
+<rect class="gt" x="130" y="36" width="214" height="196" rx="3" stroke-dasharray="5 3"/>
+<text class="sm" x="237" y="48">MASTER</text>
+<rect class="gt" x="352" y="36" width="226" height="196" rx="3" stroke-dasharray="5 3"/>
+<text class="sm" x="465" y="48">SLAVE</text>
+<path class="gt" d="M150,60.5 q12,19.5 0,39 q24,0 40,-19.5 q-16,-19.5 -40,-19.5 z"/><circle class="gt" cx="194" cy="80" r="4"/>
+<path class="gt" d="M150,180.5 q12,19.5 0,39 q24,0 40,-19.5 q-16,-19.5 -40,-19.5 z"/><circle class="gt" cx="194" cy="200" r="4"/>
+<path class="gt" d="M262,60.5 q12,19.5 0,39 q24,0 40,-19.5 q-16,-19.5 -40,-19.5 z"/><circle class="gt" cx="306" cy="80" r="4"/>
+<path class="gt" d="M262,180.5 q12,19.5 0,39 q24,0 40,-19.5 q-16,-19.5 -40,-19.5 z"/><circle class="gt" cx="306" cy="200" r="4"/>
+<path class="wr" d="M310,80 L320,80 L320,132 L252,132 L252,187 L266,187"/>
+<path class="wr" d="M310,200 L332,200 L332,148 L240,148 L240,93 L266,93"/>
+<circle cx="320" cy="80" r="2.6" style="fill:var(--fg)"/>
+<circle cx="332" cy="200" r="2.6" style="fill:var(--fg)"/>
+<path class="wr" d="M198,80 L222,80 L222,67 L266,67"/>
+<path class="wr" d="M198,200 L222,200 L222,213 L266,213"/>
+<path class="gt" d="M384,64 q12,16 0,32 q24,0 40,-16 q-16,-16 -40,-16 z"/><circle class="gt" cx="428" cy="80" r="4"/>
+<path class="gt" d="M384,184 q12,16 0,32 q24,0 40,-16 q-16,-16 -40,-16 z"/><circle class="gt" cx="428" cy="200" r="4"/>
+<path class="gt" d="M496,60.5 q12,19.5 0,39 q24,0 40,-19.5 q-16,-19.5 -40,-19.5 z"/><circle class="gt" cx="540" cy="80" r="4"/>
+<path class="gt" d="M496,180.5 q12,19.5 0,39 q24,0 40,-19.5 q-16,-19.5 -40,-19.5 z"/><circle class="gt" cx="540" cy="200" r="4"/>
+<path class="wr" d="M544,80 L554,80 L554,132 L486,132 L486,187 L500,187"/>
+<path class="wr" d="M544,200 L566,200 L566,148 L474,148 L474,93 L500,93"/>
+<circle cx="554" cy="80" r="2.6" style="fill:var(--fg)"/>
+<circle cx="566" cy="200" r="2.6" style="fill:var(--fg)"/>
+<path class="wr" d="M432,80 L450,80 L450,67 L500,67"/>
+<path class="wr" d="M432,200 L450,200 L450,213 L500,213"/>
+<path class="wr" d="M310,80 L356,80 L356,72 L388,72"/>
+<path class="wr" d="M310,200 L364,200 L364,192 L388,192"/>
+<text class="sm" x="314" y="70">Qm'</text>
+<text class="sm" x="314" y="214">Qm</text>
+<path class="gt" d="M60,51 q12,16 0,32 q24,0 40,-16 q-16,-16 -40,-16 z"/><circle class="gt" cx="104" cy="67" r="4"/>
+<path class="wr" d="M56,59 L64,59"/>
+<path class="wr" d="M56,75 L64,75"/>
+<path class="wr" d="M56,59 L56,75"/>
+<path class="gt" d="M60,197 q12,16 0,32 q24,0 40,-16 q-16,-16 -40,-16 z"/><circle class="gt" cx="104" cy="213" r="4"/>
+<path class="wr" d="M56,205 L64,205"/>
+<path class="wr" d="M56,221 L64,221"/>
+<path class="wr" d="M56,205 L56,221"/>
+<path class="gt" d="M60,124 q12,16 0,32 q24,0 40,-16 q-16,-16 -40,-16 z"/><circle class="gt" cx="104" cy="140" r="4"/>
+<path class="wr" d="M56,132 L64,132"/>
+<path class="wr" d="M56,148 L64,148"/>
+<path class="wr" d="M56,132 L56,148"/>
+<path class="wr" d="M20,67 L56,67"/>
+<text class="lb" x="14" y="67" style="text-anchor:end">J</text>
+<path class="wr" d="M108,67 L154,67"/>
+<path class="wr" d="M20,213 L56,213"/>
+<text class="lb" x="14" y="213" style="text-anchor:end">K</text>
+<path class="wr" d="M108,213 L154,213"/>
+<path class="wr" d="M20,140 L56,140"/>
+<text class="lb" x="14" y="140" style="text-anchor:end">C</text>
+<circle cx="36" cy="140" r="2.6" style="fill:var(--fg)"/>
+<path class="wr" d="M108,140 L122,140"/>
+<path class="wr" d="M122,80 L122,200"/>
+<circle cx="122" cy="140" r="2.6" style="fill:var(--fg)"/>
+<path class="wr" d="M122,80 L154,80"/>
+<path class="wr" d="M122,200 L154,200"/>
+<text class="sm" x="112" y="152" style="text-anchor:end">C'</text>
+<path class="wr" d="M36,140 L36,292 L366,292 L366,208 L388,208"/>
+<path class="wr" d="M366,208 L366,88 L388,88"/>
+<circle cx="366" cy="208" r="2.6" style="fill:var(--fg)"/>
+<path class="wr" d="M544,80 L624,80"/>
+<text class="lb" x="632" y="80" style="text-anchor:start">Q'</text>
+<path class="wr" d="M544,200 L624,200"/>
+<text class="lb" x="632" y="200" style="text-anchor:start">Q</text>
+<path class="wr" d="M580,200 L580,316 L128,316 L128,93 L154,93"/>
+<circle cx="580" cy="200" r="2.6" style="fill:var(--fg)"/>
+<path class="wr" d="M592,80 L592,20 L136,20 L136,187 L154,187"/>
+<circle cx="592" cy="80" r="2.6" style="fill:var(--fg)"/>
+<path class="wr" d="M266,80 L248,80 L248,8 L472,8 L472,80 L500,80"/>
+<path class="wr" d="M248,8 L236,8"/>
+<text class="lb" x="230" y="8" style="text-anchor:end">PRE</text>
+<circle cx="248" cy="80" r="2.6" style="fill:var(--fg)"/>
+<circle cx="472" cy="80" r="2.6" style="fill:var(--fg)"/>
+<path class="wr" d="M266,200 L248,200 L248,330 L472,330 L472,200 L500,200"/>
+<path class="wr" d="M248,330 L236,330"/>
+<text class="lb" x="230" y="330" style="text-anchor:end">CLR</text>
+<circle cx="248" cy="200" r="2.6" style="fill:var(--fg)"/>
+<circle cx="472" cy="200" r="2.6" style="fill:var(--fg)"/>
+</svg><div class="figlabel">Master-slave JK, NOR gates only, asynchronous PRE and CLR (active high here) wired to both the master and the slave latch. The three inverters are NORs with tied inputs.</div></div>
+<ol>
+<li>Master input gates are 3-input NORs: S₁ = (J' + C' + Q)' = J·C·Q' and R₁ = (K' + C' + Q')' = K·C·Q. The NOR needs inverted J, K and C, so three NORs with tied inputs act as inverters.</li>
+<li>Master latch: two cross-coupled NORs. Slave input gates: S₂ = (Q<sub>m</sub>' + C)' = Q<sub>m</sub>·C' and R₂ = (Q<sub>m</sub> + C)' = Q<sub>m</sub>'·C'. They are open when C = 0. Slave latch: two cross-coupled NORs.</li>
+<li><b>PRE</b> (preset) is a third input to the NOR that makes Q' (so Q' is forced to 0 and Q to 1). <b>CLR</b> (clear) is a third input to the NOR that makes Q (Q forced to 0). Both go to <b>the master and the slave</b>, so the value is not overwritten when the clock next goes low.</li>
+<li>PRE = CLR = 0 in normal operation. PRE = CLR = 1 together is forbidden (same as S = R = 1). They work at any time, whatever the clock does: <b>asynchronous</b>.</li>
+</ol>
+<p>Total gates: 3 inverters + 2 + 2 + 2 + 2 = 11 NOR gates. With NAND gates the PRE and CLR would be active-low (drawn with a bubble). Because the question says NOR, they are active-high here: say so on the script.</p>
+</div></details></div>
+
+<div class="exam"><div class="exam-src">2022–23 Q6(a) · 10 marks · older papers: 12 marks</div><div class="exam-q"><p>Draw the block diagram of a negative-edge triggered master-slave D flip-flop using D latches.</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<div class="fg-wrap"><svg class="dsa-fig" viewBox="0 0 560 180" width="560" role="img" aria-label="negative-edge master-slave D flip-flop">
+<rect class="gt" x="130" y="30" width="120" height="70" rx="3"/><text class="lb" x="190" y="65">D latch</text>
+<rect class="gt" x="330" y="30" width="120" height="70" rx="3"/><text class="lb" x="390" y="65">D latch</text>
+<text class="sm" x="190" y="48">master</text>
+<text class="sm" x="390" y="48">slave</text>
+<path class="wr" d="M40,65 L130,65"/>
+<text class="lb" x="34" y="65" style="text-anchor:end">D</text>
+<text class="sm" x="137" y="65" style="text-anchor:start">D</text>
+<text class="sm" x="337" y="65" style="text-anchor:start">D</text>
+<path class="wr" d="M250,65 L330,65"/>
+<text class="sm" x="290" y="56">Qm</text>
+<path class="wr" d="M450,65 L520,65"/>
+<text class="lb" x="528" y="65" style="text-anchor:start">Q</text>
+<text class="sm" x="190" y="88">EN (C)</text>
+<text class="sm" x="390" y="88">EN (C)</text>
+<path class="wr" d="M190,100 L190,150"/>
+<path class="wr" d="M390,100 L390,150"/>
+<path class="gt" d="M280,138 L312,150 L280,162 z"/><circle class="gt" cx="316" cy="150" r="4"/>
+<path class="wr" d="M40,150 L190,150"/>
+<text class="lb" x="34" y="150" style="text-anchor:end">CLK</text>
+<circle cx="190" cy="150" r="2.6" style="fill:var(--fg)"/>
+<path class="wr" d="M190,150 L280,150"/>
+<path class="wr" d="M320,150 L390,150"/>
+<text class="sm" x="335" y="140">CLK'</text>
+</svg><div class="figlabel">Negative-edge D flip-flop: master latch open while CLK = 1, slave latch open while CLK = 0 (through the inverter). Q takes D at the falling edge.</div></div>
+<div class="fg-wrap"><svg class="dsa-fig timing" viewBox="0 0 488 168" width="488" role="img" aria-label="negative-edge master-slave D timing"><line class="tick" x1="78" y1="4" x2="78" y2="146"/><line class="tick" x1="114" y1="4" x2="114" y2="146"/><line class="tick" x1="150" y1="4" x2="150" y2="146"/><line class="tick" x1="186" y1="4" x2="186" y2="146"/><line class="tick" x1="222" y1="4" x2="222" y2="146"/><line class="tick" x1="258" y1="4" x2="258" y2="146"/><line class="tick" x1="294" y1="4" x2="294" y2="146"/><line class="tick" x1="330" y1="4" x2="330" y2="146"/><line class="tick" x1="366" y1="4" x2="366" y2="146"/><line class="tick" x1="402" y1="4" x2="402" y2="146"/><line class="tick" x1="438" y1="4" x2="438" y2="146"/><line class="tick" x1="474" y1="4" x2="474" y2="146"/><text class="lb" x="70" y="20" style="text-anchor:end">CLK</text><path class="wave clk" d="M78,30 L78,30 L78,30 L114,30 L114,10 L222,10 L222,30 L330,30 L330,10 L438,10 L438,30 L474,30"/><text class="lb" x="70" y="54" style="text-anchor:end">D</text><path class="wave" d="M78,64 L78,64 L78,64 L150,64 L150,44 L276,44 L276,64 L474,64"/><text class="lb" x="70" y="88" style="text-anchor:end">master Qm</text><path class="wave" d="M78,98 L78,98 L78,98 L150,98 L150,78 L330,78 L330,98 L474,98"/><text class="lb" x="70" y="122" style="text-anchor:end">slave Q</text><path class="wave" d="M78,132 L78,132 L78,132 L222,132 L222,112 L438,112 L438,132 L474,132"/></svg><div class="figlabel">Master open while CLK = 1 (follows D). Slave opens at the falling edge and copies Qm. Q changes only at the falling edges, t = 8 and t = 20.</div></div>
+<ol>
+<li>Master D latch: enable = CLK (open when CLK = 1). Its D input is the flip-flop's D.</li>
+<li>Slave D latch: enable = CLK' (a NOT gate), open when CLK = 0. Its D input is Q<sub>m</sub>.</li>
+<li>When CLK falls, the master closes, the slave opens, and Q takes the D value that the master held at the edge. The output changes only at the falling edge: <b>negative-edge triggered</b>.</li>
+<li>For a <b>positive-edge</b> D flip-flop swap the two: master enable CLK', slave enable CLK.</li>
+</ol>
+<p>The equation: Q<sub>n+1</sub> = D, sampled at the falling edge.</p>
+</div></details></div>
+
+<h2>6. Master-slave under real clock edges (2024–25 Q4(b), 12 marks)</h2>
+<div class="exam"><div class="exam-src">2024–25 Q4(b) · 12 marks · compulsory half of Q4</div><div class="exam-q"><p>A clocked sequential circuit uses master-slave configuration. (i) Explain how signal propagation through master and slave stages affects timing. (ii) Analyse and justify the possibility of race-around under a non-ideal clock (finite rise and fall time).</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<p><b>(i) Propagation and timing.</b></p>
+<ol>
+<li>While C = 1 the master follows J, K (and the frozen Q, Q'). The slave is closed, so Q does not move even when J and K change. Only the master output Q<sub>m</sub> moves.</li>
+<li>At the falling edge the master closes after its gate delay t<sub>pd,m</sub>, holding the value at the edge. The slave opens through the inverter (one more t<sub>pd</sub>) and Q follows Q<sub>m</sub> after another t<sub>pd,s</sub>.</li>
+<li>So the output delay from the falling clock edge is about t<sub>inv</sub> + t<sub>pd,s</sub>. The inputs must be stable for a <b>set-up time</b> before the master closes and for a <b>hold time</b> after it.</li>
+<li>Q cannot reach the master while the master is open (the slave is closed), so no loop runs with C high: the structure has no race-around if the two latches are never open together.</li>
+</ol>
+<p><b>(ii) Finite rise and fall time.</b></p>
+<ol>
+<li>An ideal clock switches in zero time. A real clock falls through a transition region, taking t<sub>f</sub>. The master closes when C drops below its input-gate threshold. The slave opens when C' (the inverter output) rises above its own threshold.</li>
+<li>If t<sub>f</sub> is large, or the inverter is fast and the master gates have a low threshold, there is a short window t<sub>ov</sub> in which <b>the master is still open and the slave is already open</b> (or the other way round at the rising edge).</li>
+<li>In that window the master follows J, K, Q; the slave copies the master; Q changes; and the changed Q feeds back to the master, which is still open. With J = K = 1 the loop toggles. If t<sub>ov</sub> is longer than the loop delay (about 2·t<sub>pd</sub>) Q toggles again: <b>race-around returns</b> and the output is uncertain. Exactly the failure of the single latch, reduced to the length of the overlap.</li>
+<li><b>Justification:</b> the design is safe only if t<sub>ov</sub> &lt; loop delay, i.e. break before make is kept. A slowly changing clock breaks that assumption.</li>
+<li><b>Remedies:</b> keep clock edges sharp (clock buffer or Schmitt trigger), make the slave's inverter slower than the master's gates, or use a genuinely edge-triggered flip-flop (data sampled in a very small window) in place of master-slave.</li>
+</ol>
+<p>A second known weakness of the master-slave JK (not in his notes, one line is enough): <b>ones-catching</b>. A glitch on J while C = 1 can set the master, and the feedback from Q then blocks K from clearing it again, so a false 1 reaches Q.</p>
+</div></details></div>
+
+<h2>7. T flip-flop, summary of all four</h2>
+<p>The T flip-flop is a JK with J and K tied together ("JK is shorted"). T = 0 holds, T = 1 toggles: Q<sub>n+1</sub> = T Q<sub>n</sub>' + T' Q<sub>n</sub> = T ⊕ Q<sub>n</sub>. It is used to build counters, because T = 1 gives divide-by-2.</p>
+<div class="figrow"><div><div class="figlabel">SR</div><div class="tbl"><table class="mat"><tr><th>S</th><th>R</th><th>Q<sub>n</sub></th><th>Q<sub>n+1</sub></th></tr><tr><td>0</td><td>0</td><td>0</td><td>0</td></tr><tr><td>0</td><td>0</td><td>1</td><td>1</td></tr><tr><td>0</td><td>1</td><td>0</td><td>0</td></tr><tr><td>0</td><td>1</td><td>1</td><td>0</td></tr><tr><td>1</td><td>0</td><td>0</td><td>1</td></tr><tr><td>1</td><td>0</td><td>1</td><td>1</td></tr><tr><td>1</td><td>1</td><td>0</td><td>x</td></tr><tr><td>1</td><td>1</td><td>1</td><td>x</td></tr></table></div></div><div><div class="figlabel">D</div><div class="tbl"><table class="mat"><tr><th>D</th><th>Q<sub>n</sub></th><th>Q<sub>n+1</sub></th></tr><tr><td>0</td><td>0</td><td>0</td></tr><tr><td>0</td><td>1</td><td>0</td></tr><tr><td>1</td><td>0</td><td>1</td></tr><tr><td>1</td><td>1</td><td>1</td></tr></table></div></div><div><div class="figlabel">JK</div><div class="tbl"><table class="mat"><tr><th>J</th><th>K</th><th>Q<sub>n</sub></th><th>Q<sub>n+1</sub></th></tr><tr><td>0</td><td>0</td><td>0</td><td>0</td></tr><tr><td>0</td><td>0</td><td>1</td><td>1</td></tr><tr><td>0</td><td>1</td><td>0</td><td>0</td></tr><tr><td>0</td><td>1</td><td>1</td><td>0</td></tr><tr><td>1</td><td>0</td><td>0</td><td>1</td></tr><tr><td>1</td><td>0</td><td>1</td><td>1</td></tr><tr><td>1</td><td>1</td><td>0</td><td>1</td></tr><tr><td>1</td><td>1</td><td>1</td><td>0</td></tr></table></div></div><div><div class="figlabel">T</div><div class="tbl"><table class="mat"><tr><th>T</th><th>Q<sub>n</sub></th><th>Q<sub>n+1</sub></th></tr><tr><td>0</td><td>0</td><td>0</td></tr><tr><td>0</td><td>1</td><td>1</td></tr><tr><td>1</td><td>0</td><td>1</td></tr><tr><td>1</td><td>1</td><td>0</td></tr></table></div></div></div>
+<div class="tbl"><table class="mat"><tr><th>FF</th><th>Characteristic equation</th></tr><tr><td>SR</td><td>Q<sub>n+1</sub> = S + R'Q<sub>n</sub> (with S·R = 0)</td></tr><tr><td>D</td><td>Q<sub>n+1</sub> = D</td></tr><tr><td>JK</td><td>Q<sub>n+1</sub> = J Q<sub>n</sub>' + K'Q<sub>n</sub></td></tr><tr><td>T</td><td>Q<sub>n+1</sub> = T ⊕ Q<sub>n</sub> = T Q<sub>n</sub>' + T'Q<sub>n</sub></td></tr></table></div>
+<p>Now the <b>excitation requirements</b> (the textbook excitation table): which inputs make Q<sub>n</sub> → Q<sub>n+1</sub>. x = don't care. They are computed by <code>L.FF[...].ex</code>, the same function the counter and conversion widgets use.</p>
+<div class="figrow"><div><div class="figlabel">SR</div><div class="tbl"><table class="mat"><tr><th>Q<sub>n</sub> → Q<sub>n+1</sub></th><th>S</th><th>R</th></tr><tr><td>0 → 0</td><td>0</td><td>x</td></tr><tr><td>0 → 1</td><td>1</td><td>0</td></tr><tr><td>1 → 0</td><td>0</td><td>1</td></tr><tr><td>1 → 1</td><td>x</td><td>0</td></tr></table></div></div><div><div class="figlabel">D</div><div class="tbl"><table class="mat"><tr><th>Q<sub>n</sub> → Q<sub>n+1</sub></th><th>D</th></tr><tr><td>0 → 0</td><td>0</td></tr><tr><td>0 → 1</td><td>1</td></tr><tr><td>1 → 0</td><td>0</td></tr><tr><td>1 → 1</td><td>1</td></tr></table></div></div><div><div class="figlabel">JK</div><div class="tbl"><table class="mat"><tr><th>Q<sub>n</sub> → Q<sub>n+1</sub></th><th>J</th><th>K</th></tr><tr><td>0 → 0</td><td>0</td><td>x</td></tr><tr><td>0 → 1</td><td>1</td><td>x</td></tr><tr><td>1 → 0</td><td>x</td><td>1</td></tr><tr><td>1 → 1</td><td>x</td><td>0</td></tr></table></div></div><div><div class="figlabel">T</div><div class="tbl"><table class="mat"><tr><th>Q<sub>n</sub> → Q<sub>n+1</sub></th><th>T</th></tr><tr><td>0 → 0</td><td>0</td></tr><tr><td>0 → 1</td><td>1</td></tr><tr><td>1 → 0</td><td>1</td></tr><tr><td>1 → 1</td><td>0</td></tr></table></div></div></div>
+<p>Memory trick for JK: 0 → 0 is "J = 0, K = x", 1 → 1 is "J = x, K = 0". A transition you want from a state can be done in two ways, so there is a don't-care. For SR, 0 → 0 = 0x and 1 → 1 = x0.</p>
+
+<p>State diagrams of the four (arrow labels are the inputs that cause the move):</p>
+<div class="figrow"><div class="fg-wrap"><svg class="dsa-fig" viewBox="0 0 260 130" width="260" role="img" aria-label="D state diagram">
+<circle class="nd" cx="70" cy="70" r="24"/><text class="tx" x="70" y="70">Q=0</text><circle class="nd" cx="190" cy="70" r="24"/><text class="tx" x="190" y="70">Q=1</text>
+<path class="wr" d="M58,48 C40,12 100,12 82,48"/><path class="wr" d="M178,48 C160,12 220,12 202,48"/>
+<path class="wr" d="M94,60 C120,48 140,48 166,60"/><path class="wr" d="M166,80 C140,92 120,92 94,80"/>
+<path class="wr" d="M160,56 l6,4 l-8,3"/><path class="wr" d="M100,84 l-6,-4 l8,-3"/>
+<text class="sm" x="70" y="12">D = 0</text>
+<text class="sm" x="190" y="12">D = 1</text>
+<text class="sm" x="130" y="40">D = 1</text>
+<text class="sm" x="130" y="108">D = 0</text>
+</svg><div class="figlabel">D (with C = 1)</div></div><div class="fg-wrap"><svg class="dsa-fig" viewBox="0 0 260 130" width="260" role="img" aria-label="JK state diagram">
+<circle class="nd" cx="70" cy="70" r="24"/><text class="tx" x="70" y="70">Q=0</text><circle class="nd" cx="190" cy="70" r="24"/><text class="tx" x="190" y="70">Q=1</text>
+<path class="wr" d="M58,48 C40,12 100,12 82,48"/><path class="wr" d="M178,48 C160,12 220,12 202,48"/>
+<path class="wr" d="M94,60 C120,48 140,48 166,60"/><path class="wr" d="M166,80 C140,92 120,92 94,80"/>
+<path class="wr" d="M160,56 l6,4 l-8,3"/><path class="wr" d="M100,84 l-6,-4 l8,-3"/>
+<text class="sm" x="70" y="12">JK = 00, 01</text>
+<text class="sm" x="190" y="12">JK = 00, 10</text>
+<text class="sm" x="130" y="40">JK = 1x</text>
+<text class="sm" x="130" y="108">JK = x1</text>
+</svg><div class="figlabel">JK</div></div><div class="fg-wrap"><svg class="dsa-fig" viewBox="0 0 260 130" width="260" role="img" aria-label="T state diagram">
+<circle class="nd" cx="70" cy="70" r="24"/><text class="tx" x="70" y="70">Q=0</text><circle class="nd" cx="190" cy="70" r="24"/><text class="tx" x="190" y="70">Q=1</text>
+<path class="wr" d="M58,48 C40,12 100,12 82,48"/><path class="wr" d="M178,48 C160,12 220,12 202,48"/>
+<path class="wr" d="M94,60 C120,48 140,48 166,60"/><path class="wr" d="M166,80 C140,92 120,92 94,80"/>
+<path class="wr" d="M160,56 l6,4 l-8,3"/><path class="wr" d="M100,84 l-6,-4 l8,-3"/>
+<text class="sm" x="70" y="12">T = 0</text>
+<text class="sm" x="190" y="12">T = 0</text>
+<text class="sm" x="130" y="40">T = 1</text>
+<text class="sm" x="130" y="108">T = 1</text>
+</svg><div class="figlabel">T</div></div></div>
+<h2>8. Level against edge, in one place</h2>
+<div class="tbl"><table class="mat"><tr><th></th><th>Level triggered</th><th>Edge triggered</th></tr><tr><td>Active during</td><td>the whole high (or low) time of the clock</td><td>one instant: rising or falling edge</td></tr><tr><td>Symbol</td><td>C or EN, no triangle</td><td>triangle at the clock input (bubble = falling edge)</td></tr><tr><td>Gives</td><td>latch</td><td>flip-flop</td></tr><tr><td>JK, J = K = 1</td><td>race-around</td><td>one toggle per edge</td></tr><tr><td>How to get edge</td><td>-</td><td>master-slave, or a pulse-narrowing / edge-detector circuit</td></tr></table></div>
+
+<div class="write"><h4>What to write (SR latch and the forbidden input, 4–7 marks)</h4>
+<ol>
+<li>Circuit: two cross-coupled NOR gates, inputs S and R, outputs Q and Q', labelled.</li>
+<li>The excitation table (S R Q<sub>n</sub> → Q<sub>n+1</sub>) with rows 00, 01, 10, 11. Mark 11 as "not allowed".</li>
+<li>The equation Q<sub>n+1</sub> = S + R'Q<sub>n</sub>.</li>
+<li>The one sentence: "S = R = 1 forces Q = Q' = 0. If S and R then both go to 0, the two gates race and the final state is unpredictable, so the input is not allowed."</li>
+</ol>
+</div>
+<div class="write"><h4>What to write (master-slave JK, 5–8 marks)</h4>
+<ol>
+<li>Draw master gates (3-input), master latch, clock inverter, slave gates, slave latch. Label J, K, C, Q, Q', and Q<sub>m</sub>.</li>
+<li>Draw both feedback wires from the <b>slave</b> outputs to the <b>master</b> input gates.</li>
+<li>Write: "Master works at C = 1, slave at C = 0. Q changes once, after the falling edge, so there is no race-around."</li>
+<li>Write the gate count (nine NANDs, or 11 NORs with PRE/CLR) at the side of the figure.</li>
+</ol>
+</div>
+<div class="write"><h4>What to write ("problem of JK, how to overcome", 6 marks)</h4>
+<ol>
+<li>Problem: J = K = 1 with level clock gives repeated toggling (race-around) when t<sub>p</sub> &gt; t<sub>pd</sub>.</li>
+<li>The waveform of Q toggling during C = 1.</li>
+<li>Three cures: narrow pulse (impractical), edge-triggered FF, master-slave FF.</li>
+<li>A sentence on the master-slave: one change per clock cycle, at the edge.</li>
+</ol>
+</div>
+<div class="trap"><h4>Traps that cost marks</h4><ul>
+<li>NOR latch inputs are active-high; the bare NAND latch inputs are active-low. Say which one you drew.</li>
+<li>Master-slave: the feedback goes from the <b>slave</b> Q and Q' to the master gates. Do not wire it from the master.</li>
+<li>Do not forget the inverter on the clock. Without it both latches open together and the whole thing is just a long latch.</li>
+<li>Do not say the master-slave JK is "edge triggered by the clock edge itself". It changes at the edge, but only because of the two latch levels.</li>
+<li>The 2021–22 question says NOR only: draw the NOR inverters for J, K, C. Do not drop in a NOT symbol.</li>
+<li>In the gated SR equation keep (C' + R')Q<sub>n</sub>. Dropping C'Q<sub>n</sub> makes the latch lose its state when C = 0.</li>
+<li>A latch is not a flip-flop. Use the two words as he defines them.</li>
+</ul></div>
+
+<h2>Mandatory practice</h2>
+<div id="p1"></div>
+<div id="r1"></div>
+<div id="r2"></div>
+<div id="r3"></div>
+<div id="r4"></div>
+</main>
+<script src="../assets/book.js"></script><script src="../assets/logic.js"></script><script src="../assets/dld.js"></script>
+<script>
+ffLab('#lab-sr', { type: 'SR' });
+ffLab('#lab-d', { type: 'D' });
+ffLab('#lab-jk', { type: 'JK' });
+ffLab('#lab-ms', { type: 'MSJK' });
+practice('#p1', { id: 'p1', kind: 'excite', n: 2 });
+recall('#r1', { id: 'r1', marks: 7, q: 'Discuss why the condition S = R = 1 leads to an unstable condition for an SR latch. (2018–19 Q7c)', points: ['Both NOR outputs forced to 0, so Q = Q\' = 0 (not complements)', 'The state is stable while S = R = 1', 'When S and R both return to 0 each gate tries to output 1', 'Each output feeds the other gate: a race, the faster gate wins, or it oscillates', 'Result depends on gate delays, so the next state is unpredictable: forbidden input', 'Cure: restrict inputs (S·R = 0) or use JK'], model: '<p>See section 2: S = R = 1 gives Q = Q\' = 0. Releasing both at once makes the two NORs race, so the outcome is unpredictable. That is why 11 is not allowed; the JK feeds Q back to avoid it.</p>' });
+recall('#r2', { id: 'r2', marks: 6, q: 'What is the problem in the construction of a J-K flip-flop? How is it overcome? (2023–24 Q6b)', points: ['Level-triggered JK with J = K = 1 toggles repeatedly while C = 1 (race-around, infinite toggle)', 'Happens when pulse width is longer than the loop propagation delay', 'Q is unpredictable at the end of the pulse (waveform shown)', 'Cure 1: pulse shorter than gate delay (impractical)', 'Cure 2: edge-triggered flip-flop', 'Cure 3: master-slave: master at C = 1, slave at C = 0, Q changes once per cycle'], model: '<p>See section 4 and 5: the feedback from Q to the input gates makes the JK toggle again and again while C = 1. Use edge triggering or a master-slave so that Q changes only once per clock cycle.</p>' });
+recall('#r3', { id: 'r3', marks: 8, q: 'Draw the circuit diagram of a master-slave J-K flip-flop using only NAND gates. (2018–19 Q5b)', points: ['Master input gates: 3-input NANDs (J, C, Q\') and (K, C, Q)', 'Master latch: two cross-coupled NANDs', 'Clock inverter (NAND with tied inputs)', 'Slave input gates fed by Qm, Qm\' and C\'', 'Slave latch: two cross-coupled NANDs', 'Feedback Q, Q\' from the slave to the master gates', 'Q and Q\' outputs labelled; master at C = 1, slave at C = 0'], model: '<p>See the figure in section 5: nine NAND gates, master first, clock inverter, slave second, feedback from slave to master.</p>' });
+recall('#r4', { id: 'r4', marks: 10, q: 'Draw the block diagram of a negative-edge triggered master-slave D flip-flop using D latches. (2022–23 Q6a)', points: ['Two D latches in series: D into the master, Qm into the slave, Q from the slave', 'Master enable = CLK (open at CLK = 1)', 'Slave enable = CLK\' through a NOT gate (open at CLK = 0)', 'Q changes at the falling edge, to the D value held by the master', 'Positive-edge version swaps the two enables'], model: '<p>See the figure in section 5: master latch enabled by CLK, slave latch enabled by CLK\', Q changes at the falling edge only.</p>' });
+</script>
+</body>
+</html>

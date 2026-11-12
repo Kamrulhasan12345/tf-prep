@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Comparators, code converters, parity · CSE 205 Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Combinational circuits · Mano §4.7, §4.9 · Tanzima ma'am L13–14 (Jul 21 – Jul 25) and L18–19 (parity) · most years</div>
+<h1>Comparators, max/min, code converters and parity</h1>
+<p class="lede">Past TF questions on this topic: <b>2024–25</b> Q6b (14, magnitude comparator for two 3-bit numbers); <b>2022–23</b> Q2a (20, 3-bit Gray to binary with minimum gates); <b>2021–22</b> Q1a (20, "random code" to BCD with K-maps); <b>2020–21</b> Q4a (10, max of two 3-bit numbers, show 7 and 3), Q2a (15, BCD to Excess-3, done on a PLA, see the PLA chapter), Q2c (5, 3-bit transmission, error on odd parity); <b>2018–19</b> Q2a (12, smaller of two 4-bit numbers, A = 7 and B = 9), Q4a (8, odd parity checker versus generator); <b>2017–18</b> Q2a (10, max of two 3-bit numbers), Q4a (8, odd parity checker and generator for a 3-bit Excess-3 code). Older: 2-bit magnitude comparator (2016–17, 10), negative-logic 4-bit parity checker/generator (2016–17, 6), BCD error detector, Binary-to-Excess-3 with control lines. <b>A code-converter or comparator design question appears in about six of eight papers, 10–20 marks.</b> The method is always the same: truth table with don't-cares, a K-map per output, gates.</p>
+
+<h2>1. Magnitude comparator</h2>
+<p>A comparator takes two n-bit numbers X and Y and gives three outputs: X &gt; Y, X = Y, X &lt; Y. Exactly one is 1.</p>
+<ol>
+<li>Bit i is <b>equal</b> when both bits match: <b>e<sub>i</sub> = X<sub>i</sub> ⊙ Y<sub>i</sub> = X<sub>i</sub>Y<sub>i</sub> + X<sub>i</sub>'Y<sub>i</sub>'</b> (an XNOR gate).</li>
+<li><b>X = Y</b> when every bit is equal: AND of all e<sub>i</sub>.</li>
+<li><b>X &gt; Y</b>: look from the MSB. X is bigger if the top bits differ with X<sub>2</sub> = 1, Y<sub>2</sub> = 0; or the top bits are equal and the next bits give X bigger; and so on. <b>X<sub>2</sub>Y<sub>2</sub>' + e<sub>2</sub>X<sub>1</sub>Y<sub>1</sub>' + e<sub>2</sub>e<sub>1</sub>X<sub>0</sub>Y<sub>0</sub>'</b>.</li>
+<li><b>X &lt; Y</b>: the same with the roles swapped: <b>X<sub>2</sub>'Y<sub>2</sub> + e<sub>2</sub>X<sub>1</sub>'Y<sub>1</sub> + e<sub>2</sub>e<sub>1</sub>X<sub>0</sub>'Y<sub>0</sub></b>.</li></ol>
+<p>This is ma'am's method (her n = 4 version has one more term). A 6-input truth table has 64 rows, so never do it that way for 3 bits.</p>
+<div class="exam"><div class="exam-src">2024–25 Q6(b) · 14 marks · older: 2-bit comparator 2016–17 (10 marks)</div><div class="exam-q"><p>Design a magnitude comparator for two 3-bit numbers X and Y.</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<p>Outputs: G (X &gt; Y), E (X = Y), L (X &lt; Y). Equal-bit signals e2, e1, e0 from XNOR gates.</p>
+<p class="formula">G = X2 Y2' + e2 X1 Y1' + e2 e1 X0 Y0'<br>E = e2 e1 e0<br>L = X2' Y2 + e2 X1' Y1 + e2 e1 X0' Y0</p>
+<div id="cmp"></div>
+<p>(Shortcut: exactly one output is 1, so L = (G + E)' needs one NOR gate and saves the second set of AND gates. Either circuit is correct. The equations were checked for all 64 input pairs.)</p>
+</div></details></div>
+<div class="write"><h4>What to write (comparator, 10–14 marks)</h4><ol>
+<li>"Three outputs G, E, L; exactly one is 1."</li>
+<li>e<sub>i</sub> = X<sub>i</sub> ⊙ Y<sub>i</sub> (XNOR), with a line saying why.</li>
+<li>The three equations, written MSB first (G, E, L above).</li>
+<li>The circuit: 3 XNOR gates, AND gates for each term, an OR for G and L, an AND for E. Label X2 as MSB.</li>
+<li>One check: X = 101, Y = 011 gives e2 = 0, G = X2Y2' = 1.</li></ol></div>
+
+<h2>2. Larger or smaller of two numbers (max / min)</h2>
+<p>This is a comparator followed by a <b>multiplexer</b>. The comparator output decides which number is passed to the output.</p>
+<ol>
+<li>Compare X and Y: get G = (X &gt; Y).</li>
+<li><b>Maximum:</b> Z = X if G = 1, otherwise Y. A 2×1 MUX on every bit: Z<sub>i</sub> = G·X<sub>i</sub> + G'·Y<sub>i</sub>. (If X = Y it does not matter which one is chosen.)</li>
+<li><b>Minimum:</b> Z = Y if G = 1, otherwise X. Swap the two MUX inputs: Z<sub>i</sub> = G'·X<sub>i</sub> + G·Y<sub>i</sub>.</li>
+<li>Hardware: one comparator + a "quad 2×1" MUX (one 2×1 MUX per bit, one shared select).</li></ol>
+<div id="mm"></div>
+<div class="exam"><div class="exam-src">2017–18 Q2(a) · 10 marks · 2018–19 Q2(a) · 12 marks · 2020–21 Q4(a) · 10 marks · older: 2-bit comparator in 2016–17</div><div class="exam-q"><p>Design a circuit that outputs the larger of two 3-bit numbers X2X1X0 and Y2Y1Y0 (2017–18; 2020–21 adds "explain with 7 and 3"). Design a circuit that returns the <b>smaller</b> of two 4-bit numbers A and B; show it for A = 7, B = 9 (2018–19).</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<p><b>Design (3-bit max):</b> comparator gives G; three 2×1 MUXes with S = G, I1 = X<sub>i</sub>, I0 = Y<sub>i</sub> give Z<sub>i</sub>.</p>
+<div id="mx"></div>
+<p><b>7 and 3 (max, 2020–21):</b> X = 111, Y = 011. The top bits differ: X2 = 1, Y2 = 0, so G = X2Y2' = 1 straight away. The MUX selects X. <b>Z = 111 = 7.</b></p>
+<p><b>A = 7, B = 9 (min, 2018–19):</b> A = 0111, B = 1001. Top bits: A3 = 0, B3 = 1, so L = A3'B3 = 1 (A &lt; B), G = 0. For the minimum the MUX passes A. <b>Z = 0111 = 7.</b></p>
+<p>The bench above traces any two numbers bit by bit, the way you should on paper.</p>
+</div></details></div>
+<div class="write"><h4>What to write (max/min, 10–12 marks)</h4><ol>
+<li>Block diagram: comparator, then MUX with the comparator output as select. Name G, and say which input is which.</li>
+<li>The comparator equations (section 1), or the block labelled "magnitude comparator" if the question lets you.</li>
+<li>Z<sub>i</sub> = G X<sub>i</sub> + G' Y<sub>i</sub> for max, written per bit.</li>
+<li>The numeric trace, starting at the MSB, saying which equation fires.</li></ol></div>
+
+<h2>3. Gray code and binary</h2>
+<p>In Gray code only one bit changes between neighbouring numbers. Binary → Gray: the top bit is copied, every other bit is XORed with the bit above it. Gray → binary: the top bit is copied, every other bit is the <b>binary bit above it XOR the Gray bit</b>.</p>
+<p class="formula">Binary → Gray: g2 = b2, g1 = b2 ⊕ b1, g0 = b1 ⊕ b0<br>Gray → binary: b2 = g2, b1 = b2 ⊕ g1 = g2 ⊕ g1, b0 = b1 ⊕ g0 = g2 ⊕ g1 ⊕ g0</p>
+<div class="exam"><div class="exam-src">2022–23 Q2(a) · 20 marks</div><div class="exam-q"><p>Design a combinational circuit that converts a three-bit Gray code to a three-bit binary number. Use only a minimum number of gates.</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<p><b>Truth table</b> (inputs G2 G1 G0, outputs B2 B1 B0). The binary value is found by XORing down: each binary bit = the binary bit above XOR the Gray bit.</p>
+<div class="tbl"><table class="mat"><tr><th>G2</th><th>G1</th><th>G0</th><th>B2</th><th>B1</th><th>B0</th></tr>
+<tr><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td></tr><tr><td>0</td><td>0</td><td>1</td><td>0</td><td>0</td><td>1</td></tr><tr><td>0</td><td>1</td><td>0</td><td>0</td><td>1</td><td>1</td></tr><tr><td>0</td><td>1</td><td>1</td><td>0</td><td>1</td><td>0</td></tr>
+<tr><td>1</td><td>0</td><td>0</td><td>1</td><td>1</td><td>1</td></tr><tr><td>1</td><td>0</td><td>1</td><td>1</td><td>1</td><td>0</td></tr><tr><td>1</td><td>1</td><td>0</td><td>1</td><td>0</td><td>0</td></tr><tr><td>1</td><td>1</td><td>1</td><td>1</td><td>0</td><td>1</td></tr></table></div>
+<p><b>K-maps.</b> B2 = Σ(4,5,6,7) = G2. B1 = Σ(2,3,4,5) = G2'G1 + G2G1' = G2 ⊕ G1. B0 = Σ(1,2,4,7): a checkerboard, no grouping possible, so as SOP it needs four 3-literal terms; it is G2 ⊕ G1 ⊕ G0.</p>
+<div id="gk1"></div><div id="gk0"></div>
+<p><b>Circuit with the fewest gates:</b> B2 is a wire from G2. B1 = G2 ⊕ G1 (one XOR). B0 = B1 ⊕ G0 (a second XOR, reusing B1). <b>Two XOR gates in total.</b></p>
+<div id="gc"></div>
+</div></details></div>
+<div class="write"><h4>What to write (code converter, 15–20 marks)</h4><ol>
+<li>The full truth table, every input row.</li>
+<li>A K-map for each output (3 variables, B0 is a checkerboard: say "no grouping, XOR").</li>
+<li>The simplified equations, then the XOR form that gives the minimum gates.</li>
+<li>The circuit with inputs G2 G1 G0 and outputs B2 B1 B0 labelled.</li></ol></div>
+
+<h2>4. An arbitrary code to BCD ("random code")</h2>
+<p>A custom code converter is a standard 4-step design: (1) truth table with every input; (2) the unused input combinations become <b>don't-cares</b>; (3) one K-map per output; (4) minimise and draw. Use the don't-cares to get larger groups.</p>
+<div class="exam"><div class="exam-src">2021–22 Q1(a) · 20 marks</div><div class="exam-q"><p>Design a combinational circuit converting the "Random Code" ABCD to BCD wxyz. Show K-maps and the circuit diagram. The random code for each digit is: 0 → 0000, 1 → 0011, 2 → 0101, 3 → 0110, 4 → 1010, 5 → 1011, 6 → 1100, 7 → 1101, 8 → 1110, 9 → 1111. The other six codes never occur.</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<p><b>Assumption:</b> the printed table lists, for each decimal digit, the random code on the input side (ABCD), and BCD is the output (wxyz = the digit in binary). The six codes 0001, 0010, 0100, 0111, 1000, 1001 never occur: don't-care.</p>
+<p><b>Step 1: truth table.</b></p>
+<div class="tbl"><table class="mat"><tr><th>ABCD</th><th>digit</th><th>w</th><th>x</th><th>y</th><th>z</th></tr>
+<tr><td>0000</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td></tr>
+<tr><td>0001</td><td>–</td><td>x</td><td>x</td><td>x</td><td>x</td></tr>
+<tr><td>0010</td><td>–</td><td>x</td><td>x</td><td>x</td><td>x</td></tr>
+<tr><td>0011</td><td>1</td><td>0</td><td>0</td><td>0</td><td>1</td></tr>
+<tr><td>0100</td><td>–</td><td>x</td><td>x</td><td>x</td><td>x</td></tr>
+<tr><td>0101</td><td>2</td><td>0</td><td>0</td><td>1</td><td>0</td></tr>
+<tr><td>0110</td><td>3</td><td>0</td><td>0</td><td>1</td><td>1</td></tr>
+<tr><td>0111</td><td>–</td><td>x</td><td>x</td><td>x</td><td>x</td></tr>
+<tr><td>1000</td><td>–</td><td>x</td><td>x</td><td>x</td><td>x</td></tr>
+<tr><td>1001</td><td>–</td><td>x</td><td>x</td><td>x</td><td>x</td></tr>
+<tr><td>1010</td><td>4</td><td>0</td><td>1</td><td>0</td><td>0</td></tr>
+<tr><td>1011</td><td>5</td><td>0</td><td>1</td><td>0</td><td>1</td></tr>
+<tr><td>1100</td><td>6</td><td>0</td><td>1</td><td>1</td><td>0</td></tr>
+<tr><td>1101</td><td>7</td><td>0</td><td>1</td><td>1</td><td>1</td></tr>
+<tr><td>1110</td><td>8</td><td>1</td><td>0</td><td>0</td><td>0</td></tr>
+<tr><td>1111</td><td>9</td><td>1</td><td>0</td><td>0</td><td>1</td></tr></table></div>
+<p><b>Step 2: the ones.</b> w = Σ(14,15); x = Σ(10,11,12,13); y = Σ(5,6,12,13); z = Σ(3,6,11,13,15); don't-cares d(1,2,4,7,8,9) in every map.</p>
+<p><b>Step 3: K-maps</b> (step through each one).</p>
+<p><b>w</b></p><div id="rk1"></div><p><b>x</b></p><div id="rk2"></div><p><b>y</b></p><div id="rk3"></div><p><b>z</b></p><div id="rk4"></div>
+<p><b>Step 4: results.</b> <b>w = ABC</b> &nbsp; <b>x = AB' + AC'</b> &nbsp; <b>y = A'B + BC'</b> (A'B + AC' is equally small) &nbsp; <b>z = A'C + AD</b>.</p>
+<div id="rg1"></div><div id="rg2"></div><div id="rg3"></div><div id="rg4"></div>
+</div></details></div>
+<div class="write"><h4>What to write (custom code converter, 20 marks)</h4><ol>
+<li>Name the inputs and outputs and state which side is which (assumption line).</li>
+<li>The 16-row truth table with <b>x</b> in the unused rows.</li>
+<li>Four K-maps with don't-cares marked x, the groups drawn, and the minterm lists.</li>
+<li>Four simplified equations.</li>
+<li>The circuit: gates for the four outputs, shared inverters, every input and output labelled.</li></ol></div>
+
+<h2>5. BCD ↔ Excess-3</h2>
+<p>Excess-3 (XS3) is BCD plus 3: the digit 0 is 0011, 9 is 1100. It is self-complementing (the 9's complement is the bit-flip). Only ten of the 16 codes are used, so six are don't-cares.</p>
+<div class="tbl"><table class="mat"><tr><th>digit</th><th>BCD ABCD</th><th>XS3 wxyz</th></tr><tr><td>0</td><td>0000</td><td>0011</td></tr><tr><td>1</td><td>0001</td><td>0100</td></tr><tr><td>2</td><td>0010</td><td>0101</td></tr><tr><td>3</td><td>0011</td><td>0110</td></tr><tr><td>4</td><td>0100</td><td>0111</td></tr><tr><td>5</td><td>0101</td><td>1000</td></tr><tr><td>6</td><td>0110</td><td>1001</td></tr><tr><td>7</td><td>0111</td><td>1010</td></tr><tr><td>8</td><td>1000</td><td>1011</td></tr><tr><td>9</td><td>1001</td><td>1100</td></tr></table></div>
+<p><b>BCD → XS3.</b> Inputs ABCD (BCD), outputs wxyz, don't-cares 10–15:</p>
+<p><b>w</b></p><div id="bk1"></div><p><b>x</b></p><div id="bk2"></div><p><b>y</b></p><div id="bk3"></div><p><b>z</b></p><div id="bk4"></div>
+<p class="formula">w = A + BC + BD &nbsp; x = B'C + B'D + BC'D' &nbsp; y = CD + C'D' = C ⊙ D &nbsp; z = D'</p>
+<p><b>Shortcut with a binary adder:</b> XS3 = BCD + 0011. A single 4-bit adder with the second input tied to 0011 and carry-in 0 does the job. The other way, XS3 → BCD, is XS3 − 3 = XS3 + 1101 (mod 16, ignore the carry).</p>
+<p><b>XS3 → BCD.</b> Inputs wxyz (XS3), outputs ABCD (BCD). Unused codes are 0000, 0001, 0010, 1101, 1110, 1111: don't-care. Results from the K-maps:</p>
+<p class="formula">A = wx + wyz &nbsp; B = x'y' + x'z' + xyz &nbsp; C = y ⊕ z &nbsp; D = z'</p>
+<div class="write"><h4>What to write (BCD ↔ Excess-3)</h4><ol>
+<li>The table of ten valid rows plus a line "other six are don't-care".</li>
+<li>One K-map per output with the groups.</li>
+<li>The four equations (above) and the gates.</li>
+<li>If the question allows it: "XS3 = BCD + 0011 with a 4-bit adder" as the short design.</li></ol></div>
+
+<h2>6. Parity generator and checker</h2>
+<p>A <b>parity bit</b> is added to a word so that the total number of 1s is always even (<b>even parity</b>) or always odd (<b>odd parity</b>). The receiver recomputes parity and raises an error flag when it is wrong. It finds any single-bit error, but cannot say which bit.</p>
+<p><b>The tool is the XOR gate.</b> x ⊕ y ⊕ z is 1 exactly when an odd number of the inputs are 1. So a chain of XORs counts the 1s (mod 2).</p>
+<div class="tbl"><table class="mat"><tr><th></th><th>generator (sender)</th><th>checker (receiver)</th></tr>
+<tr><td>inputs</td><td>the n data bits</td><td>the n data bits + the received parity bit P (n + 1 bits)</td></tr>
+<tr><td>output</td><td>the parity bit P</td><td>an error flag E (1 = error)</td></tr>
+<tr><td>even parity, n = 3</td><td>P = x ⊕ y ⊕ z</td><td>E = x ⊕ y ⊕ z ⊕ P</td></tr>
+<tr><td>odd parity, n = 3</td><td>P = (x ⊕ y ⊕ z)' (XNOR)</td><td>E = (x ⊕ y ⊕ z ⊕ P)' (error when the count of 1s is even)</td></tr></table></div>
+<div class="exam"><div class="exam-src">2018–19 Q4(a) · 8 marks · 2017–18 Q4(a) · 8 marks · 2020–21 Q2(c) · 5 marks · older 2016–17 (negative-logic 4-bit, 6 marks)</div><div class="exam-q"><p>(2018–19) What are the differences between an odd parity checker and an odd parity generator? (2017–18) For a 3-bit Excess-3 code design an odd parity checker and an odd parity generator. (2020–21) Three-bit data is transmitted; an error is indicated if the parity is odd. Design the circuit.</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<p><b>Difference (2018–19):</b> the generator is at the sender: it has n inputs (the data) and produces the parity bit that makes the total number of 1s odd. The checker is at the receiver: it has n + 1 inputs (data and the received parity bit) and produces an error flag that is 1 when the total number of 1s is <b>even</b> (a violation of odd parity). Both are XOR trees; the generator inverts once at the end, so does the checker.</p>
+<p><b>Odd parity, 3 data bits (assumption: "3-bit" means three data bits x y z; for the 4-bit Excess-3 digit wxyz use the same circuit with one more XOR).</b></p>
+<div class="tbl"><table class="mat"><tr><th>x y z</th><th>ones</th><th>P (odd generator)</th><th>x y z P</th><th>E (checker, even = error)</th></tr>
+<tr><td>000</td><td>0</td><td>1</td><td>0001</td><td>0</td></tr><tr><td>001</td><td>1</td><td>0</td><td>0010</td><td>0</td></tr><tr><td>010</td><td>1</td><td>0</td><td>0100</td><td>0</td></tr><tr><td>011</td><td>2</td><td>1</td><td>0111</td><td>0</td></tr>
+<tr><td>100</td><td>1</td><td>0</td><td>1000</td><td>0</td></tr><tr><td>101</td><td>2</td><td>1</td><td>1011</td><td>0</td></tr><tr><td>110</td><td>2</td><td>1</td><td>1101</td><td>0</td></tr><tr><td>111</td><td>3</td><td>0</td><td>1110</td><td>0</td></tr></table></div>
+<p>P = Σ(0,3,5,6) = (x ⊕ y ⊕ z)'. The checker is 1 for any received word with an even number of 1s, for example 0000 (no ones) or 0011 (two ones): E = (x ⊕ y ⊕ z ⊕ P)'.</p>
+<div id="pg"></div><div id="pc"></div>
+<p><b>2020–21 (error if the parity of the three bits is odd):</b> E = x ⊕ y ⊕ z. E = 1 means an odd number of 1s was received, so report an error. (If the three bits are two data bits and an even parity bit, the circuit is the same.)</p>
+</div></details></div>
+<div class="write"><h4>What to write (parity, 5–8 marks)</h4><ol>
+<li>Define the scheme: odd parity means an odd number of 1s in data + parity.</li>
+<li>Truth table (data, P) for the generator and the equation P = (x ⊕ y ⊕ z)'.</li>
+<li>The checker equation E = (x ⊕ y ⊕ z ⊕ P)' and what E = 1 means.</li>
+<li>Two small circuits made of XOR gates with every input labelled.</li>
+<li>For "differences": sender versus receiver, n versus n + 1 inputs, parity bit versus error flag.</li></ol></div>
+
+<div class="trap"><b>Traps that cost marks</b><ul>
+<li>Comparator: forgetting the e<sub>i</sub> factors. X1Y1' alone is not enough: it must be ANDed with "the higher bits are equal".</li>
+<li>Max versus min: swapping the MUX inputs. Test with two numbers before you draw.</li>
+<li>Code converters: leaving don't-cares as 0. Use them to enlarge groups.</li>
+<li>Gray → binary: XORing Gray bits only (that gives binary → Gray). Gray → binary needs the <b>binary bit above</b>.</li>
+<li>Parity: even versus odd. Odd parity generator = XNOR, odd checker flags an <b>even</b> count.</li>
+<li>When the question's table is unclear (2021–22), write the assumption in one line before you start.</li></ul></div>
+
+<h2>Mandatory practice</h2>
+<div id="p1"></div>
+<div id="p2"></div>
+<div id="r1"></div>
+<div id="r2"></div>
+<div id="r3"></div>
+</main>
+<script src="../assets/book.js"></script><script src="../assets/logic.js"></script><script src="../assets/dld.js"></script>
+<script>
+// net(sel, {inputs:[...], nodes:[{id,kind,label,ins:[ref..],pi:[..],po:[..],nout}], outputs:[{ref,label}], note})
+// kinds: and or nand nor not xor xnor | box (label, pi = input pin labels, po = output pin labels)
+function net(sel, sp) {
+  const IN = sp.inputs || [], N = {}, G = ['and', 'or', 'nand', 'nor', 'not', 'xor', 'xnor', 'buf'];
+  sp.nodes.forEach(n => { N[n.id] = n; n.isG = G.includes(n.kind); });
+  const parse = r => IN.includes(r) ? { p: r } : { id: r.split('.')[0], k: +(r.split('.')[1] || 0) };
+  Object.values(N).forEach(n => { const ni = n.ins.length, no = (n.po || [0]).length;
+    if (n.isG) { n.w = 44; n.h = n.kind === 'not' ? 22 : Math.max(26, ni * 13); } else { n.w = Math.max(74, (n.label || '').length * 7.5 + ((n.pi || n.po) ? 56 : 20)); n.h = Math.max(44, 22 * Math.max(ni, no) + 8); } });
+  const lv = {}; const L1 = id => { if (lv[id] !== undefined) return lv[id]; lv[id] = 1 + Math.max(0, ...N[id].ins.map(r => { const s = parse(r); return s.p ? 0 : L1(s.id); })); return lv[id]; };
+  Object.keys(N).forEach(L1); const nl = Math.max(...Object.values(lv)), cols = []; for (let l = 1; l <= nl; l++) cols.push(Object.values(N).filter(n => lv[n.id] === l));
+  let x = 90; cols.forEach(c => { const w = Math.max(...c.map(n => n.w)); c.forEach(n => { n.x = x; n.cw = w; }); x += w + 78; });
+  const outPin = (n, k) => { const no = (n.po || [0]).length; return [n.x + n.w + (/^n|^not$|^xnor$/.test(n.kind) && n.isG ? 8 : 0), n.y + (k + .5) * n.h / no]; };
+  const inPin = (n, j) => [n.x - (n.kind === 'xor' || n.kind === 'xnor' ? 4 : 0), n.y + (j + .5) * n.h / n.ins.length];
+  const stack = c => { let y = 20; c.forEach(n => { n.y = y; y += n.h + 20; }); };
+  cols.forEach(stack);
+  const pry = {}; IN.forEach((p, i) => pry[p] = 24 + i * 26);
+  const srcY = r => { const s = parse(r); return s.p ? pry[s.p] : outPin(N[s.id], s.k)[1]; };
+  for (let it = 0; it < 4; it++) { cols.forEach(c => { c.forEach(n => n.by = n.ins.reduce((a, r) => a + srcY(r), 0) / n.ins.length); c.sort((a, b) => a.by - b.by); let y = 0; c.forEach(n => { n.y = Math.max(y + 18, n.by - n.h / 2); y = n.y + n.h; }); }); IN.forEach(p => { const ys = []; Object.values(N).forEach(n => n.ins.forEach((r, j) => { if (r === p) ys.push(inPin(n, j)[1]); })); if (ys.length) pry[p] = ys.reduce((a, b) => a + b, 0) / ys.length; }); const sp2 = [...IN].sort((a, b) => pry[a] - pry[b]); let y = 14; sp2.forEach(p => { pry[p] = Math.max(pry[p], y); y = pry[p] + 24; }); }
+  { const ys = [...Object.values(N).map(n => n.y), ...IN.map(p => pry[p] - 10)], mn = Math.min(...ys) - 14; Object.values(N).forEach(n => n.y -= mn); IN.forEach(p => pry[p] -= mn); }
+  let wires = '', body = '';
+  Object.values(N).forEach(n => n.ins.forEach((r, j) => { const s = parse(r), [xs, ys] = s.p ? [64, pry[s.p]] : outPin(N[s.id], s.k), [xt, yt] = inPin(n, j), xm = xt - 12 - 6 * (j % 4); wires += `<path class="wr" d="M${xs},${ys} H${xm} V${yt} H${xt}"/>`; }));
+  IN.forEach(p => { body += `<text class="lb" x="58" y="${pry[p]}" style="text-anchor:end">${ovs(p)}</text><line class="wr" x1="62" y1="${pry[p]}" x2="68" y2="${pry[p]}"/>`; });
+  Object.values(N).forEach(n => { if (n.isG) { const t = n.kind === 'xor' ? 'or' : n.kind === 'xnor' ? 'nor' : n.kind === 'buf' ? 'and' : n.kind, g = gateShape(t, n.x, n.y, n.w, n.h); body += g.svg; if (n.kind === 'xor' || n.kind === 'xnor') body += `<path class="wr" d="M${n.x - 6},${n.y} q${n.w * .3},${n.h / 2} 0,${n.h}"/>`; if (n.label) body += `<text class="sm" x="${n.x + n.w / 2 - 4}" y="${n.y + n.h + 9}">${ovs(n.label)}</text>`; }
+    else { body += `<rect class="gt" x="${n.x}" y="${n.y}" width="${n.w}" height="${n.h}" rx="4"/><text class="lb" x="${n.x + n.w / 2}" y="${n.y + n.h / 2}">${ovs(n.label || '')}</text>`; (n.pi || []).forEach((t, j) => { const [px, py] = inPin(n, j); body += `<text class="sm" x="${px + 4}" y="${py}" style="text-anchor:start">${ovs(t)}</text>`; }); (n.po || []).forEach((t, k) => { const [px, py] = outPin(n, k); body += `<text class="sm" x="${px - 4}" y="${py}" style="text-anchor:end">${ovs(t)}</text>`; }); } });
+  let W = x - 20, H = 20;
+  (sp.outputs || []).forEach(o => { const s = parse(o.ref), [ox, oy] = outPin(N[s.id], s.k); body += `<line class="wr" x1="${ox}" y1="${oy}" x2="${ox + 26}" y2="${oy}"/><text class="lb" x="${ox + 30}" y="${oy}" style="text-anchor:start">${ovs(o.label)}</text>`; W = Math.max(W, ox + 40 + o.label.length * 8); });
+  Object.values(N).forEach(n => { H = Math.max(H, n.y + n.h + 22); }); IN.forEach(p => { H = Math.max(H, pry[p] + 16); });
+  host(sel).innerHTML = `<div class="fg-wrap"><svg class="dsa-fig" viewBox="0 0 ${W} ${H}" width="${W}" role="img" aria-label="${esc(sp.alt || 'circuit diagram')}">${wires}${body}</svg>${sp.note ? `<div class="figlabel">${sp.note}</div>` : ''}</div>`;
+}
+
+// comparator
+net('#cmp', { alt: '3-bit magnitude comparator', inputs: ['X2', 'Y2', 'X1', 'Y1', 'X0', 'Y0'], nodes: [
+  { id: 'e2', kind: 'xnor', label: 'e2', ins: ['X2', 'Y2'] }, { id: 'e1', kind: 'xnor', label: 'e1', ins: ['X1', 'Y1'] }, { id: 'e0', kind: 'xnor', label: 'e0', ins: ['X0', 'Y0'] },
+  { id: 'ny2', kind: 'not', ins: ['Y2'] }, { id: 'ny1', kind: 'not', ins: ['Y1'] }, { id: 'ny0', kind: 'not', ins: ['Y0'] },
+  { id: 't1', kind: 'and', ins: ['X2', 'ny2'] }, { id: 't2', kind: 'and', ins: ['e2', 'X1', 'ny1'] }, { id: 't3', kind: 'and', ins: ['e2', 'e1', 'X0', 'ny0'] },
+  { id: 'G', kind: 'or', ins: ['t1', 't2', 't3'] }, { id: 'E', kind: 'and', ins: ['e2', 'e1', 'e0'] }, { id: 'L', kind: 'nor', ins: ['G', 'E'] }],
+  outputs: [{ ref: 'G', label: 'G (X>Y)' }, { ref: 'E', label: 'E (X=Y)' }, { ref: 'L', label: 'L (X<Y)' }], note: '3-BIT COMPARATOR: e = XNOR, G = AND-OR of three terms, E = AND of e, L = (G + E)\'' });
+// max / min
+net('#mx', { alt: 'max of two 3-bit numbers', inputs: ['X', 'Y'], nodes: [
+  { id: 'c', kind: 'box', label: 'Comparator', ins: ['X', 'Y'], pi: ['X', 'Y'], po: ['G'] },
+  { id: 'm', kind: 'box', label: 'Quad 2×1 MUX (3 bits)', ins: ['Y', 'X', 'c'], pi: ['I0', 'I1', 'S'], po: ['Z'] }],
+  outputs: [{ ref: 'm', label: 'Z = max(X, Y)' }], note: 'MAX: S = G = (X > Y) picks X. For MIN swap the two data inputs: I0 = X, I1 = Y.' });
+// Gray -> binary
+kmap('#gk1', { vars: ['G2', 'G1', 'G0'], ones: [2, 3, 4, 5] });
+kmap('#gk0', { vars: ['G2', 'G1', 'G0'], ones: [1, 2, 4, 7] });
+net('#gc', { alt: '3-bit Gray to binary', inputs: ['G2', 'G1', 'G0'], nodes: [
+  { id: 'x1', kind: 'xor', label: 'B1', ins: ['G2', 'G1'] }, { id: 'x0', kind: 'xor', label: 'B0', ins: ['x1', 'G0'] }],
+  outputs: [{ ref: 'x1', label: 'B1' }, { ref: 'x0', label: 'B0' }], note: 'B2 = G2 (a plain wire). Two XOR gates in all.' });
+// random code
+const V4 = ['A', 'B', 'C', 'D'], DC = [1, 2, 4, 7, 8, 9];
+const RC = [['w', [14, 15], 'ABC'], ['x', [10, 11, 12, 13], "AB' + AC'"], ['y', [5, 6, 12, 13], "A'B + BC'"], ['z', [3, 6, 11, 13, 15], "A'C + AD"]];
+RC.forEach(([nm, ones, ex], i) => { kmap('#rk' + (i + 1), { vars: V4, ones, dc: DC }); gates('#rg' + (i + 1), { expr: ex, vars: V4, form: 'and-or', out: nm }); });
+// BCD -> XS3
+[[5, 6, 7, 8, 9], [1, 2, 3, 4, 9], [0, 3, 4, 7, 8], [0, 2, 4, 6, 8]].forEach((ones, i) => kmap('#bk' + (i + 1), { vars: V4, ones, dc: [10, 11, 12, 13, 14, 15] }));
+// parity
+net('#pg', { alt: 'odd parity generator', inputs: ['x', 'y', 'z'], nodes: [{ id: 'a', kind: 'xor', ins: ['x', 'y'] }, { id: 'p', kind: 'xnor', ins: ['a', 'z'] }], outputs: [{ ref: 'p', label: 'P' }], note: 'ODD PARITY GENERATOR: P = (x⊕y⊕z)\'' });
+net('#pc', { alt: 'odd parity checker', inputs: ['x', 'y', 'z', 'P'], nodes: [{ id: 'a', kind: 'xor', ins: ['x', 'y'] }, { id: 'b', kind: 'xor', ins: ['z', 'P'] }, { id: 'e', kind: 'xnor', ins: ['a', 'b'] }], outputs: [{ ref: 'e', label: 'E (1 = error)' }], note: 'ODD PARITY CHECKER: E = (x⊕y⊕z⊕P)\'' });
+
+// comparator bench
+(() => {
+  const el = $('#mm'); el.innerHTML = `<div class="def"><b>Comparator and max/min bench (4 bits).</b> A <input id="ma" type="number" min="0" max="15" value="7" style="width:4em"> B <input id="mb" type="number" min="0" max="15" value="9" style="width:4em"><div id="mo"></div></div>`;
+  const run = () => { const a = Math.max(0, Math.min(15, +$('#ma').value | 0)), b = Math.max(0, Math.min(15, +$('#mb').value | 0)), bit = (v, i) => (v >> i) & 1; let eq = 1, G = 0, Lt = 0, rows = '';
+    for (let i = 3; i >= 0; i--) { const x = bit(a, i), y = bit(b, i), e = +(x === y); const g = eq && x && !y ? 1 : 0, l = eq && !x && y ? 1 : 0; G |= g; Lt |= l; rows += `<tr><td>${i}</td><td>${x}</td><td>${y}</td><td>${e}</td><td>${eq}</td><td>${g}</td><td>${l}</td></tr>`; eq = eq && e; }
+    $('#mo').innerHTML = `<div class="tbl"><table class="mat"><tr><th>bit</th><th>A<sub>i</sub></th><th>B<sub>i</sub></th><th>equal e<sub>i</sub></th><th>all higher bits equal</th><th>A&gt;B term fires</th><th>A&lt;B term fires</th></tr>${rows}</table></div><p class="tracer-hint">G (A&gt;B) = ${G}, E (A=B) = ${eq}, L (A&lt;B) = ${Lt}. <b>max = ${G ? a : b}</b> (MUX select G = ${G} passes ${G ? 'A' : 'B'}). <b>min = ${G ? b : a}</b>.</p>`; };
+  el.querySelectorAll('input').forEach(i => i.oninput = run); run();
+})();
+
+practice('#p1', { id: 'p1', kind: 'sop', n: 2 });
+practice('#p2', { id: 'p2', kind: 'sop', n: 1, opts: { n: 3 } });
+recall('#r1', { id: 'r1', marks: 14, q: 'Design a magnitude comparator for two 3-bit numbers X and Y. (2024–25 Q6b)', points: ['Three outputs G (X>Y), E (X=Y), L (X<Y); exactly one is 1', 'Equal-bit signal e_i = X_i XNOR Y_i = X_i Y_i + X_i\' Y_i\'', 'E = e2 e1 e0', 'G = X2 Y2\' + e2 X1 Y1\' + e2 e1 X0 Y0\'', 'L = X2\' Y2 + e2 X1\' Y1 + e2 e1 X0\' Y0 (or L = (G + E)\')', 'Circuit drawn with XNOR, AND and OR gates, inputs and outputs labelled'], model: '<p>See section 1. e<sub>i</sub> = X<sub>i</sub> ⊙ Y<sub>i</sub>. G = X2Y2\' + e2X1Y1\' + e2e1X0Y0\'. E = e2e1e0. L = X2\'Y2 + e2X1\'Y1 + e2e1X0\'Y0. Three XNORs, AND-OR for G and L, AND for E.</p>' });
+recall('#r2', { id: 'r2', marks: 20, q: 'Design a circuit that converts a three-bit Gray code to a three-bit binary number with the minimum number of gates. (2022–23 Q2a)', points: ['Full 8-row truth table G2 G1 G0 to B2 B1 B0', 'B2 = G2 (K-map or observation)', 'B1 = G2\'G1 + G2G1\' = G2 XOR G1', 'B0 is a checkerboard on the K-map: G2 XOR G1 XOR G0', 'Minimum gates: two XORs, with B0 = B1 XOR G0 reusing B1', 'Circuit drawn and inputs and outputs labelled'], model: '<p>B2 = G2, B1 = G2 ⊕ G1, B0 = G2 ⊕ G1 ⊕ G0 = B1 ⊕ G0. Two XOR gates. Truth table: 000→000, 001→001, 010→011, 011→010, 100→111, 101→110, 110→100, 111→101.</p>' });
+recall('#r3', { id: 'r3', marks: 8, q: 'For a 3-bit data word, design an odd parity generator and an odd parity checker, and state the differences between them. (2017–18 Q4a, 2018–19 Q4a)', points: ['Odd parity: the total number of 1s including the parity bit is odd', 'Generator: 3 inputs, output P = (x XOR y XOR z)\'', 'Checker: 4 inputs (data and P), output E = (x XOR y XOR z XOR P)\', E = 1 means error (even count)', 'Truth table of P', 'Circuits drawn from XOR and XNOR gates', 'Difference: generator at the sender with n inputs and a parity-bit output, checker at the receiver with n + 1 inputs and an error flag'], model: '<p>See section 6: P = (x⊕y⊕z)\' from one XOR and one XNOR. E = (x⊕y⊕z⊕P)\' with three XOR-type gates. Generator at the sender (n inputs, output P); checker at the receiver (n + 1 inputs, output E = 1 on error).</p>' });
+</script>
+</body>
+</html>

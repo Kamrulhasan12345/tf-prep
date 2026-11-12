@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Races and state assignment · CSE 205 Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+<style>
+.krow{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:flex-start}.km1{min-width:0}.kgroup{margin:.8em 0;padding:.4em .6em;border:1px solid var(--line);border-radius:6px}
+h4.step{margin:1.2em 0 .3em;font:600 13px var(--mono);text-transform:uppercase;letter-spacing:.05em;color:var(--accent)}
+.eqs{font-family:var(--mono);padding-left:1.2em}.eqs li{margin:.2em 0}.dsa-fig.kmap{max-width:100%;height:auto}
+.fm5 li{margin:.25em 0}.fm5{font-size:.97rem}
+</style>
+</head>
+<body>
+<main>
+
+<div class="eyebrow">Asynchronous circuits · Nelson / Kohavi (Async) · Adnan sir L19 (Sep 26), circuit step from Badhon's notes · every year, "10 marks: state assignment"</div>
+<h1>Races and race-free state assignment</h1>
+<p class="lede">Every paper ends its fundamental-mode question with an assignment: 2022–23 Q8a (12 marks, what is a race, critical and non-critical, with examples), 2021–22 Q8b (10, find a valid assignment without critical race and complete the modified flow table), 2020–21 Q8b (10, same), 2018–19 Q8b (8, same), 2017–18 Q8b (10, same table as 2018–19). The assignment is also part of 2019–20 Q4b and 2020–21 Q8a (25 marks each, with K-maps and circuit) and 2023–24 Q8a (minimum states for a race-free assignment). Bank: #262 (find all races and cycles in a transition table, 10), #263 (multiple-row method, 10), #261/#264/#256 (races, 10–12). Adnan sir: <b>"TF #3: 25 → fundamental, 10 → state assignment"</b>, "ashbei" (it will definitely come); Badhon wrote "exactly one question is confirmed from here". It is 8–12 marks that follow a recipe.</p>
+
+<div class="key"><b>The whole method on one screen</b>
+<ol>
+<li><b>Race</b> = a move where <b>two or more state variables must change</b>. If the circuit ends in the same stable state whatever the order, it is <b>non-critical</b>; if an intermediate state is stable (or leads elsewhere), the order decides and it is <b>critical</b>. Never allow a critical race.</li>
+<li><b>Transition diagram:</b> a vertex per row, an edge for every unstable move row r → row s. The two codes of every edge must <b>differ in exactly one bit</b>.</li>
+<li><b>2 variables</b> work if the graph is inside a square (a path or a 4-cycle). A <b>triangle</b> (3 mutually joined rows) never fits: add one spare row on one edge to turn it into a square.</li>
+<li><b>Dense graph (K₄):</b> use 3 variables, spare rows on 3 edges (b′, c′, d′ in Adnan sir's TF #3), place them on the cube with the adjacency map: a = 000, b = 001, b′ = 011, c = 010, c′ = 110, d = 100, d′ = 101.</li>
+<li><b>Modified flow table:</b> the spare row is a via-row (leads on to the target, everything else "–"). Then transition table → K-maps → circuit.</li>
+</ol></div>
+
+<h2>1. What a race is (2022–23 Q8a, 12 marks)</h2>
+<p>An asynchronous circuit has a combinational part and feedback. When an unstable total state moves to a row whose code differs in <b>more than one bit</b>, the secondary variables change at slightly different speeds: a <b>race</b>. Adnan sir's picture: moving 00 → 11 can go via 10 (path 1) or via 01 (path 2).</p>
+<div class="def"><dl>
+<dt>Non-critical race</dt><dd>Both intermediate states (10 and 01) are <b>unstable</b> in that column and lead on to 11. Whichever variable wins, the circuit ends in 11.</dd>
+<dt>Critical race</dt><dd>One intermediate state is <b>stable</b> in that column. If that path wins, the circuit stops there and never reaches 11: the result depends on the speeds.</dd>
+<dt>Cycle</dt><dd>A chain of unstable states that returns to a state it has already visited, so it never settles (it oscillates).</dd>
+</dl></div>
+<p><b>Worked analysis of bank #262</b> (transition table, rows y₁y₂, columns x₁x₂, entries Y₁Y₂):</p>
+<div id="t262"></div>
+<p>Engine analysis: every unstable (column, start) with the possible final stable states:</p>
+<div class="tbl"><table class="mat"><tr><th>column x₁x₂</th><th>start y₁y₂</th><th>move</th><th>can end in</th><th>verdict</th><th></th></tr><tr><td>00</td><td>00</td><td>one bit</td><td>01</td><td>–</td><td></td></tr><tr><td>00</td><td>10</td><td>one bit</td><td>01</td><td>–</td><td></td></tr><tr><td>00</td><td>11</td><td>one bit</td><td>01</td><td>–</td><td></td></tr><tr><td>01</td><td>01</td><td>one bit</td><td>00</td><td>–</td><td></td></tr><tr><td>01</td><td>10</td><td>one bit</td><td>00</td><td>–</td><td></td></tr><tr><td>01</td><td>11</td><td>two bits change</td><td>00</td><td><b class="good">non-critical</b></td><td></td></tr><tr><td>11</td><td>00</td><td>two bits change</td><td>11 or 10</td><td><b class="bad">critical</b></td><td>can cycle</td></tr><tr><td>11</td><td>01</td><td>two bits change</td><td>10 or 11</td><td><b class="bad">critical</b></td><td>can cycle</td></tr><tr><td>10</td><td>00</td><td>one bit</td><td>10</td><td>–</td><td></td></tr><tr><td>10</td><td>01</td><td>two bits change</td><td>10 or 11</td><td><b class="bad">critical</b></td><td></td></tr></table></div>
+<p>Example reading. <b>Column 01, start 11:</b> Y = 00, both bits change; the intermediates 10 and 01 are both unstable in column 01 and both lead to 00: <b>non-critical</b>. <b>Column 11, start 00:</b> Y = 11, both bits change; the intermediate 10 is <b>stable</b> in column 11 (Y = 10), so the circuit can stop there instead of reaching 11: <b>critical</b>. In column 11 the moves 00 → … → 01 → … can also revisit a state: a <b>cycle</b>.</p>
+<div class="write"><h4>What to write (what is a race, 12 marks)</h4><ol>
+<li>Definition: more than one state variable must change for one input change; the circuit is a combinational part with feedback and the variables change at different speeds.</li>
+<li>Non-critical: all paths end in the same stable state. Critical: some path ends in a different stable state. Give one table of each (a 2-variable transition table is enough) and draw the paths 00 → 10 → 11 and 00 → 01 → 11 with the stable ones marked.</li>
+<li>The cure: assign states so that every unstable move changes one bit (single-step transitions), adding spare rows if needed.</li></ol></div>
+
+<h2>2. Transition diagram and adjacency</h2>
+<div class="method"><h4>Finding a race-free assignment</h4><ol>
+<li>From the (reduced) flow table list every unstable entry: row r has "s" in some column → edge r – s. Do it for all rows; each pair once. (Stable entries are not edges.)</li>
+<li>Number of state variables k = ⌈log₂ rows⌉ (2 for 3–4 rows, 3 for 5–8).</li>
+<li>Draw the graph. Put the vertices on the corners of a square (k = 2) or cube (k = 3). Every edge must join <b>neighbouring</b> corners (codes differing in one bit); diagonals are not allowed.</li>
+<li>If it does not fit, add a <b>spare row</b> on an edge r – s: r now goes to the spare row x, x goes on to s. Two edges instead of one, each of length one. Repeat until it fits. A graph with a triangle never fits a square or a cube corner pair directly, so a triangle always needs a spare row.</li>
+<li>Write the <b>modified flow table</b> with the extra rows and the codes.</li></ol></div>
+<p>The widget below tries to find a 2-variable assignment; red dashed lines are required adjacencies that are diagonals (a race). It is run on the table of 2018–19 Q8b.</p>
+
+<h2>3. 2018–19 Q8b = 2017–18 Q8b (8 and 10 marks)</h2>
+<div class="exam"><div class="exam-src">2018–19 Q8(b) · 8 marks · 2017–18 Q8(b) · 10 marks (identical table)</div><div class="exam-q"><p>For the reduced flow table in the figure, find a valid assignment without any critical race and complete the modified flow table.</p><div id="q1"></div></div>
+<details open><summary>Answer</summary><div class="exam-a">
+<p><b>Edges</b> (every unstable entry): a → d (01), a → c (10), b → c (01), b → d (10), c → b (00), c → a (11), d → a (00), d → b (11). As pairs: a-d, a-c, b-c, b-d. That is the 4-cycle a – c – b – d – a with no diagonals: <b>it fits a square</b>, no spare row.</p>
+<div id="r1a"></div>
+<p>One valid assignment (the engine lists 2; the other is the mirror image): a = 00, b = 11, c = 01, d = 10. Every unstable move changes one bit: a→d, a→c, b→c, b→d, c→b, c→a, d→a, d→b.</p>
+<div id="m1"></div>
+</div></details></div>
+
+<h2>4. Triangles: 2020–21 Q8b (10 marks) and Adnan sir's a, b, c example</h2>
+<div class="exam"><div class="exam-src">2020–21 Q8(b) · 10 marks</div><div class="exam-q"><p>Reduced flow table below; find a valid assignment without critical race and complete the modified flow table.</p><div id="q2"></div></div>
+<details open><summary>Answer</summary><div class="exam-a">
+<p><b>Edges:</b> a-b, b-c, a-c: a <b>triangle</b> a – b – c. Three states fit 2 variables only if they form a path; the engine finds no 2-variable assignment. Break the triangle with a spare row on one edge. Choose a – c: c′ between them (a = 00, b = 01, c = 11, c′ = 10: the square 00-01-11-10).</p>
+<div id="r2a"></div>
+<p>Rewrite: c (stable at 01, 11) goes to a at 00 through c′: row c has c′ at 00; row c′ has a at 00 and nothing else (c′ is only a stepping stone). The check: a–b 00–01, b–c 01–11, c–c′ 11–10, c′–a 10–00: all single steps.</p>
+<div id="m2"></div>
+</div></details></div>
+<div class="hint"><b>Which edge to cut?</b> Any one of the three works (the search finds all three). The marks are for the diagram, the extra row, and a modified table in which <b>every</b> unstable entry is a single-bit move.</div>
+
+<h2>5. 2021–22 Q8b (10 marks): two triangles</h2>
+<div class="exam"><div class="exam-src">2021–22 Q8(b) · 10 marks</div><div class="exam-q"><p>Reduced flow table below; find a valid assignment without critical race and complete the modified flow table. (Row B has no circled entry: it is a pure via-row in the question.)</p><div id="q3"></div></div>
+<details open><summary>Answer</summary><div class="exam-a">
+<p><b>Edges:</b> A-D, A-B, B-C, A-C, C-D. Triangles A–B–C and A–C–D share the edge A–C. A single spare row is not enough (the engine tried every single edge); two spare rows are: put one on B–C and one on C–D. With A = 000, B = 001, C = 010, D = 100, the spare rows are BC = 011 (between B and C) and CD = 110 (between C and D). A–B, A–C, A–D are single steps already.</p>
+<div id="r3a"></div>
+<div id="m3"></div>
+</div></details></div>
+
+<h2>6. Adnan sir's TF #3: K₄, 7 rows, 3 variables (10 marks)</h2>
+<div class="exam"><div class="exam-src">Adnan sir "TF #3" · "10 → State assignment" · same pattern as bank #263 (2014–15)</div><div class="exam-q"><p>Reduced flow table below. Draw the transition diagram, add states to make it race-free, give the race-free flow table and an assignment.</p><div id="q4"></div></div>
+<details open><summary>Answer</summary><div class="exam-a">
+<p><b>Edges:</b> a-c, a-b, b-c, c-d, b-d, a-d: all six pairs of {a, b, c, d}, the complete graph K₄. Two variables are impossible. 4 rows plus spare rows: b′ on b–c, c′ on c–d, d′ on b–d, leaving a joined directly to b, c, d. 7 rows: 3 variables, one cell of the cube left empty.</p>
+<p><b>Adjacency map</b> (rows y₃, columns y₂y₁; fill by trial and error so that every edge joins neighbouring cells, including the wrap-around):</p>
+<div id="am4"></div>
+<p><b>Assignment:</b> a = 000, b = 001, b' = 011, c = 010, c' = 110, d = 100, d' = 101. Check by hand: a–b 000–001, a–c 000–010, a–d 000–100 are single steps; b–c via b′ (001–011–010); c–d via c′ (010–110–100); b–d via d′ (001–101–100).</p>
+<div id="r4a"></div>
+<p><b>Race-free flow table</b> (spare rows have a single purpose: to lead on):</p>
+<div id="m4"></div>
+<p class="tracer-hint">In Raiyan's note the row b at 00 reads "a, 0"; the reduced table and Badhon's note have "a, 1". Use a, 1.</p>
+</div></details></div>
+<div class="exam"><div class="exam-src">Bank #263 · 2014–15 · 10 marks (multiple-row method)</div><div class="exam-q"><p>Find a critical-race-free assignment for the reduced flow table below.</p><div id="q5"></div></div>
+<details open><summary>Answer</summary><div class="exam-a"><p>Edges a-c, a-d, a-b, b-c, c-d, b-d again K₄ (no 2-variable assignment). Same recipe and the same codes: a = 000, b = 001, b′ = 011, c = 010, c′ = 110, d = 100, d′ = 101.</p><div id="m5"></div></div></details></div>
+<div class="write"><h4>What to write (state assignment, 8–12 marks)</h4><ol>
+<li>The list of edges, or the transition diagram with the edge labels (the column in which the move happens).</li>
+<li>The statement "triangle / K₄ → cannot be placed on a square → add rows" (or "fits a square, no extra row").</li>
+<li>The codes, written next to every state; for 3 variables the adjacency map.</li>
+<li>The modified flow table in full: every original row, every spare row, every stable entry circled, every unstable entry a row name.</li>
+<li>One line of check: "every unstable move changes one bit".</li></ol></div>
+
+<h2>7. From the race-free table to the circuit (Badhon's notes)</h2>
+<p>Adnan sir stops at the transition table; Badhon's notes finish the job. Take his Example 1 (the three-row table with output z, rows a, b, c).</p>
+<div class="method"><h4>Race-free table → circuit</h4><ol>
+<li><b>Transition table:</b> replace row names by codes. Write the next-state code Y<sub>k</sub> and the output in each cell; spare rows and unspecified cells give don't-cares; unused codes are don't-cares.</li>
+<li><b>Latches:</b> "If D latches are used, the transition table <i>is</i> the excitation table": D = Y. (With SR latches: S = Y·y', R = Y'·y.)</li>
+<li><b>K-maps</b> over (x₁, x₂, y…) for each Y and for z. Minimise with don't-cares.</li>
+<li><b>Circuit:</b> AND-OR network for each Y; the outputs y fed back; z from its own gates.</li></ol></div>
+<div id="ex1pre"></div>
+<p><b>The trial assignment a = 00, b = 01, c = 10 in his notes is not race-free:</b> b → c at 10 changes both bits (01 → 10). That is why the assignment comes first. With the spare row c′ (a = 00, b = 01, c = 11, c′ = 10):</p>
+<div id="ex1"></div>
+<p>Compare Badhon's trial-assignment result (Y₂ = x₁x₂y₁' + x₁x₂'y₁ + x₁y₂, Y₁ = x₁'x₂ + x₂y₁, Z = y₂y₁'). The equations differ because the codes differ; a race-free answer must use the race-free codes.</p>
+
+<div class="trap"><h4>Traps that cost marks</h4><ul>
+<li>Counting only the edges of the circled entries. Edges come from the <b>unstable</b> entries.</li>
+<li>Using the trial assignment "a = 00, b = 01, c = 10" and never checking 01 → 10.</li>
+<li>Adding a spare row but leaving the old unstable entry pointing straight at the far state (the via-row must be <b>in the path</b>).</li>
+<li>Giving the spare row stable entries: it is a stepping stone only.</li>
+<li>Forgetting that one cell of the 3-cube stays unused (7 rows) and is a don't-care in the K-maps.</li>
+<li>Calling a race "critical" only because two bits change: it is critical only if some path ends in a <b>different stable state</b>.</li></ul></div>
+
+<h2>Mandatory practice</h2>
+<div id="r1"></div>
+<div id="r2"></div>
+<div id="r3"></div>
+</main>
+<script src="../assets/book.js"></script><script src="../assets/logic.js"></script><script src="../assets/dld.js"></script>
+<script>
+// ---- page helpers (shared by 11-13) ----
+const spx = s => s.replace(/(?<=[0-9'])(?=[A-Za-z])/g, ' ');            // y2'y1 -> y2' y1
+const eqh = s => ov(spx(s));
+const lits = (t, names) => { const ns = [...names].sort((a, b) => b.length - a.length), out = []; let i = 0; t = t.trim(); while (i < t.length) { const nm = ns.find(v => t.startsWith(v, i)); if (!nm) { i++; continue; } i += nm.length; let s = nm; if (t[i] === "'") { s += "'"; i++; } out.push(s); } return out; };
+// circuit: spec {ins, ys, fns:[{name, expr, latch}], latches:[{label, kind:'SR'|'T'|'JK'|'D', pins:[..]}], outs:[{name, expr}]}
+function sch(sel, c) {
+  const sig = [...c.ins, ...c.ys], P = 44, x0 = 40, X = {}, ymax = [];
+  sig.forEach((s, i) => { X[s] = x0 + i * P; X[s + "'"] = x0 + i * P + 22; });
+  const all = [...(c.fns || []), ...(c.outs || [])], terms = all.map(f => f.expr === '0' || f.expr === '1' ? [] : f.expr.split('+').map(t => lits(t, sig)));
+  const needN = new Set(); terms.forEach(ts => ts.forEach(t => t.forEach(l => { if (l.endsWith("'")) needN.add(l.slice(0, -1)); })));
+  const gx = x0 + sig.length * P + 10, GW = 34, ox = gx + GW + 24, OW = 34, ex = ox + OW + 22, lx = ex + 6;
+  let y = 52, s = '', gy = [], outY = [];
+  all.forEach((f, fi) => {
+    const ts = terms[fi]; const top = y; const o = [];
+    if (!ts.length) { s += `<text class="lb" x="${gx}" y="${y + 8}" style="text-anchor:start">${f.name} = ${f.expr}</text>`; outY.push(y + 8); y += 26; return; }
+    ts.forEach(t => {
+      if (t.length === 1) { const yy = y + 7; s += `<line class="wr" x1="${X[t[0]]}" y1="${yy}" x2="${ts.length > 1 ? gx + GW + 8 : ex}" y2="${yy}"/><circle cx="${X[t[0]]}" cy="${yy}" r="2.6" style="fill:var(--fg)"/>`; o.push([ts.length > 1 ? gx + GW + 8 : ex, yy]); y += 22; return; }
+      const h = Math.max(26, t.length * 13), g = gateShape('and', gx, y, GW, h); s += g.svg;
+      t.forEach((l, i) => { const yy = y + (i + .5) * h / t.length; s += `<line class="wr" x1="${X[l]}" y1="${yy}" x2="${gx}" y2="${yy}"/><circle cx="${X[l]}" cy="${yy}" r="2.6" style="fill:var(--fg)"/>`; });
+      o.push([g.out[0], y + h / 2]); y += h + 10;
+    });
+    let my;
+    if (ts.length > 1) {
+      const h = Math.max(30, ts.length * 13), t0 = (top + y - 10) / 2 - h / 2, g = gateShape('or', ox, t0, OW, h); s += g.svg;
+      o.forEach(([px, py], i) => { const ty = t0 + (i + .5) * h / o.length; s += `<path class="wr" d="M${px},${py} H${ox - 12} V${ty} H${ox + 4}"/>`; });
+      my = t0 + h / 2; s += `<line class="wr" x1="${g.out[0]}" y1="${my}" x2="${ex}" y2="${my}"/>`;
+    } else { my = o[0][1]; if (terms[fi][0].length > 1) s += `<line class="wr" x1="${o[0][0]}" y1="${my}" x2="${ex}" y2="${my}"/>`; }
+    s += `<text class="lb" x="${gx - 6}" y="${top - 2}" style="text-anchor:start;fill:var(--accent)">${f.name}</text>`;
+    outY.push(my); y += 12;
+  });
+  const H = y + 6;
+  // buses
+  sig.forEach(v => { const used = (n) => terms.some(ts => ts.some(t => t.includes(n))); if (used(v)) s += `<line class="wr" x1="${X[v]}" y1="30" x2="${X[v]}" y2="${H}"/>`; if (needN.has(v)) { s += `<line class="wr" x1="${X[v] + 22}" y1="40" x2="${X[v] + 22}" y2="${H}"/><circle cx="${X[v]}" cy="28" r="2.6" style="fill:var(--fg)"/><line class="wr" x1="${X[v]}" y1="28" x2="${X[v] + 4}" y2="28"/><path class="gt" d="M${X[v] + 4},22 L${X[v] + 4},34 L${X[v] + 13},28 z"/><circle class="gt" cx="${X[v] + 16}" cy="28" r="3"/><path class="wr" d="M${X[v] + 19},28 H${X[v] + 22} V40"/>`; }
+    s += `<text class="lb" x="${X[v]}" y="14">${v}</text>`; if (needN.has(v)) s += `<text class="lb" x="${X[v] + 22}" y="14">${ovs(v + "'")}</text>`; });
+  // latches
+  const nf = (c.fns || []).length;
+  (c.latches || []).forEach((L0, k) => {
+    const mine = (c.fns || []).map((f, i) => ({ f, i })).filter(o => o.f.latch === k), ys0 = mine.map(o => outY[o.i]), top = Math.min(...ys0) - 14, bot = Math.max(...ys0) + 14, qy = (top + bot) / 2, qx = lx + 58, ly = H + 14 + k * 11;
+    s += `<rect class="gt" x="${lx}" y="${top}" width="58" height="${bot - top}" rx="3"/><text class="tx" x="${lx + 29}" y="${qy + 4}" style="font-size:11px">${L0.kind}</text>`;
+    mine.forEach((o, i) => { s += `<line class="wr" x1="${ex}" y1="${ys0[i]}" x2="${lx}" y2="${ys0[i]}"/><text class="sm" x="${lx + 4}" y="${ys0[i] + 3}" style="text-anchor:start">${o.f.pin}</text>`; });
+    s += `<path class="wr" d="M${qx},${qy} H${qx + 16 + k * 8} V${ly} H${X[L0.label]} V${H}"/><text class="sm" x="${qx + 4}" y="${qy - 4}" style="text-anchor:start">Q = ${L0.label}</text>`;
+  });
+  (c.outs || []).forEach((f, i) => { const my = outY[nf + i]; s += `<line class="wr" x1="${ex}" y1="${my}" x2="${ex + 36}" y2="${my}"/><text class="lb" x="${ex + 42}" y="${my}" style="text-anchor:start;font-weight:700">${f.name}</text>`; });
+  const W = lx + 58 + 16 + (c.latches || []).length * 8 + 40, HH = H + 20 + (c.latches || []).length * 11;
+  host(sel).innerHTML = `<div class="fg-wrap"><svg class="dsa-fig" viewBox="0 0 ${W} ${HH}" width="${W}" role="img" aria-label="circuit sketch">${s}</svg><div class="figlabel">${c.note || 'Circuit sketch: each box is the AND-OR network of one equation; Q of each latch is fed back to its bus.'}</div></div>`;
+}
+// static flow table with optional row labels and column heads
+function ft(sel, txt, cols = ['00', '01', '11', '10'], o = {}) {
+  const F = asTable(txt);
+  host(sel).insertAdjacentHTML('beforeend', flowHTML(F, cols, {}).replace('<th>row</th>', `<th>${o.corner || 'row'}</th>`));
+}
+// one K-map (vars, ones, dc) with its minimal cover drawn
+function kmapStatic(vars, ones, dc, name) {
+  const n = vars.length, m = L.minimize(n, ones, dc, vars), vals = valsOf(n, ones, dc);
+  return `<div class="km1"><div class="figlabel"><b>${name}</b> = ${ones.length ? eqh(m.sop) : '0'}</div>${kmapSVG(vars, vals, (m.sols[0] || []).map((q, j) => ({ cube: q, color: COL[j % COL.length] })))}</div>`;
+}
+
+// flow-table design helpers (pure, no DOM): shared by node generator and pasted into pages
+function expandFlow(T, pairs) { // T parseTable obj; pairs [[r,s,name]]
+  const t = JSON.parse(JSON.stringify(T)); const S = [...T.S];
+  pairs.forEach(([r, s, nm]) => { S.push(nm); t.t[nm] = T.I.map(() => [null, null]);
+    T.I.forEach((_, j) => { if (T.t[r][j][0] === s && s !== r) { t.t[r][j] = [nm, T.t[r][j][1]]; t.t[nm][j] = [s, T.t[r][j][1]]; }
+      if (T.t[s][j][0] === r && s !== r) { t.t[s][j] = [nm, T.t[s][j][1]]; t.t[nm][j] = [r, T.t[s][j][1]]; } }); });
+  return { S, I: T.I, t: t.t };
+}
+function flowText(T) { return T.S.map(r => r + ': ' + T.t[r].map(([n, o]) => n === null ? '-' : (n === r ? `(${n})` : n) + '/' + (o === null ? '-' : o)).join(' ')).join('\n'); }
+function adjOK(T, code) { return L.flowEdges(T).every(([a, b]) => L.pc(code[a] ^ code[b]) === 1); }
+// synthesis: cols = input column strings, ins names, ys state var names (MSB first)
+function fmSynth(T, code, cols, ins, ys) {
+  const ni = ins.length, b = ys.length, vars = [...ins, ...ys], n = ni + b, used = T.S.map(s => code[s]);
+  const Y = ys.map(() => ({ ones: [], dc: [] })), Z = { ones: [], dc: [] }, seen = new Set(), table = {};
+  T.S.forEach(s => cols.forEach((c, j) => { const idx = (parseInt(c, 2) << b) | code[s], [nx, o] = T.t[s][j]; seen.add(idx);
+    if (nx === null) ys.forEach((_, k) => Y[k].dc.push(idx)); else ys.forEach((_, k) => { if ((code[nx] >> (b - 1 - k)) & 1) Y[k].ones.push(idx); });
+    if (o === null) Z.dc.push(idx); else if (o === '1') Z.ones.push(idx); }));
+  L.range(1 << n).forEach(i => { if (!seen.has(i)) { Y.forEach(y => y.dc.push(i)); Z.dc.push(i); } });
+  const f = x => ({ ...x, m: L.minimize(n, x.ones, x.dc, vars) });
+  return { vars, n, Y: Y.map(f), Z: f(Z), b };
+}
+if (typeof module !== 'undefined') module.exports = { expandFlow, flowText, adjOK, fmSynth };
+
+// ---- fundamental-mode design display ----
+// o: {X: expanded flow table text (rows incl. via rows), code:{row:int}, cols, ins, ys, base:[rows that are original], note}
+function fmShow(sel, o) {
+  const el = host(sel), T = L.parseTable(o.X.replace(/[()]/g, '')), cols = o.cols || ['00', '01', '11', '10'], b = o.ys.length, R = fmSynth(T, o.code, cols, o.ins, o.ys), bin = c => L.bin(c, b);
+  let h = `<h4 class="step">A · Race-free flow table with codes</h4><div class="t1"></div><p>${T.S.map(s => `${s} = ${bin(o.code[s])}`).join(', ')}</p>`;
+  const byCode = L.range(1 << b);
+  h += `<h4 class="step">B · Transition table (next state ${o.ys.join('')}, output) — rows in code order</h4>` + tbl(['code', 'row', ...cols.map(c => o.ins.join('') + ' = ' + c)], byCode.map(c => { const s = T.S.find(x => o.code[x] === c); return [bin(c), s || '–', ...cols.map((_, j) => { if (!s) return '–'; const [n, z] = T.t[s][j]; return n === null ? '–' : `${bin(o.code[n])}${z === null ? ', –' : ', ' + z}`; })]; }));
+  h += `<h4 class="step">C · K-maps (variables ${R.vars.join(' ')}; unused codes and unspecified cells are don't-cares)</h4><div class="krow">${R.Y.map((y, k) => kmapStatic(R.vars, y.ones, y.dc, 'Y' + o.ys[k].replace(/^y/, ''))).join('')}${kmapStatic(R.vars, R.Z.ones, R.Z.dc, o.zname || 'Z')}</div>`;
+  h += `<h4 class="step">D · Equations (D latches: the transition table is the excitation table, D = Y)</h4><ul class="eqs">${R.Y.map((y, k) => `<li><b>Y${o.ys[k].replace(/^y/, '')}</b> = ${eqh(y.m.sop)}</li>`).join('')}<li><b>${o.zname || 'Z'}</b> = ${eqh(R.Z.m.sop)}</li></ul>`;
+  h += `<h4 class="step">E · Circuit</h4><div class="ck"></div>`;
+  el.innerHTML = h; ft(el.querySelector('.t1'), flowText(T), cols, { corner: 'row' });
+  sch(el.querySelector('.ck'), { ins: o.ins, ys: o.ys, fns: R.Y.map((y, k) => ({ name: 'Y' + o.ys[k].replace(/^y/, ''), expr: y.m.sop, latch: k, pin: 'D' })), latches: o.ys.map(y => ({ label: y, kind: 'D latch' })), outs: [{ name: o.zname || 'Z', expr: R.Z.m.sop }], note: 'Circuit sketch: Y = next state from the AND-OR network, memory = the feedback delay (drawn as a D latch), y fed back.' });
+  return R;
+}
+
+const C4 = ['00', '01', '11', '10'];
+function modTable(sel, X, code, bits) { const T = L.parseTable(X.replace(/[()]/g, '')); const el = host(sel); el.insertAdjacentHTML('beforeend', '<div class="t1"></div>'); ft(el.querySelector('.t1'), X, C4, { corner: 'row' }); el.insertAdjacentHTML('beforeend', tbl(['code', 'row', ...C4.map(c => 'x₁x₂ = ' + c)], L.range(1 << bits).map(c => { const s = T.S.find(x => code[x] === c); return [L.bin(c, bits), s || '–', ...C4.map((_, j) => { if (!s) return '–'; const [n, z] = T.t[s][j]; return n === null ? '–' : L.bin(code[n], bits) + (z === null ? '' : ', ' + z); })]; }))); }
+function adjMap(sel, code) { const nm = Object.fromEntries(Object.entries(code).map(([k, v]) => [v, k])); const g = [0, 1, 3, 2]; host(sel).innerHTML = tbl(['y3 \\ y2y1', '00', '01', '11', '10'], [0, 1].map(r => [String(r), ...g.map(c => nm[(r << 2) | c] || '(empty)')])); }
+const Q = (id, t) => ft('#' + id, t);
+document.getElementById('t262').innerHTML = tbl(['y1y2 \\ x1x2', '00', '01', '11', '10'], [['00', '10', '00', '11', '10'], ['01', '01', '00', '10', '10'], ['11', '01', '00', '11', '11'], ['10', '11', '00', '10', '10']]);
+Q('q1', "a: (a)/0 d/0 (a)/1 c/0\nb: (b)/0 c/- (b)/0 d/-\nc: b/0 (c)/1 a/1 (c)/0\nd: a/0 (d)/0 b/0 (d)/1"); raceFig('#r1a', { table: "a: (a)/0 d/0 (a)/1 c/0\nb: (b)/0 c/- (b)/0 d/-\nc: b/0 (c)/1 a/1 (c)/0\nd: a/0 (d)/0 b/0 (d)/1" }); modTable('#m1', "a: (a)/0 d/0 (a)/1 c/0\nb: (b)/0 c/- (b)/0 d/-\nc: b/0 (c)/1 a/1 (c)/0\nd: a/0 (d)/0 b/0 (d)/1", {"a":0,"b":3,"c":1,"d":2}, 2);
+Q('q2', "a: (a)/0 b/- (a)/1 b/-\nb: a/- (b)/0 c/- (b)/0\nc: a/- (c)/1 (c)/0 b/-"); raceFig('#r2a', { table: "a: (a)/0 b/- (a)/1 b/-\nb: a/- (b)/0 c/- (b)/0\nc: c'/- (c)/1 (c)/0 b/-\nc': a/- - - -", codes: {"a":0,"b":1,"c":3,"c'":2}, bits: 2 }); modTable('#m2', "a: (a)/0 b/- (a)/1 b/-\nb: a/- (b)/0 c/- (b)/0\nc: c'/- (c)/1 (c)/0 b/-\nc': a/- - - -", {"a":0,"b":1,"c":3,"c'":2}, 2);
+Q('q3', "A: (A)/0 D/0 B/- (A)/0\nB: A/- - C/- -\nC: A/- (C)/1 (C)/1 (C)/1\nD: A/0 (D)/0 (D)/0 C/-"); raceFig('#r3a', { table: "A: (A)/0 D/0 B/- (A)/0\nB: A/- - BC/- -\nC: A/- (C)/1 (C)/1 (C)/1\nD: A/0 (D)/0 (D)/0 CD/-\nBC: - - C/- -\nCD: - - - C/-", codes: {"A":0,"B":1,"BC":3,"C":2,"CD":6,"D":4}, bits: 3 }); modTable('#m3', "A: (A)/0 D/0 B/- (A)/0\nB: A/- - BC/- -\nC: A/- (C)/1 (C)/1 (C)/1\nD: A/0 (D)/0 (D)/0 CD/-\nBC: - - C/- -\nCD: - - - C/-", {"A":0,"B":1,"BC":3,"C":2,"CD":6,"D":4}, 3);
+Q('q4', "a: (a)/1 c/0 (a)/0 b/0\nb: a/1 (b)/1 c/1 (b)/0\nc: d/0 (c)/0 (c)/1 d/1\nd: (d)/0 b/- a/- (d)/1"); adjMap('#am4', {"a":0,"b":1,"b'":3,"c":2,"c'":6,"d":4,"d'":5}); raceFig('#r4a', { table: "a: (a)/1 c/0 (a)/0 b/0\nb: a/1 (b)/1 b'/1 (b)/0\nc: c'/0 (c)/0 (c)/1 c'/1\nd: (d)/0 d'/- a/- (d)/1\nb': - - c/1 -\nc': d/0 - - d/1\nd': - b/- - -", codes: {"a":0,"b":1,"b'":3,"c":2,"c'":6,"d":4,"d'":5}, bits: 3 }); modTable('#m4', "a: (a)/1 c/0 (a)/0 b/0\nb: a/1 (b)/1 b'/1 (b)/0\nc: c'/0 (c)/0 (c)/1 c'/1\nd: (d)/0 d'/- a/- (d)/1\nb': - - c/1 -\nc': d/0 - - d/1\nd': - b/- - -", {"a":0,"b":1,"b'":3,"c":2,"c'":6,"d":4,"d'":5}, 3);
+Q('q5', "a: (a)/- c/- (a)/- d/-\nb: a/- (b)/- c/- (b)/-\nc: (c)/- (c)/- (c)/- d/-\nd: (d)/- b/- a/- (d)/-"); modTable('#m5', "a: (a)/- c/- (a)/- d/-\nb: a/- (b)/- b'/- (b)/-\nc: (c)/- (c)/- (c)/- c'/-\nd: (d)/- d'/- a/- (d)/-\nb': - - c/- -\nc': - - - d/-\nd': - b/- - -", {"a":0,"b":1,"b'":3,"c":2,"c'":6,"d":4,"d'":5}, 3);
+document.getElementById('ex1pre').insertAdjacentHTML('beforeend', '<p>Reduced flow table (edges a–b, a–c, b–c):</p>'); ft('#ex1pre', "a: (a)/0 b/0 c/- (a)/0\nb: a/0 (b)/0 (b)/0 c/-\nc: a/- b/- (c)/1 (c)/1");
+fmShow('#ex1', { X: "a: (a)/0 b/0 c'/- (a)/0\nb: a/0 (b)/0 (b)/0 c/-\nc: c'/- b/- (c)/1 (c)/1\nc': a/- - c/- -", code: {"a":0,"b":1,"c":3,"c'":2}, ins: ['x1', 'x2'], ys: ['y2', 'y1'], zname: 'Z' });
+recall('#r1', { id: 'r1', marks: 10, q: 'A reduced flow table has rows a, b, c with a → b, b → c, a → c as unstable moves. Explain why 2 state variables are not enough as it stands, and give a race-free assignment with the modified flow table of the form "a = 00, …".', points: ['Lists the edges from the unstable entries', 'Names the triangle a–b–c; three mutually adjacent states cannot sit on a square', 'Adds one spare row on one edge so that the graph becomes a 4-cycle', 'Codes written, e.g. a 00, b 01, c 11, c′ 10, each edge a single-bit step', 'Modified table: via-row only leads on, other entries –', 'Check line: every unstable move changes one bit'], model: "<p>Reduced table (found by the engine for \"z = 1 after x₂ rises while x₁ = 1\"):</p><pre>a: (a)/0 (a)/0 (a)/0 b/0\nb: a/0 - c/- (b)/0\nc: a/- a/- (c)/1 (c)/1</pre><p>Edges a–b, b–c, a–c: a triangle, so no 2-variable assignment. One spare row: on a–b. Codes: a = 00, b = 11, c = 01, xab = 10.</p><pre>a: (a)/0 (a)/0 (a)/0 xab/0\nb: xab/0 - c/- (b)/0\nc: a/- a/- (c)/1 (c)/1\nxab: a/0 - - b/0</pre>" });
+recall('#r2', { id: 'r2', marks: 12, q: 'What is a race in a fundamental-mode circuit? Explain critical and non-critical races with an example of each (a 2-variable transition table).', points: ['More than one state variable must change for one input change; unequal delays', 'Non-critical: every order of change ends in the same stable state', 'Critical: an intermediate state is stable (or leads elsewhere), so the final state depends on the delays', 'An example table with both paths drawn and the stable cell marked', 'Cure: single-step assignment, with spare rows when needed'], model: '<p>Race: two or more state variables have to change at once; the circuit may take either order. Example, column 01 start 11, Y = 00: both intermediates 10 and 01 are unstable and lead to 00, so non-critical. Example, column 11 start 00, Y = 11: the intermediate 10 is stable (Y = 10), so the circuit can stop at 10 instead of 11: critical. Cure: assign codes so that each unstable move changes one bit, adding spare rows if the transition diagram has triangles.</p>' });
+recall('#r3', { id: 'r3', marks: 10, q: '2017–18 style: take the 4-row reduced table of 2017–18 Q8a (the 00-01-11 / 00-10-11 detector). Draw its transition diagram, show that 2 variables fail, and give a race-free assignment with spare rows.', points: ['Edge list from the unstable entries', 'Shows a triangle, so no square works', 'Adds the spare row(s), codes with 3 variables', 'Modified flow table with via-row', 'One-line check of single-bit moves'], model: "<p>Reduced table (2017–18 Q8a, cover {3,4,5} {7,8,9} {1,2} {6}):</p><pre>a: (a)/00 (a)/00 b/- c/00\nb: a/- (b)/10 (b)/10 (b)/10\nc: a/00 - d/- (c)/00\nd: a/- (d)/01 (d)/01 (d)/01</pre><p>Edges a–b, a–c, c–d, a–d: contains triangles, no 2-variable assignment. One spare row a-c gives a 3-variable race-free assignment: a = 000, b = 001, c = 110, d = 010, xac = 100.</p><pre>a: (a)/00 (a)/00 b/- xac/00\nb: a/- (b)/10 (b)/10 (b)/10\nc: xac/00 - d/- (c)/00\nd: a/- (d)/01 (d)/01 (d)/01\nxac: a/00 - - c/00</pre>" });
+</script>
+</body>
+</html>

@@ -1,0 +1,389 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Adders, subtractors, BCD adder, CLA, multiplier · CSE 205 Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Combinational circuits · Mano §4.3–4.7 · Tanzima ma'am L11–13 (Jul 18 – Jul 21) · almost every year</div>
+<h1>Arithmetic circuits: adders, subtractors, BCD, look-ahead, multiplier</h1>
+<p class="lede">Past TF questions on this topic: <b>2024–25</b> Q1a (15, 4-bit subtractor with full adders, explain 2's complement), Q3b (12, carry look-ahead, derive C1..C4), Q3c (11, overflow); <b>2023–24</b> Q4a (6, 1's complement with half adders), Q4c (15, CLA benefit and carries); <b>2021–22</b> Q4a (10, incrementer from half adders), Q4c (15, 2×2 multiplier); <b>2020–21</b> Q4b (12, BCD adder-subtractor), Q4c (13, 4-bit CLA, role of the carries); <b>2019–20</b> Q8a (18, full subtractor); <b>2018–19</b> Q2b (13, adder + XOR doing A+1, A', A'+1, A), Q2c (10, 3-bit × 3-bit multiplier with a 4-bit adder); <b>2017–18</b> Q2b (13, BCD adder-subtractor, explain 9+7 and 9−7), Q2c (12, 3-bit CLA, carries for 3+4). Also CT2 (29 Jul 2026) Q2a+b (4+4, complement with half adders). Older papers: incrementer 2011–12, full subtractor from a truth table (2012–13, 20), 2-bit multiplier (2012–13, 20), 3-bit multiplier with 4-bit adders (2016–17, 15), CLA with gate delays (18, 10, 5), BCD adder (2014–15, 15). <b>Section A has an arithmetic question almost every year, usually 10–15 marks and a drawing.</b> This is the most "draw it" chapter, so practise the block diagrams.</p>
+
+<h2>1. Half adder, full adder, full subtractor</h2>
+<p>A <b>half adder</b> adds two bits. A <b>full adder</b> adds three bits (x, y and a carry-in z). A <b>full subtractor</b> computes x − y − b, where b is the borrow from the previous stage.</p>
+<div class="tbl"><table class="mat"><tr><th>circuit</th><th>outputs</th></tr>
+<tr><td>Half adder</td><td>S = x ⊕ y &nbsp;&nbsp; C = xy</td></tr>
+<tr><td>Full adder</td><td>S = x ⊕ y ⊕ z = Σ(1,2,4,7) &nbsp;&nbsp; C = xy + xz + yz = xy + z(x ⊕ y) = Σ(3,5,6,7)</td></tr>
+<tr><td>Half subtractor</td><td>D = x ⊕ y &nbsp;&nbsp; B = x'y</td></tr>
+<tr><td>Full subtractor</td><td>D = x ⊕ y ⊕ b = Σ(1,2,4,7) &nbsp;&nbsp; B<sub>out</sub> = x'y + x'b + yb = Σ(1,2,3,7)</td></tr></table></div>
+<p>The full adder from <b>two half adders</b> (ma'am's way): HA1 adds x and y. HA2 adds HA1's sum and z. The two carries are ORed.</p>
+<div id="f1"></div>
+
+<div class="exam"><div class="exam-src">2019–20 Q8(a) · 18 marks · older: 2012–13 full subtractor from a truth table, 20 marks</div><div class="exam-q"><p>Design a full-subtractor circuit with three inputs x, y, B<sub>in</sub> and two outputs Diff and B<sub>out</sub>. The circuit subtracts x − y − B<sub>in</sub>.</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<p><b>Step 1: truth table.</b> Borrow is 1 whenever the subtraction needs to borrow: x < y + B<sub>in</sub>.</p>
+<div class="tbl"><table class="mat"><tr><th>x</th><th>y</th><th>B<sub>in</sub></th><th>Diff</th><th>B<sub>out</sub></th></tr>
+<tr><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td></tr><tr><td>0</td><td>0</td><td>1</td><td>1</td><td>1</td></tr><tr><td>0</td><td>1</td><td>0</td><td>1</td><td>1</td></tr><tr><td>0</td><td>1</td><td>1</td><td>0</td><td>1</td></tr>
+<tr><td>1</td><td>0</td><td>0</td><td>1</td><td>0</td></tr><tr><td>1</td><td>0</td><td>1</td><td>0</td><td>0</td></tr><tr><td>1</td><td>1</td><td>0</td><td>0</td><td>0</td></tr><tr><td>1</td><td>1</td><td>1</td><td>1</td><td>1</td></tr></table></div>
+<p><b>Step 2: K-maps.</b> Diff = Σ(1,2,4,7) = x ⊕ y ⊕ B<sub>in</sub> (no grouping possible, it is a checkerboard). B<sub>out</sub> = Σ(1,2,3,7) = x'y + x'B<sub>in</sub> + yB<sub>in</sub> (three pairs).</p>
+<div id="k1"></div>
+<p><b>Step 3: circuit.</b> Diff: two XOR gates. B<sub>out</sub>: AND-OR, or from two half subtractors (HS2 takes Diff₁ and B<sub>in</sub>; B<sub>out</sub> = x'y + Diff₁'·B<sub>in</sub>).</p>
+<div id="f2"></div><div id="g1"></div>
+</div></details></div>
+<div class="write"><h4>What to write (adder / subtractor design, 10–18 marks)</h4><ol>
+<li>The truth table with every input combination and both outputs.</li>
+<li>The output equations, minimised (K-map if SOP is needed; say "XOR" if it is a checkerboard).</li>
+<li>The circuit: gates drawn, every input and output labelled, and the names x, y, z (or B<sub>in</sub>), S, C (or Diff, B<sub>out</sub>).</li>
+<li>One line of check: "x=1, y=1, z=1 gives S=1, C=1".</li></ol></div>
+
+<h2>2. The 4-bit ripple-carry adder</h2>
+<p>Chain four full adders. The carry out of each one goes into the next. C0 is the input carry (0 for a plain addition), C4 is the final carry.</p>
+<div id="c1"></div>
+<p>Each full adder has to wait for the carry of the one before it. The worst case is C0 changing and rippling all the way to S3 and C4. This waiting is why the adder is slow and why carry look-ahead (section 6) exists.</p>
+
+<h2>3. Subtractor and adder-subtractor (2's complement)</h2>
+<p>Subtraction reuses the adder because <b>A − B = A + B' + 1</b>. B' is the 1's complement (flip every bit). The +1 makes it the 2's complement of B, which is −B.</p>
+<div class="exam"><div class="exam-src">2024–25 Q1(a) · 15 marks · compulsory · older: 2013–14 "adder, then modify it into a subtractor", 15 marks</div><div class="exam-q"><p>Design a 4-bit binary subtractor using full adders. (i) Construct it and draw the logic diagram. (ii) Explain how subtraction is performed using 2's complement.</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<p><b>(i) Circuit.</b> Four full adders. Each B<sub>i</sub> goes through a NOT gate. The input carry C0 is tied to <b>1</b>. The outputs D3..D0 are the difference, and C4 tells you the sign.</p>
+<div id="c2"></div>
+<p><b>(ii) Explanation.</b></p>
+<ol>
+<li>The 2's complement of B is B' + 1, and −B is represented by it. So A − B = A + (−B) = A + B' + 1.</li>
+<li>The NOT gates give B'. The carry-in 1 supplies the +1.</li>
+<li><b>End carry C4 = 1:</b> A ≥ B, the result is positive and the 4-bit answer is correct (discard the carry). Example 7 − 3: 0111 + 1100 + 1 = 1 0100. C4 = 1, D = 0100 = 4.</li>
+<li><b>End carry C4 = 0:</b> A &lt; B, the answer is negative and the 4 bits are the 2's complement of the magnitude. Example 3 − 7: 0011 + 1000 + 1 = 0 1100. C4 = 0, so the result is −(2's complement of 1100) = −0100 = −4.</li></ol>
+</div></details></div>
+<p><b>Adder-subtractor with a control M</b> (ma'am's "controlled adder/subtractor"): put an XOR gate on every B input. M = 0: B ⊕ 0 = B and C0 = 0, so A + B. M = 1: B ⊕ 1 = B' and C0 = 1, so A + B' + 1 = A − B. One circuit does both. Try it:</p>
+<div id="c3"></div>
+<div id="calc"></div>
+<div class="write"><h4>What to write (adder-subtractor, 12–15 marks)</h4><ol>
+<li>"A − B = A + B' + 1 (2's complement)", written first.</li>
+<li>The diagram: four FA boxes chained, XOR on each B (control M), C0 = M, outputs S3..S0 and C4. Label M = 0 add, M = 1 subtract.</li>
+<li>A small table: M = 0 → B passes, C0 = 0; M = 1 → B' , C0 = 1.</li>
+<li>One numeric example for each case and the meaning of C4 (no borrow when C4 = 1 in subtraction).</li></ol></div>
+
+<h2>4. Overflow detection</h2>
+<div class="exam"><div class="exam-src">2024–25 Q3(c) · 11 marks · older: 2013–14 and 2024–25 "how do you check overflow, signed and unsigned", 5 marks</div><div class="exam-q"><p>What is overflow in binary arithmetic? Explain how overflow is detected in signed addition and subtraction, with examples.</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<p><b>Definition.</b> Overflow means the true result does not fit in the n bits available, so the stored answer is wrong.</p>
+<p><b>Unsigned:</b> overflow when the end carry C<sub>n</sub> = 1 (for subtraction A − B, C<sub>n</sub> = 0 means a borrow, the answer is negative).</p>
+<p><b>Signed (2's complement):</b> the end carry means nothing. Overflow can happen only when the two operands have the <b>same sign</b> and the result has the <b>opposite sign</b>. Two operands of different signs can never overflow.</p>
+<div class="tbl"><table class="mat"><tr><th>A sign</th><th>B sign</th><th>sum sign</th><th>carry into MSB</th><th>carry out of MSB</th><th>overflow</th></tr>
+<tr><td>0</td><td>0</td><td>1</td><td>1</td><td>0</td><td><b>1</b></td></tr>
+<tr><td>1</td><td>1</td><td>0</td><td>0</td><td>1</td><td><b>1</b></td></tr>
+<tr><td colspan="3">all other cases</td><td colspan="2">both carries equal</td><td>0</td></tr></table></div>
+<p class="formula">V = C<sub>n−1</sub> ⊕ C<sub>n</sub> &nbsp;(carry into the sign bit XOR carry out of the sign bit)</p>
+<p>In the hardware: one XOR gate with C3 and C4 of the last full adder. For subtraction use the same gate, because A − B is just A + B' + 1.</p>
+<div id="c4"></div>
+<div class="tbl"><table class="mat"><tr><th>example (4 bits)</th><th>sum</th><th>C3</th><th>C4</th><th>V</th><th>meaning</th></tr>
+<tr><td>0101 + 0100 (5 + 4)</td><td>1001</td><td>1</td><td>0</td><td>1</td><td>should be +9, shows −7: overflow</td></tr>
+<tr><td>1100 + 1011 (−4 + −5)</td><td>0111</td><td>0</td><td>1</td><td>1</td><td>should be −9, shows +7: overflow</td></tr>
+<tr><td>0101 + 1110 (5 + −2)</td><td>0011</td><td>1</td><td>1</td><td>0</td><td>+3, correct (mixed signs)</td></tr>
+<tr><td>0111 − 1110 (7 − (−2))</td><td>1001</td><td>1</td><td>0</td><td>1</td><td>should be +9: overflow (subtraction)</td></tr></table></div>
+</div></details></div>
+
+<h2>5. BCD adder and BCD adder-subtractor</h2>
+<p>A BCD digit is 0–9 (4 bits). Adding two digits plus a carry gives at most 9 + 9 + 1 = 19. The binary adder gives a binary sum, which is only right when it is ≤ 9.</p>
+<ol>
+<li>Add the two digits with a 4-bit binary adder: you get S3S2S1S0 and a carry C4.</li>
+<li>If the binary result is 10 to 19, add <b>0110 (6)</b> to correct it. Adding 6 skips the six unused codes 1010–1111.</li>
+<li>The correction condition is <b>K = C4 + S3S2 + S3S1</b>. The sums 10–15 are 1010, 1011, 1100, 1101, 1110, 1111, and all have S3 = 1 with S2 = 1 or S1 = 1. Sums 16–19 have C4 = 1.</li>
+<li>A second 4-bit adder adds 0 K K 0 (that is 0110 when K = 1, 0000 when K = 0). K is also the decimal carry out.</li></ol>
+<p>Ma'am's K-map of S3S2 × S1S0 (the six cells 10–15):</p>
+<div id="k2"></div>
+<div id="d1"></div>
+<div class="exam"><div class="exam-src">2017–18 Q2(b) · 9+4 marks · 2020–21 Q4(b) · 12 marks · also 2016–17</div><div class="exam-q"><p>Design a BCD adder-subtractor with two 4-bit BCD numbers A and B and a selector S: S = 0 gives A + B, S = 1 gives A − B. Explain the operations 9 + 7 and 9 − 7.</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<p><b>Method (assumption stated: ma'am did not teach BCD subtraction, so use the standard 9's complement method of Mano).</b> A − B = A + (9's complement of B) + 1, done by the BCD adder above.</p>
+<ol>
+<li>A block "B or 9's complement of B" in front of the adder, controlled by S. For S = 0 it passes B. For S = 1 it gives 9 − B. For a valid BCD digit the 9's complement is: <b>n3 = B3'B2'B1', n2 = B2 ⊕ B1, n1 = B1, n0 = B0'</b> (checked for all ten digits).</li>
+<li>S is also the carry-in of the first adder (the +1).</li>
+<li>Then the BCD adder: correction K = C4 + S3S2 + S3S1, second adder adds 0KK0.</li>
+<li>Output carry K. For S = 1, K = 1 means the answer is positive (discard the carry). K = 0 means negative: the digit is the 9's complement of the magnitude; take its 10's complement and attach a minus sign.</li></ol>
+<div id="d2"></div>
+<div class="tbl"><table class="mat"><tr><th>step</th><th>9 + 7 (S = 0)</th><th>9 − 7 (S = 1)</th></tr>
+<tr><td>B into adder</td><td>0111 (7)</td><td>9's complement of 7 = 0010 (2)</td></tr>
+<tr><td>carry-in</td><td>0</td><td>1</td></tr>
+<tr><td>first adder: 1001 + B + Cin</td><td>1001 + 0111 = 1 0000 (C4 = 1, S = 0000)</td><td>1001 + 0010 + 1 = 0 1100 (C4 = 0, S = 1100 = 12)</td></tr>
+<tr><td>K = C4 + S3S2 + S3S1</td><td>1</td><td>S3S2 = 1, so K = 1</td></tr>
+<tr><td>second adder adds 0110</td><td>0000 + 0110 = 0110</td><td>1100 + 0110 = 1 0010, digit 0010</td></tr>
+<tr><td>result</td><td>carry K = 1, digit 0110: <b>16</b></td><td>K = 1 (positive), digit 0010: <b>+2</b></td></tr></table></div>
+</div></details></div>
+<div class="write"><h4>What to write (BCD adder / adder-subtractor, 12–15 marks)</h4><ol>
+<li>"Binary sum > 9 is wrong in BCD; add 6 (0110) to correct it."</li>
+<li>The condition K = C4 + S3S2 + S3S1 with the K-map or the list 1010–1111.</li>
+<li>The two-adder block diagram: adder 1, the AND-OR for K, adder 2 with inputs 0KK0, carry out K.</li>
+<li>For the subtractor: the 9's complement block and carry-in S.</li>
+<li>The two numeric traces if the question asks (9+7, 9−7), with every intermediate 4-bit value.</li></ol></div>
+
+<h2>6. Carry look-ahead adder (CLA)</h2>
+<p><b>Idea.</b> In a ripple adder, C<sub>i+1</sub> depends on C<sub>i</sub>, so the carries come one after another. In a CLA every carry is written directly in terms of the inputs (A, B and C0), so all carries are produced <b>at the same time</b> by two levels of AND-OR gates.</p>
+<ol>
+<li>For each bit define <b>propagate P<sub>i</sub> = A<sub>i</sub> ⊕ B<sub>i</sub></b> (the carry passes through) and <b>generate G<sub>i</sub> = A<sub>i</sub>B<sub>i</sub></b> (this stage makes a carry by itself). These are the first half adder of the FA.</li>
+<li>Sum: <b>S<sub>i</sub> = P<sub>i</sub> ⊕ C<sub>i</sub></b>. Carry: <b>C<sub>i+1</sub> = G<sub>i</sub> + P<sub>i</sub>C<sub>i</sub></b>.</li>
+<li>Substitute again and again until only C0 is left (C0 is the input carry; ma'am's note has it as 0 for plain addition):</li></ol>
+<p class="formula">C1 = G0 + P0C0<br>C2 = G1 + P1G0 + P1P0C0<br>C3 = G2 + P2G1 + P2P1G0 + P2P1P0C0<br>C4 = G3 + P3G2 + P3P2G1 + P3P2P1G0 + P3P2P1P0C0</p>
+<p>Look at the pattern: C<sub>k</sub> has one term for each earlier G, each ANDed with all the P above it, plus the last term with C0.</p>
+<div id="c5"></div>
+<p><b>Delay, one gate = one unit, XOR counted as one gate:</b></p>
+<div class="tbl"><table class="mat"><tr><th></th><th>P, G ready</th><th>C1</th><th>C2</th><th>C3</th><th>C4</th><th>S3</th></tr>
+<tr><td>ripple</td><td>1</td><td>3</td><td>5</td><td>7</td><td>9</td><td>8</td></tr>
+<tr><td>CLA</td><td>1</td><td>3</td><td>3</td><td>3</td><td>3</td><td>4</td></tr></table></div>
+<p>Ripple delay grows by 2 for every extra bit. CLA stays about 4 levels, at the cost of wide AND/OR gates (more hardware, more fan-in), which is why practical CLA blocks stop at 4 bits.</p>
+<div class="exam"><div class="exam-src">2017–18 Q2(c) · 8+4 marks · also 2020–21 Q4(c) 13 · 2023–24 Q4(c) 15 · 2024–25 Q3(b) 12 · older 2015–16 (18), 2013–14 (10), 2016–17 (5)</div><div class="exam-q"><p>Design a 3-bit carry look-ahead circuit and show all the carries for 3 + 4. (Other years: derive C1..C4 for a 4-bit CLA; steps and the role of the different carries; benefit of look-ahead.)</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<p><b>3-bit CLA.</b> P<sub>i</sub> = A<sub>i</sub> ⊕ B<sub>i</sub>, G<sub>i</sub> = A<sub>i</sub>B<sub>i</sub>, C1 = G0 + P0C0, C2 = G1 + P1G0 + P1P0C0, C3 = G2 + P2G1 + P2P1G0 + P2P1P0C0, S<sub>i</sub> = P<sub>i</sub> ⊕ C<sub>i</sub>. C3 is the carry out.</p>
+<p><b>3 + 4:</b> A = 011, B = 100, C0 = 0.</p>
+<div class="tbl"><table class="mat"><tr><th>bit i</th><th>A<sub>i</sub></th><th>B<sub>i</sub></th><th>P<sub>i</sub> = A⊕B</th><th>G<sub>i</sub> = AB</th><th>C<sub>i</sub></th><th>S<sub>i</sub> = P⊕C</th></tr>
+<tr><td>0</td><td>1</td><td>0</td><td>1</td><td>0</td><td>C0 = 0</td><td>1</td></tr>
+<tr><td>1</td><td>1</td><td>0</td><td>1</td><td>0</td><td>C1 = 0 + 1·0 = 0</td><td>1</td></tr>
+<tr><td>2</td><td>0</td><td>1</td><td>1</td><td>0</td><td>C2 = 0 + 1·0 + 1·1·0 = 0</td><td>1</td></tr>
+<tr><td>carry out</td><td colspan="4"></td><td>C3 = 0 (all G = 0, C0 = 0)</td><td></td></tr></table></div>
+<p>Sum = 111 = 7, carry out 0. Correct. (Every P = 1, so a carry would ripple through, but nothing generates one.)</p>
+<p><b>Role of the carries (2020–21):</b> P and G are local, found from A and B only. C1..C4 are the look-ahead carries, found from P, G and C0 without waiting. C4 is the carry out. The sums need the carries.</p>
+</div></details></div>
+<div class="write"><h4>What to write (CLA, 12–15 marks)</h4><ol>
+<li>One line: "ripple carry waits for the previous stage; CLA computes all carries together".</li>
+<li>P<sub>i</sub> = A<sub>i</sub> ⊕ B<sub>i</sub>, G<sub>i</sub> = A<sub>i</sub>B<sub>i</sub>, S<sub>i</sub> = P<sub>i</sub> ⊕ C<sub>i</sub>, C<sub>i+1</sub> = G<sub>i</sub> + P<sub>i</sub>C<sub>i</sub>.</li>
+<li>The expanded C1, C2, C3, C4, each fully in terms of G, P and C0. Do not leave them as C<sub>i+1</sub> = G<sub>i</sub> + P<sub>i</sub>C<sub>i</sub>.</li>
+<li>The block diagram: PG generators, look-ahead carry box, sum XORs.</li>
+<li>The delay comparison, if asked.</li></ol></div>
+
+<h2>7. Binary multipliers</h2>
+<div class="exam"><div class="exam-src">2021–22 Q4(c) · 15 marks · older: 2012–13 (20), 2013–14 1-bit (5)</div><div class="exam-q"><p>Discuss and design a 2-bit by 2-bit binary multiplier.</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<p>Multiply B1B0 by A1A0 like decimal long multiplication. Each partial product bit is an AND.</p>
+<pre class="mono">            A1    A0
+      x     B1    B0
+      ----------------
+          A1B0  A0B0
+    A1B1  A0B1
+    ----------------------
+ P3   P2    P1    P0</pre>
+<ol>
+<li>P0 = A0B0.</li>
+<li>P1 and the carry c1: add A1B0 and A0B1 with a half adder HA1. P1 = A1B0 ⊕ A0B1, c1 = A1B0·A0B1.</li>
+<li>P2 and P3: add A1B1 and c1 with a second half adder HA2. P2 = A1B1 ⊕ c1, P3 = A1B1·c1.</li></ol>
+<p>Hardware: <b>4 AND gates and 2 half adders</b>. (Ma'am's own note says 3 half adders; the slide and the book use 2. Both work, 2 is enough.)</p>
+<div id="m1"></div>
+</div></details></div>
+<div class="exam"><div class="exam-src">2018–19 Q2(c) · 10 marks · older 2016–17 (15)</div><div class="exam-q"><p>Design a circuit with 4-bit binary adders which returns A × B, where A and B are 3-bit binary numbers.</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<p>The product is 6 bits (7 × 7 = 49 &lt; 64). Form the partial-product rows with 9 AND gates, then add them with two 4-bit adders (the same idea as Mano's 4×3 multiplier).</p>
+<ol>
+<li>Row 0 = A·B0 = a2b0 a1b0 a0b0. Row 1 = A·B1 = a2b1 a1b1 a0b1 (weight ×2). Row 2 = A·B2 = a2b2 a1b2 a0b2 (weight ×4).</li>
+<li>P0 = a0b0 directly.</li>
+<li>Adder 1 adds (0, 0, a2b0, a1b0) and (0, a2b1, a1b1, a0b1). Its lowest sum bit is P1. Its upper bits and carry, C4 S3 S2 S1, go on.</li>
+<li>Adder 2 adds (C4, S3, S2, S1) and (0, a2b2, a1b2, a0b2). Its four sum bits are P2, P3, P4, P5. Its carry out is always 0 and is not used.</li></ol>
+<div id="m2"></div>
+<p>Hardware: 9 AND gates and two 4-bit adders (checked for all 64 input pairs).</p>
+</div></details></div>
+
+<h2>8. Incrementer and decrementer</h2>
+<div class="exam"><div class="exam-src">2021–22 Q4(a) · 10 marks · older 2011–12 · homework in ma'am's notes</div><div class="exam-q"><p>Design a 4-bit incrementer circuit using only half adders. The incrementer adds 1 to a binary number.</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<p>Adding 1 means A + 0001. The carry-in of the LSB is 1 and every other bit adds 0, so a <b>half adder per bit</b> is enough (the second input of each HA is the carry from the HA before it). HA0 adds x0 and the constant 1.</p>
+<div id="c6"></div>
+<p>y0 = x0', y1 = x1 ⊕ x0, y2 = x2 ⊕ x1x0, y3 = x3 ⊕ x2x1x0. The final carry is 1 only for 1111 + 1. (<b>Decrementer</b>, ma'am's note: x − 1 = x + 1111, which needs one half adder for the LSB (adding 1) and three full adders for the rest.)</p>
+</div></details></div>
+
+<h2>9. 1's and 2's complement circuits from half adders</h2>
+<p>A half adder's <b>sum output is an XOR</b>, so HA(a, C).sum = a ⊕ C. With C = 0 it passes a; with C = 1 it flips a. That is a "controlled complementer", the XOR used in the adder-subtractor.</p>
+<div class="exam"><div class="exam-src">2023–24 Q4(a) · 6 marks · CT2 2026 Q2(a)+(b) · 4+4 marks</div><div class="exam-q"><p>(2023–24) Using only half adders, design a circuit that outputs the 1's complement of a 4-bit input when control C = 1 and passes the input unchanged when C = 0. (CT2) The same for a 2-bit input with two half adders; then change it to give the <b>2's complement</b> when C = 1 using up to four half adders and no other gates.</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<p><b>1's complement, 4 bits:</b> four HAs. HA<sub>i</sub> takes (a<sub>i</sub>, C). The sum output is y<sub>i</sub> = a<sub>i</sub> ⊕ C. The carry outputs are not used.</p>
+<div id="h1"></div>
+<p><b>2's complement, 2 bits (CT2 Q2b):</b> 2's complement = 1's complement + 1 = (a ⊕ C) + C. Let x<sub>i</sub> = a<sub>i</sub> ⊕ C.</p>
+<ol>
+<li>HA1: (a0, C) gives x0.</li>
+<li>HA2: (x0, C) gives y0 = x0 ⊕ C = a0 (bit 0 of a 2's complement is always a0), and the carry c = x0·C.</li>
+<li>HA3: (a1, C) gives x1.</li>
+<li>HA4: (x1, c) gives y1 = x1 ⊕ c. Its carry is not used.</li></ol>
+<div id="h2"></div>
+<p>Check, C = 1: a = 01 gives y = 11 (−1 = 11). a = 10 gives y = 10. a = 00 gives y = 00. a = 11 gives y = 01. With C = 0 the output equals the input. For 4 bits the same method needs 8 half adders: four to form x<sub>i</sub> and four to add the carry C (checked for all 16 inputs).</p>
+</div></details></div>
+
+<h2>10. Four-bit adder with controlled inputs (the 2018–19 trick)</h2>
+<div class="exam"><div class="exam-src">2018–19 Q2(b) · 13 marks · also filed twice in the QBank</div><div class="exam-q"><p>Using a 4-bit binary adder and XOR gates, design a circuit that takes 4-bit A and a 2-bit control, and returns A + 1 when the control is 00, A' when 01, A' + 1 when 10, and A when 11.</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<p><b>Assumption:</b> the question mentions a second BCD input B, but no result uses it, so B is not needed (tie the adder's second input to 0000). The control bits are S1 S0.</p>
+<p><b>Idea:</b> feed the adder X = A or A' (XOR with a control k), Y = 0000, and carry-in c.</p>
+<div class="tbl"><table class="mat"><tr><th>S1 S0</th><th>wanted</th><th>X</th><th>k (XOR with A)</th><th>carry-in c</th></tr>
+<tr><td>00</td><td>A + 1</td><td>A</td><td>0</td><td>1</td></tr><tr><td>01</td><td>A'</td><td>A'</td><td>1</td><td>0</td></tr><tr><td>10</td><td>A' + 1</td><td>A'</td><td>1</td><td>1</td></tr><tr><td>11</td><td>A</td><td>A</td><td>0</td><td>0</td></tr></table></div>
+<p>From the table: <b>k = S1 ⊕ S0</b> (0, 1, 1, 0) and <b>c = S0'</b> (1, 0, 1, 0). Gates: one XOR for k, four XORs on A, one NOT for c.</p>
+<div id="t1"></div>
+<p>Check with A = 0101: 00 gives 0110, 01 gives 1010, 10 gives 1011, 11 gives 0101. All four hold for every A from 0000 to 1111.</p>
+</div></details></div>
+
+<div class="trap"><b>Traps that cost marks</b><ul>
+<li>Forgetting the carry-in 1 in the subtractor. Without it you get A + B' = A − B − 1.</li>
+<li>Reading C4 wrongly: in subtraction C4 = 1 means <b>no</b> borrow (positive result).</li>
+<li>BCD adder: the correction adds 0110 only when K = 1. Do not forget that C4 = 1 also triggers it (sums 16–19).</li>
+<li>CLA: leaving C3 and C4 unexpanded, or dropping the P·P·…·C0 term.</li>
+<li>Signed overflow: using the end carry alone. It is C3 ⊕ C4.</li>
+<li>Half-adder complementers: the sum output is the XOR, not the carry output.</li>
+<li>2×2 multiplier: P3 is the carry of HA2, not an AND of the inputs.</li></ul></div>
+
+<h2>Mandatory practice</h2>
+<div id="p1"></div>
+<div id="p2"></div>
+<div id="r1"></div>
+<div id="r2"></div>
+<div id="r3"></div>
+</main>
+<script src="../assets/book.js"></script><script src="../assets/logic.js"></script><script src="../assets/dld.js"></script>
+<script>
+// net(sel, {inputs:[...], nodes:[{id,kind,label,ins:[ref..],pi:[..],po:[..],nout}], outputs:[{ref,label}], note})
+// kinds: and or nand nor not xor xnor | box (label, pi = input pin labels, po = output pin labels)
+function net(sel, sp) {
+  const IN = sp.inputs || [], N = {}, G = ['and', 'or', 'nand', 'nor', 'not', 'xor', 'xnor', 'buf'];
+  sp.nodes.forEach(n => { N[n.id] = n; n.isG = G.includes(n.kind); });
+  const parse = r => IN.includes(r) ? { p: r } : { id: r.split('.')[0], k: +(r.split('.')[1] || 0) };
+  Object.values(N).forEach(n => { const ni = n.ins.length, no = (n.po || [0]).length;
+    if (n.isG) { n.w = 44; n.h = n.kind === 'not' ? 22 : Math.max(26, ni * 13); } else { n.w = Math.max(74, (n.label || '').length * 7.5 + ((n.pi || n.po) ? 56 : 20)); n.h = Math.max(44, 22 * Math.max(ni, no) + 8); } });
+  const lv = {}; const L1 = id => { if (lv[id] !== undefined) return lv[id]; lv[id] = 1 + Math.max(0, ...N[id].ins.map(r => { const s = parse(r); return s.p ? 0 : L1(s.id); })); return lv[id]; };
+  Object.keys(N).forEach(L1); const nl = Math.max(...Object.values(lv)), cols = []; for (let l = 1; l <= nl; l++) cols.push(Object.values(N).filter(n => lv[n.id] === l));
+  let x = 90; cols.forEach(c => { const w = Math.max(...c.map(n => n.w)); c.forEach(n => { n.x = x; n.cw = w; }); x += w + 78; });
+  const outPin = (n, k) => { const no = (n.po || [0]).length; return [n.x + n.w + (/^n|^not$|^xnor$/.test(n.kind) && n.isG ? 8 : 0), n.y + (k + .5) * n.h / no]; };
+  const inPin = (n, j) => [n.x - (n.kind === 'xor' || n.kind === 'xnor' ? 4 : 0), n.y + (j + .5) * n.h / n.ins.length];
+  const stack = c => { let y = 20; c.forEach(n => { n.y = y; y += n.h + 20; }); };
+  cols.forEach(stack);
+  const pry = {}; IN.forEach((p, i) => pry[p] = 24 + i * 26);
+  const srcY = r => { const s = parse(r); return s.p ? pry[s.p] : outPin(N[s.id], s.k)[1]; };
+  for (let it = 0; it < 4; it++) { cols.forEach(c => { c.forEach(n => n.by = n.ins.reduce((a, r) => a + srcY(r), 0) / n.ins.length); c.sort((a, b) => a.by - b.by); let y = 0; c.forEach(n => { n.y = Math.max(y + 18, n.by - n.h / 2); y = n.y + n.h; }); }); IN.forEach(p => { const ys = []; Object.values(N).forEach(n => n.ins.forEach((r, j) => { if (r === p) ys.push(inPin(n, j)[1]); })); if (ys.length) pry[p] = ys.reduce((a, b) => a + b, 0) / ys.length; }); const sp2 = [...IN].sort((a, b) => pry[a] - pry[b]); let y = 14; sp2.forEach(p => { pry[p] = Math.max(pry[p], y); y = pry[p] + 24; }); }
+  { const ys = [...Object.values(N).map(n => n.y), ...IN.map(p => pry[p] - 10)], mn = Math.min(...ys) - 14; Object.values(N).forEach(n => n.y -= mn); IN.forEach(p => pry[p] -= mn); }
+  let wires = '', body = '';
+  Object.values(N).forEach(n => n.ins.forEach((r, j) => { const s = parse(r), [xs, ys] = s.p ? [64, pry[s.p]] : outPin(N[s.id], s.k), [xt, yt] = inPin(n, j), xm = xt - 12 - 6 * (j % 4); wires += `<path class="wr" d="M${xs},${ys} H${xm} V${yt} H${xt}"/>`; }));
+  IN.forEach(p => { body += `<text class="lb" x="58" y="${pry[p]}" style="text-anchor:end">${ovs(p)}</text><line class="wr" x1="62" y1="${pry[p]}" x2="68" y2="${pry[p]}"/>`; });
+  Object.values(N).forEach(n => { if (n.isG) { const t = n.kind === 'xor' ? 'or' : n.kind === 'xnor' ? 'nor' : n.kind === 'buf' ? 'and' : n.kind, g = gateShape(t, n.x, n.y, n.w, n.h); body += g.svg; if (n.kind === 'xor' || n.kind === 'xnor') body += `<path class="wr" d="M${n.x - 6},${n.y} q${n.w * .3},${n.h / 2} 0,${n.h}"/>`; if (n.label) body += `<text class="sm" x="${n.x + n.w / 2 - 4}" y="${n.y + n.h + 9}">${ovs(n.label)}</text>`; }
+    else { body += `<rect class="gt" x="${n.x}" y="${n.y}" width="${n.w}" height="${n.h}" rx="4"/><text class="lb" x="${n.x + n.w / 2}" y="${n.y + n.h / 2}">${ovs(n.label || '')}</text>`; (n.pi || []).forEach((t, j) => { const [px, py] = inPin(n, j); body += `<text class="sm" x="${px + 4}" y="${py}" style="text-anchor:start">${ovs(t)}</text>`; }); (n.po || []).forEach((t, k) => { const [px, py] = outPin(n, k); body += `<text class="sm" x="${px - 4}" y="${py}" style="text-anchor:end">${ovs(t)}</text>`; }); } });
+  let W = x - 20, H = 20;
+  (sp.outputs || []).forEach(o => { const s = parse(o.ref), [ox, oy] = outPin(N[s.id], s.k); body += `<line class="wr" x1="${ox}" y1="${oy}" x2="${ox + 26}" y2="${oy}"/><text class="lb" x="${ox + 30}" y="${oy}" style="text-anchor:start">${ovs(o.label)}</text>`; W = Math.max(W, ox + 40 + o.label.length * 8); });
+  Object.values(N).forEach(n => { H = Math.max(H, n.y + n.h + 22); }); IN.forEach(p => { H = Math.max(H, pry[p] + 16); });
+  host(sel).innerHTML = `<div class="fg-wrap"><svg class="dsa-fig" viewBox="0 0 ${W} ${H}" width="${W}" role="img" aria-label="${esc(sp.alt || 'circuit diagram')}">${wires}${body}</svg>${sp.note ? `<div class="figlabel">${sp.note}</div>` : ''}</div>`;
+}
+
+function chain(sel, o) {
+  const n = o.n, cw = 64, gap = 46, x0 = o.ov ? 190 : 70, y0 = 84, ch = 50, cell = o.cell || 'FA', X = k => x0 + (n - 1 - k) * (cw + gap);
+  const W = X(0) + cw + 70, H = 205 + (o.ov ? 20 : 0); let s = '';
+  if (o.pre === 'xor') s += `<line class="wr" x1="${x0 - 56}" y1="30" x2="${X(0) + cw - 10}" y2="30"/><text class="lb" x="${x0 - 60}" y="30" style="text-anchor:end">M</text>`;
+  for (let k = 0; k < n; k++) {
+    const x = X(k), tops = o.top(k);
+    s += `<rect class="gt" x="${x}" y="${y0}" width="${cw}" height="${ch}" rx="4"/><text class="lb" x="${x + cw / 2}" y="${y0 + ch / 2}">${cell}${k}</text>`;
+    tops.forEach((t, j) => { const px = x + (j + 1) * cw / (tops.length + 1); let ys = 20;
+      s += `<text class="lb" x="${px}" y="10">${ovs(t)}</text>`;
+      if (o.pre && tops.length === 2 && j === 1) {
+        if (o.pre === 'xor') s += `<line class="wr" x1="${px}" y1="16" x2="${px}" y2="40"/><circle class="gt" cx="${px}" cy="49" r="9"/><text class="sm" x="${px}" y="49" style="dominant-baseline:central">⊕</text><path class="wr" d="M${px + 16},30 V49 H${px + 9}"/><line class="wr" x1="${px}" y1="58" x2="${px}" y2="${y0}"/>`;
+        else s += `<line class="wr" x1="${px}" y1="16" x2="${px}" y2="38"/><g transform="translate(${px},50) rotate(90)">${gateShape('not', -9, -9, 18, 18).svg}</g><line class="wr" x1="${px}" y1="66" x2="${px}" y2="${y0}"/>`;
+      } else s += `<line class="wr" x1="${px}" y1="16" x2="${px}" y2="${y0}"/>`; });
+    s += `<line class="wr" x1="${x + cw / 2}" y1="${y0 + ch}" x2="${x + cw / 2}" y2="${y0 + ch + 24}"/><text class="lb" x="${x + cw / 2}" y="${y0 + ch + 36}">${ovs(o.bot(k))}</text>`;
+    const cy = y0 + ch / 2, rx = x + cw;
+    if (k === 0) s += `<line class="wr" x1="${rx}" y1="${cy}" x2="${rx + 34}" y2="${cy}"/><text class="lb" x="${rx + 38}" y="${cy}" style="text-anchor:start">${o.cin}</text>`;
+    if (k < n - 1) s += `<line class="wr" x1="${x - gap}" y1="${cy}" x2="${x}" y2="${cy}"/><text class="sm" x="${x - gap / 2}" y="${cy - 8}">C${k + 1}</text>`;
+    else s += `<line class="wr" x1="${x}" y1="${cy}" x2="${x - 30}" y2="${cy}"/><text class="lb" x="${x - 34}" y="${cy - 10}" style="text-anchor:end">${o.cout || ''}</text>`;
+  }
+  if (o.ov) { const xv = X(n - 1) - 100, cy = y0 + ch / 2, gx = X(n - 1) - gap / 2 + 0; const tapx = X(n - 2) - gap / 2 + 0;
+    s += `<rect class="gt" x="${xv}" y="${cy + 18}" width="40" height="30" rx="4"/><text class="lb" x="${xv + 20}" y="${cy + 33}">XOR</text><text class="lb" x="${xv - 6}" y="${cy + 33}" style="text-anchor:end"></text>`;
+    s += `<path class="wr" d="M${X(n - 1)},${cy} H${xv + 60} V${cy + 26} H${xv + 40}"/><path class="wr" d="M${tapx},${cy} V${y0 + ch + 56} H${xv + 52} V${cy + 42} H${xv + 40}"/><circle cx="${tapx}" cy="${cy}" r="3" fill="currentColor"/>`;
+    s += `<line class="wr" x1="${xv}" y1="${cy + 33}" x2="${xv - 20}" y2="${cy + 33}"/><text class="lb" x="${xv - 24}" y="${cy + 33}" style="text-anchor:end">V</text>`; }
+  host(sel).innerHTML = `<div class="fg-wrap"><svg class="dsa-fig" viewBox="0 ${o.ov ? 0 : 0} ${W} ${H}" width="${W}" role="img" aria-label="${o.alt || 'adder chain'}">${s}</svg>${o.note ? `<div class="figlabel">${o.note}</div>` : ''}</div>`;
+}
+const idx = (p, k) => p + k;
+const ADD = { n: 4, top: k => ['A' + k, 'B' + k], bot: k => 'S' + k, cin: 'C0', cout: 'C4' };
+
+// 1. HA / FA
+net('#f1', { alt: 'full adder from two half adders', inputs: ['x', 'y', 'z'], nodes: [
+  { id: 'h1', kind: 'box', label: 'HA1', ins: ['x', 'y'], pi: ['', ''], po: ['S', 'C'] },
+  { id: 'h2', kind: 'box', label: 'HA2', ins: ['h1.0', 'z'], pi: ['', ''], po: ['S', 'C'] },
+  { id: 'or', kind: 'or', ins: ['h1.1', 'h2.1'] }],
+  outputs: [{ ref: 'h2.0', label: 'S' }, { ref: 'or', label: 'C' }], note: 'FULL ADDER from two half adders: S = x⊕y⊕z, C = xy + (x⊕y)z' });
+kmap('#k1', { vars: ['x', 'y', 'b'], ones: [1, 2, 3, 7] });
+net('#f2', { alt: 'full subtractor from two half subtractors', inputs: ['x', 'y', 'Bin'], nodes: [
+  { id: 'h1', kind: 'box', label: 'HS1', ins: ['x', 'y'], pi: ['', ''], po: ['D1', 'B1'] },
+  { id: 'h2', kind: 'box', label: 'HS2', ins: ['h1.0', 'Bin'], pi: ['', ''], po: ['D', 'B2'] },
+  { id: 'or', kind: 'or', ins: ['h1.1', 'h2.1'] }],
+  outputs: [{ ref: 'h2.0', label: 'Diff' }, { ref: 'or', label: 'Bout' }], note: 'FULL SUBTRACTOR from two half subtractors (HS: D = a⊕b, B = a\'b)' });
+gates('#g1', { expr: "x'y + x'b + yb", vars: ['x', 'y', 'b'], form: 'and-or', out: 'Bout' });
+
+// 2-3. ripple chains
+chain('#c1', { ...ADD, alt: '4-bit ripple adder', note: '4-BIT RIPPLE-CARRY ADDER: C4 S3 S2 S1 S0 = A + B + C0' });
+chain('#c2', { ...ADD, pre: 'not', top: k => ['A' + k, 'B' + k], bot: k => 'D' + k, cin: '1', alt: '4-bit subtractor', note: '4-BIT SUBTRACTOR: D = A + B\' + 1' });
+chain('#c3', { ...ADD, pre: 'xor', cin: 'M', alt: '4-bit adder-subtractor', note: 'ADDER-SUBTRACTOR: M = 0 → A + B, M = 1 → A + B\' + 1 = A − B' });
+chain('#c4', { ...ADD, pre: 'xor', cin: 'M', ov: true, alt: 'overflow detection', note: 'OVERFLOW: V = C3 ⊕ C4 (one XOR gate on the last two carries)' });
+chain('#c6', { n: 4, cell: 'HA', top: k => ['x' + k], bot: k => 'y' + k, cin: '1', cout: 'C4', alt: '4-bit incrementer', note: 'INCREMENTER: y = x + 1 with four half adders (LSB adds the constant 1)' });
+
+// live adder-subtractor calculator
+(() => {
+  const el = $('#calc'); el.innerHTML = `<div class="def"><b>Adder-subtractor bench.</b> A <input id="ca" type="number" min="0" max="15" value="7" style="width:4em"> B <input id="cb" type="number" min="0" max="15" value="3" style="width:4em"> M <select id="cm"><option value="0">0 (add)</option><option value="1" selected>1 (subtract)</option></select><div id="co" class="tracer-hint"></div></div>`;
+  const run = () => { const a = Math.max(0, Math.min(15, +$('#ca').value | 0)), b = Math.max(0, Math.min(15, +$('#cb').value | 0)), m = +$('#cm').value, bb = m ? ~b & 15 : b, bin = v => v.toString(2).padStart(4, '0');
+    let c = m, cs = [c], s = 0; for (let i = 0; i < 4; i++) { const t = ((a >> i) & 1) + ((bb >> i) & 1) + c; s |= (t & 1) << i; c = t >> 1; cs.push(c); }
+    const sg = v => v > 7 ? v - 16 : v, V = cs[3] ^ cs[4];
+    $('#co').innerHTML = `B ⊕ M = <b>${bin(bb)}</b>, C0 = ${m}. Carries C1..C4 = ${cs.slice(1).join(' ')}. Sum = <b>${bin(s)}</b> (unsigned ${s}, signed ${sg(s)}).<br>C4 = ${cs[4]} ${m ? (cs[4] ? '(subtraction: no borrow, A ≥ B)' : '(subtraction: borrow, A &lt; B, result negative)') : (cs[4] ? '(unsigned overflow)' : '')}. Signed overflow V = C3 ⊕ C4 = ${cs[3]} ⊕ ${cs[4]} = <b>${V}</b>.`; };
+  el.querySelectorAll('input,select').forEach(i => i.oninput = run); run();
+})();
+
+// 5. BCD adder
+kmap('#k2', { vars: ['S3', 'S2', 'S1', 'S0'], ones: [10, 11, 12, 13, 14, 15] });
+net('#d1', { alt: 'BCD adder', inputs: ['A', 'B', 'C0'], nodes: [
+  { id: 'a1', kind: 'box', label: '4-bit adder 1', ins: ['A', 'B', 'C0'], pi: ['A', 'B', 'Cin'], po: ['S3', 'S2', 'S1', 'S0', 'C4'] },
+  { id: 'g1', kind: 'and', ins: ['a1.0', 'a1.1'] }, { id: 'g2', kind: 'and', ins: ['a1.0', 'a1.2'] },
+  { id: 'k', kind: 'or', label: 'K', ins: ['a1.4', 'g1', 'g2'] },
+  { id: 'a2', kind: 'box', label: '4-bit adder 2', ins: ['a1.0', 'a1.1', 'a1.2', 'a1.3', 'k'], pi: ['S3', 'S2', 'S1', 'S0', '0KK0'], po: ['digit', 'Cout'] }],
+  outputs: [{ ref: 'a2.0', label: 'BCD digit' }], note: 'BCD ADDER: K = C4 + S3S2 + S3S1 (also the decimal carry out); adder 2 adds 0 K K 0' });
+net('#d2', { alt: 'BCD adder-subtractor', inputs: ['A', 'B', 'S'], nodes: [
+  { id: 'c9', kind: 'box', label: 'B or 9-B', ins: ['B', 'S'], pi: ['B', 'S'], po: ['Y'] },
+  { id: 'a1', kind: 'box', label: '4-bit adder 1', ins: ['A', 'c9', 'S'], pi: ['A', 'Y', 'Cin = S'], po: ['S3', 'S2', 'S1', 'S0', 'C4'] },
+  { id: 'g1', kind: 'and', ins: ['a1.0', 'a1.1'] }, { id: 'g2', kind: 'and', ins: ['a1.0', 'a1.2'] },
+  { id: 'k', kind: 'or', label: 'K', ins: ['a1.4', 'g1', 'g2'] },
+  { id: 'a2', kind: 'box', label: '4-bit adder 2', ins: ['a1.0', 'a1.1', 'a1.2', 'a1.3', 'k'], pi: ['S3', 'S2', 'S1', 'S0', '0KK0'], po: ['digit', 'Cout'] }],
+  outputs: [{ ref: 'a2.0', label: 'BCD result' }], note: 'decimal carry out = K. B or 9-B block: n3 = B3\'B2\'B1\', n2 = B2⊕B1, n1 = B1, n0 = B0\' (S = 1); passes B when S = 0' });
+
+// 6. CLA
+net('#c5', { alt: '4-bit carry look-ahead adder', inputs: ['A0', 'B0', 'A1', 'B1', 'A2', 'B2', 'A3', 'B3', 'C0'], nodes: [
+  ...[0, 1, 2, 3].map(i => ({ id: 'pg' + i, kind: 'box', label: 'PG' + i, ins: ['A' + i, 'B' + i], pi: ['A', 'B'], po: ['P' + i, 'G' + i] })),
+  { id: 'cla', kind: 'box', label: 'Look-ahead carry generator', ins: ['pg0.0', 'pg0.1', 'pg1.0', 'pg1.1', 'pg2.0', 'pg2.1', 'pg3.0', 'pg3.1', 'C0'], pi: ['P0', 'G0', 'P1', 'G1', 'P2', 'G2', 'P3', 'G3', 'C0'], po: ['C1', 'C2', 'C3', 'C4'] },
+  { id: 'x0', kind: 'xor', ins: ['pg0.0', 'C0'], label: 'S0' }, { id: 'x1', kind: 'xor', ins: ['pg1.0', 'cla.0'], label: 'S1' },
+  { id: 'x2', kind: 'xor', ins: ['pg2.0', 'cla.1'], label: 'S2' }, { id: 'x3', kind: 'xor', ins: ['pg3.0', 'cla.2'], label: 'S3' }],
+  outputs: [{ ref: 'x0', label: 'S0' }, { ref: 'x1', label: 'S1' }, { ref: 'x2', label: 'S2' }, { ref: 'x3', label: 'S3' }, { ref: 'cla.3', label: 'C4' }], note: 'CLA: P = A⊕B, G = AB in every bit; all carries from one two-level box; S = P⊕C' });
+
+// 7. multipliers
+net('#m1', { alt: '2x2 multiplier', inputs: ['A1', 'A0', 'B1', 'B0'], nodes: [
+  { id: 'p0', kind: 'and', ins: ['A0', 'B0'] }, { id: 'p1', kind: 'and', ins: ['A1', 'B0'] }, { id: 'p2', kind: 'and', ins: ['A0', 'B1'] }, { id: 'p3', kind: 'and', ins: ['A1', 'B1'] },
+  { id: 'h1', kind: 'box', label: 'HA1', ins: ['p1', 'p2'], pi: ['', ''], po: ['S', 'C'] }, { id: 'h2', kind: 'box', label: 'HA2', ins: ['p3', 'h1.1'], pi: ['', ''], po: ['S', 'C'] }],
+  outputs: [{ ref: 'p0', label: 'P0' }, { ref: 'h1.0', label: 'P1' }, { ref: 'h2.0', label: 'P2' }, { ref: 'h2.1', label: 'P3' }], note: '2×2 MULTIPLIER: 4 AND gates + 2 half adders' });
+net('#m2', { alt: '3x3 multiplier', inputs: ['A', 'B'], nodes: [
+  { id: 'pp', kind: 'box', label: '9 AND gates  ai·bj', ins: ['A', 'B'], pi: ['A', 'B'], po: ['P0', 'X1', 'Y1', 'Y2'] },
+  { id: 'ad1', kind: 'box', label: '4-bit adder 1', ins: ['pp.1', 'pp.2'], pi: ['X', 'Y'], po: ['S0', 'C4..S1'] },
+  { id: 'ad2', kind: 'box', label: '4-bit adder 2', ins: ['ad1.1', 'pp.3'], pi: ['X', 'Y'], po: ['S3..S0'] }],
+  outputs: [{ ref: 'pp.0', label: 'P0' }, { ref: 'ad1.0', label: 'P1' }, { ref: 'ad2.0', label: 'P5 P4 P3 P2' }], note: 'X1 = 0 0 a2b0 a1b0 · Y1 = 0 a2b1 a1b1 a0b1 · adder 2: X = C4 S3 S2 S1, Y2 = 0 a2b2 a1b2 a0b2 · carry out of adder 2 is always 0' });
+
+// 9. complementers
+net('#h1', { alt: '4-bit controlled 1s complement', inputs: ['a3', 'a2', 'a1', 'a0', 'C'], nodes: [3, 2, 1, 0].map(i => ({ id: 'h' + i, kind: 'box', label: 'HA' + i, ins: ['a' + i, 'C'], pi: ['', ''], po: ['S', 'C'] })),
+  outputs: [3, 2, 1, 0].map(i => ({ ref: 'h' + i + '.0', label: 'y' + i })), note: '1\'s COMPLEMENT: y = a ⊕ C (sum outputs of four half adders, carries unused)' });
+net('#h2', { alt: '2-bit controlled 2s complement', inputs: ['a1', 'a0', 'C'], nodes: [
+  { id: 'h1', kind: 'box', label: 'HA1', ins: ['a0', 'C'], pi: ['', ''], po: ['S', 'C'] },
+  { id: 'h2', kind: 'box', label: 'HA2', ins: ['h1.0', 'C'], pi: ['', ''], po: ['S', 'C'] },
+  { id: 'h3', kind: 'box', label: 'HA3', ins: ['a1', 'C'], pi: ['', ''], po: ['S', 'C'] },
+  { id: 'h4', kind: 'box', label: 'HA4', ins: ['h3.0', 'h2.1'], pi: ['', ''], po: ['S', 'C'] }],
+  outputs: [{ ref: 'h2.0', label: 'y0' }, { ref: 'h4.0', label: 'y1' }], note: '2\'s COMPLEMENT (2 bits): y = (a ⊕ C) + C using four half adders' });
+
+// 10. A+1, A', A'+1, A
+net('#t1', { alt: 'adder with controlled inputs', inputs: ['A', 'S1', 'S0', '0000'], nodes: [
+  { id: 'k', kind: 'xor', label: 'k', ins: ['S1', 'S0'] }, { id: 'n', kind: 'not', ins: ['S0'] },
+  { id: 'xr', kind: 'box', label: '4 XOR gates  A ⊕ k', ins: ['A', 'k'], pi: ['A', 'k'], po: ['X'] },
+  { id: 'ad', kind: 'box', label: '4-bit adder', ins: ['xr', '0000', 'n'], pi: ['X', 'Y', 'Cin'], po: ['Result'] }],
+  outputs: [{ ref: 'ad.0', label: 'F' }], note: 'k = S1⊕S0, Cin = S0\'; Y = 0000' });
+
+practice('#p1', { id: 'p1', kind: 'comp', n: 2 });
+practice('#p2', { id: 'p2', kind: 'sop', n: 1 });
+recall('#r1', { id: 'r1', marks: 15, q: 'Design a 4-bit binary subtractor using full adders. Draw it and explain how subtraction is done with 2\'s complement. (2024–25 Q1a)', points: ['A − B = A + B\' + 1 (2\'s complement of B is B\' + 1)', 'Diagram: four full adders chained, each B input through a NOT gate, C0 tied to 1', 'Outputs D3..D0 and end carry C4 labelled', 'C4 = 1 means A ≥ B, result positive, discard the carry', 'C4 = 0 means negative, take the 2\'s complement of the 4 bits for the magnitude', 'One worked example (7 − 3 = 0100 with C4 = 1, and 3 − 7 giving 1100 with C4 = 0)'], model: '<p>A − B = A + (2\'s complement of B) = A + B\' + 1. Four full adders, B<sub>i</sub> through NOT, C0 = 1. 7 − 3: 0111 + 1100 + 1 = 1 0100, C4 = 1 so result +4. 3 − 7: 0011 + 1000 + 1 = 0 1100, C4 = 0 so the result is negative: −(2\'s complement of 1100) = −0100 = −4.</p>' });
+recall('#r2', { id: 'r2', marks: 12, q: 'Design a BCD adder-subtractor (S = 0: A + B, S = 1: A − B) and explain 9 + 7 and 9 − 7. (2017–18 Q2b, 2020–21 Q4b)', points: ['Binary sum above 9 is invalid BCD, so add 0110', 'Correction condition K = C4 + S3S2 + S3S1', 'Two 4-bit adders; adder 2 adds 0 K K 0; carry out = K', 'Subtraction by 9\'s complement of B (n3 = B3\'B2\'B1\', n2 = B2⊕B1, n1 = B1, n0 = B0\') with carry-in S', '9 + 7: 1001 + 0111 = 1 0000, K = 1, + 0110 = 0110, carry 1, answer 16', '9 − 7: 1001 + 0010 + 1 = 1100, K = 1, + 0110 = 1 0010, answer +2'], model: '<p>See section 5: adder 1, K = C4 + S3S2 + S3S1, adder 2 adds 0KK0, 9\'s-complement block on B controlled by S, carry-in S. 9+7 gives K = 1 and digits 0001 0110 (16). 9−7: B becomes 0010, 1001 + 0010 + 1 = 1100, K = 1, 1100 + 0110 = 1 0010, result +2.</p>' });
+recall('#r3', { id: 'r3', marks: 12, q: 'Explain the working principle of a carry look-ahead adder and derive C1 to C4 using generate and propagate. (2024–25 Q3b)', points: ['Ripple carry is slow because each stage waits for the previous carry; CLA produces all carries together', 'P_i = A_i ⊕ B_i, G_i = A_i B_i, S_i = P_i ⊕ C_i, C_{i+1} = G_i + P_i C_i', 'C1 = G0 + P0C0 and C2 = G1 + P1G0 + P1P0C0', 'C3 = G2 + P2G1 + P2P1G0 + P2P1P0C0', 'C4 = G3 + P3G2 + P3P2G1 + P3P2P1G0 + P3P2P1P0C0', 'Block diagram or the delay comparison (about 4 levels versus 2n)'], model: '<p>See section 6: define P and G, substitute C<sub>i</sub> repeatedly. C4 = G3 + P3G2 + P3P2G1 + P3P2P1G0 + P3P2P1P0C0. All carries come from two AND-OR levels, so the delay stays about 4 gate levels instead of growing with n.</p>' });
+</script>
+</body>
+</html>

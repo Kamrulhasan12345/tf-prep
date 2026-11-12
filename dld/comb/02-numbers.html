@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Number Systems and Codes · CSE 205 Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Combinational circuits · Mano §1.2–1.7 · Tanzima ma'am L5–7 (Jun 30 – Jul 4) · CT1 syllabus + most years</div>
+<h1>Number systems, complements, signed numbers and codes</h1>
+<p class="lede">This topic is the first class test and a steady 5–15 marks in the final. <b>M − N by complements</b>: 2017–18 Q1a (2+5, rules for M ≥ N and M &lt; N, then 9 − 6.9 − 9.8 in hexadecimal), 2021–22 Q2d (8, steps for unsigned M, N in base r), 2022–23 Q1a (13, steps using the (r−1)'s complement), CT1 2026 Q5 (4, steps using the radix complement). <b>Overflow</b>: 2024–25 Q3c (11, what is overflow, how is it detected for signed addition and subtraction, with examples). <b>Codes</b>: 2022–23 Q1b (9, binary against Gray and the benefits of each), CT1 2026 Q2 (3, weighted code for digits 0–5 with weights 4, 1, 2). Older papers: conversions with fractions (41.6875, 0.625), 11010 − 1101 with both complements, −50 − (−70) in 2's complement, (305.E)₁₆ − (109.6875)₁₀, the 6, 3, 1, 1 weighted code, "r's against (r−1)'s complement" (2 marks), overflow rule (5). Parity-bit <i>circuits</i> (2017–18 Q4a, 2018–19 Q4a, 2020–21 Q2c) and the Gray-to-binary converter (2022–23 Q2a, 20 marks) are designed in chapter 7; this chapter gives the theory they rest on.</p>
+
+<h2>1. Number systems and conversions</h2>
+<p>A number system has a <b>base (radix) r</b> and digits 0 … r−1. Value = Σ digit × r<sup>position</sup>; positions right of the point are negative powers.</p>
+<ol class="steps">
+<li><b>Any base → decimal:</b> multiply each digit by its power of r and add. (0110)₂ = 0·8 + 1·4 + 1·2 + 0 = 6.</li>
+<li><b>Decimal integer → base r:</b> divide by r repeatedly. Write quotient, remainder. Read the remainders <b>bottom (MSB) to top (LSB)</b>. 13 → 6 r1, 3 r0, 1 r1, 0 r1 → 1101.</li>
+<li><b>Decimal fraction → base r:</b> multiply the fraction by r repeatedly. The integer part of each product is the next digit, <b>top to bottom</b>. 0.625 × 2 = 1.25 (1); 0.25 × 2 = 0.5 (0); 0.5 × 2 = 1.0 (1) → (0.101)₂. 41.6875 = 101001.1011 (41 → 101001; 0.6875 → 1011).</li>
+<li><b>Binary ↔ octal / hex:</b> group bits in 3s / 4s from the <b>point outwards</b>, padding zeros at the far ends. (10110.01)₂ → 0001 0110 . 0100 → (16.4)₁₆. (26.2)₈ → 010 110 . 010 → regroup in 4s → (16.4)₁₆.</li>
+</ol>
+<p>Her tables for integer division use columns "Quotient | Remainder | Coefficient" and, for fractions, "Integer | Fraction | Coefficient". Copy that layout.</p>
+
+<h2>2. Complements</h2>
+<div class="def"><dl>
+<dt>(r−1)'s complement of N</dt><dd>(rⁿ − 1) − N for an n-digit number: <b>subtract each digit from r−1</b>. Decimal: 9's complement of 546700 = 453299. Binary: 1's complement = flip every bit; 1011000 → 0100111.</dd>
+<dt>r's (radix) complement of N</dt><dd>rⁿ − N (0 if N = 0) = <b>(r−1)'s complement + 1</b>. Decimal: 10's complement of 246700 = 753300. Binary: 2's complement = flip and add 1. Shortcut: copy bits from the right up to and including the first 1, then flip all bits to its left: 10110000 → 01010000.</dd>
+</dl></div>
+<p>The number of digits n is fixed. If M has more digits than N, pad N with leading zeros <b>before</b> complementing. With a radix point, n counts the integer digits, and the fraction digits just come along (in ulps of the last place).</p>
+<p><b>r's against (r−1)'s (2 marks):</b> they differ by 1 in the last place. r's has one zero (no −0) and no end-around carry; (r−1)'s needs an end-around carry and has two zeros (+0 = 00…0 and −0 = 11…1).</p>
+
+<h2>3. Subtraction M − N by complements (the most repeated question)</h2>
+<p>Ma'am's wording, for two n-digit unsigned numbers M and N in base r. <b>r's complement version (2017–18, 2021–22, CT1):</b></p>
+<ol class="steps">
+<li>Take the r's complement of N: rⁿ − N.</li>
+<li>Add it to M: Sum = M + (rⁿ − N) = (M − N) + rⁿ.</li>
+<li><b>If an end carry occurs (M ≥ N):</b> discard it. What is left is M − N.</li>
+<li><b>If no end carry (M &lt; N):</b> the answer is negative. M − N = −(r's complement of Sum). Put a minus sign in front.</li>
+</ol>
+<p><b>(r−1)'s complement version (2022–23 Q1a):</b> the same, except step 1 uses (r−1)'s complement and:</p>
+<ol class="steps">
+<li>Add M + [(r−1)'s complement of N].</li>
+<li><b>End carry (M ≥ N):</b> <b>add that carry to the least significant digit</b> (end-around carry). The result is M − N.</li>
+<li><b>No end carry (M &lt; N):</b> M − N = −((r−1)'s complement of Sum).</li>
+</ol>
+<p>Why it works: rⁿ − N added to M gives M − N + rⁿ. The extra rⁿ is the end carry. If M &lt; N the sum is rⁿ − (N − M), which <i>is</i> the r's complement of the magnitude, so we complement it back. In the (r−1)'s case the stored value is one less, so the carry has to be put back.</p>
+<p>Step through any case below. The animation does the arithmetic with the same rules, so you can check your own working.</p>
+
+<div class="exam"><div class="exam-src">2021–22 Q2(d) 8 marks · CT1 2026 Q5 4 marks · 2022–23 Q1(a) 13 marks</div><div class="exam-q"><p>Given two n-digit unsigned numbers M and N in base r, write the steps to find M − N using complements (r's complement; (r−1)'s complement). Give examples.</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<p>Write the steps above for the version asked. Then <b>always add examples</b>, one with M &gt; N and one with M &lt; N (ma'am's slide numbers):</p>
+<p><b>65438 − 5623</b> (decimal, r's): N = 05623 (5 digits), 10's complement = 94377. 65438 + 94377 = 1 59815. End carry, discard: <b>59815</b>.</p>
+<div id="s1"></div>
+<p><b>5623 − 65438</b>: 10's complement of 65438 = 34562. 05623 + 34562 = 40185, no end carry. Answer −(10's complement of 40185) = <b>−59815</b>.</p>
+<div id="s2"></div>
+<p><b>Binary:</b> 10110010 − 10011111 and 10011111 − 10110010, both with 2's and 1's complement:</p>
+<div id="s3"></div><div id="s4"></div><div id="s5"></div><div id="s6"></div>
+</div></details></div>
+
+<div class="exam"><div class="exam-src">2017–18 Q1(a) · 2 + 5 marks</div><div class="exam-q"><p>Write the rules of subtraction for two n-digit numbers M and N in base r (cases M ≥ N and M &lt; N). Find the value of 9 − 6.9 − 9.8 using the complement rule where the base is hexadecimal.</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<p><b>Rules (2 marks):</b> the four numbered steps of the r's complement version above, with the two cases separated.</p>
+<p><b>The calculation (5 marks).</b> Assumption: the expression is read left to right, (9 − 6.9) − 9.8, all in hexadecimal. This gives one M ≥ N case and one M &lt; N case, which is clearly what the examiner wants. Use n = 1 integer digit, one fraction digit. 6.9₁₆ means 6 + 9/16.</p>
+<p><b>Step 1: 9 − 6.9.</b> M = 9.0, N = 6.9. 15's complement of 6.9 = 9.6; add 1 in the last place: 16's complement = 9.7. M + that = 9.0 + 9.7 = 1 2.7 → end carry, discard → <b>2.7</b>.</p>
+<div id="s7"></div>
+<p><b>Step 2: 2.7 − 9.8.</b> 16's complement of 9.8 = 6.8 (15's complement 6.7, plus 1 in the last place). 2.7 + 6.8 = 8.F. No end carry, so negative: −(16's complement of 8.F) = −7.1.</p>
+<div id="s8"></div>
+<p><b>Answer: 9 − 6.9 − 9.8 = −7.1₁₆</b> (decimal check: 9 − 6.5625 − 9.5 = −7.0625 = −7.1₁₆ ✓).</p>
+</div></details></div>
+<div class="write"><h4>What to write (M − N by complement, 4–13 marks)</h4>
+<ol>
+<li>Name the version: "r's complement" or "(r−1)'s complement with end-around carry".</li>
+<li>The 3–4 numbered steps, with the two cases M ≥ N and M &lt; N written separately.</li>
+<li>For each worked example: N padded to n digits, its complement (show the digit-by-digit subtraction), the addition in columns, the end carry marked, the final answer with its sign.</li>
+<li>One line of verification in decimal.</li></ol></div>
+
+<div class="exam"><div class="exam-src">older papers 2011–14 · 10, 6, 9 and 15 marks</div><div class="exam-q"><p>(a) 11010 − 1101 with (i) 2's complement, (ii) 1's complement. (b) 11000011 − 10101010. (c) Using 2's complement, subtract decimal −70 from decimal −50. (d) (305.E)₁₆ and (109.6875)₁₀: convert both to binary, subtract the latter from the former in binary, convert the result to octal.</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<p><b>(a)</b> N = 01101 (pad to 5 bits). Answer 01101 = 13 both ways:</p>
+<div id="s9"></div><div id="s10"></div>
+<p><b>(c)</b> −(−70) = +70, so −50 − (−70) = (−50) + (+70). In 8-bit 2's complement −50 = 11001110, +70 = 01000110. The table shows the sum 00010100 = +20, carry out discarded, no overflow:</p>
+<div id="o1"></div>
+<p><b>(d)</b> (305.E)₁₆ = 0011 0000 0101 . 1110 = 1100000101.111₂ (773.875). (109.6875)₁₀ = 1101101.1011₂. Subtract with 2's complement (N padded to 10 integer digits, 4 fraction digits):</p>
+<div id="s11"></div>
+<p>Result 1010011000.0011₂ = 664.1875. To octal, group in 3s from the point: 001 010 011 000 . 001 100 → <b>(1230.14)₈</b>.</p>
+</div></details></div>
+
+<h2>4. Signed numbers and overflow</h2>
+<p>Ma'am uses <b>signed 2's complement</b>: the leftmost bit is the sign (0 = +, 1 = −), a negative number is stored as the 2's complement of its magnitude. An n-bit number holds −2<sup>n−1</sup> … +2<sup>n−1</sup>−1 (8 bits: −128 … +127; 4 bits: −8 … +7).</p>
+<ol class="steps">
+<li><b>Addition:</b> add all n bits including the sign bit. Discard any carry out of the sign bit.</li>
+<li><b>Subtraction A − B:</b> take the 2's complement of B (sign bit included) and add. A − (+B) = A + (−B), A − (−B) = A + (+B).</li>
+<li>Her examples (8-bit): (+5) + (−11): 00000101 + 11110101 = 11111010 = −6. (−5) + (−11): 11111011 + 11110101 = 1 11110000 → drop carry → −16. (−6) − (−13) = (−6) + 13: 11111010 + 00001101 = 1 00000111 → +7.</li>
+</ol>
+<div class="def"><dl>
+<dt>Overflow</dt><dd>The true result does not fit in the n bits, so the stored result is wrong. The adder cannot signal it by itself.</dd>
+<dt>Unsigned numbers</dt><dd>Overflow = a <b>carry out</b> of the MSB (for A + B).</dd>
+<dt>Signed numbers</dt><dd>The end carry does <b>not</b> mean overflow. Overflow can happen only when the two operands have the <b>same sign</b>, and it has happened when the <b>sum's sign differs</b> from them. Equivalent hardware test: <b>V = (carry into the sign bit) XOR (carry out of the sign bit)</b>. For subtraction, A − B is done as A + B' + 1 and the same test is applied to that addition.</dd>
+</dl></div>
+<p>Truth table (ma'am's slide): A sign 0, B sign 0, carry in 1 → carry out 0, sum sign 1 → overflow. A sign 1, B sign 1, carry in 0 → carry out 1, sum sign 0 → overflow. Opposite signs can never overflow.</p>
+<div class="exam"><div class="exam-src">2024–25 Q3(c) 11 marks · 2013–14 (older) 5 marks</div><div class="exam-q"><p>What is overflow in binary arithmetic? Explain how overflow is detected in signed addition and subtraction, with examples.</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<p>Definition and the rule from the box above. Then examples, 4-bit signed (range −8 … +7). The table is computed live; read the last two columns:</p>
+<div id="o2"></div>
+<p>Rows 1 and 2: two positives or two negatives whose sum leaves the range, so the sign comes out wrong and carry-in ≠ carry-out → overflow. Row 3: (+5) + (−3) has a carry out <b>and</b> a carry in, equal, so no overflow although there is an end carry. Row 6, 5 − (−4) = 5 + 4: subtraction of a negative behaves like adding two positives, so it overflows. Row 4: opposite signs never overflow. Rows 5 and 7: same signs, but the sum fits, so no overflow. Row 8: 7 + 1 = 8 does not fit in 4 bits.</p>
+<p>Circuit: one XOR gate on the two carries at the sign position, V = C<sub>n−1</sub> ⊕ C<sub>n</sub>. For unsigned, V = C<sub>n</sub>.</p>
+</div></details></div>
+<div class="write"><h4>What to write (overflow, 5–11 marks)</h4>
+<ol><li>Definition: result outside −2ⁿ⁻¹ … 2ⁿ⁻¹−1 (signed) or 0 … 2ⁿ−1 (unsigned).</li>
+<li>Unsigned rule: carry out of MSB. Signed rule: same-sign operands and different-sign result, or C<sub>in</sub> ⊕ C<sub>out</sub> at the MSB.</li>
+<li>At least two worked examples, one positive+positive and one negative+negative, with bits, both carries and the verdict. Add one example that does <b>not</b> overflow although it has a carry.</li>
+<li>For subtraction: "A − B = A + B' + 1, then the same test".</li></ol></div>
+
+<h2>5. Codes</h2>
+<h3>Weighted and decimal codes</h3>
+<p>A <b>weighted code</b> gives each bit position a weight; the digit is the sum of the weights of the 1 bits. BCD is weights 8, 4, 2, 1. The codes 1010–1111 are <b>unused</b> in BCD (six invalid combinations). Excess-3 is not weighted: each digit is BCD + 3 (0011), and it is self-complementing. Live table (every row is computed or checked from the weights):</p>
+<div id="ct"></div>
+<ol class="steps">
+<li><b>Build a weighted code for given weights</b> (CT1 Q2): list all bit patterns, compute weight sums, assign one pattern per digit, mark leftovers as unused.</li>
+<li><b>Decode</b> a given string by splitting it into groups of 4 and summing the weights of the 1s.</li>
+</ol>
+<div class="exam"><div class="exam-src">CT1 2026 Q2 · 3 marks</div><div class="exam-q"><p>Formulate a weighted binary code for the decimal digits 0–5, using weights 4, 1, 2.</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<p>Three bits (b₄ b₁ b₂), weights 4, 1, 2. Value = 4b₄ + b₁ + 2b₂. The six digits need six different patterns, and the eight patterns have sums 0…7 (the weights are just 4, 2, 1 in another order), so each digit has exactly one code:</p>
+<div id="ct2"></div>
+<p>Unused patterns: 101 (= 6) and 111 (= 7).</p>
+</div></details></div>
+<div class="exam"><div class="exam-src">2014–15 (older) 4 marks</div><div class="exam-q"><p>The decimal number N is stored in the weighted code 0011 0100 1010 1100 with weights 6, 3, 1, 1. Find N.</p></div>
+<details><summary>Answer</summary><div class="exam-a"><p>Groups of 4, weights 6 3 1 1: 0011 = 1 + 1 = 2; 0100 = 3; 1010 = 6 + 1 = 7; 1100 = 6 + 3 = 9. <b>N = 2379</b>.</p></div></details></div>
+
+<h3>BCD addition (her method)</h3>
+<ol class="steps">
+<li>Add the two 4-bit digits as binary (with the carry from the lower digit).</li>
+<li>If the result is 1010–1111 or there is a carry out, the digit is invalid: <b>add 0110 (6)</b>, which skips the six unused codes. The carry goes to the next digit.</li>
+</ol>
+<p>Example 184 + 576: digit 4 + 6 = 1010 invalid → + 0110 = 1 0000: digit 0, carry 1. Digit 8 + 7 + 1 = 10000 → carry, + 0110 → 0110, carry 1. Digit 1 + 5 + 1 = 0111. Answer 0111 0110 0000 = 760. The adder <i>circuit</i> is in chapter 6.</p>
+
+<h3>Gray code against binary (2022–23 Q1b, 9 marks)</h3>
+<div id="gt"></div>
+<p><b>Binary → Gray:</b> g<sub>n−1</sub> = b<sub>n−1</sub>, g<sub>i</sub> = b<sub>i+1</sub> ⊕ b<sub>i</sub>. <b>Gray → binary:</b> b<sub>n−1</sub> = g<sub>n−1</sub>, b<sub>i</sub> = b<sub>i+1</sub> ⊕ g<sub>i</sub> (running XOR from the MSB). For 3 bits: b₂ = g₂, b₁ = g₂ ⊕ g₁, b₀ = g₂ ⊕ g₁ ⊕ g₀. (Ma'am's notes and slides give only the table and the "one bit changes" property; these conversion rules are the standard ones, and the K-map check is in chapter 7.)</p>
+<div class="exam"><div class="exam-src">2022–23 Q1(b) · 9 marks</div><div class="exam-q"><p>Explain the difference between binary and Gray encoding and the benefits of each.</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<div class="tbl"><table class="mat"><tr><th></th><th>Binary</th><th>Gray</th></tr>
+<tr><td>Definition</td><td>Positional code, weights 2ⁿ⁻¹ … 2, 1.</td><td>Unit-distance code: two consecutive values differ in <b>exactly one bit</b> (also 15 → 0 wraps with one bit).</td></tr>
+<tr><td>Weighted?</td><td>Yes.</td><td>No (reflected code, no fixed weights).</td></tr>
+<tr><td>Benefits</td><td>Arithmetic works directly (adders, comparators, counters). Simple conversion to and from decimal. Most hardware uses it.</td><td>Going from one value to the next changes one bit, so no wrong intermediate value can appear when bits change at slightly different times (shaft encoders, position sensors, asynchronous counters between clock domains). Fewer transitions: lower power. Labels K-map axes. Any single-bit error is a neighbouring value.</td></tr>
+<tr><td>Drawback</td><td>Several bits can change at once (0111 → 1000), giving glitches or false readings during the change.</td><td>Not suitable for arithmetic. Needs a converter (XOR chain) before use.</td></tr></table></div>
+<p>Example: 3 → 4 in binary is 011 → 100, all three bits flip; in Gray it is 010 → 110, one bit.</p>
+</div></details></div>
+
+<h3>Parity bit (error detection)</h3>
+<p>Add one extra bit to a code word so that the total number of 1s is <b>even</b> (even parity) or <b>odd</b> (odd parity). A receiver counts the 1s: wrong parity means an error. It detects any <b>single-bit</b> error (and any odd number of flipped bits), but cannot say which bit, cannot correct, and misses two flipped bits. ASCII uses 7 bits plus a parity bit. Examples: 'A' = 1000001 has two 1s: even-parity bit 0 (01000001), odd-parity bit 1 (11000001). 'T' = 1010100 has three 1s: even-parity bit 1 (11010100), odd-parity bit 0 (01010100). Rule: <b>even parity bit = 1 when the data has an odd number of 1s</b>, i.e. P = XOR of the data bits. (Her note's wording on p22 reads inverted; her examples and the generator on p84 are right.) The generator and checker circuits are in chapter 7.</p>
+
+<div class="trap"><h4>Traps that cost marks</h4><ul>
+<li>Not padding N to n digits before taking its complement. 5623 − 65438 needs 05623.</li>
+<li>Discarding the end carry in the (r−1)'s version. There it must be <b>added back</b> to the LSB.</li>
+<li>Calling the carry out an overflow in signed arithmetic. Use C<sub>in</sub> ⊕ C<sub>out</sub> or the sign rule.</li>
+<li>Forgetting the minus sign and the second complement when there is no end carry.</li>
+<li>Reading remainders top-to-bottom (integer part) or fraction digits bottom-to-top.</li>
+<li>BCD: adding 6 only when the sum is above 9 <b>or</b> there is a carry, not always.</li>
+<li>Grouping binary for octal or hex from the left instead of from the point outwards.</li>
+</ul></div>
+
+<h2>Mandatory practice</h2>
+<div id="p1"></div>
+<div id="p2"></div>
+<div id="r1"></div>
+<div id="r2"></div>
+<div id="r3"></div>
+</main>
+<script src="../assets/book.js"></script><script src="../assets/logic.js"></script><script src="../assets/dld.js"></script>
+<script>
+// complement subtraction stepper. M, N: digit strings in base r (optional point). mode 'r' = r's complement, 'r1' = (r-1)'s complement with end-around carry.
+function complSub(sel, { M, N, r, mode = 'r' }) {
+  const sp = s => s.split('.'), [mi, mf = ''] = sp(M), [ni, nf = ''] = sp(N);
+  const n = Math.max(mi.length, ni.length), f = Math.max(mf.length, nf.length), T = n + f;
+  const dig = (i, fr) => i.padStart(n, '0') + fr.padEnd(f, '0');
+  const Md = dig(mi, mf), Nd = dig(ni, nf), R = BigInt(r), RT = R ** BigInt(T);
+  const val = s => [...s].reduce((a, c) => a * R + BigInt(parseInt(c, 36)), 0n);
+  const fmt = v => { let s = v.toString(r).toUpperCase().padStart(T, '0'); return f ? s.slice(0, n) + '.' + s.slice(n) : s; };
+  const dd = s => f ? s.slice(0, n) + '.' + s.slice(n) : s, Mv = val(Md), Nv = val(Nd), one = mode === 'r';
+  const c1 = L.rComp(Nd, r, true), comp = one ? (Nv === 0n ? 0n : RT - Nv) : RT - 1n - Nv;
+  const S = Mv + comp, carry = S >= RT, low = carry ? S - RT : S, nm = one ? `${r}'s` : `${r - 1}'s`;
+  let res, last;
+  if (carry) { res = one ? low : low + 1n; last = one ? `End carry 1: <b>discard it</b>. Result = ${fmt(res)}.` : `End carry 1: <b>add it back to the last digit</b>: ${fmt(low)} + 1 = ${fmt(res)}.`; }
+  else { const m = one ? RT - S : RT - 1n - S; res = m; last = `<b>No end carry</b>, so M &lt; N and the answer is negative: −(${nm} complement of ${fmt(S)}) = <b>−${fmt(m)}</b>.`; }
+  const F = [
+    { html: `<p class="formula">M = ${dd(Md)}<sub>${r}</sub>, N = ${dd(Nd)}<sub>${r}</sub> (n = ${n} integer digit${n > 1 ? 's' : ''})</p>`, cap: `Compute M − N with the ${nm} complement. Both numbers are padded to the same number of digits.` },
+    { html: `<p class="formula">${nm} complement of ${dd(Nd)} = ${fmt(comp)}</p>`, cap: one ? `Subtract each digit from ${r - 1}: ${dd(c1)}. Then <b>add 1</b> in the last place: ${fmt(comp)}.` : `Subtract each digit of N from ${r - 1}: ${fmt(comp)}.` },
+    { html: `<p class="formula">${dd(Md)} + ${fmt(comp)} = ${carry ? '<b>1</b> ' : ''}${fmt(low)}</p>`, cap: `Add M and the complement as ordinary base-${r} numbers.` },
+    { html: `<p class="formula"><b>M − N = ${carry ? fmt(res) : '−' + fmt(res)}</b></p>`, cap: last },
+  ];
+  stepper(sel, F, { tag: `${nm} complement · M − N` });
+  return (carry ? '' : '-') + fmt(res);
+}
+// signed add/subtract table with carries. rows: [a, b, '+'|'-'], n bits
+function ovfTable(sel, n, rows) {
+  const m = (1 << n) - 1, lo = m >> 1, B = x => L.bin(x & m, n), lim = [-(1 << (n - 1)), (1 << (n - 1)) - 1];
+  const body = rows.map(([a, b, op]) => {
+    const x = a & m, y = (op === '-' ? ~b : b) & m, c0 = op === '-' ? 1 : 0, s = x + y + c0, r = s & m, cin = ((x & lo) + (y & lo) + c0) >> (n - 1) & 1, cout = s >> n & 1, tv = op === '-' ? a - b : a + b, v = cin ^ cout;
+    return [`${a} ${op} ${b < 0 ? '(' + b + ')' : b}`, B(x), op === '-' ? B(y) + ' (B\'+1)' : B(y), B(r), cin, cout, tv, `<b>${v ? 'OVERFLOW' : 'ok'}</b>${(tv < lim[0] || tv > lim[1]) === !!v ? '' : ' ?'}`];
+  });
+  host(sel).innerHTML = tbl(['A op B', 'A', 'B (as added)', 'sum bits', 'C into sign', 'C out of sign', 'true value', `${n}-bit result`], body);
+}
+// weighted-code tables
+const CODES = [['BCD 8421', [8, 4, 2, 1], '0000 0001 0010 0011 0100 0101 0110 0111 1000 1001'], ['2421', [2, 4, 2, 1], '0000 0001 0010 0011 0100 1011 1100 1101 1110 1111'], ['8 4 −2 −1', [8, 4, -2, -1], '0000 0111 0110 0101 0100 1011 1010 1001 1000 1111']];
+const wsum = (w, c) => [...c].reduce((s, b, i) => s + +b * w[i], 0);
+{
+  const rows = L.range(10).map(d => [d, ...CODES.map(([, w, t]) => { const c = t.split(' ')[d]; return wsum(w, c) === d ? c : c + ' ✗'; }), L.bin(d + 3, 4)]);
+  host('#ct').innerHTML = tbl(['digit', ...CODES.map(c => c[0]), 'Excess-3'], rows) + '<p class="tracer-hint">Unused in every 4-bit decimal code: six combinations (BCD: 1010–1111).</p>';
+  const w = [4, 1, 2], rr = L.range(6).map(d => { const ps = L.range(8).map(k => L.bin(k, 3)).filter(c => wsum(w, c) === d); return [d, ps.join(' / '), ps.length === 1 ? 'unique' : 'ambiguous']; });
+  host('#ct2').innerHTML = tbl(['digit', 'b₄ b₁ b₂', ''], rr);
+  host('#gt').innerHTML = tbl(['n', 'binary', 'Gray', 'bits changed from n−1'], L.range(16).map(i => [i, L.bin(i, 4), L.bin(L.gray(i), 4), i ? L.pc(L.gray(i) ^ L.gray(i - 1)) : '–']));
+}
+complSub('#s1', { M: '65438', N: '5623', r: 10 });
+complSub('#s2', { M: '5623', N: '65438', r: 10 });
+complSub('#s3', { M: '10110010', N: '10011111', r: 2 });
+complSub('#s4', { M: '10011111', N: '10110010', r: 2 });
+complSub('#s5', { M: '10110010', N: '10011111', r: 2, mode: 'r1' });
+complSub('#s6', { M: '10011111', N: '10110010', r: 2, mode: 'r1' });
+complSub('#s7', { M: '9', N: '6.9', r: 16 });
+complSub('#s8', { M: '2.7', N: '9.8', r: 16 });
+complSub('#s9', { M: '11010', N: '1101', r: 2 });
+complSub('#s10', { M: '11010', N: '1101', r: 2, mode: 'r1' });
+complSub('#s11', { M: '1100000101.1110', N: '1101101.1011', r: 2 });
+ovfTable('#o1', 8, [[-50, 70, '+']]);
+ovfTable('#o2', 4, [[5, 4, '+'], [-5, -4, '+'], [5, -3, '+'], [-5, 3, '+'], [3, 2, '+'], [5, -4, '-'], [-3, -4, '+'], [7, 1, '+']]);
+practice('#p1', { id: 'p1', kind: 'comp', n: 2 });
+practice('#p2', { id: 'p2', kind: 'comp', n: 2 });
+recall('#r1', { id: 'r1', marks: 8, q: 'Write the steps to find M − N for two n-digit unsigned numbers in base r using the r\'s complement, for both cases M ≥ N and M < N. Illustrate with 65438 − 5623 and 5623 − 65438. (2021–22 Q2d, CT1 Q5)', points: ['Step 1: r\'s complement of N = r^n − N (pad N to n digits first)', 'Step 2: add it to M; sum = (M − N) + r^n', 'M ≥ N: an end carry appears; discard it, the rest is M − N', 'M < N: no end carry; M − N = −(r\'s complement of the sum)', '65438 − 5623: 10\'s complement 94377, sum 159815, discard carry → 59815', '5623 − 65438: complement 34562, sum 40185, no carry → −(10\'s complement of 40185) = −59815'], model: '<p>See section 3. Steps: complement N (r^n − N), add to M, end carry → discard (result M − N), no carry → negative, take the complement of the sum and put a minus sign. Examples: 65438 + 94377 = 1 59815 → 59815; 05623 + 34562 = 40185 → −59815.</p>' });
+recall('#r2', { id: 'r2', marks: 11, q: 'What is overflow? Explain how it is detected in signed addition and subtraction, with examples. (2024–25 Q3c)', points: ['Definition: result does not fit in n bits, stored result wrong', 'Unsigned: carry out of the MSB', 'Signed: only possible when both operands have the same sign; overflow if the sum sign differs', 'Hardware test: carry into sign bit XOR carry out of sign bit', 'Subtraction: A − B = A + B\' + 1, same test applied', 'Example with overflow (e.g. 0101 + 0100 = 1001 in 4 bits)', 'Example with carry out but no overflow (e.g. 0101 + 1101 = 1 0010)'], model: '<p>Overflow means the true sum is outside −2^(n−1) … 2^(n−1)−1. Same-sign operands with a different-sign result, or C_in ⊕ C_out at the sign bit. 0101 + 0100 = 1001: carry in 1, carry out 0, overflow. 0101 + 1101 = 1 0010: carry in 1, carry out 1, no overflow. Subtraction is addition of the 2\'s complement; same test.</p>' });
+recall('#r3', { id: 'r3', marks: 9, q: 'Explain the difference between binary and Gray encoding and the benefits of each. Show Gray code for 0–7. (2022–23 Q1b)', points: ['Binary is positional/weighted; Gray is unit-distance (one bit changes between consecutive values)', 'Gray is not weighted', 'Binary: arithmetic works directly', 'Gray: no multi-bit changes, so no false intermediate readings (shaft encoders)', 'Gray: lower switching power, error is a neighbouring value', 'Gray needs a converter for arithmetic', 'Gray 0–7: 000 001 011 010 110 111 101 100'], model: '<p>Binary changes several bits at once (011 → 100) and is weighted, so adders work on it. Gray changes one bit per step (010 → 110) and is not weighted; it avoids glitches and false readings and is used for position encoders, but must be converted to binary for arithmetic. Gray 0–7: 000, 001, 011, 010, 110, 111, 101, 100.</p>' });
+</script>
+</body>
+</html>

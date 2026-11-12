@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mealy and Moore · CSE 205 Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Clocked circuits · Mano §5.6 · Adnan sir R p54–57 (after Lec 11, before Lec 12, 8 Sep) · your weak spot, so slowly</div>
+<h1>Mealy and Moore, slowly</h1>
+<p class="lede">Asked in <b>6 of the last 8 papers</b>: 2024–25 Q8a (10 marks: block diagrams + difference with an example), 2023–24 Q8c (6: Mealy → Moore), 2022–23 Q7c (10: differentiate with block diagrams), 2021–22 Q8c (5: Mealy → Moore), 2018–19 Q8c (7: Moore → Mealy), 2017–18 Q6c (5: define both). In the bank, "Mealy vs Moore block diagram and difference" appears in 5 sessions. It is small marks each time, but nearly certain, and every sequential design question (detectors, vending machines, locks) is drawn as one of the two.</p>
+
+<div class="key"><p><b>The whole chapter on one screen</b></p><ol>
+<li><b>Mealy:</b> output = f(present state, <b>input</b>). Written on the <b>arrow</b>: <code>x/z</code>.</li>
+<li><b>Moore:</b> output = f(present state <b>only</b>). Written <b>inside the circle</b>: <code>A/0</code>. Arrows carry only the input.</li>
+<li>Mealy reacts to the input <b>at once</b> (same clock period). Moore shows the result <b>one clock later</b>, after the state changes. It needs more states, but its output is stable and glitch-free.</li>
+<li><b>Mealy → Moore:</b> look at the outputs on the arrows <b>coming into</b> each state. If they are all the same, keep the state and give it that output. If they differ, split the state into one copy per output (B0, B1). Each copy keeps the old row; each arrow goes to the copy that matches its output.</li>
+<li><b>Moore → Mealy:</b> put on each arrow the output of the state it points to, delete the output column, then merge equivalent states.</li>
+</ol></div>
+
+<h2>1. The two models</h2>
+<p>Every clocked sequential circuit is a <b>finite state machine</b>: memory (flip-flops) holds the present state, combinational logic computes the next state, and some logic computes the output. The two models differ only in <b>what the output logic is allowed to see</b>.</p>
+<div class="figrow">
+<div><div class="figlabel">Mealy model</div><svg class="dsa-fig" viewBox="0 0 380 190" width="380" role="img" aria-label="Mealy block diagram">
+<defs><marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0L10,5L0,10z" fill="var(--muted)"/></marker></defs>
+<rect class="box" x="70" y="30" width="90" height="60" rx="6"/><text class="tx" x="115" y="54" style="font-size:11px">next-state</text><text class="tx" x="115" y="70" style="font-size:11px">logic</text>
+<rect class="box" x="190" y="30" width="80" height="60" rx="6"/><text class="tx" x="230" y="54" style="font-size:11px">memory</text><text class="tx" x="230" y="70" style="font-size:11px">(FFs)</text>
+<rect class="box" x="190" y="120" width="80" height="50" rx="6"/><text class="tx" x="230" y="140" style="font-size:11px">output</text><text class="tx" x="230" y="155" style="font-size:11px">logic</text>
+<path class="ed" marker-end="url(#a1)" d="M10,60 H70"/><text class="lb" x="22" y="50">x</text>
+<path class="ed" marker-end="url(#a1)" d="M160,60 H190"/>
+<path class="ed" marker-end="url(#a1)" d="M270,60 H300 V10 H40 V45 H70"/><text class="sm" x="160" y="22">present state y</text>
+<path class="ed" marker-end="url(#a1)" d="M300,60 V100 H230 V120"/>
+<path class="ed cur" marker-end="url(#a1)" d="M40,60 V145 H190"/><text class="sm" x="110" y="138">x goes to the output too</text>
+<path class="ed" marker-end="url(#a1)" d="M270,145 H330"/><text class="lb" x="345" y="145">z</text>
+<text class="sm" x="230" y="104">clk</text>
+</svg></div>
+<div><div class="figlabel">Moore model</div><svg class="dsa-fig" viewBox="0 0 380 190" width="380" role="img" aria-label="Moore block diagram">
+<defs><marker id="a2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0L10,5L0,10z" fill="var(--muted)"/></marker></defs>
+<rect class="box" x="70" y="30" width="90" height="60" rx="6"/><text class="tx" x="115" y="54" style="font-size:11px">next-state</text><text class="tx" x="115" y="70" style="font-size:11px">logic</text>
+<rect class="box" x="190" y="30" width="80" height="60" rx="6"/><text class="tx" x="230" y="54" style="font-size:11px">memory</text><text class="tx" x="230" y="70" style="font-size:11px">(FFs)</text>
+<rect class="box" x="190" y="120" width="80" height="50" rx="6"/><text class="tx" x="230" y="140" style="font-size:11px">output</text><text class="tx" x="230" y="155" style="font-size:11px">logic</text>
+<path class="ed" marker-end="url(#a2)" d="M10,60 H70"/><text class="lb" x="22" y="50">x</text>
+<path class="ed" marker-end="url(#a2)" d="M160,60 H190"/>
+<path class="ed" marker-end="url(#a2)" d="M270,60 H300 V10 H40 V45 H70"/><text class="sm" x="160" y="22">present state y</text>
+<path class="ed" marker-end="url(#a2)" d="M300,60 V100 H230 V120"/><text class="sm" x="330" y="96">only y</text>
+<path class="ed" marker-end="url(#a2)" d="M270,145 H330"/><text class="lb" x="345" y="145">z</text>
+</svg></div>
+</div>
+<p class="formula">Mealy: S(t+1) = δ(S(t), x(t)),  z(t) = λ(S(t), x(t))<br>Moore: S(t+1) = δ(S(t), x(t)),  z(t) = λ(S(t))</p>
+<p>That is his notation: δ is the next-state function and λ the output function. The only difference is the <b>x(t)</b> inside λ.</p>
+
+<h2>2. Same job, both ways: a 1101 detector</h2>
+<p>Output 1 when the last four inputs were 1101 (overlapping allowed). In the Mealy machine, states remember how much of 1101 has been matched: A = nothing, B = "1", C = "11", D = "110". The output 1 sits on the arrow D → B for input 1, at the moment the last 1 arrives. Press <b>Play</b> to feed it 1101101.</p>
+<div id="d1"></div>
+<p>Converted to Moore, the "just saw 1101" moment has to become a <b>state</b> with output 1. B is entered with output 0 (from A) and with output 1 (from D), so B splits into B0 and B1. B1 is the "found it" state. Same input string:</p>
+<div id="d2"></div>
+<p>Compare the two output strings. The Moore machine shows each 1 <b>in the state after</b> the arrow that the Mealy machine marked, and it needs one more state (5 instead of 4).</p>
+
+<h2>3. Timing: why Moore is "one clock late" and glitch-free</h2>
+<p>This is the part people get wrong, so look at the waveforms. During one clock period the machine sits in one state and sees one input value.</p>
+<ul>
+<li><b>Mealy</b> computes z from (state, x) during that period. If x changes mid-period, z can change mid-period. If x has a glitch, z has the same glitch.</li>
+<li><b>Moore</b> computes z from the state only. The state changes only at the clock edge, so z changes only at clock edges: stable, no glitches, but the effect of an input appears one period later.</li>
+</ul>
+<div id="mm1"></div>
+
+<h2>4. The differences (his five rows)</h2>
+<div class="tbl"><table class="mat"><tr><th></th><th>Mealy</th><th>Moore</th></tr>
+<tr><td>Output depends on</td><td>present state <b>and</b> present input</td><td>present state <b>only</b></td></tr>
+<tr><td>Number of states</td><td>fewer</td><td>more: the output is tied to the state, so A/0 and A/1 are different states</td></tr>
+<tr><td>Output stability</td><td>not stable ("pulsated"): can change whenever the input changes</td><td>stable: changes only at clock edges</td></tr>
+<tr><td>Glitches</td><td>an input glitch passes to the output</td><td>no glitch from the input</td></tr>
+<tr><td>Ease of design</td><td>easier (fewer states)</td><td>more complicated (more states)</td></tr>
+<tr><td>Response</td><td>in the same clock period as the input</td><td>one clock period later</td></tr>
+<tr><td>Diagram</td><td>output on the arrows: x/z</td><td>output inside the state: S/z</td></tr></table></div>
+<div class="write"><h4>What to write · "differentiate with block diagrams and an example" (5–10 marks)</h4>
+<ol>
+<li>Both block diagrams (section 1). In Mealy, draw the extra wire from the input to the output logic and label it.</li>
+<li>The two output equations: z = λ(S, x) and z = λ(S).</li>
+<li>The table above, at least 4 rows.</li>
+<li>A tiny example of each, the 1101 detector: the Mealy diagram (4 states, 1/1 on D→B) and the Moore diagram (5 states, the extra state written B1/1). Say "the Moore machine needs one more state and outputs one clock later".</li>
+</ol></div>
+
+<h2>5. Which one does a word problem want?</h2>
+<div class="hint"><p><b>Adnan sir's rule</b> (from the pulse-mode lock): <b>level output, "after …" → Moore</b>. <b>Pulse output, "until …" or "when …" → Mealy</b>.</p>
+<p>"The lock output is 1 <i>after</i> the sequence" is a level that stays while you remain in the unlocked state, so it is Moore (the output belongs to the state). "Produce a pulse when the amount reaches 15 Tk" happens on the transition, so it is Mealy. If the question says nothing, Mealy is shorter. Say which model you chose.</p></div>
+
+<h2>6. Mealy → Moore, step by step</h2>
+<div class="write"><h4>The method (his "split by the output you enter with")</h4>
+<ol>
+<li>Make a list: for each state, every <b>(state, input) → this state</b> arrow and the <b>output</b> on it.</li>
+<li>If all incoming outputs are equal, keep the state and give it that output. If they differ, split it into S<sub>0</sub>, S<sub>1</sub>, … (subscript = output).</li>
+<li>Write the Moore table. Each copy of S gets S's old next-state row. In every cell, a Mealy entry "T, z" becomes "T<sub>z</sub>" (or just T if T was not split).</li>
+<li>Add the output column Z = the subscript.</li>
+<li>A state with <b>no incoming arrow</b> (only the start state can be like that) can take either output; say so. The start state's output is the "initial output", before any input.</li>
+</ol></div>
+<p>His own example has three inputs and three output values. Every state is entered with all three outputs, so every state splits into three:</p>
+<div id="mm2"></div>
+<div class="trap">His notes say the copies a0, a1, a2 are "equivalent" because their rows match. They are <b>not</b> equivalent in the Moore machine: their outputs differ (0, 1, 2). Equal next-state rows with different outputs never merge. Do not write that they merge.</div>
+
+<div class="exam"><div class="exam-src">2023–24 Q8(c) · 6 marks</div><div class="exam-q"><p>Transform the Mealy machine into a corresponding Moore machine.</p><pre>PS | x=0 | x=1
+A  | B,1 | C,0
+B  | C,1 | D,0
+C  | D,0 | E,1
+D  | E,0 | A,1
+E  | A,1 | B,1</pre></div>
+<details><summary>Answer</summary><div class="exam-a">
+<p>Incoming outputs: A ← D(1), E(1): only 1 → A/1. B ← A(1), E(1) → B/1. C ← A(0), B(1) → split C0, C1. D ← B(0), C(0) → D/0. E ← C(1), D(0) → split E0, E1.</p>
+<div id="mm3"></div>
+<p>Moore machine, 7 states: A/1, B/1, C0/0, C1/1, D/0, E0/0, E1/1. A's output 1 is only its initial output; note that in one line.</p>
+</div></details></div>
+
+<div class="exam"><div class="exam-src">2021–22 Q8(c) · 5 marks</div><div class="exam-q"><p>Transform the Mealy machine into a Moore machine.</p><pre>PS | x=0 | x=1
+A  | C,0 | B,0
+B  | A,1 | D,0
+C  | B,1 | A,1
+D  | D,1 | C,0</pre></div>
+<details><summary>Answer</summary><div class="exam-a"><div id="mm4"></div><p>A/1 (entered only with 1), B splits B0/B1, C/0, D splits D0/D1: 6 states.</p></div></details></div>
+
+<h2>7. Moore → Mealy</h2>
+<p>His notes say "by simplification" and leave it as self-study. The method is short:</p>
+<ol>
+<li>Output on each arrow = the Moore output of the state the arrow <b>goes to</b>. In the table: cell "T" becomes "T, z(T)".</li>
+<li>Delete the Z column.</li>
+<li>Now states that were split only to carry different outputs may be equivalent. Run the partition method (<a href="09-state-min.html">next-but-one chapter</a>) and merge them. That is the "simplification".</li>
+</ol>
+<div class="exam"><div class="exam-src">2018–19 Q8(c) · 7 marks</div><div class="exam-q"><p>Obtain the Mealy equivalent state table for the Moore machine:</p><pre>PS | x=0 | x=1 | Z
+A  | A   | B   | 0
+B  | C   | B   | 0
+C  | C   | D   | 1
+D  | A   | D   | 0</pre></div>
+<details><summary>Answer</summary><div class="exam-a">
+<p>Each cell takes the output of its next state: A → 0, B → 0, C → 1, D → 0.</p>
+<div class="tbl"><table class="mat"><tr><th>PS</th><th>x=0</th><th>x=1</th></tr><tr><td>A</td><td>A, 0</td><td>B, 0</td></tr><tr><td>B</td><td>C, 1</td><td>B, 0</td></tr><tr><td>C</td><td>C, 1</td><td>D, 0</td></tr><tr><td>D</td><td>A, 0</td><td>D, 0</td></tr></table></div>
+<p>Check for equivalent states: P₀ = (ABCD); P₁ = (AD)(BC) by output rows; P₂: for x = 1, A goes to B and D goes to D, which are in different blocks, so A and D split; likewise B and C. Final (A)(B)(C)(D): no merging, the Mealy machine also has 4 states.</p>
+<div id="pt1"></div>
+</div></details></div>
+
+<div class="trap"><b>Traps</b><ul>
+<li>Splitting by the outputs on the arrows <i>leaving</i> a state. Always use the arrows <b>entering</b> it.</li>
+<li>Forgetting to redirect the arrows. "T, 1" must point to T<sub>1</sub>, not to T<sub>0</sub>.</li>
+<li>In Moore diagrams, writing outputs on the arrows. The arrows carry only the input; the output goes in the circle as A/0.</li>
+<li>Saying Moore is "faster". It is slower by one clock; it is <b>more stable</b>.</li>
+<li>Reading a Moore output too early: in a timing question, z for period k is the output of the state <b>during</b> period k.</li>
+</ul></div>
+
+<h2>Mandatory practice</h2>
+<div id="p1"></div>
+<div id="p2"></div>
+<div id="r1"></div>
+</main>
+<script src="../assets/book.js"></script><script src="../assets/logic.js"></script><script src="../assets/dld.js"></script>
+<script>
+const DET = 'A: A,0 B,0\nB: A,0 C,0\nC: D,0 C,0\nD: A,0 B,1';
+diagram('#d1', { table: DET, run: '1101101' });
+const MO = L.mealyToMoore(L.parseTable(DET));
+diagram('#d2', { M: MO, start: MO.start, run: '1101101' });
+mealyMoore('#mm1', { table: DET, run: '1101101101' });
+mealyMoore('#mm2', { table: 'a: c,0 b,1 c,2\nb: c,1 a,0 a,1\nc: a,2 b,2 b,0', inputs: ['0', '1', '2'] });
+mealyMoore('#mm3', { table: 'A: B,1 C,0\nB: C,1 D,0\nC: D,0 E,1\nD: E,0 A,1\nE: A,1 B,1' });
+mealyMoore('#mm4', { table: 'A: C,0 B,0\nB: A,1 D,0\nC: B,1 A,1\nD: D,1 C,0' });
+partitionAnim('#pt1', { table: 'A: A,0 B,0\nB: C,1 B,0\nC: C,1 D,0\nD: A,0 D,0' });
+practice('#p1', { id: 'p1', kind: 'moore', n: 2 });
+practice('#p2', { id: 'p2', kind: 'mealyrun', n: 3 });
+recall('#r1', { id: 'r1', marks: 10, q: 'Draw the block diagrams of Mealy and Moore state machines. State the difference between the two models with a simple example. (2024–25 Q8a, also 2022–23 Q7c)', points: ['Mealy block diagram with the input wire into the output logic', 'Moore block diagram, output logic fed only by the flip-flops', 'Equations z = λ(S, x) and z = λ(S)', 'Moore needs more states (output tied to state)', 'Moore output stable, changes only at clock edges; Mealy can glitch with the input', 'Mealy responds in the same period; Moore one clock later', 'An example drawn both ways (e.g. a 1101 detector: Mealy 4 states with 1/1 on an arrow, Moore 5 states with B1/1)'], model: '<p>See sections 1–4: the two diagrams, the two λ equations, the difference table, and the 1101 detector as a 4-state Mealy machine (A, B, C, D; D –1/1→ B) and a 5-state Moore machine (A/0, B0/0, C/0, D/0, B1/1).</p>' });
+</script>
+</body>
+</html>

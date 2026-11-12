@@ -1,0 +1,424 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Registers and counters · CSE 205 Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+
+<div class="eyebrow">Sequential circuits · Mano §6.1–6.2, §6.5 · Adnan sir L10–11 (Sep 5–6), Nelson p.447 for the universal register · every year</div>
+<h1>Registers, ring and Johnson counters, serial adder</h1>
+<p class="lede">This chapter has the most past questions of any in Section B. 2024–25: Q1(b) (13 marks, 4-bit universal shift register with MUXes and D flip-flops), Q3(a) (12, ring counter started in a wrong state, add self-correction), Q4(a) (16, serial transmission timing and error propagation), Q4(c) (7, universal against dedicated). 2022–23: Q5(c) (copy register A to B), Q6(b) (5, ring counter note). 2021–22: Q5(b) (10, shift register with a 2-to-4 decoder), Q6(b) (10, serial subtractor with JK). 2020–21 Q5(b) and 2019–20 Q2(a) (10 each, 5-bit ring and Johnson with timing). 2018–19 Q6(c) (7, 4-bit Johnson with timing). 2017–18 Q6(b) (10, serial adder) and Q7(c) (10, 5-bit ring with timing). Older: universal register (12–15 marks, three times), serial adder trace of 0101 + 0011 (6+6, twice), serial subtractor (10), Johnson 4-bit (10), switch-tail ring (5). Adnan sir marks the universal register "<b>10 mark question, see Nelson 447</b>" and the async counter and register block "5–7 marks". Expect one question from this chapter.</p>
+
+<h2>1. Registers and shift registers</h2>
+<p>A register of n flip-flops stores n bits. A <b>shift register</b> moves its bits one place at every clock pulse. His example: the byte 10100010 shifted <b>right</b> is 01010001 (the new bit enters on the left). Shifted <b>left</b> it is 01000100 (the new bit enters on the right).</p>
+<div class="tbl"><table class="mat"><tr><th>Name</th><th>Data in</th><th>Data out</th><th>How</th></tr><tr><td>SISO</td><td>serial</td><td>serial</td><td>bit in on the first FF, bit out of the last FF after n clocks</td></tr><tr><td>SIPO</td><td>serial</td><td>parallel</td><td>read all Q outputs after n clocks (serial to parallel converter)</td></tr><tr><td>PISO</td><td>parallel</td><td>serial</td><td>load all D inputs, then shift out one bit per clock (parallel to serial)</td></tr><tr><td>PIPO</td><td>parallel</td><td>parallel</td><td>load all D inputs at one clock: a plain register</td></tr></table></div>
+<p>Basic right-shift register: n D flip-flops in a row, the Q of each feeds the D of the next, serial in at the first D, common clock and common clear. <b>His remark: there is no way to hold the data by inhibiting the clock.</b> The register shifts at every pulse. That is why we add a MUX per stage (section 2).</p>
+<div id="sh1"></div>
+<p>Run the bench: serial-in bits 1, 0, 1, 1 arrive on successive clocks and move to the right.</p>
+<p><b>Parallel load register.</b> Each D input is its own input line I<sub>i</sub>: at every pulse the inputs are saved. To hold the data a <b>2×1 MUX</b> sits in front of each D: L = 0 sends the flip-flop's own Q back to D (hold), L = 1 loads I<sub>i</sub>. <b>Both directions:</b> a 2×1 MUX with select S (S = 0 right, S = 1 left) picks the left or the right neighbour. <b>Everything together</b> needs a 4×1 MUX per stage: this is the universal shift register.</p>
+
+<h2>2. The universal shift register (74194)</h2>
+<div class="tbl"><table class="mat"><tr><th>CLEAR</th><th>S1</th><th>S0</th><th>CLK</th><th>Mode</th><th>MUX input used</th></tr><tr><td>0</td><td>x</td><td>x</td><td>x</td><td>asynchronous clear</td><td>-</td></tr><tr><td>1</td><td>0</td><td>0</td><td>edge</td><td>hold (clock inhibit)</td><td>I0 = own Q</td></tr><tr><td>1</td><td>0</td><td>1</td><td>edge</td><td>shift right</td><td>I1 = Q of the left neighbour (SIR for the leftmost)</td></tr><tr><td>1</td><td>1</td><td>0</td><td>edge</td><td>shift left</td><td>I2 = Q of the right neighbour (SIL for the rightmost)</td></tr><tr><td>1</td><td>1</td><td>1</td><td>edge</td><td>parallel load</td><td>I3 = P<sub>i</sub></td></tr></table></div>
+<p>Decimal value of S1 S0 = the number of the MUX input it picks (0, 1, 2, 3). This is the IC 74194 table he writes: 00 hold, 01 right, 10 left, 11 load. (The slides write the columns as S0 S1; with his S1 S0 order the codes are the same as above.)</p>
+<div class="fg-wrap"><svg class="dsa-fig" viewBox="0 0 1050 270" width="1050" role="img" aria-label="4-bit universal shift register">
+<path class="gt" d="M70,30 L114,40 L114,130 L70,140 z"/><text class="sm" x="74" y="43.75" style="text-anchor:start">I0</text><text class="sm" x="74" y="71.25" style="text-anchor:start">I1</text><text class="sm" x="74" y="98.75" style="text-anchor:start">I2</text><text class="sm" x="74" y="126.25" style="text-anchor:start">I3</text><text class="sm" x="84.66666666666667" y="133">S1</text><text class="sm" x="99.33333333333333" y="133">S0</text><path class="wr" d="M44,43.8 L70,43.8"/>
+<text class="lb" x="40" y="43.8" style="text-anchor:end">Q3</text>
+<path class="wr" d="M44,71.3 L70,71.3"/>
+<text class="lb" x="40" y="71.3" style="text-anchor:end">SIR</text>
+<path class="wr" d="M44,98.8 L70,98.8"/>
+<text class="lb" x="40" y="98.8" style="text-anchor:end">Q2</text>
+<path class="wr" d="M44,126.3 L70,126.3"/>
+<text class="lb" x="40" y="126.3" style="text-anchor:end">P3</text>
+<rect class="gt" x="150" y="67" width="62" height="60" rx="3"/><text class="sm" x="161" y="85">D</text><path class="gt" style="fill:none" d="M150,103 L159,109 L150,115"/><text class="sm" x="203" y="85">Q</text><text class="sm" x="203" y="109">Q'</text><circle class="gt" cx="216" cy="109" r="4"/><circle class="gt" cx="181" cy="131" r="4"/><text class="sm" x="181" y="118">CLR</text>
+<path class="wr" d="M114,85 L150,85"/>
+<path class="wr" d="M212,85 L236,85"/>
+<text class="lb" x="240" y="85" style="text-anchor:start">Q3</text>
+<path class="wr" d="M84.7,140 L84.7,186"/>
+<path class="wr" d="M99.3,140 L99.3,198"/>
+<circle cx="84.7" cy="186" r="2.6" style="fill:var(--fg)"/>
+<circle cx="99.3" cy="198" r="2.6" style="fill:var(--fg)"/>
+<path class="wr" d="M140,232 L140,109 L150,109"/>
+<circle cx="140" cy="232" r="2.6" style="fill:var(--fg)"/>
+<path class="wr" d="M181,135 L181,250"/>
+<circle cx="181" cy="250" r="2.6" style="fill:var(--fg)"/>
+<path class="gt" d="M300,30 L344,40 L344,130 L300,140 z"/><text class="sm" x="304" y="43.75" style="text-anchor:start">I0</text><text class="sm" x="304" y="71.25" style="text-anchor:start">I1</text><text class="sm" x="304" y="98.75" style="text-anchor:start">I2</text><text class="sm" x="304" y="126.25" style="text-anchor:start">I3</text><text class="sm" x="314.6666666666667" y="133">S1</text><text class="sm" x="329.3333333333333" y="133">S0</text><path class="wr" d="M274,43.8 L300,43.8"/>
+<text class="lb" x="270" y="43.8" style="text-anchor:end">Q2</text>
+<path class="wr" d="M274,71.3 L300,71.3"/>
+<text class="lb" x="270" y="71.3" style="text-anchor:end">Q3</text>
+<path class="wr" d="M274,98.8 L300,98.8"/>
+<text class="lb" x="270" y="98.8" style="text-anchor:end">Q1</text>
+<path class="wr" d="M274,126.3 L300,126.3"/>
+<text class="lb" x="270" y="126.3" style="text-anchor:end">P2</text>
+<rect class="gt" x="380" y="67" width="62" height="60" rx="3"/><text class="sm" x="391" y="85">D</text><path class="gt" style="fill:none" d="M380,103 L389,109 L380,115"/><text class="sm" x="433" y="85">Q</text><text class="sm" x="433" y="109">Q'</text><circle class="gt" cx="446" cy="109" r="4"/><circle class="gt" cx="411" cy="131" r="4"/><text class="sm" x="411" y="118">CLR</text>
+<path class="wr" d="M344,85 L380,85"/>
+<path class="wr" d="M442,85 L466,85"/>
+<text class="lb" x="470" y="85" style="text-anchor:start">Q2</text>
+<path class="wr" d="M314.7,140 L314.7,186"/>
+<path class="wr" d="M329.3,140 L329.3,198"/>
+<circle cx="314.7" cy="186" r="2.6" style="fill:var(--fg)"/>
+<circle cx="329.3" cy="198" r="2.6" style="fill:var(--fg)"/>
+<path class="wr" d="M370,232 L370,109 L380,109"/>
+<circle cx="370" cy="232" r="2.6" style="fill:var(--fg)"/>
+<path class="wr" d="M411,135 L411,250"/>
+<circle cx="411" cy="250" r="2.6" style="fill:var(--fg)"/>
+<path class="gt" d="M530,30 L574,40 L574,130 L530,140 z"/><text class="sm" x="534" y="43.75" style="text-anchor:start">I0</text><text class="sm" x="534" y="71.25" style="text-anchor:start">I1</text><text class="sm" x="534" y="98.75" style="text-anchor:start">I2</text><text class="sm" x="534" y="126.25" style="text-anchor:start">I3</text><text class="sm" x="544.6666666666666" y="133">S1</text><text class="sm" x="559.3333333333334" y="133">S0</text><path class="wr" d="M504,43.8 L530,43.8"/>
+<text class="lb" x="500" y="43.8" style="text-anchor:end">Q1</text>
+<path class="wr" d="M504,71.3 L530,71.3"/>
+<text class="lb" x="500" y="71.3" style="text-anchor:end">Q2</text>
+<path class="wr" d="M504,98.8 L530,98.8"/>
+<text class="lb" x="500" y="98.8" style="text-anchor:end">Q0</text>
+<path class="wr" d="M504,126.3 L530,126.3"/>
+<text class="lb" x="500" y="126.3" style="text-anchor:end">P1</text>
+<rect class="gt" x="610" y="67" width="62" height="60" rx="3"/><text class="sm" x="621" y="85">D</text><path class="gt" style="fill:none" d="M610,103 L619,109 L610,115"/><text class="sm" x="663" y="85">Q</text><text class="sm" x="663" y="109">Q'</text><circle class="gt" cx="676" cy="109" r="4"/><circle class="gt" cx="641" cy="131" r="4"/><text class="sm" x="641" y="118">CLR</text>
+<path class="wr" d="M574,85 L610,85"/>
+<path class="wr" d="M672,85 L696,85"/>
+<text class="lb" x="700" y="85" style="text-anchor:start">Q1</text>
+<path class="wr" d="M544.7,140 L544.7,186"/>
+<path class="wr" d="M559.3,140 L559.3,198"/>
+<circle cx="544.7" cy="186" r="2.6" style="fill:var(--fg)"/>
+<circle cx="559.3" cy="198" r="2.6" style="fill:var(--fg)"/>
+<path class="wr" d="M600,232 L600,109 L610,109"/>
+<circle cx="600" cy="232" r="2.6" style="fill:var(--fg)"/>
+<path class="wr" d="M641,135 L641,250"/>
+<circle cx="641" cy="250" r="2.6" style="fill:var(--fg)"/>
+<path class="gt" d="M760,30 L804,40 L804,130 L760,140 z"/><text class="sm" x="764" y="43.75" style="text-anchor:start">I0</text><text class="sm" x="764" y="71.25" style="text-anchor:start">I1</text><text class="sm" x="764" y="98.75" style="text-anchor:start">I2</text><text class="sm" x="764" y="126.25" style="text-anchor:start">I3</text><text class="sm" x="774.6666666666666" y="133">S1</text><text class="sm" x="789.3333333333334" y="133">S0</text><path class="wr" d="M734,43.8 L760,43.8"/>
+<text class="lb" x="730" y="43.8" style="text-anchor:end">Q0</text>
+<path class="wr" d="M734,71.3 L760,71.3"/>
+<text class="lb" x="730" y="71.3" style="text-anchor:end">Q1</text>
+<path class="wr" d="M734,98.8 L760,98.8"/>
+<text class="lb" x="730" y="98.8" style="text-anchor:end">SIL</text>
+<path class="wr" d="M734,126.3 L760,126.3"/>
+<text class="lb" x="730" y="126.3" style="text-anchor:end">P0</text>
+<rect class="gt" x="840" y="67" width="62" height="60" rx="3"/><text class="sm" x="851" y="85">D</text><path class="gt" style="fill:none" d="M840,103 L849,109 L840,115"/><text class="sm" x="893" y="85">Q</text><text class="sm" x="893" y="109">Q'</text><circle class="gt" cx="906" cy="109" r="4"/><circle class="gt" cx="871" cy="131" r="4"/><text class="sm" x="871" y="118">CLR</text>
+<path class="wr" d="M804,85 L840,85"/>
+<path class="wr" d="M902,85 L926,85"/>
+<text class="lb" x="930" y="85" style="text-anchor:start">Q0</text>
+<path class="wr" d="M774.7,140 L774.7,186"/>
+<path class="wr" d="M789.3,140 L789.3,198"/>
+<circle cx="774.7" cy="186" r="2.6" style="fill:var(--fg)"/>
+<circle cx="789.3" cy="198" r="2.6" style="fill:var(--fg)"/>
+<path class="wr" d="M830,232 L830,109 L840,109"/>
+<circle cx="830" cy="232" r="2.6" style="fill:var(--fg)"/>
+<path class="wr" d="M871,135 L871,250"/>
+<circle cx="871" cy="250" r="2.6" style="fill:var(--fg)"/>
+<path class="wr" d="M40,186 L782,186"/>
+<text class="lb" x="36" y="186" style="text-anchor:end">S1</text>
+<path class="wr" d="M40,198 L790,198"/>
+<text class="lb" x="36" y="198" style="text-anchor:end">S0</text>
+<path class="wr" d="M40,232 L830,232"/>
+<text class="lb" x="36" y="232" style="text-anchor:end">CLK</text>
+<path class="wr" d="M40,250 L860,250"/>
+<text class="lb" x="36" y="250" style="text-anchor:end">CLEAR</text>
+</svg><div class="figlabel">Each stage: a 4×1 MUX in front of a D flip-flop. Labels that match are connected (Q3 of the left stage is the I1 input of the stage on its right, and so on). S1 S0 are common to all four MUXes, as are CLK and CLEAR. SIR = serial in (right shift), SIL = serial in (left shift).</div></div>
+<div class="exam"><div class="exam-src">2024–25 Q1(b) · 13 marks · compulsory Q1 · older: 12, 12, 15 marks (2012–13, 2015–16, 2016–17)</div><div class="exam-q"><p>Design a 4-bit universal shift register using multiplexers and D flip-flops.</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<ol>
+<li><b>Modes</b> (state them first): S1 S0 = 00 hold, 01 shift right, 10 shift left, 11 parallel load. Add an asynchronous CLEAR if you like (74194).</li>
+<li><b>One stage</b> = one 4×1 MUX + one D flip-flop. The MUX output is the D input. Stage i (bit i, Q3 is the MSB):
+<ul><li>I0 = Q<sub>i</sub> (hold)</li><li>I1 = Q<sub>i+1</sub> (shift right: the bit moves down from the left neighbour); for the MSB stage I1 = serial-in right, SIR</li><li>I2 = Q<sub>i−1</sub> (shift left); for the LSB stage I2 = serial-in left, SIL</li><li>I3 = P<sub>i</sub> (parallel input)</li></ul></li>
+<li>All four MUXes share S1 and S0. All four flip-flops share CLK and CLEAR.</li>
+<li>Draw the figure above: four MUXes, four D flip-flops, the three wiring rows, serial outputs Q0 (right shift) and Q3 (left shift).</li>
+<li>Write the equation for one stage: D<sub>i</sub> = S1'S0'·Q<sub>i</sub> + S1'S0·Q<sub>i+1</sub> + S1S0'·Q<sub>i−1</sub> + S1S0·P<sub>i</sub>.</li>
+</ol>
+<p>Worked case: Q3 Q2 Q1 Q0 = 1011, S1 S0 = 01 (right), SIR = 0. After one clock: 0101. Same register, S1 S0 = 10 (left), SIL = 0: after one clock 0110.</p>
+</div></details></div>
+<div class="exam"><div class="exam-src">2024–25 Q4(c) · 7 marks</div><div class="exam-q"><p>Compare hardware efficiency and flexibility of universal shift registers with dedicated shift registers.</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<div class="tbl"><table class="mat"><tr><th></th><th>Universal</th><th>Dedicated (right-only, left-only or load-only)</th></tr><tr><td>Hardware</td><td>a 4×1 MUX per bit plus mode decoding: more gates, more wiring</td><td>only the flip-flops (and at most a 2×1 MUX): least hardware per bit</td></tr><tr><td>Speed</td><td>MUX delay in every bit path, lower clock rate</td><td>direct Q to D, faster</td></tr><tr><td>Flexibility</td><td>one part does hold, both shifts and load; mode can change at any clock</td><td>fixed to one job; several registers are needed for several jobs</td></tr><tr><td>Design effort and cost</td><td>one standard part serves many designs (74194)</td><td>cheaper if only one function is needed</td></tr></table></div>
+<p>Conclusion: universal is better when a design needs several modes (serial-parallel converters, CPU registers). Dedicated is better when one mode is enough: smaller, faster, cheaper.</p>
+</div></details></div>
+<div class="write"><h4>What to write (universal shift register, 10–13 marks)</h4>
+<ol>
+<li>The mode table with S1 S0 and what each does.</li>
+<li>The 4-stage figure: MUX in front of each D flip-flop, inputs I0..I3 labelled with their sources (Q<sub>i</sub>, Q<sub>i+1</sub> or SIR, Q<sub>i−1</sub> or SIL, P<sub>i</sub>).</li>
+<li>S1 S0, CLK, CLEAR drawn as common lines.</li>
+<li>The one-line stage equation, and a note that the hold mode feeds Q back.</li>
+</ol>
+</div>
+
+<h2>3. The same register with a 2-to-4 decoder (2021–22 Q5(b))</h2>
+<div class="exam"><div class="exam-src">2021–22 Q5(b) · 10 marks</div><div class="exam-q"><p>Use a 2-to-4 decoder, NAND gates and edge-triggered D flip-flops to design a 4-bit shift register: S1S0 = 00 shift right, 01 shift left, 10 synchronous common clear, 11 synchronous parallel load.</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<p>The decoder outputs are d0 = S1'S0' (right), d1 = S1'S0 (left), d2 = S1S0' (clear), d3 = S1S0 (load). Each D input is an AND-OR of the modes that put something into it. <b>Clear (d2) is not used by any gate, so D = 0 and the flip-flop clears at the next clock edge: synchronous clear for free.</b></p>
+<p class="formula">D3 = d0·SIR + d1·Q2 + d3·P3<br>D2 = d0·Q3 + d1·Q1 + d3·P2<br>D1 = d0·Q2 + d1·Q0 + d3·P1<br>D0 = d0·Q1 + d1·SIL + d3·P0</p>
+<div class="fg-wrap"><svg class="dsa-fig" viewBox="0 0 560 250" width="560" role="img" aria-label="decoder version one stage">
+<rect class="gt" x="30" y="40" width="70" height="90" rx="3"/><text class="lb" x="65" y="85">decoder</text>
+<path class="gt" d="M250,34 h20 a16,16 0 0 1 0,32 h-20 z"/>
+<path class="gt" d="M250,94 h20 a16,16 0 0 1 0,32 h-20 z"/>
+<path class="gt" d="M250,154 h20 a16,16 0 0 1 0,32 h-20 z"/>
+<path class="gt" d="M340,90.5 q12,19.5 0,39 q24,0 40,-19.5 q-16,-19.5 -40,-19.5 z"/>
+<path class="wr" d="M290,50 L310,50 L310,97 L344,97"/>
+<path class="wr" d="M290,110 L310,110 L310,110 L344,110"/>
+<path class="wr" d="M290,170 L310,170 L310,123 L344,123"/>
+<rect class="gt" x="440" y="92" width="62" height="60" rx="3"/><text class="sm" x="451" y="110">D</text><path class="gt" style="fill:none" d="M440,128 L449,134 L440,140"/><text class="sm" x="493" y="110">Q</text><text class="sm" x="493" y="134">Q'</text><circle class="gt" cx="506" cy="134" r="4"/>
+<path class="wr" d="M380,110 L440,110"/>
+<path class="wr" d="M210,42 L250,42"/>
+<text class="lb" x="206" y="42" style="text-anchor:end">d0</text>
+<path class="wr" d="M210,58 L250,58"/>
+<text class="lb" x="206" y="58" style="text-anchor:end">Q(i+1)</text>
+<path class="wr" d="M210,102 L250,102"/>
+<text class="lb" x="206" y="102" style="text-anchor:end">d1</text>
+<path class="wr" d="M210,118 L250,118"/>
+<text class="lb" x="206" y="118" style="text-anchor:end">Q(i−1)</text>
+<path class="wr" d="M210,162 L250,162"/>
+<text class="lb" x="206" y="162" style="text-anchor:end">d3</text>
+<path class="wr" d="M210,178 L250,178"/>
+<text class="lb" x="206" y="178" style="text-anchor:end">P(i)</text>
+<path class="wr" d="M502,110 L532,110"/>
+<text class="lb" x="536" y="110" style="text-anchor:start">Q(i)</text>
+<path class="wr" d="M410,134 L440,134"/>
+<text class="lb" x="406" y="134" style="text-anchor:end">CLK</text>
+<text class="sm" x="30" y="20" style="text-anchor:start">S1 S0 → decoder → d0 d1 d2 d3 (d2 unused: clear)</text>
+</svg><div class="figlabel">One stage of the 2-to-4 decoder register. d2 (mode 10, clear) feeds no AND gate, so D = 0 and the flip-flop clears at the clock. The decoder (left) is shared by all four stages.</div></div>
+<p>With NAND gates: each AND term is a 2-input NAND and the three NAND outputs go into one 3-input NAND (NAND-NAND = AND-OR). That is four NAND gates per bit, 16 NANDs and one decoder for the whole register. Compare with the 4×1 MUX version: same function with a shared decoder, but there is no hold mode here.</p>
+<p>Check: S1 S0 = 10: d2 = 1, d0 = d1 = d3 = 0, so all D = 0 and every Q clears at the clock ✓.</p>
+</div></details></div>
+
+<h2>4. Copy register A to B (2022–23 Q5(c))</h2>
+<div class="exam"><div class="exam-src">2022–23 Q5(c) · marks not legible in the scan (about 12) · block diagram wanted</div><div class="exam-q"><p>Design a sequential circuit to copy the content of shift register A to shift register B. Use a block diagram to represent the shift register in the diagram.</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<div class="fg-wrap"><svg class="dsa-fig" viewBox="0 0 640 250" width="640" role="img" aria-label="copy register A to B">
+<text class="sm" x="10" y="14" style="text-anchor:start">Parallel transfer (one clock pulse)</text>
+<rect class="gt" x="40" y="30" width="130" height="44" rx="3"/><text class="lb" x="105" y="52">register A</text>
+<rect class="gt" x="300" y="30" width="160" height="44" rx="3"/><text class="lb" x="380" y="52">register B (load L)</text>
+<path class="wr" d="M170,52 L300,52"/>
+<text class="sm" x="235" y="44">A3..A0</text>
+<path class="wr" d="M300,66 L290,66"/>
+<path class="wr" d="M420,100 L420,74"/>
+<text class="sm" x="420" y="112">L = 1: load</text>
+<path class="wr" d="M400,100 L400,74"/>
+<text class="sm" x="380" y="112">CLK</text>
+<text class="sm" x="10" y="140" style="text-anchor:start">Serial transfer (4 clock pulses, A also refills itself)</text>
+<rect class="gt" x="40" y="156" width="130" height="44" rx="3"/><text class="lb" x="105" y="178">shift register A</text>
+<rect class="gt" x="300" y="156" width="130" height="44" rx="3"/><text class="lb" x="365" y="178">shift register B</text>
+<path class="wr" d="M170,178 L300,178"/>
+<text class="sm" x="235" y="170">serial out → serial in</text>
+<path class="wr" d="M170,192 L180,192 L180,228 L30,228 L30,178 L40,178"/>
+<text class="sm" x="100" y="240">recirculate (optional)</text>
+<path class="wr" d="M350,156 L350,134"/>
+<text class="sm" x="380" y="134">shift enable, CLK</text>
+</svg><div class="figlabel">Block diagrams for copying A into B: parallel (needs a load control) and serial (needs the same clock and shift enable on both).</div></div>
+<p>Assumption: the registers are n bits, A is a shift register (as the question says).</p>
+<ol>
+<li><b>Serial transfer</b> (uses the shift registers as they are): connect the serial out of A to the serial in of B, apply the same clock and a shift enable to both. After <b>n clock pulses</b> every bit of A has moved into B, and B = A. A's own serial in can take its serial out (recirculate) so that A keeps its data. A control circuit (a mod-n counter, or the shift enable held high for n pulses) stops the transfer.</li>
+<li><b>Parallel transfer</b> (faster): connect A<sub>i</sub> to the parallel input of B<sub>i</sub> and give B a load control L (a 2×1 MUX in front of each D, as in the load register). L = 1 for one clock pulse copies all bits at once.</li>
+</ol>
+<p>Say which one you choose and why: serial needs fewer wires, n clocks; parallel needs n wires, one clock.</p>
+</div></details></div>
+
+<h2>5. Serial transmission and error propagation (2024–25 Q4(a), 16 marks)</h2>
+<div class="exam"><div class="exam-src">2024–25 Q4(a) · 16 marks</div><div class="exam-q"><p>A 4-bit shift register is used for serial data transmission. (i) Analyse the timing relationship between input data, clock and output. (ii) Explain how errors may propagate in serial communication using shift registers.</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<p><b>(i) Timing.</b> Take a 4-bit serial-in parallel-out register (D flip-flops, positive edge). Send the bits 1, 0, 1, 1 (first bit first). Each bit must be stable at D for a set-up time before the rising clock edge and a hold time after it. At each edge every Q takes the value of the stage on its left, and Q0 takes the bit at D.</p>
+<div id="t1"></div>
+<ol>
+<li>After edge 1 the first bit (1) is in Q0. After edge 2 it is in Q1, after edge 3 in Q2, after edge 4 in Q3.</li>
+<li>After <b>4 edges</b> all four bits are present: Q3 Q2 Q1 Q0 = 1 1 0 1 (the first bit sent is in Q3). Read the parallel output now. One more edge shifts the first bit out (serial out at Q3).</li>
+<li>The latency from first bit in to last stage is 4 clock periods. The data rate is one bit per clock. The clock period must exceed t<sub>pd</sub> + t<sub>setup</sub> of one stage, so the maximum rate is 1/(t<sub>pd</sub> + t<sub>su</sub>).</li>
+<li>Input must change only between edges (just after an edge). Output changes a delay t<sub>pd</sub> after each edge.</li>
+</ol>
+<p><b>(ii) Error propagation.</b></p>
+<ol>
+<li><b>One corrupted bit</b> (noise flips a bit at D): it is shifted along with the others and ends up in one fixed position. The other bits are right, so the error is confined to one bit, but nothing in the register detects it. Example: the stream 1, 0, 0, 1 instead of 1, 0, 1, 1: Q3 Q2 Q1 Q0 = 1 0 0 1 instead of 1 1 0 1.</li>
+<li><b>Extra or missing clock pulse</b> (a glitch on the clock, or a lost edge): the register shifts one place too many or too few. <b>Every following bit lands one place off</b> (framing error). The error propagates to the whole word and to every word after it until the receiver is re-synchronised.</li>
+<li><b>Feedback registers</b> (serial adder, a register whose output returns to its input): a wrong bit is added into the carry, so it also changes the <b>next</b> bit. The error propagates along the number.</li>
+<li><b>Remedies:</b> parity bit per word, start/stop bits or a frame marker for synchronisation, CRC, and a clean clock.</li>
+</ol>
+</div></details></div>
+<div class="write"><h4>What to write (serial transmission timing)</h4>
+<ol>
+<li>Draw CLK, serial D, Q0, Q1, Q2, Q3 one under the other, with the sampling edges marked.</li>
+<li>Write the bit sequence you assumed.</li>
+<li>Mark when all four bits are valid (after 4 edges) and where the first bit leaves.</li>
+<li>Two or three error cases, each with one sentence of effect.</li>
+</ol>
+</div>
+
+<h2>6. Ring counter and the self-correcting fix (2024–25 Q3(a), 2017–18 Q7(c), 2022–23 Q6(b))</h2>
+<p>A ring counter is a shift register whose last output feeds the first input. <b>One 1 circulates.</b> For n flip-flops it has n states (mod-n). His 4-bit table (Q0 Q1 Q2 Q3): 1000 → 0100 → 0010 → 0001 → 1000. D flip-flops do the shifting. <b>The first FF has PRESET and the others have CLEAR</b>, so the counter starts at 1000.</p>
+<div id="sh2"></div>
+<p>Use "Load a bad state" and "Self-correction" on the bench above.</p>
+<div class="exam"><div class="exam-src">2024–25 Q3(a) · 12 marks</div><div class="exam-q"><p>A ring counter is initialised incorrectly. (i) Analyse the resulting sequence of states. (ii) Propose a circuit modification to ensure automatic correction.</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<p><b>(i) Analysis</b> (4-bit, Q0 Q1 Q2 Q3, D0 = Q3). The 16 states fall into separate loops, because the circuit only rotates the pattern it starts with and the number of 1s never changes:</p>
+<ul>
+<li>(0000) stuck: never leaves all-zero</li>
+<li>(0001 → 1000 → 0100 → 0010)</li>
+<li>(0011 → 1001 → 1100 → 0110)</li>
+<li>(0101 → 1010)</li>
+<li>(0111 → 1011 → 1101 → 1110)</li>
+<li>(1111) stuck: never leaves all-one</li>
+</ul>
+<p>Only the loop with exactly one 1 is the intended ring. For example, an initial state 1010 gives 1010, 0101, 1010, 0101, ... forever: wrong frequency (it flips every clock), wrong pattern (two 1s), and it never corrects itself. Initial state 0000 or 1111 locks up completely.</p>
+<div id="t2"></div>
+<p><b>(ii) Modification.</b> Replace D0 = Q3 by <b>D0 = (Q0 + Q1 + Q2)'</b>, a NOR of all outputs except the last. A 1 is fed in only when the first n−1 stages are all 0.</p>
+<ul>
+<li>Any state with a 1 in Q0..Q2: D0 = 0, so the 1s are shifted down and out at Q3 one by one, until Q0..Q2 are all 0.</li>
+<li>When Q0 Q1 Q2 = 000: D0 = 1, so a single 1 is injected (0001 gives 1000, 0000 gives 1000).</li>
+<li>Result: from every one of the 16 states the counter enters the 1000 → 0100 → 0010 → 0001 loop within at most 3 clocks (computed). It is a <b>self-correcting (self-starting) ring counter</b>. Cost: one 3-input NOR gate.</li>
+</ul>
+<div id="t3"></div>
+</div></details></div>
+<div class="exam"><div class="exam-src">2017–18 Q7(c) · 10 marks · 2022–23 Q6(b) · 5 marks · older: 4-stage switch-tail (5), 4-bit design (10)</div><div class="exam-q"><p>Design a 5-bit ring counter using a shift register and draw the timing diagram. (2022–23: write a short note about a ring counter.)</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<p>Five D flip-flops, clocked together, Q0 → D1 → ... → Q4 → D0. Q0 is preset to 1 and Q1..Q4 are cleared at start. States (Q0..Q4): 10000, 01000, 00100, 00010, 00001, then 10000 again. Mod-5. Each output is high for one clock and low for four: the waveforms are the same shape delayed by one clock each.</p>
+<div id="t4"></div>
+<p>Short note points (5 marks): circular shift register; one 1 circulates; n flip-flops, n states; each flip-flop output is already one decoded state (no decoder needed); initial state set by preset/clear; wasteful (2<sup>n</sup> − n unused states) and not self-starting unless modified (section 6); uses: sequence generators, timing control.</p>
+</div></details></div>
+
+<h2>7. Johnson (twisted-ring) counter (2019–20 Q2(a), 2020–21 Q5(b), 2018–19 Q6(c))</h2>
+<p>A ring counter with the <b>inverted</b> last output fed back: <b>D0 = Q3'</b> (his words: "flip Q3, then shift by 1"). All flip-flops are cleared at the start (0000). The register fills with 1s and then with 0s. n flip-flops give <b>2n states</b>. His 4-bit table (Q0..Q3): 0000, 1000, 1100, 1110, 1111, 0111, 0011, 0001, back to 0000. Each output is high for 4 clocks and low for 4, each shifted by one clock.</p>
+<div id="sh3"></div>
+<div class="tbl"><table class="mat"><tr><th></th><th>Ring counter</th><th>Johnson counter</th></tr><tr><td>Feedback</td><td>Q<sub>n−1</sub> to D0</td><td>Q<sub>n−1</sub>' to D0</td></tr><tr><td>States for n FFs</td><td>n</td><td>2n</td></tr><tr><td>Initial state</td><td>one FF preset, others cleared</td><td>all cleared</td></tr><tr><td>Decoding a state</td><td>none: each Q is a state</td><td>one 2-input AND per state (any two adjacent outputs)</td></tr><tr><td>Each output</td><td>high for 1 clock in n</td><td>high for n clocks in 2n</td></tr><tr><td>Unused states</td><td>2<sup>n</sup> − n</td><td>2<sup>n</sup> − 2n</td></tr><tr><td>Self-starting?</td><td>no (needs the NOR fix)</td><td>no (needs a fix too)</td></tr></table></div>
+<div class="exam"><div class="exam-src">2018–19 Q6(c) · 7 marks · 2019–20 Q2(a) and 2020–21 Q5(b) · 10 marks · older (2014–15) · 10 marks</div><div class="exam-q"><p>Design a 4-bit Johnson counter using a shift register and illustrate its operation using a timing diagram. (2019–20, 2020–21: distinguish ring and Johnson; design a 5-bit ring counter and a 5-bit Johnson counter with timing diagrams. 2014–15: also the disadvantage.)</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<p><b>4-bit Johnson.</b> Four D flip-flops with common clock and clear; D0 = Q3', D1 = Q0, D2 = Q1, D3 = Q2. Clear to 0000.</p>
+<div id="t5"></div>
+<p><b>5-bit Johnson</b> (10 states, Q0..Q4): 00000, 10000, 11000, 11100, 11110, 11111, 01111, 00111, 00011, 00001, 00000.</p>
+<div id="t6"></div>
+<p><b>Disadvantage</b> (2014–15): if it starts in an unused state it can stay in a loop of unused states forever. For 4 bits the engine-style enumeration gives the loops: (0000 → 1000 → 1100 → 1110 → 1111 → 0111 → 0011 → 0001) ; (0010 → 1001 → 0100 → 1010 → 1101 → 0110 → 1011 → 0101). Only the first loop is the real 8-state sequence. Cure (found by exhaustive search over all choices of D0 on the unused states): <b>D0 = Q3' + Q1·Q2'</b> (Q0 is the first stage). It equals Q3' on the 8 valid states, so the sequence is unchanged, and every unused state enters the 8-state loop. Also: needs 2-input decoding gates to get one-hot outputs.</p>
+<p>Advantages: only one flip-flop output changes per clock (no glitches in the decoded outputs), twice the states of a ring counter for the same number of flip-flops, and each decoded state needs just a 2-input AND.</p>
+</div></details></div>
+<div class="write"><h4>What to write (ring and Johnson, with timing, 7–10 marks)</h4>
+<ol>
+<li>Circuit: n D flip-flops in a row, the feedback wire (Q<sub>n−1</sub> for ring, Q<sub>n−1</sub>' for Johnson), the common clock, preset on the first FF for ring or clear for Johnson.</li>
+<li>The count table, clock by clock, with the number of states (n or 2n).</li>
+<li>The timing diagram: CLK on top, then every Q<sub>i</sub> below it. Ring: one pulse per output, high for one clock. Johnson: high for n clocks, each output shifted by one clock.</li>
+<li>One line: "ring is mod-n, Johnson is mod-2n".</li>
+</ol>
+</div>
+
+<h2>8. Serial adder and serial subtractor as small state machines</h2>
+<p>A serial adder adds two numbers one bit pair per clock, <b>LSB first</b>, with one flip-flop to remember the carry. It is a Mealy machine with two states. His definition: state <b>A</b> = carry 0 at the previous clock, state <b>B</b> = carry 1. Inputs x1 x2, output z = the sum bit. Convention: lower case y = present carry, capital Y = next carry.</p>
+<div id="ds1"></div>
+<p>State table (columns x1x2 = 00, 01, 11, 10; each cell is next state, z):</p>
+<div class="tbl"><table class="mat"><tr><th>PS</th><th>00</th><th>01</th><th>11</th><th>10</th></tr><tr><td>A (y = 0)</td><td>A, 0</td><td>A, 1</td><td>B, 0</td><td>A, 1</td></tr><tr><td>B (y = 1)</td><td>A, 1</td><td>B, 0</td><td>B, 1</td><td>B, 0</td></tr></table></div>
+<p>His <b>excitation table</b> (his name for the binary-coded table: present state y, inputs, next state Y, output z), with one flip-flop (⌈log<sub>2</sub> 2⌉ = 1), rows y = 0, 1:</p>
+<div class="tbl"><table class="mat"><tr><th>y (carry)</th><th>x1 x2</th><th>Y (next carry)</th><th>z (sum)</th></tr><tr><td>0</td><td>00</td><td>0</td><td>0</td></tr><tr><td>0</td><td>01</td><td>0</td><td>1</td></tr><tr><td>0</td><td>10</td><td>0</td><td>1</td></tr><tr><td>0</td><td>11</td><td>1</td><td>0</td></tr><tr><td>1</td><td>00</td><td>0</td><td>1</td></tr><tr><td>1</td><td>01</td><td>1</td><td>0</td></tr><tr><td>1</td><td>10</td><td>1</td><td>0</td></tr><tr><td>1</td><td>11</td><td>1</td><td>1</td></tr></table></div>
+<p class="formula">Y = x1x2 + x1y + x2y &nbsp;&nbsp; z = x1 ⊕ x2 ⊕ y</p>
+<p>(The engine gave these from the table with a D flip-flop, Y = D.) Circuit: a full adder with a D flip-flop in the carry path.</p>
+<div class="fg-wrap"><svg class="dsa-fig" viewBox="0 0 640 250" width="640" role="img" aria-label="serial adder">
+<rect class="gt" x="30" y="20" width="160" height="40" rx="3"/><text class="lb" x="110" y="40">shift register A</text>
+<rect class="gt" x="30" y="100" width="160" height="40" rx="3"/><text class="lb" x="110" y="120">shift register B</text>
+<path class="wr" d="M190,40 L260,40"/>
+<text class="sm" x="225" y="32">x1</text>
+<path class="wr" d="M190,120 L260,120"/>
+<text class="sm" x="225" y="112">x2</text>
+<rect class="gt" x="260" y="30" width="90" height="100" rx="3"/><text class="lb" x="305" y="80">full adder</text>
+<path class="wr" d="M350,50 L450,50 L450,20 L10,20 L10,40 L30,40"/>
+<text class="sm" x="400" y="42">sum z → A serial in</text>
+<rect class="gt" x="400" y="150" width="62" height="60" rx="3"/><text class="sm" x="411" y="168">D</text><path class="gt" style="fill:none" d="M400,186 L409,192 L400,198"/><text class="sm" x="453" y="168">Q</text><text class="sm" x="453" y="192">Q'</text><circle class="gt" cx="466" cy="192" r="4"/>
+<path class="wr" d="M350,110 L380,110 L380,168 L400,168"/>
+<text class="sm" x="372" y="100" style="text-anchor:end">carry out Y</text>
+<path class="wr" d="M462,168 L482,168 L482,230 L240,230 L240,100 L260,100"/>
+<text class="sm" x="300" y="224">carry in y</text>
+<path class="wr" d="M30,215 L400,215 L400,192"/>
+<text class="lb" x="24" y="215" style="text-anchor:end">CLK</text>
+</svg><div class="figlabel">Serial adder: the two registers shift right on every clock, LSBs first. The full adder adds x1, x2 and the stored carry y. The sum bit enters A at the left; the carry is saved in one D flip-flop.</div></div>
+<div class="exam"><div class="exam-src">2017–18 Q6(b) · 10 marks · older: trace 0101 + 0011 (6+6, 2011–12 and 2012–13), 2016–17 · 10</div><div class="exam-q"><p>Design a serial adder that computes the sum of two 4-bit numbers A and B stored in shift registers; the result is stored in the register of A. (Older: draw the logic diagram and show the values after every clock pulse for 0101 + 0011.)</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<ol>
+<li>A and B are 4-bit right-shift registers. Their serial outputs (the LSBs) go to the full adder inputs x1, x2.</li>
+<li>The full adder's sum output goes to the serial input of A (leftmost flip-flop). After 4 clocks the sum is in A.</li>
+<li>The carry out goes to the D input of a flip-flop; its Q is the carry in. The flip-flop is cleared at the start (no carry).</li>
+<li>All three (A, B, carry flip-flop) have the same clock. Four clocks are needed.</li>
+</ol>
+<p>Trace of 0101 (5) + 0011 (3), LSB first:</p>
+<div class="tbl"><table class="mat"><tr><th>clock</th><th>x1 (A bit)</th><th>x2 (B bit)</th><th>carry y (before)</th><th>sum z</th><th>carry y (after)</th></tr><tr><td>1</td><td>1</td><td>1</td><td>0</td><td>0</td><td>1</td></tr><tr><td>2</td><td>0</td><td>1</td><td>1</td><td>0</td><td>1</td></tr><tr><td>3</td><td>1</td><td>0</td><td>1</td><td>0</td><td>1</td></tr><tr><td>4</td><td>0</td><td>0</td><td>1</td><td>1</td><td>0</td></tr></table></div>
+<p>The sum bits in order are 0, 0, 0, 1, so the first bit shifted in ends as the LSB: A = 1000 = 8 ✓. The final carry is 0 (no overflow).</p>
+</div></details></div>
+<div class="exam"><div class="exam-src">2021–22 Q6(b) · 10 marks · older (2013–14) · 10 marks</div><div class="exam-q"><p>Design a serial subtractor A − B, operands LSB first, using J-K flip-flops. (Older: result stored in A.)</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<p>Same idea, with borrow in place of carry. State A = borrow 0, state B = borrow 1. Inputs A and B are the bits of the minuend and subtrahend; output d = difference bit.</p>
+<div id="ds2"></div>
+<div class="tbl"><table class="mat"><tr><th>PS</th><th>00</th><th>01</th><th>11</th><th>10</th></tr><tr><td>no borrow</td><td>0, 0</td><td>1, 1</td><td>0, 0</td><td>0, 1</td></tr><tr><td>borrow</td><td>1, 1</td><td>1, 0</td><td>1, 1</td><td>0, 0</td></tr></table></div>
+<p>(Columns A B = 00, 01, 11, 10, cells next state (1 = borrow), d.) Excitation table with the JK requirement (0→0 = 0x, 0→1 = 1x, 1→0 = x1, 1→1 = x0):</p>
+<div class="tbl"><table class="mat"><tr><th>y (borrow)</th><th>A B</th><th>Y (next borrow)</th><th>d</th><th>J<sub>y</sub></th><th>K<sub>y</sub></th></tr><tr><td>0</td><td>00</td><td>0</td><td>0</td><td>0</td><td>x</td></tr><tr><td>0</td><td>01</td><td>1</td><td>1</td><td>1</td><td>x</td></tr><tr><td>0</td><td>10</td><td>0</td><td>1</td><td>0</td><td>x</td></tr><tr><td>0</td><td>11</td><td>0</td><td>0</td><td>0</td><td>x</td></tr><tr><td>1</td><td>00</td><td>1</td><td>1</td><td>x</td><td>0</td></tr><tr><td>1</td><td>01</td><td>1</td><td>0</td><td>x</td><td>0</td></tr><tr><td>1</td><td>10</td><td>0</td><td>0</td><td>x</td><td>1</td></tr><tr><td>1</td><td>11</td><td>1</td><td>1</td><td>x</td><td>0</td></tr></table></div>
+<p class="formula">J<sub>y</sub> = A'B &nbsp;&nbsp; K<sub>y</sub> = AB' &nbsp;&nbsp; d = A ⊕ B ⊕ y</p>
+<div class="fg-wrap"><svg class="dsa-fig" viewBox="0 0 640 300" width="640" role="img" aria-label="serial subtractor">
+<rect class="gt" x="470" y="130" width="62" height="84" rx="3"/><text class="sm" x="481" y="148">J</text><path class="gt" style="fill:none" d="M470,166 L479,172 L470,178"/><text class="sm" x="481" y="196">K</text><text class="sm" x="523" y="148">Q</text><text class="sm" x="523" y="196">Q'</text><circle class="gt" cx="536" cy="196" r="4"/>
+<path class="gt" d="M300,132 h20 a16,16 0 0 1 0,32 h-20 z"/>
+<path class="gt" d="M300,180 h20 a16,16 0 0 1 0,32 h-20 z"/>
+<path class="gt" d="M190,128 L222,140 L190,152 z"/><circle class="gt" cx="226" cy="140" r="4"/>
+<path class="gt" d="M190,192 L222,204 L190,216 z"/><circle class="gt" cx="226" cy="204" r="4"/>
+<path class="wr" d="M40,156 L300,156"/>
+<text class="lb" x="34" y="156" style="text-anchor:end">B</text>
+<path class="wr" d="M40,188 L300,188"/>
+<text class="lb" x="34" y="188" style="text-anchor:end">A</text>
+<path class="wr" d="M40,140 L190,140"/>
+<text class="lb" x="34" y="140" style="text-anchor:end">A</text>
+<path class="wr" d="M230,140 L300,140"/>
+<path class="wr" d="M40,204 L190,204"/>
+<text class="lb" x="34" y="204" style="text-anchor:end">B</text>
+<path class="wr" d="M230,204 L300,204"/>
+<path class="wr" d="M340,148 L470,148"/>
+<path class="wr" d="M340,196 L470,196"/>
+<text class="sm" x="400" y="134">J = A'B</text>
+<text class="sm" x="400" y="212">K = AB'</text>
+<path class="wr" d="M40,250 L440,250 L440,172 L470,172"/>
+<text class="lb" x="34" y="250" style="text-anchor:end">CLK</text>
+<path class="gt" d="M150,14 q12,16 0,32 q24,0 40,-16 q-16,-16 -40,-16 z"/><path class="gt" style="fill:none" d="M144,14 q12,16 0,32"/>
+<path class="gt" d="M320,14 q12,16 0,32 q24,0 40,-16 q-16,-16 -40,-16 z"/><path class="gt" style="fill:none" d="M314,14 q12,16 0,32"/>
+<path class="wr" d="M190,30 L270,30 L270,22 L324,22"/>
+<path class="wr" d="M124,22 L154,22"/>
+<text class="lb" x="120" y="22" style="text-anchor:end">A</text>
+<path class="wr" d="M124,38 L154,38"/>
+<text class="lb" x="120" y="38" style="text-anchor:end">B</text>
+<path class="wr" d="M294,38 L324,38"/>
+<text class="lb" x="290" y="38" style="text-anchor:end">y</text>
+<path class="wr" d="M360,30 L420,30"/>
+<text class="lb" x="426" y="30" style="text-anchor:start">d → A serial in</text>
+<path class="wr" d="M532,148 L562,148"/>
+<text class="lb" x="566" y="148" style="text-anchor:start">y</text>
+</svg><div class="figlabel">Serial subtractor A − B, LSBs first: d = A ⊕ B ⊕ y, borrow flip-flop is a JK with J = A'B (borrow starts), K = AB' (borrow ends); otherwise it holds.</div></div>
+<p>Trace of 1100 (12) − 0101 (5), LSB first:</p>
+<div class="tbl"><table class="mat"><tr><th>clock</th><th>x1 (A bit)</th><th>x2 (B bit)</th><th>borrow y (before)</th><th>d</th><th>borrow y (after)</th></tr><tr><td>1</td><td>0</td><td>1</td><td>0</td><td>1</td><td>1</td></tr><tr><td>2</td><td>0</td><td>0</td><td>1</td><td>1</td><td>1</td></tr><tr><td>3</td><td>1</td><td>1</td><td>1</td><td>1</td><td>1</td></tr><tr><td>4</td><td>1</td><td>0</td><td>1</td><td>0</td><td>0</td></tr></table></div>
+<p>d bits 1, 1, 1, 0 give 0111 = 7 ✓, with no final borrow. The JK holds the borrow whenever A = B (J = K = 0), sets it when A = 0, B = 1 (a borrow is needed), clears it when A = 1, B = 0.</p>
+</div></details></div>
+
+<div class="trap"><h4>Traps that cost marks</h4><ul>
+<li>Ring and Johnson tables use Q0 as the leftmost bit. A different order is fine if you label it. Do not mix orders between the table and the timing diagram.</li>
+<li>A ring counter with D0 = Q3 does <b>not</b> fix a bad state. The fix is the NOR of Q0 .. Q(n−2).</li>
+<li>Johnson feeds back Q<sub>n−1</sub> <b>complemented</b>. Forgetting the bubble gives a ring counter.</li>
+<li>Clear the carry or borrow flip-flop before a serial add. Otherwise the first sum bit is wrong.</li>
+<li>Serial adder: LSB first, and the sum enters the <b>left</b> end of A so after 4 clocks the bits are in the right order.</li>
+<li>Universal register: the MSB stage has no left neighbour (use SIR) and the LSB stage no right neighbour (use SIL). Label them.</li>
+<li>In the decoder version the clear mode has no gate: say that "D = 0 when d2 = 1".</li>
+<li>Draw the clock edge marks on a timing diagram, and give the assumed input sequence.</li>
+</ul></div>
+
+<h2>Mandatory practice</h2>
+<div id="p1"></div>
+<div id="r1"></div>
+<div id="r2"></div>
+<div id="r3"></div>
+<div id="r4"></div>
+<div id="r5"></div>
+</main>
+<script src="../assets/book.js"></script><script src="../assets/logic.js"></script><script src="../assets/dld.js"></script>
+<script>
+shiftLab('#sh1', { n: 4, kind: 'shift', serial: '1011' });
+shiftLab('#sh2', { n: 4, kind: 'ring' });
+shiftLab('#sh3', { n: 4, kind: 'johnson' });
+timing('#t1', {"signals":{"D":[1,0,1,1,0,0,0],"Q0":[0,1,0,1,1,0,0],"Q1":[0,0,1,0,1,1,0],"Q2":[0,0,0,1,0,1,1],"Q3":[0,0,0,0,1,0,1]},"clock":true});
+timing('#t2', {"signals":{"Q0":[1,0,1,0,1,0,1],"Q1":[0,1,0,1,0,1,0],"Q2":[1,0,1,0,1,0,1],"Q3":[0,1,0,1,0,1,0]},"clock":true});
+timing('#t3', {"signals":{"Q0":[1,0,0,0,1,0,0],"Q1":[1,1,0,0,0,1,0],"Q2":[1,1,1,0,0,0,1],"Q3":[1,1,1,1,0,0,0]},"clock":true});
+timing('#t4', {"signals":{"Q0":[1,0,0,0,0,1,0,0,0,0,1],"Q1":[0,1,0,0,0,0,1,0,0,0,0],"Q2":[0,0,1,0,0,0,0,1,0,0,0],"Q3":[0,0,0,1,0,0,0,0,1,0,0],"Q4":[0,0,0,0,1,0,0,0,0,1,0]},"clock":true});
+timing('#t5', {"signals":{"Q0":[0,1,1,1,1,0,0,0,0,1],"Q1":[0,0,1,1,1,1,0,0,0,0],"Q2":[0,0,0,1,1,1,1,0,0,0],"Q3":[0,0,0,0,1,1,1,1,0,0]},"clock":true});
+timing('#t6', {"signals":{"Q0":[0,1,1,1,1,1,0,0,0,0,0,1],"Q1":[0,0,1,1,1,1,1,0,0,0,0,0],"Q2":[0,0,0,1,1,1,1,1,0,0,0,0],"Q3":[0,0,0,0,1,1,1,1,1,0,0,0],"Q4":[0,0,0,0,0,1,1,1,1,1,0,0]},"clock":true});
+diagram('#ds1', { table: 'A: A,0 A,1 B,0 A,1\nB: A,1 B,0 B,1 B,0', inputs: ['00', '01', '11', '10'] });
+diagram('#ds2', { table: 'A: A,0 B,1 A,0 A,1\nB: B,1 B,0 B,1 A,0', inputs: ['00', '01', '11', '10'] });
+practice('#p1', { id: 'p1', kind: 'excite', n: 2 });
+recall('#r1', { id: 'r1', marks: 13, q: 'Design a 4-bit universal shift register using multiplexers and D flip-flops. (2024–25 Q1b)', points: ['Mode table: S1S0 = 00 hold, 01 shift right, 10 shift left, 11 parallel load', 'One 4×1 MUX per stage feeding the D flip-flop', 'I0 = own Q, I1 = left neighbour or SIR, I2 = right neighbour or SIL, I3 = parallel input', 'S1 S0, CLK (and CLEAR) common to all stages', 'Four stages drawn with all wires labelled', 'Serial outputs Q0 and Q3'], model: '<p>See section 2: stage i has D<sub>i</sub> = S1\'S0\'Q<sub>i</sub> + S1\'S0 Q<sub>i+1</sub> + S1S0\' Q<sub>i−1</sub> + S1S0 P<sub>i</sub>.</p>' });
+recall('#r2', { id: 'r2', marks: 12, q: 'A ring counter is initialised incorrectly. Analyse the resulting sequence and propose a circuit modification for automatic correction. (2024–25 Q3a)', points: ['The number of 1s never changes, so the states form separate loops', 'Example: 1010 loops 1010 and 0101 forever; 0000 and 1111 lock up', 'Only the single-1 loop is correct', 'Modification: D0 = NOR of Q0 .. Q(n−2)', 'It feeds a 1 in only when the first n−1 stages are 0', 'Every state reaches 1000 within a few clocks: self-correcting'], model: '<p>See section 6.</p>' });
+recall('#r3', { id: 'r3', marks: 7, q: 'Design a 4-bit Johnson counter using a shift register and illustrate its operation with a timing diagram. (2018–19 Q6c)', points: ['Four D flip-flops, common clock and clear', 'D0 = Q3\' (inverted feedback), D1 = Q0, D2 = Q1, D3 = Q2', 'Count table with 8 states 0000, 1000, 1100, 1110, 1111, 0111, 0011, 0001', 'Timing diagram: each output high 4 clocks, low 4, shifted by one clock', 'Mod-8 = 2n'], model: '<p>See section 7.</p>' });
+recall('#r4', { id: 'r4', marks: 10, q: 'Design a serial adder that adds two 4-bit numbers stored in shift registers A and B; the result goes to A. (2017–18 Q6b)', points: ['Full adder with x1, x2 from the serial outputs of A and B (LSB first)', 'Sum back to the serial input of A', 'Carry out to a D flip-flop, Q is the carry in; cleared at start', 'Same clock for all, four pulses', 'State diagram or table with states A (carry 0) and B (carry 1)', 'Equations Y = x1x2 + x1y + x2y, z = x1 xor x2 xor y'], model: '<p>See section 8.</p>' });
+recall('#r5', { id: 'r5', marks: 16, q: 'A 4-bit shift register is used for serial data transmission. Analyse the timing of data, clock and output, and explain how errors propagate. (2024–25 Q4a)', points: ['Waveform of CLK, D, Q0..Q3 with sampling edges', 'Bit moves one stage per clock; all 4 bits valid after 4 edges', 'Set-up and hold times; max clock rate from t_pd and set-up', 'Single corrupted bit stays in one position, not detected', 'Extra or missing clock pulse shifts every later bit (framing error)', 'Feedback registers spread the error to following bits', 'Remedies: parity, start/stop bits, clean clock'], model: '<p>See section 5.</p>' });
+</script>
+</body>
+</html>

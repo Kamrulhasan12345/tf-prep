@@ -1,0 +1,323 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Decoders, encoders, priority encoders · CSE 205 Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Combinational circuits · Mano §4.9, §4.10 · Tanzima ma'am L13–15 (Jul 21 – Jul 26) · every year</div>
+<h1>Decoders, encoders and priority encoders</h1>
+<p class="lede">Past TF questions on this topic: <b>2024–25</b> Q6c (15, priority encoder, servers C A E H D G F B), Q7c (12, full subtractor on a 4-to-16 decoder, active-low outputs, two enables); <b>2023–24</b> Q3a (12, 4-to-16 from 2-to-4 decoders), Q2b (9, 8-to-3 priority encoder table, lower number higher priority); <b>2022–23</b> Q4b (10, full adder on a 3×8 decoder and two ORs); <b>2021–22</b> Q4b (10, Σ(3,5,6,7) on an active-low 3×8 decoder with AND), Q3c (8, demultiplexer); <b>2020–21</b> Q1a (15, 2-bit adder on a 2-to-4 decoder), Q1b (15, Ishrat's college choices, priority B A D E F H G C), Q1c (5, decoder as demultiplexer); <b>2018–19</b> Q3a (14, 4-variable function on a 2-to-4 decoder), Q3b (13, priority encoder 5 0 7 4 6 3 2 1), Q3c (8, decoder as demultiplexer); <b>2017–18</b> Q3a (12, 4-variable function on a 2×4 decoder), Q3b (13, priority encoder 6 0 7 4 5 3 1 2), Q3c (10, half subtractor on a 2-to-4 decoder). Older: 3×8 from two 2×4 (2011–12), full adder from decoders (2012–13, 2015–16), 4-input priority encoder (2011–12, 2013–14, 12 marks), decoder multi-function (2015–16). <b>Every one of the 8 papers has a decoder or priority-encoder question worth 10–15 marks.</b> The priority encoder with a custom order is the most predictable mark of Section A.</p>
+
+<h2>1. Decoders</h2>
+<p>A <b>decoder</b> has n inputs and 2<sup>n</sup> outputs. Exactly one output is "on" for each input combination: output D<sub>i</sub> is the <b>minterm i</b> of the inputs. A 2-to-4 decoder is four AND gates plus two inverters.</p>
+<div class="def"><dl>
+<dt>Active-high output</dt><dd>The selected output is 1, all others 0 (AND gates).</dd>
+<dt>Active-low output</dt><dd>The selected output is 0, all others 1 (NAND gates). Written D<sub>i</sub>' or drawn with a bubble.</dd>
+<dt>Enable</dt><dd>Extra input. The decoder works only when the enable is at its active level. When it is <b>disabled</b>, no output is selected: active-high outputs all 0, active-low outputs all 1. Active-low enable EN' works when EN' = 0 (tie it to ground to leave it always on). With two enables, both must be active.</dd></dl></div>
+<div id="d0"></div>
+<div id="lab"></div>
+<p>Truth table of a 2-to-4 decoder with enable (active-high, ma'am's table): E = 0 gives 0000. E = 1: I1I0 = 00 → D0 = 1, 01 → D1, 10 → D2, 11 → D3. D0 = E I1' I0', D1 = E I1' I0, D2 = E I1 I0', D3 = E I1 I0.</p>
+
+<h2>2. Any function on a decoder: the four combinations</h2>
+<p>A decoder produces all minterms, so any function is "OR of its minterms". One extra gate does the OR. ma'am's four combinations, for F = Σ(3,5,6,7) (that is also 2021–22 Q4b):</p>
+<div class="tbl"><table class="mat"><tr><th>decoder outputs</th><th>gate</th><th>which minterms go into the gate</th><th>why it works</th></tr>
+<tr><td>active-high</td><td>OR</td><td>the <b>1</b>-minterms: 3, 5, 6, 7</td><td>F = D3 + D5 + D6 + D7 (SOP)</td></tr>
+<tr><td>active-high</td><td>NOR</td><td>the <b>0</b>-minterms: 0, 1, 2, 4</td><td>NOR is 1 only when none of the zero-minterms is on</td></tr>
+<tr><td>active-low</td><td>NAND</td><td>the <b>1</b>-minterms: 3, 5, 6, 7</td><td>NAND of D' is the OR of D (De Morgan)</td></tr>
+<tr><td>active-low</td><td>AND</td><td>the <b>0</b>-minterms: 0, 1, 2, 4</td><td>AND of D' is 0 whenever a zero-minterm is selected, and 1 otherwise</td></tr></table></div>
+<div id="c1"></div><div id="c2"></div><div id="c3"></div><div id="c4"></div>
+<p><b>Rule to remember:</b> OR and NAND take the ones. NOR and AND take the zeros. The decoder polarity tells you which of the two is allowed: active-high with OR/NOR, active-low with NAND/AND. Several functions on the same decoder just means several gates (ma'am's multi-function examples):</p>
+<div class="exam"><div class="exam-src">2022–23 Q4(b) · 10 marks · older 2012–13 and 2015–16 · 2021–22 Q4(b) · 10 marks (active-low, AND)</div><div class="exam-q"><p>Design a full adder circuit using a 3×8 decoder and two OR gates. (2021–22: F(x,y,z) = Σ(3,5,6,7) using an active-low 3×8 decoder and AND gates.)</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<p>Full adder: S = Σ(1,2,4,7) and C<sub>out</sub> = Σ(3,5,6,7) of (x, y, z). Both are symmetric functions, so it does not matter which input is the MSB. Put x on I2, y on I1, z on I0 of an active-high decoder. S = D1 + D2 + D4 + D7 and C = D3 + D5 + D6 + D7. Two 4-input OR gates.</p>
+<div id="fa"></div>
+<p><b>2021–22 Q4b:</b> F = Σ(3,5,6,7), active-low outputs, AND gates: the zeros are 0, 1, 2, 4, so F = D0'·D1'·D2'·D4' with one AND gate (the second drawing above).</p>
+</div></details></div>
+<p><b>Multi-output examples from ma'am's notes.</b> F1 = Σ(0,5,7), F2 = Σ(2,3,4), F3 = Σ(1,6,7) with an active-high decoder and three OR gates; and F1 = Σ(2,4,7), F2 = Σ(0,3), F3 = Σ(0,2,3,4,7) with an active-low decoder and three NAND gates ("NAND → active-low decoder").</p>
+<div id="mo1"></div><div id="mo2"></div>
+<div class="write"><h4>What to write (function on a decoder, 10–12 marks)</h4><ol>
+<li>The minterm list of each function (convert Π to Σ if needed).</li>
+<li>A labelled decoder block: inputs with their order (MSB first), enables tied active, outputs D0..D7 with their polarity.</li>
+<li>Gate choice with the rule: "active-high with OR takes the 1s", etc.</li>
+<li>Wires from exactly the needed outputs to the gate; the output named F (or S, C).</li>
+<li>One check row, for example "x y z = 0 1 1 selects D3, so C = 1".</li></ol></div>
+
+<h2>3. Bigger decoders from smaller ones</h2>
+<p>A decoder with an enable can be grown: decode the high bits with one decoder, and use each of its outputs as the enable of one small decoder that decodes the low bits.</p>
+<div class="exam"><div class="exam-src">2023–24 Q3(a) · 12 marks · older: 3×8 from two 2×4 (2011–12, 8 marks)</div><div class="exam-q"><p>Design a 4-to-16 decoder using the minimum number of 2-to-4 decoders. (The 2-to-4 decoders have an enable, 1 = enabled; the 4-to-16 decoder itself has no enable.)</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<p>16 outputs need at least 16 / 4 = 4 small decoders. Something must also choose which of the four is on, and a 2-to-4 decoder is exactly that. <b>Minimum = 5 decoders.</b></p>
+<ol>
+<li>The first decoder takes the two high bits I3 I2. Its outputs Y0..Y3 are the enables of the four second-level decoders, so exactly one of them is enabled.</li>
+<li>All four second-level decoders get I1 I0.</li>
+<li>Second-level decoder k gives outputs D(4k)..D(4k+3). All other decoders are disabled (outputs 0).</li></ol>
+<div id="big"></div>
+<p><b>3×8 from two 2×4</b> (older question and ma'am's notes): I2 chooses the decoder. I1 I0 go to both. The decoder for D0–D3 has E = I2'. The decoder for D4–D7 has E = I2. One inverter.</p>
+</div></details></div>
+<div class="write"><h4>What to write (decoder expansion, 8–12 marks)</h4><ol>
+<li>The count and the reason: "16/4 = 4 decoders for the outputs, plus 1 to select = 5".</li>
+<li>The diagram: first-level decoder fed with the high bits, its outputs into the enables of the others, the low bits shared.</li>
+<li>Every output labelled D0..D15 and the enable polarity stated.</li></ol></div>
+
+<h2>4. A 4-variable function on a small decoder</h2>
+<p>A 2-to-4 decoder only handles two variables. Put <b>two variables on the decoder</b> and let the other two variables appear in extra gates. For each decoder output, ask: "when the decoder selects this minterm, what must F be as a function of the other two variables?" This is exactly the MUX-input table.</p>
+<ol>
+<li>Pick two variables for the decoder inputs (any two, A is the MSB). Different choices give different gate counts; try them, take the cheapest.</li>
+<li>For each decoder output D<sub>i</sub>, find the residual r<sub>i</sub>: F as a function of the two remaining variables (0, 1, a literal, or a small function).</li>
+<li>F = Σ D<sub>i</sub> · r<sub>i</sub>. Where r<sub>i</sub> = 1 the output D<sub>i</sub> goes straight in. Where r<sub>i</sub> = 0, D<sub>i</sub> is not used.</li>
+<li>With <b>active-low outputs</b> D<sub>i</sub>': each term is D<sub>i</sub>' + r<sub>i</sub>' (an OR gate), and F = NAND of all the terms. The terms with r<sub>i</sub> = 1 are just D<sub>i</sub>'.</li>
+<li>Tie the enable to its active level.</li></ol>
+<div class="exam"><div class="exam-src">2017–18 Q3(a) · 12 marks</div><div class="exam-q"><p>Implement f(w,x,y,z) = Σ(0,2,6,7,8,10,11,13,14) with a 2×4 decoder with inputs A, B, an active-low enable EN' and active-low outputs D0'..D3', using the minimum number of extra logic gates.</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<p>The cheapest choice found is A = y, B = z (y MSB). The residuals in (w, x) are:</p>
+<div id="f1"></div>
+<p>I0 = x', I1 = wx, I2 = 1, I3 = w ⊕ x. So F = D0·x' + D1·wx + D2 + D3·(w ⊕ x). With active-low outputs: F = NAND( D0' + x , D1' + (wx)' , D2' , D3' + (w ⊕ x)' ). Gates: OR(D0', x), NAND(w,x) and OR(D1', ·), XNOR(w,x) and OR(D3', ·), and the final NAND: <b>6 extra gates</b>. EN' = 0.</p>
+<div id="f1c"></div>
+<p>For comparison, w and x on the decoder gives the residuals z', y, z' + y, y ⊕ z, and the same construction needs 8 extra gates.</p>
+</div></details></div>
+<div class="exam"><div class="exam-src">2018–19 Q3(a) · 14 marks</div><div class="exam-q"><p>Design a logic circuit for f(w,x,y,z) = Σ(0,2,6,7,10,11,12,14) with a 2-to-4 line decoder with inputs A, B, enabled by active-low enables EN1' and EN2', using the minimum number of extra gates.</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<p><b>Assumption:</b> the outputs are active-high (the question says only that the enables are active-low). Again y, z on the decoder (A = y, B = z), residuals in (w, x):</p>
+<div id="f2"></div>
+<p>I0 = w ⊙ x (XNOR), I1 = 0, I2 = 1, I3 = w ⊕ x. F = D0·(w ⊙ x) + D2 + D3·(w ⊕ x). Gates: XNOR, XOR, two ANDs and an OR: <b>5 extra gates</b>. EN1' = EN2' = 0 (both to ground). (With w, x on the decoder instead, the residuals are z', y, y, z' and the circuit needs 6 gates.)</p>
+<div id="f2c"></div>
+</div></details></div>
+<div class="exam"><div class="exam-src">2017–18 Q3(c) · 10 marks</div><div class="exam-q"><p>Design a half subtractor using a 2-to-4 decoder (active-high outputs, active-low enable EN').</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<p>x − y: Difference D = x ⊕ y = Σ(1,2), Borrow B = x'y = Σ(1). Decoder inputs I1 = x, I0 = y, EN' = 0. D = D1 + D2 (one OR gate). B = D1 (<b>no gate</b>, a wire).</p>
+<div id="hs"></div>
+</div></details></div>
+<div class="exam"><div class="exam-src">2020–21 Q1(a) · 15 marks</div><div class="exam-q"><p>Add two 2-bit numbers X1X0 and Y1Y0 with a 2-to-4 decoder (inputs I0, I1, active-low outputs O3..O0, active-low enables EN1', EN2'). Use the minimum number of extra gates.</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<p>The sum S2 S1 S0 needs four inputs, but the decoder takes only two. Use the decoder as the <b>half adder of the low bits</b>, and finish the high bit with gates.</p>
+<ol>
+<li>Decoder inputs: I1 = X0, I0 = Y0. Outputs O1' (X0'Y0), O2' (X0Y0'), O3' (X0Y0). Enables grounded.</li>
+<li>S0 = X0 ⊕ Y0 = O1 + O2 = NAND(O1', O2'). The carry c1 = O3 (the complement is O3').</li>
+<li>Let g = XNOR(X1, Y1) = (X1 ⊕ Y1)'. Then S1 = (X1 ⊕ Y1) ⊕ c1 = XOR(g, O3').</li>
+<li>S2 = X1Y1 + (X1 ⊕ Y1)·c1 = AND(X1, Y1) + NOR(g, O3').</li></ol>
+<div id="add2"></div>
+<p>Extra gates: NAND, XNOR, XOR, NOR, AND, OR = <b>6</b> (verified for all 16 input pairs). Assumption: other designs exist; this one uses the decoder for the low-bit half adder and no inverters.</p>
+</div></details></div>
+<div class="exam"><div class="exam-src">2024–25 Q7(c) · 12 marks</div><div class="exam-q"><p>Design a 1-bit full subtractor using a 4-to-16 decoder with active-low outputs and two active-low enables EN1', EN2'.</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<p>x − y − b: Diff = Σ(1,2,4,7), B<sub>out</sub> = Σ(1,2,3,7). Only three inputs are needed, so <b>tie the MSB input I3 to 0</b> (assumption) and put x, y, b on I2, I1, I0. Minterm numbers are then 0–7. Enables to ground. Outputs are active-low, so use NAND gates on the ones:</p>
+<p>Diff = NAND(D1', D2', D4', D7'), B<sub>out</sub> = NAND(D1', D2', D3', D7').</p>
+<div id="fs"></div>
+<p>(Alternative that uses the spare input: tie I3 to 1 and take D9, D10, D12, D15 and D9, D10, D11, D15. Both are correct if the enables are tied to ground.)</p>
+</div></details></div>
+
+<h2>5. Decoder as a demultiplexer</h2>
+<p>A <b>demultiplexer</b> sends one input line D to one of 2<sup>n</sup> output lines chosen by n select bits. A <b>decoder with an enable is exactly a demultiplexer</b>: put the data on the enable input and the select bits on the decoder inputs.</p>
+<div class="exam"><div class="exam-src">2018–19 Q3(c) · 8 marks · 2020–21 Q1(c) · 5 marks · 2021–22 Q3(c) · 8 marks · older 2016–17 (5), 2012–13</div><div class="exam-q"><p>Show that a decoder can be used as a demultiplexer. (What is a demultiplexer? Give an example.)</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<p><b>Demultiplexer:</b> one data input, n select lines, 2<sup>n</sup> outputs. The data appears on the selected output, all other outputs are 0.</p>
+<p><b>Decoder as DEMUX (2-to-4 example):</b> inputs I1 I0 = S1 S0, enable E = D.</p>
+<div class="tbl"><table class="mat"><tr><th>D (= E)</th><th>S1</th><th>S0</th><th>Y0</th><th>Y1</th><th>Y2</th><th>Y3</th></tr>
+<tr><td>0</td><td>x</td><td>x</td><td>0</td><td>0</td><td>0</td><td>0</td></tr>
+<tr><td>1</td><td>0</td><td>0</td><td>1</td><td>0</td><td>0</td><td>0</td></tr><tr><td>1</td><td>0</td><td>1</td><td>0</td><td>1</td><td>0</td><td>0</td></tr><tr><td>1</td><td>1</td><td>0</td><td>0</td><td>0</td><td>1</td><td>0</td></tr><tr><td>1</td><td>1</td><td>1</td><td>0</td><td>0</td><td>0</td><td>1</td></tr></table></div>
+<p>So Y<sub>i</sub> = D · (minterm i of S1S0): the selected output equals D, the others are 0. That is the demultiplexer equation.</p>
+<div id="dm"></div><div id="dmt"></div>
+</div></details></div>
+
+<h2>6. Encoders</h2>
+<p>An <b>encoder</b> is the reverse of a decoder: 2<sup>n</sup> input lines, n output lines, giving the binary number of the active input. The plain octal-to-binary encoder (8 inputs, 3 outputs) is three OR gates:</p>
+<p class="formula">Y2 = I4 + I5 + I6 + I7<br>Y1 = I2 + I3 + I6 + I7<br>Y0 = I1 + I3 + I5 + I7</p>
+<div id="enc"></div>
+<p><b>Two problems:</b> (1) if two inputs are on at once the output is a mixture (I3 and I5 together give 111); (2) I0 on and no input on both give 000. Fix: make it a <b>priority encoder</b> (one input wins) with a <b>valid output V</b> (1 when any input is on).</p>
+
+<h2>7. Priority encoders</h2>
+<p>If several inputs can be on at once, the highest-<b>priority</b> one is encoded. The output is the binary <b>number</b> of that input (not its rank). V = 1 if any input is on, so that "no input" is not confused with "input 0".</p>
+<p><b>Method (do these steps in this order).</b></p>
+<ol>
+<li>Write the priority order, highest first.</li>
+<li><b>Compressed truth table.</b> The first row is "all inputs 0": outputs are don't-care (X X X), V = 0. Then one row per input, lowest priority first. In the row for input p: p = 1, every input of <b>higher</b> priority = 0, every input of <b>lower</b> priority = X. Outputs = binary number of p, V = 1.</li>
+<li><b>Equations.</b> An output bit is 1 for every row whose input number has that bit = 1. So each output is an OR of terms of the form "<b>input i is 1 and every higher-priority input is 0</b>", one term per input i whose number has that bit set. V = OR of all inputs.</li>
+<li>Simplify with a K-map or by absorption (x + x'y = x + y). Because the all-zero row is a don't-care, the terms shrink a lot.</li>
+<li>Draw: AND-OR gates, every input and the outputs Y2 Y1 Y0 and V labelled.</li></ol>
+<p><b>ma'am's 4-input example</b> (I3 &gt; I2 &gt; I1 &gt; I0): rows 0000 → XX, V = 0; 0001 → 00; 001X → 01; 01XX → 10; 1XXX → 11. Y1 = I3 + I2, Y0 = I3 + I2'I1, V = I3 + I2 + I1 + I0.</p>
+<div id="pe4"></div>
+<div class="write"><h4>What to write (priority encoder, 9–15 marks)</h4><ol>
+<li>One sentence: "highest priority input wins; output is its binary number; V = 1 when any input is 1".</li>
+<li>The compressed truth table: first row all 0 with X X X and V = 0, then the rows with the 0s above and X below, outputs filled in.</li>
+<li>Output equations as OR of "input i AND the higher inputs' complements", then the simplified form.</li>
+<li>V = OR of every input.</li>
+<li>The circuit with inputs, Y2 Y1 Y0 and V labelled.</li>
+<li>If the inputs are named by letters (A..H), say the code you assume (A = 000 … H = 111).</li></ol></div>
+
+<div class="exam"><div class="exam-src">2017–18 Q3(b) · 13 marks</div><div class="exam-q"><p>Design an 8-to-3 priority encoder with the priority order 6, 0, 7, 4, 5, 3, 1, 2 (6 highest, 2 lowest).</p></div>
+<details><summary>Answer</summary><div class="exam-a"><div id="pe1"></div>
+<div id="pe1g0"></div><div id="pe1g1"></div><div id="pe1g2"></div>
+</div></details></div>
+<div class="exam"><div class="exam-src">2018–19 Q3(b) · 13 marks</div><div class="exam-q"><p>Design an 8-to-3 priority encoder with the priority order 5, 0, 7, 4, 6, 3, 2, 1 (5 highest, 1 lowest).</p></div>
+<details><summary>Answer</summary><div class="exam-a"><div id="pe2"></div></div></details></div>
+<div class="exam"><div class="exam-src">2023–24 Q2(b) · 9 marks</div><div class="exam-q"><p>Give the truth table of an 8-to-3 priority encoder where the lower-numbered input has higher priority (I0 highest, I7 lowest).</p></div>
+<details><summary>Answer</summary><div class="exam-a"><div id="pe3"></div></div></details></div>
+<div class="exam"><div class="exam-src">2020–21 Q1(b) · 15 marks</div><div class="exam-q"><p>Ishrat has eight college choices A to H. If several are open to her, she picks by the priority B, A, D, E, F, H, G, C (B highest, C lowest). Find the Boolean function and show the steps.</p></div>
+<details><summary>Answer</summary><div class="exam-a"><p><b>Assumption:</b> the circuit has eight inputs (one per college, 1 = she can take it) and outputs the 3-bit code of the college chosen, A = 000 … H = 111, with V = 1 if she has any choice. This is a priority encoder.</p><div id="pe4a"></div></div></details></div>
+<div class="exam"><div class="exam-src">2024–25 Q6(c) · 15 marks</div><div class="exam-q"><p>A light-sensor controller for eight servers A to H: sensors tell which servers are active, and the controller must show one server. Priority order C, A, E, H, D, G, F, B (C highest, B lowest).</p></div>
+<details><summary>Answer</summary><div class="exam-a"><p><b>Assumption:</b> one sensor input per server (1 = ON), and the controller outputs the 3-bit code of the highest-priority ON server, A = 000 … H = 111, plus V = 1 when at least one server is ON. The printed question is garbled; this is the standard reading as a priority encoder.</p><div id="pe5"></div>
+<div id="pe5g0"></div><div id="pe5g1"></div><div id="pe5g2"></div></div></details></div>
+
+<div class="trap"><b>Traps that cost marks</b><ul>
+<li>Decoder with active-low outputs: using OR/NOR. Active-low takes NAND (ones) or AND (zeros).</li>
+<li>Forgetting to tie the enable to its active level (EN' = 0), or to say "disabled = all outputs inactive".</li>
+<li>Reading the decoder inputs in the wrong order. The first-named variable is the MSB (D<sub>i</sub> is the minterm number i).</li>
+<li>Giving the rank instead of the number: the output is the <b>index</b> of the winning input, not "1st priority".</li>
+<li>Priority table: putting X on the higher-priority side. X goes on the <b>lower</b>-priority side.</li>
+<li>No V output, so "no input active" and "input 0 active" look identical.</li>
+<li>4-to-16 from 2-to-4: using 4 decoders and forgetting the first-level decoder.</li></ul></div>
+
+<h2>Mandatory practice</h2>
+<div id="p1"></div>
+<div id="p2"></div>
+<div id="r1"></div>
+<div id="r2"></div>
+<div id="r3"></div>
+<div id="r4"></div>
+</main>
+<script src="../assets/book.js"></script><script src="../assets/logic.js"></script><script src="../assets/dld.js"></script>
+<script>
+// net(sel, {inputs:[...], nodes:[{id,kind,label,ins:[ref..],pi:[..],po:[..],nout}], outputs:[{ref,label}], note})
+// kinds: and or nand nor not xor xnor | box (label, pi = input pin labels, po = output pin labels)
+function net(sel, sp) {
+  const IN = sp.inputs || [], N = {}, G = ['and', 'or', 'nand', 'nor', 'not', 'xor', 'xnor', 'buf'];
+  sp.nodes.forEach(n => { N[n.id] = n; n.isG = G.includes(n.kind); });
+  const parse = r => IN.includes(r) ? { p: r } : { id: r.split('.')[0], k: +(r.split('.')[1] || 0) };
+  Object.values(N).forEach(n => { const ni = n.ins.length, no = (n.po || [0]).length;
+    if (n.isG) { n.w = 44; n.h = n.kind === 'not' ? 22 : Math.max(26, ni * 13); } else { n.w = Math.max(74, (n.label || '').length * 7.5 + ((n.pi || n.po) ? 56 : 20)); n.h = Math.max(44, 22 * Math.max(ni, no) + 8); } });
+  const lv = {}; const L1 = id => { if (lv[id] !== undefined) return lv[id]; lv[id] = 1 + Math.max(0, ...N[id].ins.map(r => { const s = parse(r); return s.p ? 0 : L1(s.id); })); return lv[id]; };
+  Object.keys(N).forEach(L1); const nl = Math.max(...Object.values(lv)), cols = []; for (let l = 1; l <= nl; l++) cols.push(Object.values(N).filter(n => lv[n.id] === l));
+  let x = 90; cols.forEach(c => { const w = Math.max(...c.map(n => n.w)); c.forEach(n => { n.x = x; n.cw = w; }); x += w + 78; });
+  const outPin = (n, k) => { const no = (n.po || [0]).length; return [n.x + n.w + (/^n|^not$|^xnor$/.test(n.kind) && n.isG ? 8 : 0), n.y + (k + .5) * n.h / no]; };
+  const inPin = (n, j) => [n.x - (n.kind === 'xor' || n.kind === 'xnor' ? 4 : 0), n.y + (j + .5) * n.h / n.ins.length];
+  const stack = c => { let y = 20; c.forEach(n => { n.y = y; y += n.h + 20; }); };
+  cols.forEach(stack);
+  const pry = {}; IN.forEach((p, i) => pry[p] = 24 + i * 26);
+  const srcY = r => { const s = parse(r); return s.p ? pry[s.p] : outPin(N[s.id], s.k)[1]; };
+  for (let it = 0; it < 4; it++) { cols.forEach(c => { c.forEach(n => n.by = n.ins.reduce((a, r) => a + srcY(r), 0) / n.ins.length); if (!sp.keep) c.sort((a, b) => a.by - b.by); let y = 0; c.forEach(n => { n.y = Math.max(y + 18, n.by - n.h / 2); y = n.y + n.h; }); }); IN.forEach(p => { const ys = []; Object.values(N).forEach(n => n.ins.forEach((r, j) => { if (r === p) ys.push(inPin(n, j)[1]); })); if (ys.length) pry[p] = ys.reduce((a, b) => a + b, 0) / ys.length; }); const sp2 = [...IN].sort((a, b) => pry[a] - pry[b]); let y = 14; sp2.forEach(p => { pry[p] = Math.max(pry[p], y); y = pry[p] + 24; }); }
+  { const ys = [...Object.values(N).map(n => n.y), ...IN.map(p => pry[p] - 10)], mn = Math.min(...ys) - 14; Object.values(N).forEach(n => n.y -= mn); IN.forEach(p => pry[p] -= mn); }
+  let wires = '', body = '';
+  Object.values(N).forEach(n => n.ins.forEach((r, j) => { const s = parse(r), [xs, ys] = s.p ? [64, pry[s.p]] : outPin(N[s.id], s.k), [xt, yt] = inPin(n, j), xm = xt - 12 - 6 * (j % 4); wires += `<path class="wr" d="M${xs},${ys} H${xm} V${yt} H${xt}"/>`; }));
+  IN.forEach(p => { body += `<text class="lb" x="58" y="${pry[p]}" style="text-anchor:end">${ovs(p)}</text><line class="wr" x1="62" y1="${pry[p]}" x2="68" y2="${pry[p]}"/>`; });
+  Object.values(N).forEach(n => { if (n.isG) { const t = n.kind === 'xor' ? 'or' : n.kind === 'xnor' ? 'nor' : n.kind === 'buf' ? 'and' : n.kind, g = gateShape(t, n.x, n.y, n.w, n.h); body += g.svg; if (n.kind === 'xor' || n.kind === 'xnor') body += `<path class="wr" d="M${n.x - 6},${n.y} q${n.w * .3},${n.h / 2} 0,${n.h}"/>`; if (n.label) body += `<text class="sm" x="${n.x + n.w / 2 - 4}" y="${n.y + n.h + 9}">${ovs(n.label)}</text>`; }
+    else { body += `<rect class="gt" x="${n.x}" y="${n.y}" width="${n.w}" height="${n.h}" rx="4"/><text class="lb" x="${n.x + n.w / 2}" y="${n.y + n.h / 2}">${ovs(n.label || '')}</text>`; (n.pi || []).forEach((t, j) => { const [px, py] = inPin(n, j); body += `<text class="sm" x="${px + 4}" y="${py}" style="text-anchor:start">${ovs(t)}</text>`; }); (n.po || []).forEach((t, k) => { const [px, py] = outPin(n, k); body += `<text class="sm" x="${px - 4}" y="${py}" style="text-anchor:end">${ovs(t)}</text>`; }); } });
+  let W = x - 20, H = 20;
+  (sp.outputs || []).forEach(o => { const s = parse(o.ref), [ox, oy] = outPin(N[s.id], s.k); body += `<line class="wr" x1="${ox}" y1="${oy}" x2="${ox + 26}" y2="${oy}"/><text class="lb" x="${ox + 30}" y="${oy}" style="text-anchor:start">${ovs(o.label)}</text>`; W = Math.max(W, ox + 40 + o.label.length * 8); });
+  Object.values(N).forEach(n => { H = Math.max(H, n.y + n.h + 22); }); IN.forEach(p => { H = Math.max(H, pry[p] + 16); });
+  host(sel).innerHTML = `<div class="fg-wrap"><svg class="dsa-fig" viewBox="0 0 ${W} ${H}" width="${W}" role="img" aria-label="${esc(sp.alt || 'circuit diagram')}">${wires}${body}</svg>${sp.note ? `<div class="figlabel">${sp.note}</div>` : ''}</div>`;
+}
+
+const W4 = ['w', 'x', 'y', 'z'];
+// decoder block with gates. o: {ins:[names MSB first], low, fns:[{name,outs,gate}], en:[labels], n}
+function decFn(sel, o) {
+  const k = o.ins.length, N = 1 << k, en = o.en || [], low = !!o.low, pins = [...o.ins.map((v, i) => 'I' + (k - 1 - i)), ...en.map(e => e.pin)];
+  const nodes = [{ id: 'd', kind: 'box', label: `${k}-to-${N} decoder`, ins: [...o.ins, ...en.map(e => e.src)], pi: pins, po: Array.from({ length: N }, (_, i) => 'D' + i + (low ? "'" : '')) }];
+  (o.fns || []).forEach((f, i) => nodes.push({ id: 'g' + i, kind: f.gate, ins: f.outs.map(m => 'd.' + m) }));
+  net(sel, { alt: 'decoder implementation', inputs: [...o.ins, ...en.map(e => e.src)], nodes, outputs: (o.fns || []).map((f, i) => ({ ref: 'g' + i, label: f.name })), note: o.note });
+}
+const ground = (n, p) => ({ src: n, pin: p });
+// 1. 2-to-4 decoder from gates
+net('#d0', { keep: 1, alt: '2-to-4 decoder with enable', inputs: ['I1', 'I0', 'E'], nodes: [
+  { id: 'n1', kind: 'not', ins: ['I1'] }, { id: 'n0', kind: 'not', ins: ['I0'] },
+  { id: 'a0', kind: 'and', ins: ['n1', 'n0', 'E'] }, { id: 'a1', kind: 'and', ins: ['n1', 'I0', 'E'] }, { id: 'a2', kind: 'and', ins: ['I1', 'n0', 'E'] }, { id: 'a3', kind: 'and', ins: ['I1', 'I0', 'E'] }],
+  outputs: [{ ref: 'a0', label: 'D0' }, { ref: 'a1', label: 'D1' }, { ref: 'a2', label: 'D2' }, { ref: 'a3', label: 'D3' }], note: '2-TO-4 DECODER with an active-high enable (replace the ANDs with NANDs for active-low outputs)' });
+// decoder lab
+(() => { const el = $('#lab'); const st = { a: 0, b: 0, c: 0, E: 1, low: 0, enLow: 0 };
+  const paint = () => { const idx = st.a * 4 + st.b * 2 + st.c, on = (st.enLow ? !st.E : st.E) ? 1 : 0;
+    el.innerHTML = `<span class="anim-tag">decoder bench · 3-to-8</span><div class="mx-ctl">${['a', 'b', 'c'].map((k, i) => `<button type="button" class="must-b" data-k="${k}">I${2 - i} = ${st[k]}</button>`).join(' ')} <button type="button" class="must-b" data-k="E">EN pin = ${st.E}</button> <button type="button" class="must-b" data-m="enLow">enable is ${st.enLow ? 'active-low (EN\')' : 'active-high (EN)'}</button> <button type="button" class="must-b" data-m="low">outputs are ${st.low ? 'active-low' : 'active-high'}</button></div>
+    <div class="leds">${[...Array(8).keys()].map(i => { const sel = on && i === idx, val = st.low ? (sel ? 0 : 1) : (sel ? 1 : 0); return `<span class="led${val ? ' on' : ''}">D${i}${st.low ? "'" : ''}<b>${val}</b></span>`; }).join('')}</div>
+    <p class="tracer-hint">${on ? `Enabled. Inputs ${st.a}${st.b}${st.c} select D${idx}: it is ${st.low ? '0 (all the others are 1)' : '1 (all the others are 0)'}.` : `Disabled: no output is selected, so every output sits at its inactive level (${st.low ? 1 : 0}).`}</p>`;
+    el.querySelectorAll('[data-k]').forEach(b => b.onclick = () => { st[b.dataset.k] ^= 1; paint(); }); el.querySelectorAll('[data-m]').forEach(b => b.onclick = () => { st[b.dataset.m] ^= 1; paint(); }); };
+  paint(); })();
+// 2. four combinations, F = Σ(3,5,6,7)
+const XYZ = ['x', 'y', 'z'];
+decFn('#c1', { ins: XYZ, low: false, fns: [{ name: 'F', gate: 'or', outs: [3, 5, 6, 7] }], note: 'ACTIVE-HIGH decoder + OR: the 1-minterms (3, 5, 6, 7)' });
+decFn('#c2', { ins: XYZ, low: false, fns: [{ name: 'F', gate: 'nor', outs: [0, 1, 2, 4] }], note: 'ACTIVE-HIGH decoder + NOR: the 0-minterms (0, 1, 2, 4)' });
+decFn('#c3', { ins: XYZ, low: true, fns: [{ name: 'F', gate: 'nand', outs: [3, 5, 6, 7] }], note: 'ACTIVE-LOW decoder + NAND: the 1-minterms (3, 5, 6, 7)' });
+decFn('#c4', { ins: XYZ, low: true, fns: [{ name: 'F', gate: 'and', outs: [0, 1, 2, 4] }], note: 'ACTIVE-LOW decoder + AND: the 0-minterms (0, 1, 2, 4)' });
+decFn('#fa', { ins: XYZ, low: false, fns: [{ name: 'S', gate: 'or', outs: [1, 2, 4, 7] }, { name: 'Cout', gate: 'or', outs: [3, 5, 6, 7] }], note: 'FULL ADDER on a 3×8 decoder: S = D1+D2+D4+D7, C = D3+D5+D6+D7' });
+decFn('#mo1', { ins: XYZ, low: false, fns: [{ name: 'F1', gate: 'or', outs: [0, 5, 7] }, { name: 'F2', gate: 'or', outs: [2, 3, 4] }, { name: 'F3', gate: 'or', outs: [1, 6, 7] }], note: 'Three functions, three OR gates' });
+decFn('#mo2', { ins: XYZ, low: true, fns: [{ name: 'F1', gate: 'nand', outs: [2, 4, 7] }, { name: 'F2', gate: 'nand', outs: [0, 3] }, { name: 'F3', gate: 'nand', outs: [0, 2, 3, 4, 7] }], note: 'Active-low decoder, three NAND gates' });
+// 3. 4-to-16 from 2-to-4
+net('#big', { alt: '4-to-16 decoder from five 2-to-4 decoders', inputs: ['I3', 'I2', 'I1', 'I0'], nodes: [
+  { id: 'd', kind: 'box', label: '2-to-4', ins: ['I3', 'I2'], pi: ['I1', 'I0'], po: ['Y0', 'Y1', 'Y2', 'Y3'] },
+  ...[0, 1, 2, 3].map(k => ({ id: 'e' + k, kind: 'box', label: '2-to-4', ins: ['I1', 'I0', 'd.' + k], pi: ['I1', 'I0', 'E'], po: [0, 1, 2, 3].map(j => 'D' + (4 * k + j)) }))],
+  outputs: [], note: '4-TO-16 from five 2-to-4 decoders: first-level outputs Y0..Y3 enable the four second-level decoders (they supply D0–D3, D4–D7, D8–D11, D12–D15 from top to bottom)' });
+// 4. functions on a 2x4 decoder
+decImpl('#f1', { vars: W4, ones: [0, 2, 6, 7, 8, 10, 11, 13, 14], sel: [2, 3], low: true });
+decImpl('#f2', { vars: W4, ones: [0, 2, 6, 7, 10, 11, 12, 14], sel: [2, 3] });
+net('#f1c', { alt: 'function on a 2-to-4 decoder, active low', inputs: ['y', 'z', 'w', 'x', "0 (EN')"], nodes: [
+  { id: 'd', kind: 'box', label: '2-to-4 decoder', ins: ['y', 'z', "0 (EN')"], pi: ['A', 'B', "EN'"], po: ["D0'", "D1'", "D2'", "D3'"] },
+  { id: 'o0', kind: 'or', ins: ['d.0', 'x'] }, { id: 'nd', kind: 'nand', ins: ['w', 'x'] }, { id: 'o1', kind: 'or', ins: ['d.1', 'nd'] },
+  { id: 'xn', kind: 'xnor', ins: ['w', 'x'] }, { id: 'o3', kind: 'or', ins: ['d.3', 'xn'] }, { id: 'f', kind: 'nand', ins: ['o0', 'o1', 'd.2', 'o3'] }],
+  outputs: [{ ref: 'f', label: 'f' }], note: 'f = NAND( D0\'+x , D1\'+(wx)\' , D2\' , D3\'+(w⊕x)\' ): 6 extra gates' });
+net('#f2c', { alt: 'function on a 2-to-4 decoder, active high', inputs: ['y', 'z', 'w', 'x', "0 (EN1')", "0 (EN2')"], nodes: [
+  { id: 'd', kind: 'box', label: '2-to-4 decoder', ins: ['y', 'z', "0 (EN1')", "0 (EN2')"], pi: ['A', 'B', "EN1'", "EN2'"], po: ['D0', 'D1', 'D2', 'D3'] },
+  { id: 'xn', kind: 'xnor', ins: ['w', 'x'] }, { id: 'xo', kind: 'xor', ins: ['w', 'x'] },
+  { id: 'a0', kind: 'and', ins: ['d.0', 'xn'] }, { id: 'a3', kind: 'and', ins: ['d.3', 'xo'] }, { id: 'f', kind: 'or', ins: ['a0', 'd.2', 'a3'] }],
+  outputs: [{ ref: 'f', label: 'f' }], note: 'f = D0·(w⊙x) + D2 + D3·(w⊕x): 5 extra gates' });
+net('#hs', { alt: 'half subtractor on a decoder', inputs: ['x', 'y', "0 (EN')"], nodes: [
+  { id: 'd', kind: 'box', label: '2-to-4 decoder', ins: ['x', 'y', "0 (EN')"], pi: ['I1', 'I0', "EN'"], po: ['D0', 'D1', 'D2', 'D3'] }, { id: 'o', kind: 'or', ins: ['d.1', 'd.2'] }],
+  outputs: [{ ref: 'o', label: 'D = x⊕y' }, { ref: 'd.1', label: 'B = x\'y' }], note: 'HALF SUBTRACTOR: one OR gate, borrow is a wire' });
+net('#add2', { alt: '2-bit adder on a 2-to-4 decoder', inputs: ['X0', 'Y0', 'X1', 'Y1', "0 (EN1')", "0 (EN2')"], nodes: [
+  { id: 'd', kind: 'box', label: '2-to-4 decoder', ins: ['X0', 'Y0', "0 (EN1')", "0 (EN2')"], pi: ['I1', 'I0', "EN1'", "EN2'"], po: ["O0'", "O1'", "O2'", "O3'"] },
+  { id: 's0', kind: 'nand', ins: ['d.1', 'd.2'] }, { id: 'g', kind: 'xnor', ins: ['X1', 'Y1'] }, { id: 's1', kind: 'xor', ins: ['g', 'd.3'] },
+  { id: 't', kind: 'nor', ins: ['g', 'd.3'] }, { id: 'u', kind: 'and', ins: ['X1', 'Y1'] }, { id: 's2', kind: 'or', ins: ['u', 't'] }],
+  outputs: [{ ref: 's0', label: 'S0' }, { ref: 's1', label: 'S1' }, { ref: 's2', label: 'S2' }], note: '2-BIT ADDER: decoder = half adder of the low bits; g = (X1⊕Y1)\'' });
+net('#fs', { alt: 'full subtractor on a 4-to-16 decoder', inputs: ['0', 'x', 'y', 'b', "0 (EN1')", "0 (EN2')"], nodes: [
+  { id: 'd', kind: 'box', label: '4-to-16 decoder', ins: ['0', 'x', 'y', 'b', "0 (EN1')", "0 (EN2')"], pi: ['I3', 'I2', 'I1', 'I0', "EN1'", "EN2'"], po: Array.from({ length: 16 }, (_, i) => 'D' + i + "'") },
+  { id: 'nd', kind: 'nand', ins: ['d.1', 'd.2', 'd.4', 'd.7'] }, { id: 'nb', kind: 'nand', ins: ['d.1', 'd.2', 'd.3', 'd.7'] }],
+  outputs: [{ ref: 'nd', label: 'Diff' }, { ref: 'nb', label: 'Bout' }], note: 'FULL SUBTRACTOR: I3 = 0, active-low outputs into NAND gates' });
+// 5. demux
+net('#dm', { alt: 'decoder as demultiplexer', inputs: ['S1', 'S0', 'D'], nodes: [{ id: 'd', kind: 'box', label: '2-to-4 decoder', ins: ['S1', 'S0', 'D'], pi: ['I1', 'I0', 'E'], po: ['Y0', 'Y1', 'Y2', 'Y3'] }],
+  outputs: [0, 1, 2, 3].map(i => ({ ref: 'd.' + i, label: 'Y' + i })), note: 'DEMUX: data D on the enable, select lines on the decoder inputs' });
+(() => { const sel = [0, 1, 3, 2, 2, 0, 1, 3], d = [1, 1, 0, 1, 0, 1, 1, 1], sg = { D: d, S1: sel.map(s => s >> 1), S0: sel.map(s => s & 1) }; [0, 1, 2, 3].forEach(i => sg['Y' + i] = sel.map((s, t) => +(s === i && d[t])));
+  timing('#dmt', { signals: sg, clock: false }); })();
+// 6. encoder
+net('#enc', { alt: 'octal to binary encoder', inputs: ['I1', 'I2', 'I3', 'I4', 'I5', 'I6', 'I7'], nodes: [
+  { id: 'y0', kind: 'or', ins: ['I1', 'I3', 'I5', 'I7'] }, { id: 'y1', kind: 'or', ins: ['I2', 'I3', 'I6', 'I7'] }, { id: 'y2', kind: 'or', ins: ['I4', 'I5', 'I6', 'I7'] }],
+  outputs: [{ ref: 'y2', label: 'Y2' }, { ref: 'y1', label: 'Y1' }, { ref: 'y0', label: 'Y0' }], note: 'OCTAL-TO-BINARY ENCODER (I0 needs no gate)' });
+// 7. priority encoder engine
+function penc(sel, o) {
+  const nm = o.names, n = nm.length, k = Math.ceil(Math.log2(n)), ord = o.order, vars = ord.map(i => nm[i]), bin = (v, w) => v.toString(2).padStart(w, '0');
+  const shown = o.asc ? [...Array(n).keys()] : [...Array(n).keys()].reverse();
+  const rows = [{ ins: nm.map(() => '0'), y: 'X'.repeat(k), v: 0 }];
+  for (let r = n - 1; r >= 0; r--) { const i = ord[r]; rows.push({ ins: nm.map((_, j) => j === i ? '1' : (ord.indexOf(j) < r ? '0' : 'X')), y: bin(i, k), v: 1 }); }
+  const eq = [], raw = [], dots = [];
+  for (let b = k - 1; b >= 0; b--) {
+    const ones = [], dc = [];
+    for (let m = 0; m < 1 << n; m++) { const bits = ord.map((_, j) => (m >> (n - 1 - j)) & 1), f = bits.indexOf(1); if (f < 0) dc.push(m); else if ((ord[f] >> b) & 1) ones.push(m); }
+    eq[b] = L.minimize(n, ones, dc, vars).sop; dots[b] = eq[b].split(' + ').map(t => (t.match(/[A-Za-z][0-9]*'?/g) || []).join('·')).join(' + ');
+    raw[b] = ord.map((i, r) => (i >> b) & 1 ? [...ord.slice(0, r).map(h => nm[h] + "'"), nm[i]].join('·') : null).filter(Boolean).join(' + ');
+  }
+  const head = [...shown.map(i => nm[i]), ...[...Array(k).keys()].reverse().map(b => 'Y' + b), 'V'];
+  const html = tbl(head, rows.map(r => [...shown.map(i => r.ins[i]), ...r.y.split(''), r.v]));
+  host(sel).innerHTML = `<p><b>Priority (highest first):</b> ${ord.map(i => nm[i]).join(' &gt; ')}. Output = the number of the winning input${/^[A-H]$/.test(nm[0]) ? ' (A = 000 … H = 111)' : ''}.</p>${html}<p><b>Equations as "input i AND every higher input 0"</b> (one term per input whose number has that bit set):</p><div class="formula" style="text-align:left;overflow-x:auto">${[...Array(k).keys()].reverse().map(b => `Y${b} = ${ov(raw[b])}`).join('<br>')}</div><p><b>Simplified</b> (the all-zero row is a don't-care):</p><div class="formula" style="text-align:left">${[...Array(k).keys()].reverse().map(b => `Y${b} = ${ov(dots[b])}`).join('<br>')}<br>V = ${nm.join(' + ')}</div>`;
+  return { eq, vars };
+}
+const NUM = n => Array.from({ length: n }, (_, i) => 'I' + i), LET = [...'ABCDEFGH'];
+const lastE = {};
+penc('#pe4', { names: NUM(4), order: [3, 2, 1, 0] });
+const e1 = penc('#pe1', { names: NUM(8), order: [6, 0, 7, 4, 5, 3, 1, 2] });
+const gx = (id, ex, vars, out) => gates(id, { expr: ex, vars, form: 'and-or', out });
+[2, 1, 0].forEach((b, i) => gx('#pe1g' + i, e1.eq[b], e1.vars, 'Y' + b));
+penc('#pe2', { names: NUM(8), order: [5, 0, 7, 4, 6, 3, 2, 1] });
+penc('#pe3', { names: NUM(8), order: [0, 1, 2, 3, 4, 5, 6, 7] });
+penc('#pe4a', { names: LET, order: [1, 0, 3, 4, 5, 7, 6, 2], asc: true });
+const e5 = penc('#pe5', { names: LET, order: [2, 0, 4, 7, 3, 6, 5, 1], asc: true });
+[2, 1, 0].forEach((b, i) => gx('#pe5g' + i, e5.eq[b], e5.vars, 'Y' + b));
+
+practice('#p1', { id: 'p1', kind: 'pos', n: 1 });
+practice('#p2', { id: 'p2', kind: 'mux4', n: 1 });
+recall('#r1', { id: 'r1', marks: 13, q: 'Design an 8-to-3 priority encoder with priority order 6, 0, 7, 4, 5, 3, 1, 2 (6 highest). Include the valid output. (2017–18 Q3b)', points: ['Compressed truth table: first row all 0 with X X X and V = 0', 'Rows lowest priority first; higher-priority inputs 0, own input 1, lower-priority inputs X', 'Output = binary number of the winning input (I6 = 110, I0 = 000, I7 = 111, ...)', 'Each output bit = OR of "I_i AND every higher-priority input is 0" terms for inputs whose number has that bit = 1', 'Simplified equations using the don\'t-care row', 'V = I0 + I1 + ... + I7', 'Circuit drawn with all labels'], model: '<p>See section 7 and the answer to 2017–18 Q3b. Method: table with X on the low-priority side, Y<sub>b</sub> = Σ I<sub>i</sub>·(higher inputs)\' over inputs with bit b set, V = OR of all inputs.</p>' });
+recall('#r2', { id: 'r2', marks: 12, q: 'Implement f(w,x,y,z) = Σ(0,2,6,7,8,10,11,13,14) with a 2×4 decoder (active-low outputs, active-low enable) and the minimum extra gates. (2017–18 Q3a)', points: ['Choose y and z for the decoder inputs (A = y MSB)', 'Residual table: I0 = x\', I1 = wx, I2 = 1, I3 = w ⊕ x', 'F = D0·x\' + D1·wx + D2 + D3·(w⊕x)', 'Active-low outputs: F = NAND of (D0\'+x), (D1\'+(wx)\'), D2\', (D3\'+(w⊕x)\')', 'EN\' tied to 0 and the gate count stated (6)'], model: '<p>y,z on A,B. Residuals x\', wx, 1, w⊕x. F = NAND(D0\'+x, D1\'+(wx)\', D2\', D3\'+XNOR(w,x)). EN\' = 0. Six extra gates.</p>' });
+recall('#r3', { id: 'r3', marks: 12, q: 'Design a 4-to-16 decoder using the minimum number of 2-to-4 decoders with enables. (2023–24 Q3a)', points: ['16/4 = 4 decoders for the outputs, plus 1 first-level decoder: 5 in total', 'First-level decoder takes I3 I2; its four outputs are the enables of the four second-level decoders', 'All second-level decoders take I1 I0', 'Second-level decoder k gives D(4k)..D(4k+3)', 'Disabled decoders output 0, so exactly one output is 1', 'Diagram with every output labelled'], model: '<p>Five 2-to-4 decoders. Level 1: I3 I2, outputs Y0..Y3 drive E of level 2. Level 2 (four decoders): I1 I0 shared, outputs D0–D3, D4–D7, D8–D11, D12–D15.</p>' });
+recall('#r4', { id: 'r4', marks: 12, q: 'Design a 1-bit full subtractor using a 4-to-16 decoder with active-low outputs and two active-low enables EN1\', EN2\'. (2024–25 Q7c)', points: ['Diff = Σ(1,2,4,7) and Bout = Σ(1,2,3,7) for (x, y, b)', 'Inputs x, y, b on I2, I1, I0 and I3 tied to 0 (state the assumption)', 'Both enables tied to 0 (ground) so the decoder is always on', 'Active-low outputs go into NAND gates on the 1-minterms', 'Diff = NAND(D1\', D2\', D4\', D7\'), Bout = NAND(D1\', D2\', D3\', D7\')', 'Circuit drawn and labelled'], model: '<p>x,y,b on I2,I1,I0; I3 = 0; EN1\' = EN2\' = 0. Diff = NAND(D1\',D2\',D4\',D7\'). Bout = NAND(D1\',D2\',D3\',D7\').</p>' });
+</script>
+</body>
+</html>

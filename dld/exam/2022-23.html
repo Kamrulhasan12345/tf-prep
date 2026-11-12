@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Term final 2022-23 · CSE 205 Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Exam · Term final 2022-23 · held 22 Apr 2024</div>
+<h1>Term final 2022-23</h1>
+<p class="lede">Format: 210 marks, 3 hours, six questions of 35 marks. Section A (Q1–Q4): answer Q1 and any two others; Section B (Q5–Q8): answer Q5 and any two of Q6–Q8. Q1 = (r−1)'s complement subtraction (13), gray vs binary (9), MUX implementation (13). Q5 = three-or-more-1s detector with D flip-flops (12), JK from T (11), copy shift register A to B (12).</p>
+<h2>Section A · Q1 compulsory, then two of Q2–Q4</h2>
+<div class="hint"><b>If this were your paper, pick these</b><ol><li>Q1 (compulsory): 1(c) MUX (13) is a table (the same question is solved in the MUX chapter); 1(a) and 1(b) are definitions with one worked example each.</li><li>Second choice Q2: 2(a) gray-to-binary (20) is two XORs once you see B1 = G2 ⊕ G1; 2(b) PLA (15) is the engine-style table.</li><li>Third choice Q3 (universal gates 14, SOP and POS 14, dual of XOR 7) or Q4 (maxterms 10, full adder from decoder 10, tabulation 15). Q3 is the quickest 35.</li></ol></div>
+<div class="exam"><div class="exam-src">Q1(a) · 13 marks · M − N with (r−1)'s complement</div><div class="exam-q"><p>Describe the steps to find M − N using the (r−1)'s complement, where M and N are n-digit unsigned numbers and r is the base.</p><p class="tracer-hint"><b>Time guide:</b> about 13 min.</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<ol><li>Write N with n digits (pad with leading zeros).</li>
+<li>Form the (r−1)'s complement of N: replace every digit d by (r−1) − d (base 10: 9's complement; base 2: 1's complement).</li>
+<li>Add it to M: M + ((rⁿ − 1) − N).</li>
+<li><b>If there is an end carry</b> (M ≥ N): discard it and add 1 to the least significant digit (end-around carry). The result is M − N, positive.</li>
+<li><b>If there is no end carry</b> (M < N): the sum is the (r−1)'s complement of the answer; take the (r−1)'s complement of the sum and put a minus sign: −(complement).</li></ol>
+<div class="tbl"><table class="mat"><tr><th>case</th><th>work</th><th>result</th></tr><tr><td>72532 − 13250 (base 10)</td><td>N has 9's complement 86749; 72532 + 86749 = 159281: end carry 1 → 59281 + 1</td><td><b>59282</b></td></tr><tr><td>13250 − 72532 (base 10)</td><td>9's complement of 72532 = 27467; 13250 + 27467 = 40717, no end carry → 9's complement of 40717 = 59282</td><td><b>−59282</b></td></tr><tr><td>1010100 − 1000011 (base 2)</td><td>1's complement of 1000011 = 0111100; 1010100 + 0111100 = 10010000: end carry 1 → 0010000 + 1 = 0010001</td><td>0010001 (= 17)</td></tr></table></div>
+<p>Note: the paper prints "r−1's complement". Same method with the r's complement: add it, discard any end carry (no +1 step); if there is no end carry, the answer is negative and equals the r's complement of the sum.</p>
+<p>Full walk-through: <a href="../comb/02-numbers.html">number systems chapter</a>.</p>
+</div></details></div>
+<div class="exam"><div class="exam-src">Q1(b) · 9 marks · binary vs gray</div><div class="exam-q"><p>Explain the difference between binary and gray encoding and the benefits of each.</p><p class="tracer-hint"><b>Time guide:</b> about 9 min.</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<div class="tbl"><table class="mat"><tr><th>decimal</th><th>binary</th><th>gray</th></tr><tr><td>0</td><td>000</td><td>000</td></tr><tr><td>1</td><td>001</td><td>001</td></tr><tr><td>2</td><td>010</td><td>011</td></tr><tr><td>3</td><td>011</td><td>010</td></tr><tr><td>4</td><td>100</td><td>110</td></tr><tr><td>5</td><td>101</td><td>111</td></tr><tr><td>6</td><td>110</td><td>101</td></tr><tr><td>7</td><td>111</td><td>100</td></tr></table></div>
+<p><b>Difference:</b> in binary, consecutive numbers can differ in many bits (011 → 100 changes three). In gray code consecutive codes differ in exactly <b>one</b> bit (also 111 → 100 wraps). Conversion: G<sub>n−1</sub> = B<sub>n−1</sub>, G<sub>i</sub> = B<sub>i+1</sub> ⊕ B<sub>i</sub>; back: B<sub>n−1</sub> = G<sub>n−1</sub>, B<sub>i</sub> = B<sub>i+1</sub> ⊕ G<sub>i</sub>.</p>
+<p><b>Binary benefits:</b> direct weighted arithmetic (add, subtract, compare), simple counters. <b>Gray benefits:</b> no glitch or wrong intermediate value when the number changes (shaft/position encoders, asynchronous counters crossing clock domains), lower switching power, and K-map axes use it so neighbours differ in one variable.</p>
+</div></details></div>
+<div class="exam"><div class="exam-src">Q1(c) · 13 marks · 4×1 MUX with external gates</div><div class="exam-q"><p>Implement F(A,B,C,D) = Σ(1,2,4,7,8,9,10,11,13,15) with a 4×1 multiplexer and external gates.</p><p class="tracer-hint"><b>Time guide:</b> about 13 min.</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<div id="w1"></div>
+<p>With A, B on the selects: I0 = C'D + CD', I1 = C'D' + CD, I2 = 1, I3 = D. In gate form: I0 = C ⊕ D, I1 = C ⊙ D (XNOR), I2 = 1, I3 = D: two external gates (XOR, XNOR).</p>
+<div class="write"><h4>What to write (13 marks)</h4><ol><li>Truth table / minterm list and the slice for each AB value (4 slices of 2-variable functions of C, D).</li><li>The four data inputs C⊕D, C⊙D, 1, D.</li><li>MUX block: S1 = A, S0 = B, inputs labelled, XOR and XNOR gates drawn, output F.</li></ol></div>
+<p>Full walk-through: <a href="../comb/09-mux.html">MUX chapter §3</a>.</p>
+</div></details></div>
+<div class="exam"><div class="exam-src">Q2(a) · 20 marks · 3-bit gray to binary converter</div><div class="exam-q"><p>Design a combinational circuit that converts a three-bit gray code to a three-bit binary number. Use a minimum number of gates.</p><p class="tracer-hint"><b>Time guide:</b> about 20 min.</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<div class="tbl"><table class="mat"><tr><th>G2 G1 G0</th><th>B2 B1 B0</th></tr><tr><td>000</td><td>000</td></tr><tr><td>001</td><td>001</td></tr><tr><td>010</td><td>011</td></tr><tr><td>011</td><td>010</td></tr><tr><td>100</td><td>111</td></tr><tr><td>101</td><td>110</td></tr><tr><td>110</td><td>100</td></tr><tr><td>111</td><td>101</td></tr></table></div>
+<p>Engine minimisation: B2 = G2; B1 = G2'G1 + G2G1' (= G2 ⊕ G1); B0 = G2'G1'G0 + G2'G1G0' + G2G1'G0' + G2G1G0 (= G2 ⊕ G1 ⊕ G0, a checkerboard: no grouping possible).</p>
+<div id="w2"></div>
+<div id="w3"></div>
+<p class="formula">B2 = G2<br>B1 = G2 ⊕ G1<br>B0 = B1 ⊕ G0 = G2 ⊕ G1 ⊕ G0</p>
+<div id="w4"></div>
+<div class="write"><h4>What to write (20 marks)</h4><ol><li>Truth table (gray in, binary out).</li><li>K-maps for B1 and B0 (checkerboards) and B2 = G2.</li><li>B1 = G2⊕G1, B0 = B1⊕G0, with the sharing noted.</li><li>Circuit: two XOR gates, "minimum = 2 gates".</li></ol></div>
+<p>Full walk-through: <a href="../comb/07-compare-codes.html">code converters chapter</a>.</p>
+</div></details></div>
+<div class="exam"><div class="exam-src">Q2(b) · 15 marks · PLA programming table</div><div class="exam-q"><p>Tabulate the PLA programming table for F1(A,B,C) = Σ(0,1,2,4) and F2(A,B,C) = Σ(0,5,6,7). Minimise the number of product terms.</p><p class="tracer-hint"><b>Time guide:</b> about 15 min.</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<div id="w5"></div>
+<p>The engine chooses the true or complement output per function and shares terms: 4 product terms in total.</p>
+<p>Full walk-through: <a href="../comb/10-pla.html">PLA chapter</a>.</p>
+</div></details></div>
+<div class="exam"><div class="exam-src">Q3(a) · 14 marks · universal gates</div><div class="exam-q"><p>What do you mean by a universal gate? Show that both NAND and NOR are universal.</p><p class="tracer-hint"><b>Time guide:</b> about 14 min.</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<p>A <b>universal gate</b> is one gate type from which any Boolean function can be built, because it can make NOT, AND and OR (a complete set).</p>
+<div class="tbl"><table class="mat"><tr><th></th><th>from NAND</th><th>from NOR</th></tr><tr><td>NOT x</td><td>(x·x)' = x'</td><td>(x+x)' = x'</td></tr><tr><td>AND</td><td>((xy)')' : NAND, then NAND as NOT</td><td>(x'+y')' : NOR each input as NOT, then NOR</td></tr><tr><td>OR</td><td>(x'y')' : NAND each input as NOT, then NAND</td><td>((x+y)')' : NOR, then NOR as NOT</td></tr></table></div>
+<div id="w6"></div>
+<div id="w7"></div>
+<p>Since AND, OR, NOT can build every function (SOP), NAND alone and NOR alone can too. Same idea: <a href="2024-25.html">2024–25 Q2(a)</a>.</p>
+</div></details></div>
+<div class="exam"><div class="exam-src">Q3(b) · 14 marks · SOP and POS</div><div class="exam-q"><p>Simplify F(A,B,C,D) = Σ(0,1,2,5,8,9,10) into (a) sum-of-products and (b) product-of-sums.</p><p class="tracer-hint"><b>Time guide:</b> about 14 min.</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<p><b>(a) SOP</b> (group the 1s): F = B'D' + B'C' + A'C'D</p><div id="w8"></div>
+<p><b>(b) POS</b> (group the 0s, read each group as a sum): F = (C' + D')(B' + D)(A' + B')</p><div id="w9"></div>
+<p>The two forms are equal (checked by the engine on all 16 rows).</p>
+</div></details></div>
+<div class="exam"><div class="exam-src">Q3(c) · 7 marks · dual of XOR</div><div class="exam-q"><p>Show that the dual of the exclusive-OR is equal to its complement.</p><p class="tracer-hint"><b>Time guide:</b> about 7 min.</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<ol><li>A ⊕ B = AB' + A'B.</li><li>Dual (swap + and ·): (A + B')(A' + B).</li><li>Expand: AA' + AB + B'A' + B'B = 0 + AB + A'B' + 0 = AB + A'B' = A ⊙ B.</li><li>(A ⊕ B)' = A ⊙ B (truth table: 1 when A = B).</li></ol><p>So the dual of XOR = XNOR = the complement of XOR. (Checked on all four input rows.)</p>
+</div></details></div>
+<div class="exam"><div class="exam-src">Q4(a) · 10 marks · product of maxterms by the distributive law</div><div class="exam-q"><p>Convert F = xy + x'z to a product of maxterms using the distributive law.</p><p class="tracer-hint"><b>Time guide:</b> about 10 min.</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<ol><li>F = xy + x'z. Distribute + over ·: (a·b + c = (a + c)(b + c)): F = (xy + x')(xy + z).</li>
+<li>xy + x' = (x + x')(y + x') = x' + y; xy + z = (x + z)(y + z).</li>
+<li>F = (x' + y)(x + z)(y + z).</li>
+<li>Add the missing variable to each factor (a = a + zz' etc.): x' + y = (x' + y + z)(x' + y + z') = M4·M5; x + z = (x + y + z)(x + y' + z) = M0·M2; y + z = (x + y + z)(x' + y + z) = M0·M4.</li>
+<li>Drop repeats: <b>F = ΠM(0, 2, 4, 5)</b> = (x+y+z)(x+y'+z)(x'+y+z)(x'+y+z') (checked against the truth table).</li></ol>
+</div></details></div>
+<div class="exam"><div class="exam-src">Q4(b) · 10 marks · full adder with a 3×8 decoder and two OR gates</div><div class="exam-q"><p>Design a full adder circuit using a 3×8 decoder and two OR gates.</p><p class="tracer-hint"><b>Time guide:</b> about 10 min.</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<p>Decoder inputs x y z (z = carry in), outputs D0..D7 active-high (D<sub>i</sub> = minterm i). S = Σ(1,2,4,7), C = Σ(3,5,6,7).</p>
+<div id="w10"></div>
+<p>Full walk-through: <a href="../comb/08-decoder-encoder.html">decoder chapter</a>.</p>
+</div></details></div>
+<div class="exam"><div class="exam-src">Q4(c) · 15 marks · tabulation: PIs and EPIs</div><div class="exam-q"><p>Using the tabular method, find the prime implicants and the essential prime implicants of F(A,B,C,D) = Σ(0,2,3,5,7,8,9,10,11,13,15).</p><p class="tracer-hint"><b>Time guide:</b> about 15 min.</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<div id="w11"></div>
+<p><b>Prime implicants (6):</b> B'D' (0,2,8,10); B'C (2,3,10,11); CD (3,7,11,15); BD (5,7,13,15); AB' (8,9,10,11); AD (9,11,13,15).</p>
+<p><b>Essential:</b> B'D' (responsible minterm 0); BD (responsible minterm 5). Remaining minterms are covered by one of the other PIs; minimal covers: B'D' + B'C + BD + AB'  |  B'D' + B'C + BD + AD  |  B'D' + CD + BD + AB'  |  B'D' + CD + BD + AD.</p>
+<p>Full walk-through: <a href="../comb/05-tabulation.html">tabulation chapter</a>.</p>
+</div></details></div>
+<h2>Timed exercise · Section A compulsory question (35 min)</h2>
+<div id="r1"></div>
+<h2>Section B · Q5 compulsory, then two of Q6–Q8</h2>
+<div class="hint"><b>If this were your paper, pick these</b><ol><li>Q5 (compulsory): 5(a) detector (12) and 5(b) JK from T (11) are fixed procedures; do them first, then 5(c) (12, serial copy with a control counter).</li><li>Second choice Q7: 7(a) ripple down counter (12) and 7(b) JK counter 1-2-5-7 (13) are mechanical; 7(c) Mealy vs Moore (10) is theory with the chapter diagrams.</li><li>Third choice Q6: 6(a) master-slave D (10) and 6(b) ring counter note (5) are quick; 6(c) vending (20) is long. Avoid Q8 unless races are fresh in your mind.</li></ol></div>
+<div class="exam"><div class="exam-src">Q5(a) · 12 marks · detector of three or more consecutive 1s, D flip-flops (compulsory)</div><div class="exam-q"><p>Develop a sequential circuit that detects a sequence of three or more consecutive 1s in a string of bits coming through an input line. Use D flip-flops. Show the state diagram, the state table and the simplified logic equations (no logic diagram needed).</p><p class="tracer-hint"><b>Time guide:</b> about 12 min.</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<p>Mealy machine: A = no 1s yet (last input 0), B = one 1, C = two or more 1s. z = 1 on every 1 that arrives in C (third and later consecutive 1s). Any 0 returns to A.</p>
+<div id="w12"></div>
+<div class="tbl"><table class="mat"><tr><th>PS (y1 y0)</th><th>x = 0: NS, z</th><th>x = 1: NS, z</th></tr><tr><td>A (00)</td><td>00, 0</td><td>01, 0</td></tr><tr><td>B (01)</td><td>00, 0</td><td>10, 0</td></tr><tr><td>C (10)</td><td>00, 0</td><td>10, 1</td></tr><tr><td>11</td><td>unused (x)</td><td>unused (x)</td></tr></table></div>
+<p>D flip-flops: D = next state. K-maps over y1 y0 x (11 unused = don't-care):</p>
+<p class="formula">D1 = y0x + y1x<br>D0 = y1'y0'x<br>z = y1x</p>
+<p>(The state table and equations were checked on every input string of length 12: z = 1 exactly when the last three inputs are all 1.)</p>
+<div class="write"><h4>What to write (12 marks)</h4><ol><li>State diagram: three states, arrows x/z, only C −1→ C and B −1→ C … with z = 1 on C −1→.</li><li>State table and assignment A = 00, B = 01, C = 10.</li><li>Transition table = D table (D = NS).</li><li>K-maps and the three equations.</li></ol></div>
+</div></details></div>
+<div class="exam"><div class="exam-src">Q5(b) · 11 marks · JK flip-flop from T flip-flop</div><div class="exam-q"><p>Construct a JK flip-flop from a T flip-flop and necessary gates. Show all the steps.</p><p class="tracer-hint"><b>Time guide:</b> about 11 min.</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<ol><li><b>Target:</b> JK characteristic table (J, K, Q → Q⁺).</li><li><b>Excitation of the T flip-flop:</b> T = Q ⊕ Q⁺ (1 only if the state must change).</li></ol>
+<div class="tbl"><table class="mat"><tr><th>J</th><th>K</th><th>Q</th><th>Q⁺</th><th>T</th></tr><tr><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td></tr><tr><td>0</td><td>0</td><td>1</td><td>1</td><td>0</td></tr><tr><td>0</td><td>1</td><td>0</td><td>0</td><td>0</td></tr><tr><td>0</td><td>1</td><td>1</td><td>0</td><td>1</td></tr><tr><td>1</td><td>0</td><td>0</td><td>1</td><td>1</td></tr><tr><td>1</td><td>0</td><td>1</td><td>1</td><td>0</td></tr><tr><td>1</td><td>1</td><td>0</td><td>1</td><td>1</td></tr><tr><td>1</td><td>1</td><td>1</td><td>0</td><td>1</td></tr></table></div>
+<ol start="3"><li><b>K-map</b> (J, K, Q): T = KQ + JQ'.</li><li><b>Circuit:</b> T = JQ' + KQ.</li></ol>
+<div id="w13"></div>
+<p>Full walk-through: <a href="../seq/02-ff-conversion.html">flip-flop conversion</a>.</p>
+</div></details></div>
+<div class="exam"><div class="exam-src">Q5(c) · 12 marks · copy shift register A into B</div><div class="exam-q"><p>Design a sequential circuit to copy the content of shift register A to shift register B. Use a block diagram to represent the shift register in the diagram.</p><p class="tracer-hint"><b>Time guide:</b> about 12 min.</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<p><b>Serial transfer</b> (Mano 6-3), 4-bit registers (assume n = 4). The registers shift right together; A's serial output goes to B's serial input <b>and back into A's own serial input</b>, so A is restored (copied, not moved). A control circuit lets exactly n = 4 clock pulses through.</p>
+<div class="fg-wrap"><svg class="dsa-fig" viewBox="0 0 560 230" width="560" role="img" aria-label="serial copy of A into B"><rect class="gt" x="40" y="30" width="170" height="44" rx="4"/><text class="lb" x="125" y="48" >Register A (4 bit)</text><text class="sm" x="125" y="63" >serial in left, out right</text><rect class="gt" x="40" y="130" width="170" height="44" rx="4"/><text class="lb" x="125" y="148" >Register B (4 bit)</text><text class="sm" x="125" y="163" >serial in left, out right</text><path class="wr" d="M210,52 H235 V14 H20 V52 H40" fill="none"/><text class="sm" x="128" y="10" >A out recirculates into A in</text><path class="wr" d="M235,52 V196 H20 V152 H40" fill="none"/><text class="sm" x="128" y="210" >A out → B in</text><path class="wr" d="M330,100 H125" fill="none"/><line class="wr" x1="125" y1="100" x2="125" y2="74"/><line class="wr" x1="125" y1="100" x2="125" y2="130"/><text class="sm" x="280" y="94" >clk·SC to both registers</text><rect class="gt" x="330" y="70" width="80" height="60" rx="4"/><text class="lb" x="370" y="96" >AND</text><text class="sm" x="370" y="111" >clk · SC</text><line class="wr" x1="370" y1="70" x2="370" y2="50"/><text class="sm" x="370" y="44" >clk</text><line class="wr" x1="370" y1="130" x2="370" y2="150"/><text class="sm" x="382" y="142" style="text-anchor:start">SC</text><rect class="gt" x="330" y="150" width="80" height="60" rx="4"/><text class="lb" x="370" y="176" >Control</text><text class="sm" x="370" y="191" >4 pulses</text><line class="wr" x1="410" y1="180" x2="450" y2="180"/><text class="sm" x="456" y="184" style="text-anchor:start">start</text></svg><div class="figlabel">serial copy of A into B</div></div>
+<p><b>Control (Moore, shift-enable SC):</b> states I, T1, T2, T3, T4. I −start→ T1; T1 → T2 → T3 → T4 → I; SC = 1 in T1..T4. The gated clock clk·SC gives exactly four shift pulses.</p>
+<div id="w14"></div>
+<p>Timing for A = 1011 (A3 is shifted out first, B fills from the left). Column k shows the contents after k clock pulses (SC high for pulses 1 to 4). After four pulses B = 1011 and A = 1011 again (checked by simulation):</p>
+<div id="w15"></div>
+<p>For a parallel copy instead (B ← A in one clock): give B's flip-flops a load control and connect A<sub>i</sub> to the load input of B<sub>i</sub>; that needs no counter but n connections.</p>
+</div></details></div>
+<div class="exam"><div class="exam-src">Q6(a) · 10 marks · negative-edge master-slave D flip-flop</div><div class="exam-q"><p>Draw the block diagram of a negative-edge triggered master-slave D flip-flop using D latches.</p><p class="tracer-hint"><b>Time guide:</b> about 10 min.</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<div class="fg-wrap"><svg class="dsa-fig" viewBox="0 0 560 150" width="560" role="img" aria-label="master-slave D flip-flop"><rect class="gt" x="110" y="30" width="110" height="70" rx="4"/><text class="lb" x="165" y="61" >Master</text><text class="sm" x="165" y="76" >D latch</text><rect class="gt" x="310" y="30" width="110" height="70" rx="4"/><text class="lb" x="365" y="61" >Slave</text><text class="sm" x="365" y="76" >D latch</text><line class="wr" x1="20" y1="55" x2="110" y2="55"/><text class="lb" x="14" y="50" style="text-anchor:end">D</text><line class="wr" x1="220" y1="55" x2="310" y2="55"/><text class="sm" x="265" y="48" >Qm</text><line class="wr" x1="420" y1="55" x2="500" y2="55"/><text class="lb" x="506" y="59" style="text-anchor:start">Q</text><text class="sm" x="122" y="90" >EN</text><text class="sm" x="322" y="90" >EN</text><line class="wr" x1="165" y1="100" x2="165" y2="130"/><line class="wr" x1="60" y1="130" x2="365" y2="130"/><line class="wr" x1="365" y1="100" x2="365" y2="130"/><path class="gt" d="M95,123 L107,130 L95,137 z"/><circle class="gt" cx="110" cy="130" r="3"/><text class="lb" x="40" y="134" style="text-anchor:end">CLK</text><text class="sm" x="260" y="144" >master enable = CLK; slave enable = CLK' (via inverter)</text></svg><div class="figlabel">master-slave D flip-flop</div></div>
+<p>Wiring: D → master D latch; master Q → slave D; slave Q is the output. The master latch is enabled when CLK = 1 (transparent), the slave when CLK = 0 (through an inverter). Use an inverter in front of the master enable of a positive-edge version instead.</p>
+<p><b>Operation:</b> CLK = 1: master follows D, slave holds (output stable). CLK falls: master closes holding D, slave opens and copies it, so Q changes at the <b>falling edge</b> only. CLK = 0: master closed, slave transparent but its input is frozen.</p>
+<div id="w16"></div>
+</div></details></div>
+<div class="exam"><div class="exam-src">Q6(b) · 5 marks · ring counter</div><div class="exam-q"><p>Write a short note about a ring counter.</p><p class="tracer-hint"><b>Time guide:</b> about 5 min.</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<ul><li>A shift register whose last output is fed back to the first input (D0 = Q<sub>n−1</sub>); one flip-flop holds 1 and the 1 circulates: 1000 → 0100 → 0010 → 0001 → 1000.</li>
+<li>n flip-flops give <b>n states</b> (mod-n counter); the outputs are one-hot, so no decoder is needed to pick a state (timing signals, sequencers).</li>
+<li>Must be initialised to a valid state (one 1): else the wrong pattern circulates forever; fix with preset/clear or by D0 = (Q0 + … + Q<sub>n−2</sub>)' (self-correcting).</li>
+<li>Output frequency is f<sub>clk</sub>/n. Costly in flip-flops compared with a binary counter (2<sup>n</sup> states) but simple and fast. The Johnson (twisted-ring) counter gives 2n states.</li></ul>
+<div id="w17"></div>
+</div></details></div>
+<div class="exam"><div class="exam-src">Q6(c) · 20 marks · vending machine, pulse mode with S-R latches</div><div class="exam-q"><p>Candy costs 15 Tk; the machine accepts 5 Tk and 10 Tk only, one coin at a time. The circuit produces a <b>pulse output</b> that delivers the candy whenever the amount received is 15 Tk or more. The excess is kept deposited for the next candy. Design a pulse-mode circuit using S-R latches.</p><p class="tracer-hint"><b>Time guide:</b> about 20 min.</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<p><b>Assumptions:</b> x5, x10 are pulse inputs (never together); clock of the latches = x5 + x10. <b>Pulse output → Mealy</b> (z is a pulse on the arrow of the coin that completes 15 Tk).</p>
+<p>States = deposit kept: S0 = 0 Tk, S5 = 5 Tk, S10 = 10 Tk. 10 + 5 = 15 → z, 0 left; 10 + 10 = 20 → z, 5 left; 5 + 10 = 15 → z, 0 left.</p>
+<div id="w18"></div>
+<div class="tbl"><table class="mat"><tr><th>PS</th><th>x5: NS, z</th><th>x10: NS, z</th></tr><tr><td>S0</td><td>S5, 0</td><td>S10, 0</td></tr><tr><td>S5</td><td>S10, 0</td><td>S0, 1</td></tr><tr><td>S10</td><td>S0, 1</td><td>S5, 1</td></tr></table></div>
+<p>Two state variables, S0 = 00, S5 = 01, S10 = 10 (11 unused, don't-care). SR: 0→0 = 0x, 0→1 = 10, 1→0 = 01, 1→1 = x0.</p>
+<div class="tbl"><table class="mat"><tr><th>state</th><th>y1y0</th><th>next (x5)</th><th>next (x10)</th><th>z (x5)</th><th>z (x10)</th><th>SR per FF (x5)</th><th>SR per FF (x10)</th></tr><tr><td>S0</td><td>00</td><td>S5 (01)</td><td>S10 (10)</td><td>0</td><td>0</td><td>0x | 10</td><td>10 | 0x</td></tr><tr><td>S5</td><td>01</td><td>S10 (10)</td><td>S0 (00)</td><td>0</td><td>1</td><td>10 | 01</td><td>0x | 01</td></tr><tr><td>S10</td><td>10</td><td>S0 (00)</td><td>S5 (01)</td><td>1</td><td>1</td><td>01 | 0x</td><td>01 | 10</td></tr></table></div>
+<p class="formula">S1 = x5(y0) + x10(y1'y0')<br>R1 = x5(y0') + x10(y1)<br>S0 = x5(y1'y0') + x10(y1)<br>R0 = x5(y0) + x10(y1')<br>z = x5(y1) + x10(y0 + y1)</p>
+<div id="w19"></div>
+<p>z = x5(y1) + x10(y0 + y1): realise it with the AND-OR gates below the latches (z is not drawn in the block above; it is the OR of the two products).</p>
+<p>Same machine as <a href="2024-25.html">2024–25 Q8(b)</a> (3 Tk, coins 1 and 2) in its Mealy form.</p>
+<p>Full walk-through: <a href="../seq/11-pulse.html">pulse mode chapter</a>.</p>
+</div></details></div>
+<div class="exam"><div class="exam-src">Q7(a) · 12 marks · 4-bit ripple count-down counter with T flip-flops</div><div class="exam-q"><p>Show the logic diagram of a four-bit binary ripple (asynchronous) countdown counter using T flip-flops that trigger on the negative edge of the clock.</p><p class="tracer-hint"><b>Time guide:</b> about 12 min.</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<p>All T inputs = 1 (toggle on every active edge). Stage 0 is clocked by the clock. Down counting: bit i+1 must toggle when bit i goes 0 → 1 (borrow); for negative-edge flip-flops that is when Q<sub>i</sub>' goes 1 → 0, so <b>clock stage i+1 from Q<sub>i</sub>'</b> (for an up counter use Q<sub>i</sub>).</p>
+<div class="fg-wrap"><svg class="dsa-fig" viewBox="0 0 560 150" width="560" role="img" aria-label="4-bit ripple down counter, negative-edge T flip-flops"><rect class="gt" x="430" y="30" width="70" height="60" rx="4"/><text class="lb" x="465" y="56" >T FF</text><text class="sm" x="465" y="71" >T = 1</text><text class="sm" x="438" y="50" >T</text><text class="sm" x="438" y="78" ></text><text class="sm" x="465" y="107" >> clk</text><line class="wr" x1="465" y1="90" x2="465" y2="118"/><text class="sm" x="465" y="132" >clock</text><line class="wr" x1="500" y1="45" x2="520" y2="45"/><text class="lb" x="522" y="49" style="text-anchor:start">Q0</text><rect class="gt" x="300" y="30" width="70" height="60" rx="4"/><text class="lb" x="335" y="56" >T FF</text><text class="sm" x="335" y="71" >T = 1</text><text class="sm" x="308" y="50" >T</text><text class="sm" x="308" y="78" ></text><text class="sm" x="335" y="107" >> clk</text><line class="wr" x1="335" y1="90" x2="335" y2="118"/><text class="sm" x="335" y="132" >Q0'</text><line class="wr" x1="370" y1="45" x2="390" y2="45"/><text class="lb" x="392" y="49" style="text-anchor:start">Q1</text><rect class="gt" x="170" y="30" width="70" height="60" rx="4"/><text class="lb" x="205" y="56" >T FF</text><text class="sm" x="205" y="71" >T = 1</text><text class="sm" x="178" y="50" >T</text><text class="sm" x="178" y="78" ></text><text class="sm" x="205" y="107" >> clk</text><line class="wr" x1="205" y1="90" x2="205" y2="118"/><text class="sm" x="205" y="132" >Q1'</text><line class="wr" x1="240" y1="45" x2="260" y2="45"/><text class="lb" x="262" y="49" style="text-anchor:start">Q2</text><rect class="gt" x="40" y="30" width="70" height="60" rx="4"/><text class="lb" x="75" y="56" >T FF</text><text class="sm" x="75" y="71" >T = 1</text><text class="sm" x="48" y="50" >T</text><text class="sm" x="48" y="78" ></text><text class="sm" x="75" y="107" >> clk</text><line class="wr" x1="75" y1="90" x2="75" y2="118"/><text class="sm" x="75" y="132" >Q2'</text><line class="wr" x1="110" y1="45" x2="130" y2="45"/><text class="lb" x="132" y="49" style="text-anchor:start">Q3</text></svg><div class="figlabel">4-bit ripple down counter, negative-edge T flip-flops</div></div>
+<p>Count sequence (Q3 Q2 Q1 Q0): 0000 → 1111 → 1110 → 1101 → … → 0001 → 0000 (16 states, mod 16, counts down). Each flip-flop divides the frequency by 2. The delay accumulates through the chain (ripple), so it is slower than a synchronous counter.</p>
+</div></details></div>
+<div class="exam"><div class="exam-src">Q7(b) · 13 marks · JK counter 1, 2, 5, 7 with unused-state analysis</div><div class="exam-q"><p>Using J-K flip-flops design a synchronous counter that counts 1, 2, 5, 7, 1, 2, … Analyse the final circuit to ensure that if it enters an unused state it comes to a used state after a finite number of clock cycles.</p><p class="tracer-hint"><b>Time guide:</b> about 13 min.</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<div id="w20"></div>
+<p>Equations (Q2 Q1 Q0 = MSB first; unused states 0, 3, 4, 6 are don't-cares): J2 = Q0'; K2 = Q1; J1 = 1; K1 = 1; J0 = 1; K0 = Q2'.</p>
+<p><b>Self-starting check:</b> 0 → 7; 3 → 0 → 7; 4 → 7; 6 → 1. Every unused state reaches the count sequence within a few clocks, so the circuit is self-correcting.</p>
+<div class="write"><h4>What to write (13 marks)</h4><ol><li>State diagram / table 1 → 2 → 5 → 7 → 1, three JK flip-flops.</li><li>Transition and JK excitation tables with unused states marked x.</li><li>Three K-map pairs and the six equations.</li><li>The analysis table of the unused states 0, 3, 4, 6 and where each goes.</li><li>The circuit diagram.</li></ol></div>
+<p>Full walk-through: <a href="../seq/05-sync-counter.html">synchronous counters chapter</a>.</p>
+</div></details></div>
+<div class="exam"><div class="exam-src">Q7(c) · 10 marks · Mealy vs Moore with block diagrams</div><div class="exam-q"><p>Differentiate between Mealy and Moore machines with block diagrams.</p><p class="tracer-hint"><b>Time guide:</b> about 10 min.</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<div class="figrow">
+<div><div class="figlabel">Mealy model</div><svg class="dsa-fig" viewBox="0 0 380 190" width="380" role="img" aria-label="Mealy block diagram">
+<defs><marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0L10,5L0,10z" fill="var(--muted)"/></marker></defs>
+<rect class="box" x="70" y="30" width="90" height="60" rx="6"/><text class="tx" x="115" y="54" style="font-size:11px">next-state</text><text class="tx" x="115" y="70" style="font-size:11px">logic</text>
+<rect class="box" x="190" y="30" width="80" height="60" rx="6"/><text class="tx" x="230" y="54" style="font-size:11px">memory</text><text class="tx" x="230" y="70" style="font-size:11px">(FFs)</text>
+<rect class="box" x="190" y="120" width="80" height="50" rx="6"/><text class="tx" x="230" y="140" style="font-size:11px">output</text><text class="tx" x="230" y="155" style="font-size:11px">logic</text>
+<path class="ed" marker-end="url(#a1)" d="M10,60 H70"/><text class="lb" x="22" y="50">x</text>
+<path class="ed" marker-end="url(#a1)" d="M160,60 H190"/>
+<path class="ed" marker-end="url(#a1)" d="M270,60 H300 V10 H40 V45 H70"/><text class="sm" x="160" y="22">present state y</text>
+<path class="ed" marker-end="url(#a1)" d="M300,60 V100 H230 V120"/>
+<path class="ed cur" marker-end="url(#a1)" d="M40,60 V145 H190"/><text class="sm" x="110" y="138">x goes to the output too</text>
+<path class="ed" marker-end="url(#a1)" d="M270,145 H330"/><text class="lb" x="345" y="145">z</text>
+<text class="sm" x="230" y="104">clk</text>
+</svg></div>
+<div><div class="figlabel">Moore model</div><svg class="dsa-fig" viewBox="0 0 380 190" width="380" role="img" aria-label="Moore block diagram">
+<defs><marker id="a2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0L10,5L0,10z" fill="var(--muted)"/></marker></defs>
+<rect class="box" x="70" y="30" width="90" height="60" rx="6"/><text class="tx" x="115" y="54" style="font-size:11px">next-state</text><text class="tx" x="115" y="70" style="font-size:11px">logic</text>
+<rect class="box" x="190" y="30" width="80" height="60" rx="6"/><text class="tx" x="230" y="54" style="font-size:11px">memory</text><text class="tx" x="230" y="70" style="font-size:11px">(FFs)</text>
+<rect class="box" x="190" y="120" width="80" height="50" rx="6"/><text class="tx" x="230" y="140" style="font-size:11px">output</text><text class="tx" x="230" y="155" style="font-size:11px">logic</text>
+<path class="ed" marker-end="url(#a2)" d="M10,60 H70"/><text class="lb" x="22" y="50">x</text>
+<path class="ed" marker-end="url(#a2)" d="M160,60 H190"/>
+<path class="ed" marker-end="url(#a2)" d="M270,60 H300 V10 H40 V45 H70"/><text class="sm" x="160" y="22">present state y</text>
+<path class="ed" marker-end="url(#a2)" d="M300,60 V100 H230 V120"/><text class="sm" x="330" y="96">only y</text>
+<path class="ed" marker-end="url(#a2)" d="M270,145 H330"/><text class="lb" x="345" y="145">z</text>
+</svg></div>
+</div>
+<p class="formula">Mealy: z(t) = λ(S(t), x(t)) &nbsp;&nbsp; Moore: z(t) = λ(S(t)); both: S(t+1) = δ(S(t), x(t))</p>
+<div class="tbl"><table class="mat"><tr><th></th><th>Mealy</th><th>Moore</th></tr><tr><td>Output depends on</td><td>present state and present input</td><td>present state only</td></tr><tr><td>Diagram</td><td>output on the arrow x/z</td><td>output inside the state</td></tr><tr><td>States</td><td>fewer</td><td>more</td></tr><tr><td>Response</td><td>in the same clock period; may glitch with the input</td><td>one clock later; changes only at clock edges, glitch-free</td></tr><tr><td>Use</td><td>pulse outputs ("when")</td><td>level outputs ("after")</td></tr></table></div>
+<p>Full walk-through: <a href="../seq/07-mealy-moore.html">Mealy and Moore chapter</a>.</p>
+</div></details></div>
+<div class="exam"><div class="exam-src">Q8(a) · 12 marks · races in fundamental-mode circuits</div><div class="exam-q"><p>What is a race in a fundamental-mode circuit? Explain critical and non-critical races with examples.</p><p class="tracer-hint"><b>Time guide:</b> about 12 min.</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<p><b>Race:</b> when an input change makes <b>two or more state variables change at once</b> (e.g. y1y2 from 00 to 11), their delays differ, so the circuit passes through an intermediate state (01 or 10) depending on which variable wins.</p>
+<p><b>Non-critical race:</b> every possible path ends in the same stable state. Example (column x = 1): rows 00 → 11; the intermediate rows 01 and 10 are unstable and also point to 11, so both paths end in 11.</p>
+<div class="tbl"><table class="mat"><tr><th>row (y1 y2)</th><th>x = 0</th><th>x = 1</th></tr><tr><td>00 (a)</td><td>(a)</td><td>d</td></tr><tr><td>01 (b)</td><td>a</td><td>d</td></tr><tr><td>10 (c)</td><td>c</td><td>d</td></tr><tr><td>11 (d)</td><td>a</td><td>(d)</td></tr></table></div>
+<p><b>Critical race:</b> different paths end in different stable states. Example (column x = 1): 00 → 11 again, but the intermediate row 01 is <b>stable</b> in that column, so if y2 changes first the circuit stops in 01 instead of 11.</p>
+<div class="tbl"><table class="mat"><tr><th>row (y1 y2)</th><th>x = 0</th><th>x = 1</th></tr><tr><td>00 (a)</td><td>(a)</td><td>d</td></tr><tr><td>01 (b)</td><td>a</td><td>(b)</td></tr><tr><td>10 (c)</td><td>c</td><td>d</td></tr><tr><td>11 (d)</td><td>a</td><td>(d)</td></tr></table></div>
+<p><b>Cure:</b> choose the state assignment so that each unstable transition changes one variable only (adjacent codes), or route through extra unstable rows (Gray-like). Non-critical races are harmless; critical races must be removed.</p>
+<p>Full walk-through: <a href="../seq/13-fund-races.html">races chapter</a>.</p>
+</div></details></div>
+<div class="exam"><div class="exam-src">Q8(b) · 12 marks · analyse an asynchronous circuit</div><div class="exam-q"><p>An asynchronous circuit has excitation function Y = x1x2' + (x1 + x2')y and output z = y. (i) Draw the logic diagram. (ii) Derive the transition table and output map. (iii) Obtain a two-state flow table.</p><p class="tracer-hint"><b>Time guide:</b> about 12 min.</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<div id="w21"></div>
+<p><b>Transition table</b> (entries Y; stable where Y = y, circled):</p>
+<div class="tbl"><table class="mat"><tr><th>y \ x1x2</th><th>00</th><th>01</th><th>11</th><th>10</th></tr><tr><td>0</td><td>(0)</td><td>(0)</td><td>(0)</td><td>1</td></tr><tr><td>1</td><td>(1)</td><td>0</td><td>(1)</td><td>(1)</td></tr></table></div>
+<p><b>Output map:</b> z = y, so z = 0 in row y = 0 and z = 1 in row y = 1.</p>
+<p><b>Two-state flow table</b> (a: y = 0, b: y = 1; entry = next state, / z):</p>
+<div class="tbl"><table class="mat"><tr><th></th><th>00</th><th>01</th><th>11</th><th>10</th></tr><tr><td>a (y=0)</td><td>(a)/0</td><td>(a)/0</td><td>(a)/0</td><td>b/–</td></tr><tr><td>b (y=1)</td><td>(b)/1</td><td>a/–</td><td>(b)/1</td><td>(b)/1</td></tr></table></div>
+<p>Reading: starting in a, only x1x2 = 10 sets the circuit to b; in b, only x1x2 = 01 resets it to a, and 00, 11, 10 keep it in b. (A set-reset latch with set = x1x2' and reset = x1'x2.)</p>
+<div id="w22"></div>
+</div></details></div>
+<div class="exam"><div class="exam-src">Q8(c) · 11 marks · state reduction with the implication table</div><div class="exam-q"><p>Reduce the number of states of the state table (inputs X = 0, 1; entries next state, output) using an implication table and show the reduced table.</p><pre>State | X=0 | X=1
+A | A,0 | B,0
+B | C,0 | D,1
+C | A,0 | B,0
+D | E,0 | D,1
+E | A,0 | D,1</pre><p class="tracer-hint"><b>Time guide:</b> about 11 min.</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<div id="w23"></div>
+<p>Equivalent pairs after the passes: AC, BE. Classes: (AC) (BE) (D): 3 states.</p>
+<div class="tbl"><table class="mat"><tr><th>PS</th><th>X = 0</th><th>X = 1</th></tr><tr><td>(AC)</td><td>(AC), 0</td><td>(BE), 0</td></tr><tr><td>(BE)</td><td>(AC), 0</td><td>D, 1</td></tr><tr><td>D</td><td>(BE), 0</td><td>D, 1</td></tr></table></div>
+<p>Full walk-through: <a href="../seq/09-state-min.html">state minimisation chapter</a>.</p>
+</div></details></div>
+<h2>Timed exercise · Section B compulsory question (35 min)</h2>
+<div id="r2"></div>
+</main>
+<script src="../assets/book.js"></script><script src="../assets/logic.js"></script><script src="../assets/dld.js"></script><script src="figs.js"></script>
+<script>
+muxImpl('#w1', {"vars":["A","B","C","D"],"ones":[1,2,4,7,8,9,10,11,13,15]});
+kmap('#w2', {"vars":["G2","G1","G0"],"ones":[2,3,4,5]});
+kmap('#w3', {"vars":["G2","G1","G0"],"ones":[1,2,4,7]});
+netFig('#w4', {"inputs":["G2","G1","G0"],"title":"gray to binary","nodes":[{"id":"b1","t":"XOR","i":["G2","G1"]},{"id":"b0","t":"XOR","i":["b1","G0"]},{"id":"b2","t":"BUF","i":["G2"]}],"outs":[{"n":"B2","src":"b2"},{"n":"B1","src":"b1"},{"n":"B0","src":"b0"}],"note":"Two XOR gates in total (B0 reuses B1)."});
+plaFig('#w5', {"vars":["A","B","C"],"fns":[[0,1,2,4],[0,5,6,7]],"names":["F1","F2"]});
+netFig('#w6', {"inputs":["x","y"],"title":"NAND-only NOT, AND, OR","nodes":[{"id":"n1","t":"NAND","i":["x","x"]},{"id":"a1","t":"NAND","i":["x","y"]},{"id":"a2","t":"NAND","i":["a1","a1"]},{"id":"o1","t":"NAND","i":["x","x"]},{"id":"o2","t":"NAND","i":["y","y"]},{"id":"o3","t":"NAND","i":["o1","o2"]}],"outs":[{"n":"NOT x","src":"n1"},{"n":"x·y","src":"a2"},{"n":"x+y","src":"o3"}]});
+netFig('#w7', {"inputs":["x","y"],"title":"NOR-only NOT, OR, AND","nodes":[{"id":"n1","t":"NOR","i":["x","x"]},{"id":"o1","t":"NOR","i":["x","y"]},{"id":"o2","t":"NOR","i":["o1","o1"]},{"id":"a1","t":"NOR","i":["x","x"]},{"id":"a2","t":"NOR","i":["y","y"]},{"id":"a3","t":"NOR","i":["a1","a2"]}],"outs":[{"n":"NOT x","src":"n1"},{"n":"x+y","src":"o2"},{"n":"x·y","src":"a3"}]});
+kmap('#w8', {"vars":["A","B","C","D"],"ones":[0,1,2,5,8,9,10]});
+kmap('#w9', {"vars":["A","B","C","D"],"ones":[0,1,2,5,8,9,10],"pos":true});
+netFig('#w10', {"inputs":["D1","D2","D3","D4","D5","D6","D7"],"title":"full adder from decoder","nodes":[{"id":"s","t":"OR","i":["D1","D2","D4","D7"]},{"id":"c","t":"OR","i":["D3","D5","D6","D7"]}],"outs":[{"n":"Sum","src":"s"},{"n":"Carry","src":"c"}],"note":"D0..D7 are the outputs of a 3×8 decoder with inputs x, y, z; D0 is unused. Two 4-input OR gates."});
+tabulation('#w11', {"vars":["A","B","C","D"],"ones":[0,2,3,5,7,8,9,10,11,13,15]});
+recall('#r1', {"id":"r1","marks":22,"q":"Q1(a)+(c), 25 min: state the steps for M − N with (r−1)'s complement and do 72532 − 13250 and 13250 − 72532; then implement Σ(1,2,4,7,8,9,10,11,13,15) with a 4×1 MUX and external gates.","points":["Pad N to n digits, take the (r−1)'s complement (9 − d each digit)","Add to M; end carry → add 1 at the LSD, result positive","No end carry → take the complement of the sum, write the minus sign","72532 − 13250 = 59282 and 13250 − 72532 = −59282 with the 9's complement 86749 / 27467 shown","A on S1, B on S0; slices AB = 00, 01, 10, 11","Data inputs C⊕D, C⊙D, 1, D and the two gates drawn"],"model":"<p>See Q1(a) and Q1(c) above.</p>"});
+diagram('#w12', {"table":"A: A,0 B,0\nB: A,0 C,0\nC: A,0 C,1","inputs":["0","1"],"run":"0111101110"});
+netFig('#w13', {"inputs":["J","K"],"title":"JK from T","nodes":[{"id":"a","t":"AND","i":["J","Q'"]},{"id":"b","t":"AND","i":["K","Q"]},{"id":"t","t":"OR","i":["a","b"]},{"id":"f","t":"FF","kind":"T","pins":["T"],"i":["t"],"out":"Q"}],"outs":[]});
+diagram('#w14', {"M":{"S":["I","T1","T2","T3","T4"],"I":["0","1"],"t":{"I":["I","T1"],"T1":["T2","T2"],"T2":["T3","T3"],"T3":["T4","T4"],"T4":["I","I"]},"z":{"I":0,"T1":1,"T2":1,"T3":1,"T4":1}},"start":"I","run":"1000"});
+timing('#w15', {"signals":{"SC":[0,1,1,1,1,0],"A3 (out)":[1,1,0,1,1,1],"B0":[0,1,1,0,1,1],"B3":[0,0,0,0,1,1]},"clock":true});
+timing('#w16', {"signals":{"CLK":[0,1,0,1,0,1,0,1],"D":[1,1,0,0,1,1,0,0],"Qm":[0,1,1,0,0,1,1,0],"Q":[0,0,1,1,0,0,1,1]}});
+shiftLab('#w17', {"n":4,"kind":"ring"});
+diagram('#w18', {"M":{"S":["S0","S5","S10"],"I":["x5","x10"],"t":{"S0":[["S5",0],["S10",0]],"S5":[["S10",0],["S0",1]],"S10":[["S0",1],["S5",1]]}},"start":"S0","run":"110001"});
+netFig('#w19', {"inputs":["x5","x10"],"title":"vending machine, pulse mode, SR latches","nodes":[{"id":"a1","t":"AND","i":["x5","y0"]},{"id":"a2","t":"AND","i":["x10","y1'","y0'"]},{"id":"oSy1","t":"OR","i":["a1","a2"]},{"id":"a3","t":"AND","i":["x5","y0'"]},{"id":"a4","t":"AND","i":["x10","y1"]},{"id":"oRy1","t":"OR","i":["a3","a4"]},{"id":"ff0","t":"FF","kind":"SR","pins":["S","R"],"i":["oSy1","oRy1"],"out":"y1"},{"id":"a5","t":"AND","i":["x5","y1'","y0'"]},{"id":"a6","t":"AND","i":["x10","y1"]},{"id":"oSy0","t":"OR","i":["a5","a6"]},{"id":"a7","t":"AND","i":["x5","y0"]},{"id":"a8","t":"AND","i":["x10","y1'"]},{"id":"oRy0","t":"OR","i":["a7","a8"]},{"id":"ff1","t":"FF","kind":"SR","pins":["S","R"],"i":["oSy0","oRy0"],"out":"y0"}],"outs":[],"note":"Clock of every flip-flop = x5 + x10 (OR of the pulse inputs)."});
+counterLab('#w20', {"seq":[1,2,5,7],"bits":3,"ff":"JK"});
+netFig('#w21', {"inputs":["x1","x2","y"],"title":"asynchronous circuit","nodes":[{"id":"a","t":"AND","i":["x1","x2'"]},{"id":"o","t":"OR","i":["x1","x2'"]},{"id":"b","t":"AND","i":["o","y"]},{"id":"Y","t":"OR","i":["a","b"]}],"outs":[{"n":"Y","src":"Y"}],"note":"y is the feedback of Y through the loop delay (no clock, no flip-flop). Output z = y."});
+flowLab('#w22', {"table":"a: a,0 a,0 a,0 b,-\nb: b,1 a,- b,1 b,1","cols":["00","01","11","10"],"start":"a"});
+implication('#w23', {"table":"A: A,0 B,0\nB: C,0 D,1\nC: A,0 B,0\nD: E,0 D,1\nE: A,0 D,1","inputs":["0","1"]});
+recall('#r2', {"id":"r2","marks":12,"q":"Q5(a), 15 min: detector for three or more consecutive 1s with D flip-flops. State diagram, state table, assignment, D equations.","points":["Mealy states A (no 1), B (one 1), C (two or more 1s)","Arrows: every 0 → A; A −1→ B; B −1→ C; C −1→ C with z = 1","State table with output; assignment A = 00, B = 01, C = 10, 11 unused","D1, D0 and z from K-maps over y1 y0 x","Equations stated (D = NS, z = x y1)"],"model":"<p>See Q5(a): z = x·y1; the D equations from the K-maps.</p>"});
+</script>
+</body>
+</html>

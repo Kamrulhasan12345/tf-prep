@@ -1,0 +1,324 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Synchronous Design from Words · CSE 205 Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Sequential circuits · Mano §5.8 · Adnan sir L4–L9 (22 Aug – 1 Sep) · almost every paper</div>
+<h1>Designing a synchronous circuit from words</h1>
+<p class="lede">Past term-final questions on this topic: <b>2018–19 Q5(a)</b> (20 marks, detect 1101 overlapping, S-R), <b>2018–19 Q6(b)</b> (8, serial parity generator), <b>2019–20 Q1(b)</b> (25, 4-bit non-overlapping sequence = your roll number, T flip-flops), <b>2020–21 Q6(a)</b> (20, synchronous vending machine, J-K, inputs X1X2, outputs Z1 Z2), <b>2020–21 Q6(b)</b> (10, serial parity again), <b>2022–23 Q5(a)</b> (12, three or more consecutive 1s, D), <b>2023–24 Q5(b)</b> (12, divide-by-three counter of 1s, D) and <b>2023–24 Q6(a)</b> (23, traffic-light controller with WALK button, S-R). Older: 1010 overlapping with T (2016–17, 20), Moore diagram for 10011 (2012–13, 8), serial 2's complementer (2015–16, 15), three or more 1s again (2011–12, 15). Every paper from 2018–19 to 2023–24 has one or two of these, worth 20 to 45 marks in total. The <i>pulse-mode</i> versions (digit lock, vending machine with S-R latches) belong to the pulse-mode chapter. The theory of Mealy versus Moore is in <a href="07-mealy-moore.html">the Mealy/Moore chapter</a>; here you only need the one-line rule below.</p>
+
+<h2>1. The recipe: Adnan sir's 8 steps</h2>
+<p>Use this order and these names on the script. The textbook name is in brackets.</p>
+<ol>
+<li><b>State Diagram.</b> Decide what each state <i>remembers</i>. Write that meaning next to the circle. Arrows are labelled <i>x / z</i> (input / output).</li>
+<li><b>State Table.</b> One row per state; for each input value, the next state and the output.</li>
+<li><b>Number of FFs and state assignment.</b> #FF = ⌈log₂ #states⌉. Give every state a binary code (A = 00, B = 01, …) [state assignment].</li>
+<li><b>Transition Table.</b> The state table written with the binary codes: y<sub>2</sub>y<sub>1</sub> → Y<sub>2</sub>Y<sub>1</sub>, z [binary state table].</li>
+<li><b>Excitation Requirement.</b> The 4-row table for your flip-flop type (Q → Q⁺ → S R / J K / T / D) [flip-flop excitation table].</li>
+<li><b>Excitation Table.</b> For every present state and input, the flip-flop inputs. Unused states and impossible inputs: x [flip-flop input columns of the state table].</li>
+<li><b>K-Map.</b> One map per flip-flop input and per output, in the variables y<sub>2</sub> y<sub>1</sub> x. Result: equations.</li>
+<li><b>Circuit Diagram.</b> Flip-flops, one clock, gates from the equations.</li>
+</ol>
+<div class="def"><dl>
+<dt>The Mealy / Moore rule in one line</dt><dd><b>Mealy:</b> output on the arrow, depends on state <i>and</i> input; it reacts in the same clock period. <b>Moore:</b> output written in the circle, depends on the state only; it changes one clock later. A Mealy detector needs fewer states (the last arrow carries the 1); a Moore detector needs one extra state for the "detected" output. Unless the question says Moore, Adnan sir's examples are <b>Mealy</b>.</dd>
+</dl></div>
+<p>If the question gives the flip-flop (S-R, T, D, J-K) use that one. The excitation table for each is on <a href="05-sync-counter.html">the counter chapter</a>; the trap list there applies here too. To check a finished design, <a href="06-analysis.html">analyse it</a> backwards.</p>
+
+<h2>2. Sequence detectors: the idea</h2>
+<p><b>A state remembers how many bits of the pattern have been matched so far.</b> For a 4-bit pattern X you need four states: no match (S0), first bit matched (S1), two matched (S2), three matched (S3). The 4th matching bit is the arrow that outputs 1.</p>
+<div class="hint"><b>Overlapping vs non-overlapping</b> only changes where the output arrow goes.
+<ul><li><b>Overlapping</b>: after a detection the last bits can already be the start of the next pattern. The detection arrow goes to the state that matches the longest suffix (for 1101 it goes to "1 matched", because the last 1 of 1101 is also the start of 1101).</li>
+<li><b>Non-overlapping</b>: after a detection start from scratch: the arrow goes to S0.</li></ul>
+For the <b>other arrows</b> (a wrong bit), both kinds use the same rule: go to the state for the <b>longest tail of what has been read that is also the start of the pattern</b>. Falling back to S0 every time is the classic mistake.</div>
+
+<h2>3. 2018–19 Q5(a): 1101, overlapping, S-R flip-flops</h2>
+<div class="exam"><div class="exam-src">2018–19 Q5(a) · 20 marks</div><div class="exam-q"><p>Design a sequence recognizer that recognizes the sequence 1101 from an input sequence. The sequence is overlapping. Design the circuit using S-R flip-flops and draw the circuit diagram.</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<p><b>Step 1: states.</b> A = no match, B = "1", C = "11", D = "110". Mealy output z = 1 on the arrow D —1→ B (the fourth bit). Overlap: the final 1 of 1101 is the start of the next 1101, so that arrow goes to B, not A. Press play with the input 1101101, which contains two overlapping patterns:</p>
+<div id="d1"></div>
+<p><b>Steps 2–4: state table and assignment.</b> The table is in the box above. 4 states, 2 flip-flops, A = 00, B = 01, C = 10, D = 11 (y2 y1).</p>
+<p><b>Steps 5–8: excitation, K-maps, equations.</b> The S-R excitation requirement is 0→0: 0x, 0→1: 10, 1→0: 01, 1→1: x0. The lab builds the transition and excitation tables and minimises every K-map:</p>
+<div id="s1"></div>
+<p>Equations: <b>S2 = y2'y1x, R2 = y2y1, S1 = y2'y1'x + y2y1'x', R1 = y2'y1 + y1x', z = y2y1x</b>. S and R are never both 1 (check each pair). z = 1 only in state 11 with x = 1.</p>
+<p><b>Circuit.</b> Two S-R flip-flops on one clock; AND gates and OR gates from the equations (gate drawings are in the lab above); z from one 3-input AND gate. The same machine with other flip-flops (engine): D: D2 = y2'y1x + y2y1', D1 = y2'y1'x + y2y1'x' + y2y1x. J-K: J2 = y1x, K2 = y1, J1 = y2'x + y2x', K1 = y2' + x'.</p>
+<details><summary>The Moore version (5 states)</summary>
+<p>For a Moore machine you need a fifth state E = "1101 seen" with output 1, and every state stores the output in the circle. 5 states means 3 flip-flops. Same input, one clock later output:</p>
+<div id="d1m"></div>
+<p>Details of the Mealy-to-Moore step are in <a href="07-mealy-moore.html">the Mealy/Moore chapter</a>.</p></details>
+<details><summary>Adnan sir's own example: 0101, overlapping, S-R</summary>
+<p>His notes use A = no match, B = "0", C = "01", D = "010", D —1/1→ C. The engine reproduces his boxed results: S1 = x', R1 = x, S2 = x y1, R2 = x ⊕ y1, Z = x y1 y2 (and for D flip-flops D2 = x'y2y1' + x y1, D1 = x', Z = x y1 y2).</p>
+<div id="s0101"></div></details>
+</div></details></div>
+
+<div class="write"><h4>What to write: a sequence detector (20–25 marks)</h4>
+<ol>
+<li>One line: "Mealy machine. Overlapping: after a detection the machine goes to … (state)". Name the states by what they remember (A = none, B = "1", C = "11", D = "110").</li>
+<li><b>State diagram</b> with every arrow labelled <i>x/z</i>. Two arrows leave every state. The 1 appears on one arrow only.</li>
+<li><b>State table</b> (PS; x = 0 and x = 1: NS, z).</li>
+<li>"#FF = ⌈log₂ 4⌉ = 2, assignment A = 00, B = 01, C = 10, D = 11."</li>
+<li><b>Transition table</b>, then the <b>excitation requirement</b> for the given FF type (four rows).</li>
+<li><b>Excitation table</b>: 8 rows (4 states × 2 inputs), columns S2R2 S1R1 and z. Use x where the requirement says so.</li>
+<li><b>K-maps</b> for S2, R2, S1, R1, z in the variables y2 y1 x (3-variable maps, 8 cells). Circle, write the equations.</li>
+<li><b>Circuit diagram</b> with flip-flops on one clock, gates, input x, output z.</li>
+</ol></div>
+
+<h2>4. 2019–20 Q1(b): non-overlapping, your roll number, T flip-flops</h2>
+<div class="exam"><div class="exam-src">2019–20 Q1(b) · 25 marks</div><div class="exam-q"><p>Design a sequence recognizer using T flip-flops that recognizes a 4-bit <b>non-overlapping</b> binary sequence X from an input stream of bits, where X = the 4-bit binary representation of your roll number (mod 16).</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<p>The question is a template: you must do it for <b>your own X</b>. Do the method below on paper for your X; the widget builds the diagram, tables and T equations for any 4-bit X so you can check.</p>
+<p><b>The method for a general X = x<sub>1</sub>x<sub>2</sub>x<sub>3</sub>x<sub>4</sub>:</b></p>
+<ol>
+<li>States S0, S1, S2, S3: S<sub>k</sub> means "the last k bits read are x<sub>1</sub>…x<sub>k</sub>".</li>
+<li>Forward arrows: from S<sub>k</sub> on input x<sub>k+1</sub> go to S<sub>k+1</sub>, output 0 (k = 0, 1, 2). From S3 on input x<sub>4</sub>: output <b>1</b> and go to <b>S0</b> (non-overlapping).</li>
+<li>Every other arrow (wrong bit): write the string "x<sub>1</sub>…x<sub>k</sub> + the bit just read", and go to the state for the <b>longest tail of that string that equals the start of X</b> (S0 if no tail does).</li>
+<li>Then the 8 steps: 4 states, 2 T flip-flops, A = S0 = 00 … S3 = 11. Excitation requirement for T: T = Q ⊕ Q⁺ (0 if the bit stays, 1 if it changes).</li>
+</ol>
+<p><b>Worked X = 1011.</b> Step 3 gives: S1 ("1") on 1 → "11": tail "1" → S1. S2 ("10") on 0 → "100": no tail → S0. S3 ("101") on 0 → "1010": tail "10" → S2. Press play: the input 1011011 has a second 1011 that <b>overlaps</b> the first, so a non-overlapping machine gives z = 0001000 (the second one is not counted).</p>
+<div id="d2"></div>
+<div id="s2"></div>
+<p>Equations for X = 1011, non-overlapping (S0 = 00 … S3 = 11, flip-flops y2 y1): <b>T2 = y2'y1x' + y2y1'x' + y2y1x, T1 = y1'x + y1x' + y2x, z = y2y1x</b>. Check: for y2 = 0, T1 = y1 ⊕ x; the term y2x is what makes the detection arrow S3 —1→ S0 clear y1 (and y2y1x clears y2).</p>
+<p><b>Try your own X:</b> type 4 bits and press Build. The checkbox switches to overlapping to see the difference in the last arrow.</p>
+<div id="dw"></div>
+</div></details></div>
+
+<h2>5. 2022–23 Q5(a): three or more consecutive 1s, D flip-flops</h2>
+<div class="exam"><div class="exam-src">2022–23 Q5(a) · 12 marks (also 2011–12 · 15 marks)</div><div class="exam-q"><p>Develop a sequential circuit that detects a sequence of three or more consecutive 1s in a string of bits coming through an input line. Use D flip-flops. Show the state diagram, the state table and simplified logic equations. You do not need to show the logic diagram.</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<p>States remember the run length of 1s: A = no 1 (or a 0 just came), B = one 1, C = two or more 1s. On a third (or later) 1 the output is 1 and the machine stays in C. Any 0 returns to A. Three states, so 2 flip-flops (code 11 unused: x).</p>
+<div id="d3"></div>
+<div id="s3"></div>
+<p>Equations: <b>D2 = y2x + y1x, D1 = y2'y1'x, z = y2x</b> (A = 00, B = 01, C = 10; the unused code 11 is a don't-care).</p>
+<details><summary>Moore version (4 states)</summary><p>With output in the state you need a fourth state D = "three or more 1s", output 1: A, B, C, D = 00, 01, 10, 11. Equations: <b>D2 = y2x + y1x, D1 = y1'x + y2x, z = y2y1</b>.</p><div id="d3m"></div><div id="s3m"></div></details>
+</div></details></div>
+
+<h2>6. Serial parity (2018–19 Q6(b), 2020–21 Q6(b))</h2>
+<div class="exam"><div class="exam-src">2018–19 Q6(b) · 8 marks · 2020–21 Q6(b) · 10 marks</div><div class="exam-q"><p>Design a serial parity generation circuit. It receives a sequence of bits and determines whether the sequence contains an even or odd number of 1s. The output p is 0 for even parity and 1 for odd parity.</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<p>Two states remember "an even number of 1s so far" (EV) and "an odd number" (OD). A 1 flips the state, a 0 keeps it (a self-loop on each state). The output is the state itself, so this is a <b>Moore</b> machine with p written in the circle: EV/0 and OD/1. One flip-flop. Assumption (state it): the circuit is reset to EV before a sequence starts (asynchronous clear).</p>
+<div id="d4"></div>
+<p class="tracer-hint">(The self-loops EV —0→ EV and OD —0→ OD sit at the edge of the drawing and may be cut off; the table above has them.)</p>
+<p>Code EV = 0, OD = 1 (the code is the output). With three kinds of flip-flop (all from the engine):</p>
+<div class="tbl"><table class="mat"><tr><th>flip-flop</th><th>equation</th><th>circuit</th></tr>
+<tr><td>T</td><td>T = x</td><td>no gate: x straight into T (it toggles on every 1)</td></tr>
+<tr><td>D</td><td>D = x'y + xy' = x ⊕ y</td><td>one XOR gate</td></tr>
+<tr><td>J-K</td><td>J = K = x</td><td>x to both J and K</td></tr></table></div>
+<div id="s4"></div>
+<p>The output is p = y (the flip-flop's Q). If the question wants the parity <i>including</i> the current bit with no one-clock delay, use the Mealy form p = x ⊕ y; the machine itself is the same.</p>
+</div></details></div>
+
+<h2>7. 2023–24 Q5(b): divide-by-three counter of 1s</h2>
+<div class="exam"><div class="exam-src">2023–24 Q5(b) · 12 marks</div><div class="exam-q"><p>Divide-by-three counter counting 1s in an input stream: the output is 1 for every third 1 seen (not necessarily in succession); then it starts again. Use D flip-flops.</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<p>Count 1s modulo 3: S0 = 0 (or 3) ones seen, S1 = 1 one, S2 = 2 ones. A 0 changes nothing (loop). A 1 moves to the next state, and on the arrow S2 —1→ S0 the output is 1. Three states, 2 flip-flops, S0 = 00, S1 = 01, S2 = 10, code 11 unused (x).</p>
+<div id="d5"></div>
+<div id="s5"></div>
+<p>Equations: <b>D2 = y1x + y2x', D1 = y2'y1'x + y1x', z = y2x</b>. The "not necessarily in succession" in the question is why the 0-arrows are self-loops, not resets.</p>
+</div></details></div>
+
+<h2>8. 2023–24 Q6(a): traffic-light controller with WALK (23 marks)</h2>
+<div class="exam"><div class="exam-src">2023–24 Q6(a) · 23 marks</div><div class="exam-q"><p>A traffic light controller for an NS street crossing an EW street. Input: WALK button. Outputs NS and EW (0 red, 1 green). With no pedestrians: NS = 0, EW = 1 for 1 minute, then NS = 1, EW = 0 for 1 minute, and so on. When WALK is pushed, NS and EW both become 1 for a minute when the present minute expires, then they alternate again. (i) State diagram and state/output table. (ii) Transition and excitation tables using S-R flip-flops. (iii) Circuit diagram.</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<p><b>Assumptions (write them at the top).</b> One clock period = 1 minute. WALK is sampled at each clock edge. The light pattern is a function of the state only (Moore). After the walk minute the normal alternation continues as if the walk minute had been inserted between two normal minutes.</p>
+<p><b>States (the memory).</b> A = EW green (NS 0, EW 1). B = NS green (1, 0). C = both green, entered from A, so the next minute is NS green. D = both green, entered from B, so the next minute is EW green. Two kinds of "both green" are needed so the alternation is not lost. 4 states, 2 flip-flops, A = 00, B = 01, C = 10, D = 11 (no unused code).</p>
+<div class="tbl"><table class="mat"><tr><th>PS</th><th>NS EW</th><th>WALK = 0</th><th>WALK = 1</th></tr><tr><td>A</td><td>0 1</td><td>B</td><td>C</td></tr><tr><td>B</td><td>1 0</td><td>A</td><td>D</td></tr><tr><td>C</td><td>1 1</td><td>B</td><td>B</td></tr><tr><td>D</td><td>1 1</td><td>A</td><td>A</td></tr></table></div>
+<p>Moore diagram (the pair in the circle is NS EW). WALK pressed in C or D is ignored: the walk minute is already running.</p>
+<div id="d6"></div>
+<div id="s6"></div>
+<p>Equations: <b>S1 = y1'x, R1 = y1, S0 = y0'x' + y1y0', R0 = y0x' + y1y0, NS = y1 + y0, EW = y1 + y0'</b>. Check: in A (00) with x = 1: S1 = 1, R1 = 0, so y1 becomes 1, S0 = 0 so y0 stays 0: 10 = C ✓.</p>
+<details><summary>The 3-state shortcut (if you prefer fewer states)</summary><p>Use one "both green" state C (code 10, code 11 unused) and always return to A (EW green) afterwards. This gives S1 = y1'x, R1 = y1, S0 = y1'y0'x', R0 = y0, NS = y1 + y0, EW = y0'. Cheaper, but the alternation is not preserved after a walk that started from A, so state clearly that this is your interpretation.</p></details>
+</div></details></div>
+
+<h2>9. 2020–21 Q6(a): the synchronous vending machine (JK, 20 marks)</h2>
+<div class="exam"><div class="exam-src">2020–21 Q6(a) · 20 marks</div><div class="exam-q"><p>Design the control unit of a synchronous vending machine. It accepts 5, 10 and 20 Tk notes. A drink costs 20 Tk. It releases a drink when the deposit is 20 or more and keeps the change as the deposit for the next purchase. The deposit is never more than 15 Tk. When the input CHANGE is given it releases the deposit. Outputs: Z1 = release drink, Z2 = release change. Inputs X1X2: 5 Tk = 00, 10 Tk = 01, 20 Tk = 10, CHANGE = 11. Use J-K flip-flops.</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<p><b>States remember the deposit:</b> S0 = 0 Tk, S1 = 5, S2 = 10, S3 = 15 (the maximum). 4 states, 2 flip-flops, S0 = 00 … S3 = 11. All four input codes are real inputs (no don't-care columns). Mealy outputs Z1 Z2.</p>
+<ul>
+<li>Add 5 or 10 and stay below 20: move to the new deposit, Z = 00.</li>
+<li>Reach 20 or more: Z1 = 1 (drink), and the excess becomes the new deposit. From S3: +5 → 20 → S0; +10 → 25 → S1 (5 kept). A 20 Tk note always gives a drink and leaves the deposit unchanged.</li>
+<li>CHANGE: Z2 = 1 and go to S0 (assumption: with nothing deposited, Z2 stays 0).</li>
+</ul>
+<div id="d7"></div>
+<div id="s7"></div>
+<p>Equations: <b>J1 = X1'X2 + y0X1', K1 = X2 + y0X1', J0 = X1'X2', K0 = X1'X2' + X1X2, Z1 = X1X2' + y1X1'X2 + y1y0X1', Z2 = y0X1X2 + y1X1X2</b> (y1 y0 = the deposit code).</p>
+<p>Sample run from S0 (the lab's table can be read by row):</p>
+<div id="t7"></div>
+</div></details></div>
+
+<h3>Adnan sir's own vending example (his notes, L9)</h3>
+<p>1 Tk and 2 Tk coins, candy costs 4 Tk. Inputs x2 x1 (x1 = 1 Tk inserted, x2 = 2 Tk inserted), outputs z2 z1 (z1 = release candy, z2 = return 1 Tk change). Both coins cannot arrive together, so <b>x2x1 = 11 is a don't-care</b>. States 0 to 3 = Tk so far (A, B, C, D). Edge case: 3 Tk deposited and a 2 Tk coin arrives = 5 Tk, so candy and 1 Tk change back (z2z1 = 11). His notes stop at the state table; the flip-flop design below is ours (D flip-flops, the same machine).</p>
+<div id="d8"></div>
+<div id="s8"></div>
+<p>His table has the last column headed "00" twice; the last column is x2x1 = 10 (a typing slip in the notes).</p>
+
+<div class="write"><h4>What to write: a word problem (traffic light, vending machine; 20–25 marks)</h4>
+<ol>
+<li><b>Assumptions line.</b> "Clock = 1 minute / one note per clock. Mealy (or Moore). Reset state = …". Write every assumption the question leaves open.</li>
+<li><b>What each state remembers</b> (deposit so far; which light is on) in one line each.</li>
+<li><b>State diagram</b> with arrows <i>x/z</i> (Mealy) or outputs in the circles (Moore). Check that <b>every state has an arrow for every input value</b>.</li>
+<li><b>State table</b> with the output; the transition table with codes.</li>
+<li><b>Excitation table</b> for the given flip-flop with x for impossible inputs and unused codes.</li>
+<li><b>K-maps</b> (one per FF input and output) and the equations.</li>
+<li><b>Circuit:</b> FFs on one clock, gates, inputs and outputs labelled.</li>
+</ol></div>
+
+<h2>10. Older questions</h2>
+<div class="exam"><div class="exam-src">2016–17 · 20 marks · 2012–13 · 8 marks</div><div class="exam-q"><p>(2016–17) Design a clocked sequential circuit that recognizes 1010 (including overlap) so that for x = 01010100011010010100 the output is z = 00001010000001000010. Use T flip-flops. (2012–13) Draw the Moore state diagram of a circuit whose output is 1 whenever 10011 occurs; overlapping is allowed.</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<p><b>1010, overlapping, T.</b> The method of section 4 with overlap on. The machine below reproduces the given z exactly for the given x (checked by the engine: run the string).</p>
+<div id="d9"></div>
+<div id="s9"></div>
+<p><b>10011, overlapping, Moore.</b> 6 states S0 … S5, S<sub>k</sub> = "the last k bits are 10011[0..k)", S5 output 1. Overlap: S5 on 0 goes to S2 ("10" is a prefix again), on 1 goes to S1. The same rule as before (longest tail that is a prefix), so S4 on 0 goes to S2, S3 on 1 goes to S4.</p>
+<div id="d10"></div>
+</div></details></div>
+
+<div class="exam"><div class="exam-src">2015–16 · 15 marks</div><div class="exam-q"><p>Design a one-input, one-output serial 2's complementer using D flip-flops. The circuit accepts bits LSB first and produces the 2's complement. Include the state diagram, state table, equations and logic diagram.</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<p>Rule: copy the bits up to and including the first 1, then invert all later bits. Two states: A = "no 1 seen yet", B = "a 1 has been seen". A: x = 0 → A, z = 0; x = 1 → B, z = 1. B: z = x' always, stay in B. Mealy machine, reset to A (assumption).</p>
+<div id="d11"></div>
+<p class="tracer-hint">Arrows: A —0/0→ A (loop), A —1/1→ B, B —0/1→ B (loop), B —1/0→ B (loop). The loops may be cut off in the drawing; the table has them.</p>
+<div id="s11"></div>
+<p>Equations: <b>D = x + y, z = x'y + xy'</b> (T flip-flop version: T = y'x). One OR gate and one XOR gate.</p>
+</div></details></div>
+
+<div class="trap"><h4>Traps that cost marks</h4><ul>
+<li>Falling back to the start state on every wrong bit. Use the longest tail that is still a prefix of the pattern.</li>
+<li>Overlapping versus non-overlapping: after a detection the arrow goes to the suffix state (overlap) or S0 (no overlap). Read the question for the word "non-overlapping".</li>
+<li>Missing arrows. Every state needs an arrow for every input value (two arrows for one input, four for two inputs).</li>
+<li>Leaving out the assumptions: reset state, one clock = one minute or one note, Mealy or Moore.</li>
+<li>Not marking the impossible input as a don't-care (Adnan's vending x2x1 = 11), or marking a real input as don't-care (the 2020–21 vending machine uses all four codes).</li>
+<li>Writing the excitation table for the wrong flip-flop (T = Q ⊕ Q⁺, D = Q⁺, S-R forbids 11).</li>
+<li>Mixing up the output: Mealy z may depend on x; a Moore output (traffic light, parity) must not.</li>
+<li>For the roll-number question, doing a generic X and not your own: write the actual bits.</li>
+</ul></div>
+
+<h2>Mandatory practice</h2>
+<div id="p1"></div>
+<div id="p2"></div>
+<div id="r1"></div>
+<div id="r2"></div>
+<div id="r3"></div>
+</main>
+<script src="../assets/book.js"></script><script src="../assets/logic.js"></script><script src="../assets/dld.js"></script>
+<script>
+// seqLab: page-local helper. Runs L.synth on spec and shows the design tables, equations, K-maps and gate drawings.
+function seqLab(sel, spec, o = {}) {
+  const el = host(sel), R = L.synth(spec), { sv, iv = [], ff, ov: outs = [] } = spec, ns = sv.length, ni = iv.length, bn = (v, w) => w ? L.bin(v, w) : '';
+  const inKeys = ff.flatMap((t, b) => L.FF[t].ins.map(nm => nm + sv[b]));
+  const head = ['PS ' + sv.join(''), ...(ni ? [iv.join('')] : []), 'NS ' + sv.join(''), ...inKeys, ...outs];
+  const rows = R.table.map(r => [bn(r.ps, ns), ...(ni ? [bn(r.x || 0, ni)] : []), bn(r.ns, ns), ...inKeys.map(k => r.ex[k]), ...outs.map((_, j) => r.z && r.z[j] !== null && r.z[j] !== undefined ? r.z[j] : '–')]);
+  const keys = [...inKeys, ...outs], mp = k => R.maps[k] || R.out[k];
+  const eqs = keys.map(k => `<b>${esc(k)}</b> = ${ov(R.eq[k].sop)}`).join(' &nbsp;·&nbsp; ');
+  const maps = keys.map(k => { const m = mp(k), e = R.eq[k]; return `<div><div class="figlabel">${esc(k)} = ${ov(e.sop)}</div>${kmapSVG(R.vars, valsOf(R.n, m.ones, m.dc), (e.sols[0] || []).map((q, j) => ({ cube: q, color: COL[j % COL.length] })))}</div>`; }).join('');
+  const gl = keys.filter(k => !/^[01]$/.test(R.eq[k].sop)).map(k => `<div><div class="figlabel">${esc(k)}</div><div data-g="${esc(k)}"></div></div>`).join('');
+  let chk = '';
+  if (o.valid) {
+    const bad = L.range(1 << ns).filter(s => !o.valid.includes(s));
+    chk = `<p><b>Unused states, simulated with these equations:</b><br>${bad.map(s => { let c = s; const p = [s]; for (let t = 0; t < 9 && c !== null && !o.valid.includes(c); t++) { c = L.step(spec, R.eq, c); p.push(c); } const ok = c !== null && o.valid.includes(c); return `${s} → ${p.slice(1).map(v => v === null ? '?' : v).join(' → ')} ${ok ? '<span class="good">(enters the count)</span>' : '<span class="bad">(lock-out)</span>'}`; }).join('<br>')}</p>`;
+  }
+  el.innerHTML = `<span class="anim-tag">${o.tag || 'design lab'} · ${ff.join(', ')}</span>${tbl(head, rows)}${o.note ? `<p class="tracer-hint">${o.note}</p>` : ''}<p>${eqs}</p>${chk}<details><summary>K-maps (variables ${R.vars.join(' ')})</summary><div class="figrow">${maps}</div></details><details><summary>Gate drawing of every flip-flop input and output</summary><div class="figrow">${gl}</div></details>`;
+  el.querySelectorAll('[data-g]').forEach(d => { const k = d.dataset.g; gates(d, { expr: R.eq[k].sop, vars: R.vars, form: 'and-or' }); });
+  return R;
+}
+// machine helpers: a Mealy table {S, t:{s:[[ns,z],..]}} (inputs by index) + codes -> synth rows; text for diagram()
+const mRows = (M, codes) => M.S.flatMap(s => M.t[s].flatMap((c, x) => c ? [{ ps: codes[s], x, ns: codes[c[0]], z: c[1] === null || c[1] === undefined ? null : [].concat(c[1]) }] : []));
+const mText = (M, f = z => z) => M.S.map(s => `${s}: ${M.t[s].map(c => c ? `${c[0]},${f(c[1])}` : '-').join(' ')}`).join('\n');
+
+function dg(sel, c) { const el = host(sel); el.innerHTML = '<div class="dg-t"></div><div class="dg-d"></div>'; const M = c.M || asTable(c.table); if (c.inputs) M.I = c.inputs; el.firstChild.innerHTML = stateTableHTML(M); diagram(el.lastChild, { ...c, M, table: undefined }); }
+const nameCodes = M => Object.fromEntries(M.S.map((s, i) => [s, i]));
+const zs = z => [].concat(z).join('');
+// KMP-style detector for a pattern X; Mealy states S0..S(n-1); overlap: detection goes to the longest suffix state, else to S0
+function detector(X, overlap) {
+  const n = X.length, S = L.range(n).map(k => 'S' + k), t = {};
+  for (let k = 0; k < n; k++) t['S' + k] = [0, 1].map(b => {
+    const full = k === n - 1 && String(b) === X[n - 1]; if (full && !overlap) return ['S0', 1];
+    const cand = X.slice(0, k) + b; let m = 0;
+    for (let j = Math.min(cand.length, n - 1); j > 0; j--) if (X.slice(0, j) === cand.slice(cand.length - j)) { m = j; break; }
+    return ['S' + m, full ? 1 : 0]; });
+  return { S, t };
+}
+// Moore detector (overlapping): states S0..Sn, output 1 in Sn
+function detMoore(X) {
+  const n = X.length, S = L.range(n + 1).map(k => 'S' + k), t = {}, z = {};
+  for (let k = 0; k <= n; k++) { z['S' + k] = k === n ? '1' : '0'; t['S' + k] = [0, 1].map(b => { const cand = X.slice(0, k) + b; let m = 0; for (let j = Math.min(cand.length, n); j > 0; j--) if (X.slice(0, j) === cand.slice(cand.length - j)) { m = j; break; } return 'S' + m; }); }
+  return { S, I: ['0', '1'], t, z };
+}
+const synthMealy = (id, M, ff, o = {}) => seqLab(id, { sv: o.sv || ['y2', 'y1'], iv: o.iv || ['x'], ff, ov: o.ov || ['z'], rows: mRows(M, o.codes || nameCodes(M)) }, o.lab || {});
+const mooreRows = (M, codes, zf) => M.S.flatMap(s => M.t[s].map((n, x) => ({ ps: codes[s], x, ns: codes[n], z: zf(s) })));
+// ---- 1101 overlapping (2018-19 Q5a)
+const M1 = { S: ['A', 'B', 'C', 'D'], t: { A: [['A', 0], ['B', 0]], B: [['A', 0], ['C', 0]], C: [['D', 0], ['C', 0]], D: [['A', 0], ['B', 1]] } };
+dg('#d1', { table: mText(M1), start: 'A', run: '1101101' });
+synthMealy('#s1', M1, ['SR', 'SR'], { lab: { tag: '1101 overlapping, Mealy' } });
+dg('#d1m', { M: detMoore('1101'), start: 'S0', run: '1101101' });
+synthMealy('#s0101', (() => { const d = detector('0101', true); return { S: d.S, t: d.t }; })(), ['SR', 'SR'], { lab: { tag: '0101 overlapping (his example), S0..S3 = A..D' } });
+// ---- non-overlapping 1011 with T (2019-20 Q1b)
+const M2 = detector('1011', false);
+dg('#d2', { table: mText(M2), start: 'S0', run: '1011011' });
+synthMealy('#s2', M2, ['T', 'T'], { lab: { tag: 'X = 1011, non-overlapping, T' } });
+(function () {
+  const el = document.querySelector('#dw');
+  el.innerHTML = `<div class="st-ctl"><label>X = <input type="text" value="0110" size="5" maxlength="5" style="font:inherit"></label> <label><input type="checkbox"> overlapping</label> <button type="button">Build</button></div><p class="tracer-hint"></p><div class="dw-d"></div><div class="dw-s"></div>`;
+  const inp = el.querySelector('input[type=text]'), cb = el.querySelector('input[type=checkbox]'), msg = el.querySelector('.tracer-hint');
+  const build = () => {
+    const X = inp.value.trim(); if (!/^[01]{3,5}$/.test(X)) { msg.textContent = 'Type 3 to 5 bits, for example 0110.'; return; }
+    msg.textContent = '';
+    const M = detector(X, cb.checked), n = X.length, bits = Math.ceil(Math.log2(n)), sv = L.range(bits).map(i => 'y' + (bits - i));
+    el.querySelector('.dw-d').innerHTML = '<div class="dw-dd"></div>'; dg(el.querySelector('.dw-dd'), { table: mText(M), start: 'S0', run: X + X });
+    el.querySelector('.dw-s').innerHTML = '<div class="dw-ss"></div>'; seqLab(el.querySelector('.dw-ss'), { sv, iv: ['x'], ff: sv.map(() => 'T'), ov: ['z'], rows: mRows(M, nameCodes(M)) }, { tag: `X = ${X}, ${cb.checked ? 'overlapping' : 'non-overlapping'}, T` });
+  };
+  el.querySelector('button').onclick = build; build();
+})();
+// ---- three or more 1s (2022-23 Q5a)
+const M3 = { S: ['A', 'B', 'C'], t: { A: [['A', 0], ['B', 0]], B: [['A', 0], ['C', 0]], C: [['A', 0], ['C', 1]] } };
+dg('#d3', { table: mText(M3), start: 'A', run: '0111101110' });
+synthMealy('#s3', M3, ['D', 'D'], { lab: { tag: 'three or more 1s, Mealy, 3 states', note: 'Code 11 is unused: its rows are don\'t-cares.' } });
+{ const Mo = { S: ['A', 'B', 'C', 'D'], I: ['0', '1'], t: { A: ['A', 'B'], B: ['A', 'C'], C: ['A', 'D'], D: ['A', 'D'] }, z: { A: '0', B: '0', C: '0', D: '1' } };
+  dg('#d3m', { M: Mo, start: 'A', run: '0111101110' });
+  seqLab('#s3m', { sv: ['y2', 'y1'], iv: ['x'], ff: ['D', 'D'], ov: ['z'], rows: mooreRows(Mo, nameCodes(Mo), s => [+Mo.z[s]]) }, { tag: 'three or more 1s, Moore, 4 states' }); }
+// ---- serial parity
+{ const Mo = { S: ['EV', 'OD'], I: ['0', '1'], t: { EV: ['EV', 'OD'], OD: ['OD', 'EV'] }, z: { EV: '0', OD: '1' } };
+  dg('#d4', { M: Mo, start: 'EV', run: '1101' });
+  const rows = mooreRows(Mo, { EV: 0, OD: 1 }, s => [+Mo.z[s]]);
+  seqLab('#s4', { sv: ['y'], iv: ['x'], ff: ['T'], ov: ['p'], rows }, { tag: 'serial parity, Moore, T flip-flop' }); }
+// ---- divide-by-3 counter of ones (2023-24 Q5b)
+const M5 = { S: ['S0', 'S1', 'S2'], t: { S0: [['S0', 0], ['S1', 0]], S1: [['S1', 0], ['S2', 0]], S2: [['S2', 0], ['S0', 1]] } };
+dg('#d5', { table: mText(M5), start: 'S0', run: '1011011' });
+synthMealy('#s5', M5, ['D', 'D'], { lab: { tag: 'divide by three, Mealy, D' } });
+// ---- traffic light (2023-24 Q6a)
+{ const tz = { A: [0, 1], B: [1, 0], C: [1, 1], D: [1, 1] }, Mo = { S: ['A', 'B', 'C', 'D'], I: ['0', '1'], t: { A: ['B', 'C'], B: ['A', 'D'], C: ['B', 'B'], D: ['A', 'A'] }, z: Object.fromEntries(Object.entries(tz).map(([k, v]) => [k, v.join('')])) };
+  dg('#d6', { M: Mo, start: 'A', run: '0010100' });
+  seqLab('#s6', { sv: ['y1', 'y0'], iv: ['x'], ff: ['SR', 'SR'], ov: ['NS', 'EW'], rows: mooreRows(Mo, nameCodes(Mo), s => tz[s]) }, { tag: 'traffic light, Moore, S-R', note: 'x = WALK. Outputs NS and EW depend on the state only, so they do not use x.' }); }
+// ---- vending machines
+const trace = (M, start, xs, names, f) => { let s = start; const rows = xs.map(x => { const [n, z] = M.t[s][x]; const r = [s, names[x], n, zs(z)]; s = n; return r; }); return tbl(f, rows); };
+{ const M = { S: ['S0', 'S1', 'S2', 'S3'], t: {
+    S0: [['S1', [0, 0]], ['S2', [0, 0]], ['S0', [1, 0]], ['S0', [0, 0]]],
+    S1: [['S2', [0, 0]], ['S3', [0, 0]], ['S1', [1, 0]], ['S0', [0, 1]]],
+    S2: [['S3', [0, 0]], ['S0', [1, 0]], ['S2', [1, 0]], ['S0', [0, 1]]],
+    S3: [['S0', [1, 0]], ['S1', [1, 0]], ['S3', [1, 0]], ['S0', [0, 1]]] } };
+  diagram('#d7', { table: mText(M, zs), inputs: ['00', '01', '10', '11'], start: 'S0' });
+  seqLab('#s7', { sv: ['y1', 'y0'], iv: ['X1', 'X2'], ff: ['JK', 'JK'], ov: ['Z1', 'Z2'], rows: mRows(M, nameCodes(M)) }, { tag: '2020-21 vending machine, Mealy, J-K', note: 'Inputs X1X2: 00 = 5 Tk, 01 = 10 Tk, 10 = 20 Tk, 11 = CHANGE. Arrows in the diagram are labelled X1X2/Z1Z2.' });
+  document.querySelector('#t7').innerHTML = trace(M, 'S0', [1, 1, 2, 0, 0, 3, 1, 2, 3], ['5', '10', '20', 'CHANGE'], ['state', 'input (Tk or CHANGE)', 'next', 'Z1Z2']); }
+{ const M = { S: ['A', 'B', 'C', 'D'], t: { A: [['A', [0, 0]], ['B', [0, 0]], ['C', [0, 0]], null], B: [['B', [0, 0]], ['C', [0, 0]], ['D', [0, 0]], null], C: [['C', [0, 0]], ['D', [0, 0]], ['A', [0, 1]], null], D: [['D', [0, 0]], ['A', [0, 1]], ['A', [1, 1]], null] } };
+  diagram('#d8', { table: mText(M, zs), inputs: ['00', '01', '10', '11'], start: 'A' });
+  seqLab('#s8', { sv: ['y2', 'y1'], iv: ['x2', 'x1'], ff: ['D', 'D'], ov: ['z2', 'z1'], rows: mRows(M, nameCodes(M)) }, { tag: 'his vending machine, 4 Tk candy, D flip-flops', note: 'Inputs x2x1: 01 = 1 Tk coin, 10 = 2 Tk coin, 11 = impossible (don\'t-care). z2 = 1 Tk change, z1 = candy.' }); }
+// ---- older: 1010 with T, 10011 Moore, 2's complementer
+{ const M = detector('1010', true);
+  dg('#d9', { table: mText(M), start: 'S0', run: '01010100011010010100' });
+  synthMealy('#s9', M, ['T', 'T'], { lab: { tag: '1010 overlapping, T' } }); }
+dg('#d10', { M: detMoore('10011'), start: 'S0', run: '1001110011' });
+{ const M = { S: ['A', 'B'], t: { A: [['A', 0], ['B', 1]], B: [['B', 1], ['B', 0]] } };
+  dg('#d11', { table: mText(M), start: 'A', run: '0110100' });
+  synthMealy('#s11', M, ['D'], { sv: ['y'], lab: { tag: 'serial 2\'s complementer, D' } }); }
+practice('#p1', { id: 'p1', kind: 'excite', n: 2 });
+practice('#p2', { id: 'p2', kind: 'mealyrun', n: 1 });
+recall('#r1', { id: 'r1', marks: 20, q: 'Design a Mealy sequence detector for 1101 (overlapping) with S-R flip-flops. Write every step in Adnan sir\'s order. (2018-19 Q5a)', points: ['States named by what they remember: A none, B "1", C "11", D "110"', 'State diagram: A 1/0 B, A 0/0 A, B 1/0 C, B 0/0 A, C 0/0 D, C 1/0 C, D 1/1 B (overlap), D 0/0 A', 'State table with outputs; 2 flip-flops, A = 00, B = 01, C = 10, D = 11', 'Transition table and S-R excitation requirement (0x, 10, 01, x0)', 'Excitation table with 8 rows', 'S2 = y2\'y1x, R2 = y2y1, S1 = y2\'y1\'x + y2y1\'x\', R1 = y2\'y1 + y1x\', z = y2y1x', 'Circuit diagram on one clock'], model: '<p>See section 3. D —1/1→ B is the overlap arrow; A = 00, B = 01, C = 10, D = 11; S2 = y2\'y1x, R2 = y2y1, S1 = y2\'y1\'x + y2y1\'x\', R1 = y2\'y1 + y1x\', z = y2y1x.</p>' });
+recall('#r2', { id: 'r2', marks: 25, q: 'Describe the method for a non-overlapping 4-bit sequence detector with T flip-flops for a general X, and apply it to X = 1011. (2019-20 Q1b)', points: ['States S0..S3 = number of matched leading bits', 'Forward arrows on the next bit of X; detection arrow from S3 outputs 1 and goes to S0 (non-overlapping)', 'Wrong-bit arrows: longest tail of the bits read that is a prefix of X (not always S0)', 'X = 1011: S1 on 1 stays S1, S2 on 0 goes to S0, S3 on 0 goes to S2, S3 on 1 outputs 1 to S0', '2 T flip-flops, T = Q xor Q+, excitation table with 8 rows', 'K-maps for T2, T1 and z, equations, circuit'], model: '<p>S<sub>k</sub> means the last k bits equal the first k bits of X. Matching arrow goes forward; S3 on the last bit outputs 1 and returns to S0. Any other arrow goes to the state for the longest tail that is also a prefix of X. For 1011: S0 0→S0, 1→S1; S1 0→S2, 1→S1; S2 0→S0, 1→S3; S3 0→S2, 1→S0 with z = 1.</p>' });
+recall('#r3', { id: 'r3', marks: 23, q: 'Traffic-light controller with WALK (2023-24 Q6a): write the assumptions, the states and what each remembers, the Moore state table with outputs, and the S-R equations.', points: ['Assumptions: one clock = 1 minute, WALK sampled each clock, Moore outputs', 'States A (EW green), B (NS green), C (both, came from A), D (both, came from B) with 2 flip-flops', 'Transitions: A→B or C, B→A or D, C→B, D→A', 'Outputs NS and EW per state: A 01, B 10, C 11, D 11', 'S-R excitation table with x entries', 'S1 = y1\'x, R1 = y1, S0 = y0\'x\' + y1y0\', R0 = y0x\' + y1y0, NS = y1 + y0, EW = y1 + y0\'', 'Circuit'], model: '<p>States A = 00 (NS 0, EW 1), B = 01 (1, 0), C = 10 (1, 1, next B), D = 11 (1, 1, next A). A: WALK 0 to B, 1 to C. B: 0 to A, 1 to D. C to B. D to A. S1 = y1\'x, R1 = y1, S0 = y0\'x\' + y1y0\', R0 = y0x\' + y1y0, NS = y1 + y0, EW = y1 + y0\'.</p>' });
+</script>
+</body>
+</html>

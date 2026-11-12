@@ -1,0 +1,279 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Incompletely specified machines · CSE 205 Notes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/book.css">
+</head>
+<body>
+<main>
+<div class="eyebrow">Sequential circuits · Kohavi (not in Mano) · Adnan sir L13–16 (Sep 12–19) · 6 of the last 8 papers, 15–25 marks</div>
+<h1>State minimisation 2: incompletely specified machines</h1>
+<p class="lede">Some next states or outputs are don't-cares ("–"). Asked in 2023–24 Q7(a) (23 marks, A–G), 2021–22 Q7(b) (15, A–E, inputs I1 I2 I3), 2020–21 Q7(b) (25, A–G, two inputs, two outputs), 2019–20 Q3(b) (25, A–G) and 2017–18 Q7(b) (15, <b>the identical A–G table as 2019–20 Q3(b)</b>), 2018–19 Q7(a) (20, A–G). Not asked in 2022–23 and 2024–25 (they asked the completely specified version, previous chapter). An older one (2014–15, a primitive flow table, 10+5+5) is at the end. Adnan sir's own notes call this a <b>20–25 mark question</b> (R p72, CT #1 is marked "20 mark question"), and his exam notes (R p89) put state minimisation in the term-final list. It is the single biggest mechanical question in Section B. Every task is the same: implication table, maximal compatibles, maximal incompatibles, bounds, minimal machine.</p>
+
+<h2>1. Compatible is not equivalent</h2>
+<div class="def"><dl>
+<dt>Compatible</dt><dd>Adnan sir: S<sub>i</sub> and S<sub>j</sub> are compatible iff for every input sequence the same output sequence is produced <b>whenever both outputs are specified</b>, whichever is the starting state. Where one output is a dash, there is nothing to disagree about.</dd>
+<dt>Equivalent</dt><dd>All outputs must match. Compatibility is weaker.</dd>
+</dl></div>
+<p>Compatibility is reflexive and symmetric, but <b>not transitive</b>. His own example (R p64): A and B are compatible (B has no outputs where A has), B and E are compatible, but A and E are not (both specify an output on I2 and I3, and they differ). This breaks the clean picture of the last chapter: the merger graph no longer falls into disjoint complete pieces. Pieces overlap, and that is where all the extra work comes from.</p>
+<p>Because you may choose the don't-cares, <b>the minimal machine is not unique</b> (Adnan sir, on his two valid covers in section 6: "both can be the answer"). Any cover that is closed, covering and has the minimum number of sets earns full marks.</p>
+
+<h2>2. The recipe (Adnan sir's official list, R p71)</h2>
+<ol>
+<li><b>Implication table</b> (for compatibility).</li>
+<li><b>Merger graph for compatibles</b>, and from it the set of <b>maximal compatibles</b> (maximal cliques).</li>
+<li><b>Merger graph for incompatibles</b>, and the set of <b>maximal incompatibles</b>.</li>
+<li><b>Bounds</b>: upper bound u = min(number of states, number of maximal compatibles). Lower bound l = the size of the largest maximal incompatible. Then l ≤ k ≤ u, where k is the number of states of the minimal machine.</li>
+<li><b>Trial and error, starting from l</b>: find a set of compatibles that is (a) minimum, (b) closed, (c) covering.</li>
+<li><b>State table</b> of the minimal machine.</li>
+</ol>
+
+<h2>3. Step 1: the implication table</h2>
+<p>Same staircase as the last chapter, with these differences.</p>
+<ol>
+<li><b>Pass 1.</b> For every pair XY and every input: if the outputs of X and Y are <b>both specified and different</b>, cross the cell (×). A dash never conflicts.</li>
+<li>Otherwise write the implied pair for each input where <b>both</b> next states are specified and different. Drop the pair XY itself and identical pairs. No implied pair: tick.</li>
+<li><b>Pass 2 and later.</b> Cross any cell that lists a crossed pair. Repeat until nothing changes. Rule from his notes: <b>"if cycle, don't cross"</b>. AB needing BD and BD needing AB do not kill each other.</li>
+<li>Uncrossed cells = compatible pairs.</li>
+</ol>
+<p>This is his "CT #1" (R p68–71, scribbled "20 mark question"). Step through the widget: it shows every pass, the maximal compatibles and incompatibles, the bounds and the closed cover with the minimal table.</p>
+<div id="w1"></div>
+
+<h2>4. Steps 2 and 3: the merger graphs</h2>
+<p>Put the states on a circle. <b>Compatibles graph</b>: an edge for every uncrossed cell. <b>Incompatibles graph</b>: an edge for every crossed cell. The two graphs together are the complete graph (every pair is one or the other), so each is the complement of the other, and you can read one off the table that you already drew.</p>
+<p>A <b>clique</b> is a set of vertices with every pair joined (a vertex, an edge, a triangle, a 4-clique…). A <b>maximal</b> clique cannot be made bigger. List <b>all</b> of them, including lone vertices and lone edges that sit in no larger clique. Maximal cliques overlap, and that is allowed.</p>
+<p>The same machine (CT #1). In the compatibles graph, the edge labels are the implied pairs from the table. A, B, D form a triangle, B–C is an edge, and E and F are isolated (their cells were all crossed). So the maximal compatibles are (ABD)(BC)(E)(F). The incompatibles graph has the maximal cliques (ACEF), (CDEF), (BEF).</p>
+<div id="g1"></div>
+<div class="hint"><b>Why the maximal set is "automatically closed".</b> Every pair that a compatible depends on is itself a compatible pair, so it lies inside some maximal compatible. Adnan sir: "dependencies need not be added by hand". So the set of all maximal compatibles is always a valid <b>closed and covering</b> set. The problem is only that it is often <b>not minimum</b>.</div>
+
+<h2>5. Step 4: the bounds</h2>
+<ul>
+<li><b>u = min(NSOC, NSMC)</b>: number of states in the original circuit, and number of sets in the maximal compatibles. The maximal solution itself is a legal machine with NSMC states, so the minimum cannot be bigger.</li>
+<li><b>l = max NSMI</b>: size of the largest maximal incompatible. The states of one maximal incompatible are pairwise incompatible, so they need different rows.</li>
+<li>For CT #1: u = min(6, 4) = 4 and l = max{4, 4, 3} = 4. <b>l = u, so no trial and error</b>: the maximal solution is the answer.</li>
+</ul>
+<p>The bounds exist "to reduce trial and error". Always compute both before searching.</p>
+
+<h2>6. Step 5: closed covering, trial and error from l</h2>
+<p>Three properties (R p68): <b>covering</b> (every state is in some chosen set), <b>closed</b> (for each chosen set and each input, the set of next states lies inside some chosen set; a set that only implies itself is fine), <b>minimum</b> (fewest sets).</p>
+<p>The set of all maximal compatibles is closed and covering but may be too big. You shrink it by dropping sets or using smaller subsets, and <b>every shrink can break closure</b>. That is why you must check each trial. Adnan sir's six-state example (R p64–67) shows it. Table, inputs I1 to I4:</p>
+<div class="tbl"><table class="mat"><tr><th>PS</th><th>I1</th><th>I2</th><th>I3</th><th>I4</th></tr><tr><td>A</td><td>–, –</td><td>C, 1</td><td>E, 1</td><td>B, 1</td></tr><tr><td>B</td><td>E, 0</td><td>–, –</td><td>–, –</td><td>–, –</td></tr><tr><td>C</td><td>F, 0</td><td>F, 1</td><td>–, –</td><td>–, –</td></tr><tr><td>D</td><td>–, –</td><td>–, –</td><td>B, 1</td><td>–, –</td></tr><tr><td>E</td><td>–, –</td><td>F, 0</td><td>A, 0</td><td>D, 1</td></tr><tr><td>F</td><td>C, 0</td><td>–, –</td><td>B, 0</td><td>C, 1</td></tr></table></div>
+<div id="w2"></div>
+<div id="g2"></div>
+<p>Maximal compatibles: (ABCD)(BE)(CF)(EF). l = 2, u = 4. His trial table (try 2 states first, then 3):</p>
+<div class="tbl"><table class="mat"><tr><th>candidate</th><th>closed?</th><th>covering?</th><th>verdict</th></tr>
+<tr><td>(ABCD)(EF)</td><td>no: AC needs CF, AD needs BE</td><td>yes</td><td>2 states not possible this way</td></tr>
+<tr><td>(ABCD)(BE)</td><td>no (needs EF, CF)</td><td>no (F missing)</td><td>reject</td></tr>
+<tr><td>(ABCD)(CF)</td><td>no (needs BE, EF)</td><td>no (E missing)</td><td>reject</td></tr>
+<tr><td>(AD)(BE)(CD)</td><td>yes (AD needs BE, present)</td><td>no (F missing)</td><td>reject</td></tr>
+<tr><td><b>(AB)(CD)(EF)</b></td><td>yes</td><td>yes</td><td><b>valid, 3 states</b></td></tr>
+<tr><td><b>(AD)(BE)(CF)</b></td><td>yes</td><td>yes</td><td><b>valid, 3 states</b></td></tr></table></div>
+<p>No pair of compatibles works (the engine behind this page tried all of them), so k = 3. Two valid answers is not a mistake. Adnan sir, on the last two rows of his table: <b>"both can be the answer. Minimum M/C is not unique if don't-cares are present."</b> The page's table below uses a third valid cover, (ABD)(BE)(CF). I checked it by hand: (ABD) sends I1 to E, I2 to C, I3 to {E, B} ⊆ (BE), I4 to B; (BE) sends I1 to E, I2 to F, I3 to A, I4 to D; (CF) sends I1 to {F, C} ⊆ (CF), I2 to F, I3 to B, I4 to C. All implied sets lie inside a chosen set, and A to F are all covered.</p>
+<div class="tbl"><table class="mat"><tr><th>chosen set</th><th>I1: next states</th><th>I2: next states</th><th>I3: next states</th><th>I4: next states</th><th>closed?</th></tr><tr><td>(ABD)</td><td>(E) ⊆ (BE)</td><td>(C) ⊆ (CF)</td><td>(BE) ⊆ (BE)</td><td>(B) ⊆ (ABD)</td><td>yes</td></tr><tr><td>(BE)</td><td>(E) ⊆ (BE)</td><td>(F) ⊆ (CF)</td><td>(A) ⊆ (ABD)</td><td>(D) ⊆ (ABD)</td><td>yes</td></tr><tr><td>(CF)</td><td>(CF) ⊆ (CF)</td><td>(F) ⊆ (CF)</td><td>(B) ⊆ (ABD)</td><td>(C) ⊆ (CF)</td><td>yes</td></tr></table></div>
+<h3>When the closed-cover search is hard: the compatibility graph</h3>
+<p>For the six-state machine of R p74–75 (section 9 below) Adnan sir draws a <b>compatibility graph</b>: one node per compatible pair, and an arrow X → Y when X depends on Y. A closed set is a part of the graph with <b>no arrow leaving it</b>. Pick the smallest such part that contains every state, merge overlapping pairs into cliques, and you have the cover. It is a way to organise the search, nothing more.</p>
+
+<h2>7. Step 6: write the minimal table</h2>
+<ol>
+<li>Name the chosen sets α, β, γ, … with their members.</li>
+<li>For each set and input: collect the next states of its members that are specified. The next state of the new row is the chosen set that <b>contains all of them</b>. If no member specifies one, write "–".</li>
+<li>The output of the new row is the output given by <b>whichever member specifies it</b> ("–" if none does). Members never disagree, because they are compatible.</li>
+<li>If the next states fit inside <b>two</b> chosen sets, either choice is correct. Adnan sir marks such a cell with "?" and says it is a free choice.</li>
+</ol>
+<div class="hint"><b>If your cover differs from the textbook's.</b> It will, often. Both are right if both are covering, closed and have the same (minimum) number of sets. To check: write each set's next-state sets per input (the closure table, as above) and see that every one lies inside a chosen set. The tables on this page come from an exhaustive search by the same engine as the widgets, and I checked each closure table by hand.</div>
+
+<h2>8. Past questions</h2>
+
+<div class="exam"><div class="exam-src">2023–24 Q7(a) · 23 marks</div>
+<div class="exam-q"><p>For the incompletely specified machine below, derive the implication table, determine the maximal compatibles and maximal incompatibles, find the upper and lower bounds and give the state table of the minimal machine.</p><div class="tbl"><table class="mat"><tr><th>PS</th><th>x=0</th><th>x=1</th></tr><tr><td>A</td><td>B, 0</td><td>C, 0</td></tr><tr><td>B</td><td>D, 0</td><td>–, –</td></tr><tr><td>C</td><td>F, 0</td><td>E, 1</td></tr><tr><td>D</td><td>B, 0</td><td>G, 0</td></tr><tr><td>E</td><td>F, 0</td><td>C, 1</td></tr><tr><td>F</td><td>E, 0</td><td>D, 1</td></tr><tr><td>G</td><td>F, 0</td><td>–, –</td></tr></table></div></div>
+<details><summary>Answer</summary><div class="exam-a">
+<div id="w3"></div>
+<p><b>Implication table.</b> Pass 1 crosses AC, CD, AE, DE, AF, DF (outputs conflict). Pass 2 crosses BC, BE, BG (all need DF), BF, CF (need DE), EF (needs CD). Pass 3 crosses AG, DG (need BF) and FG (needs EF). Compatible pairs: <b>AB, AD, BD, CE, CG, EG</b>.</p>
+<div id="g3"></div>
+<p><b>Maximal compatibles:</b> (ABD)(CEG)(F). <b>Maximal incompatibles:</b> (ACF)(AEF)(AFG)(BCF)(BEF)(BFG)(CDF)(DEF)(DFG), all of size 3.</p>
+<p><b>Bounds:</b> u = min(7, 3) = 3 and l = 3. l = u, so the maximal compatibles are the minimal cover. Closure (always true here, still show it):</p>
+<div class="tbl"><table class="mat"><tr><th>chosen set</th><th>x=0: next states</th><th>x=1: next states</th><th>closed?</th></tr><tr><td>(ABD)</td><td>(BD) ⊆ (ABD)</td><td>(CG) ⊆ (CEG)</td><td>yes</td></tr><tr><td>(CEG)</td><td>(F) ⊆ (F)</td><td>(CE) ⊆ (CEG)</td><td>yes</td></tr><tr><td>(F)</td><td>(E) ⊆ (CEG)</td><td>(D) ⊆ (ABD)</td><td>yes</td></tr></table></div>
+<p><b>Minimal machine</b> (α = (ABD), β = (CEG), γ = F):</p>
+<div class="tbl"><table class="mat"><tr><th>new state</th><th>= old</th><th>x=0</th><th>x=1</th></tr><tr><td>α</td><td>(ABD)</td><td>α, 0</td><td>β, 0</td></tr><tr><td>β</td><td>(CEG)</td><td>γ, 0</td><td>β, 1</td></tr><tr><td>γ</td><td>(F)</td><td>β, 0</td><td>α, 1</td></tr></table></div>
+</div></details></div>
+
+<div class="exam"><div class="exam-src">2021–22 Q7(b) · 15 marks</div>
+<div class="exam-q"><p>Incompletely specified machine, inputs I1 I2 I3. Find the implication table, maximal compatibles and incompatibles, the bounds and the minimal machine.</p><div class="tbl"><table class="mat"><tr><th>PS</th><th>I1</th><th>I2</th><th>I3</th></tr><tr><td>A</td><td>C, 0</td><td>E, 1</td><td>–, –</td></tr><tr><td>B</td><td>C, 0</td><td>E, –</td><td>–, –</td></tr><tr><td>C</td><td>B, –</td><td>C, 0</td><td>A, –</td></tr><tr><td>D</td><td>B, 0</td><td>C, –</td><td>E, –</td></tr><tr><td>E</td><td>–, –</td><td>E, 0</td><td>A, –</td></tr></table></div></div>
+<details><summary>Answer</summary><div class="exam-a">
+<div id="w4"></div>
+<p><b>Implication table.</b> Pass 1 crosses AC and AE (on I2, A gives 1 and C or E gives 0). Pass 2 crosses CD and DE (both need AE). Compatible pairs: <b>AB, BC, AD, BD, BE, CE</b>.</p>
+<div id="g4"></div>
+<p><b>Maximal compatibles:</b> (ABD)(BCE). B is in both. <b>Maximal incompatibles:</b> (AC)(AE)(CD)(DE)(B). <b>Bounds:</b> u = min(5, 2) = 2 and l = 2. So the two maximal compatibles are the answer.</p>
+<div class="tbl"><table class="mat"><tr><th>chosen set</th><th>I1: next states</th><th>I2: next states</th><th>I3: next states</th><th>closed?</th></tr><tr><td>(ABD)</td><td>(BC) ⊆ (BCE)</td><td>(CE) ⊆ (BCE)</td><td>(E) ⊆ (BCE)</td><td>yes</td></tr><tr><td>(BCE)</td><td>(BC) ⊆ (BCE)</td><td>(CE) ⊆ (BCE)</td><td>(A) ⊆ (ABD)</td><td>yes</td></tr></table></div>
+<p><b>Minimal machine</b> (α = (ABD), β = (BCE)):</p>
+<div class="tbl"><table class="mat"><tr><th>new state</th><th>= old</th><th>I1</th><th>I2</th><th>I3</th></tr><tr><td>α</td><td>(ABD)</td><td>β, 0</td><td>β, 1</td><td>β, –</td></tr><tr><td>β</td><td>(BCE)</td><td>β, 0</td><td>β, 0</td><td>α, –</td></tr></table></div>
+</div></details></div>
+
+<div class="exam"><div class="exam-src">2020–21 Q7(b) · 25 marks</div>
+<div class="exam-q"><p>Incompletely specified machine, two inputs x<sub>1</sub>x<sub>2</sub>, outputs Z<sub>1</sub>Z<sub>2</sub>. Implication table, maximal compatibles, maximal incompatibles, bounds, minimal machine. The output is a pair, so two states conflict if the pair differs on any input where both are specified.</p><div class="tbl"><table class="mat"><tr><th>PS</th><th>00</th><th>01</th><th>11</th><th>10</th></tr><tr><td>A</td><td>A, 00</td><td>E, 01</td><td>–, –</td><td>A, 01</td></tr><tr><td>B</td><td>–, –</td><td>C, 10</td><td>B, 00</td><td>D, 11</td></tr><tr><td>C</td><td>A, 00</td><td>C, 10</td><td>–, –</td><td>–, –</td></tr><tr><td>D</td><td>A, 00</td><td>–, –</td><td>–, –</td><td>D, 11</td></tr><tr><td>E</td><td>–, –</td><td>E, 01</td><td>F, 00</td><td>–, –</td></tr><tr><td>F</td><td>–, –</td><td>G, 10</td><td>F, 00</td><td>G, 11</td></tr><tr><td>G</td><td>A, 00</td><td>–, –</td><td>–, –</td><td>G, 11</td></tr></table></div></div>
+<details><summary>Answer</summary><div class="exam-a">
+<div id="w5"></div>
+<p><b>Implication table.</b> One pass crosses AB, AC, AD, AG, AF, BE, CE, EF. Compatible pairs: <b>BC, BD, CD, AE, DE, BF, CF, DF, BG, CG, DG, EG, FG</b> (thirteen).</p>
+<div id="g5"></div>
+<p><b>Maximal compatibles:</b> (BCDFG)(DEG)(AE). <b>Maximal incompatibles:</b> (AB)(AC)(AD)(AF)(AG)(BE)(CE)(EF), all of size 2. <b>Bounds:</b> u = min(7, 3) = 3, l = 2. Since l &lt; u, search from 2.</p>
+<p><b>Trial with 2 sets.</b> A is incompatible with everything but E, so A needs its own set with at most E. Try (AE) and (BCDFG), which covers all seven states. Closure:</p>
+<div class="tbl"><table class="mat"><tr><th>chosen set</th><th>00: next states</th><th>01: next states</th><th>11: next states</th><th>10: next states</th><th>closed?</th></tr><tr><td>(BCDFG)</td><td>(A) ⊆ (AE)</td><td>(CG) ⊆ (BCDFG)</td><td>(BF) ⊆ (BCDFG)</td><td>(DG) ⊆ (BCDFG)</td><td>yes</td></tr><tr><td>(AE)</td><td>(A) ⊆ (AE)</td><td>(E) ⊆ (AE)</td><td>(F) ⊆ (BCDFG)</td><td>(A) ⊆ (AE)</td><td>yes</td></tr></table></div>
+<p>All implied sets lie inside a chosen set, so it is closed. 2 = l, so it is minimum.</p>
+<p><b>Minimal machine</b> (α = (BCDFG), β = (AE), columns 00, 01, 11, 10, Z<sub>1</sub>Z<sub>2</sub>). The "–" entries stay "–" where no member specifies them:</p>
+<div class="tbl"><table class="mat"><tr><th>new state</th><th>= old</th><th>00</th><th>01</th><th>11</th><th>10</th></tr><tr><td>α</td><td>(BCDFG)</td><td>β, 00</td><td>α, 10</td><td>α, 00</td><td>α, 11</td></tr><tr><td>β</td><td>(AE)</td><td>β, 00</td><td>β, 01</td><td>α, 00</td><td>β, 01</td></tr></table></div>
+<p>The question says 25 marks, so show the staircase with all 21 cells, both graphs and the closure table. The question bank's solution quotes bounds 2 and 2. The formula u = min(states, maximal compatibles) gives 3, and that is the one Adnan sir uses. The minimum, 2, equals l either way.</p>
+</div></details></div>
+
+<div class="exam"><div class="exam-src">2019–20 Q3(b) · 25 marks &nbsp;=&nbsp; 2017–18 Q7(b) · 15 marks</div>
+<div class="exam-q"><p>Incompletely specified machine. Derive the implication table, determine the maximal compatibles and maximal incompatibles, find the upper and lower bounds and determine the minimal machine. The two papers print the <b>same table</b> (I compared the scans: A, A,–, B,1 on the first row down to G, G,–, G,–). Only the marks differ.</p><div class="tbl"><table class="mat"><tr><th>PS</th><th>x=0</th><th>x=1</th></tr><tr><td>A</td><td>A, –</td><td>B, 1</td></tr><tr><td>B</td><td>G, –</td><td>D, 0</td></tr><tr><td>C</td><td>B, 1</td><td>B, –</td></tr><tr><td>D</td><td>A, 1</td><td>B, –</td></tr><tr><td>E</td><td>C, –</td><td>A, –</td></tr><tr><td>F</td><td>F, –</td><td>C, –</td></tr><tr><td>G</td><td>G, –</td><td>G, –</td></tr></table></div></div>
+<details><summary>Answer</summary><div class="exam-a">
+<div id="w6"></div>
+<p><b>Implication table.</b> The only output conflict is AB (on x = 1, A gives 1 and B gives 0). Pass 2 crosses AC, CD, AE, CE, DE (they all need AB). Pass 3 crosses BF (needs CD) and EF (needs AC). Pass 4 crosses CF (needs BF). Compatible pairs: <b>BC, AD, BD, BE, AF, DF, AG, BG, CG, DG, EG, FG</b>.</p>
+<div id="g6"></div>
+<p><b>Maximal compatibles:</b> (ADFG)(BCG)(BDG)(BEG). <b>Maximal incompatibles:</b> (ACE)(CDE)(CEF)(AB)(BF)(G). <b>Bounds:</b> u = min(7, 4) = 4, l = 3.</p>
+<p><b>Why 3 is impossible (the trial from l = 3).</b> A, C, E are pairwise incompatible, so they sit in three different sets. D is incompatible with C and E, and F is incompatible with C and E, so D and F must join A's set. B is incompatible with A, so B joins C's or E's set. Now look at A's set, which holds A, D, F: on x = 1 it needs {B, C} together (A goes to B, D to B, F to C). So B and C share a set. That set needs, on x = 1, {B, D} together (B goes to D, C goes to B). But D is in A's set, and D cannot join C. Contradiction, so no 3-set closed cover exists. The answer is the maximal compatibles themselves, <b>k = 4 = u</b>.</p>
+<div class="tbl"><table class="mat"><tr><th>chosen set</th><th>x=0: next states</th><th>x=1: next states</th><th>closed?</th></tr><tr><td>(ADFG)</td><td>(AFG) ⊆ (ADFG)</td><td>(BCG) ⊆ (BCG)</td><td>yes</td></tr><tr><td>(BCG)</td><td>(BG) ⊆ (BCG)</td><td>(BDG) ⊆ (BDG)</td><td>yes</td></tr><tr><td>(BDG)</td><td>(AG) ⊆ (ADFG)</td><td>(BDG) ⊆ (BDG)</td><td>yes</td></tr><tr><td>(BEG)</td><td>(CG) ⊆ (BCG)</td><td>(ADG) ⊆ (ADFG)</td><td>yes</td></tr></table></div>
+<p><b>Minimal machine</b> (α = (ADFG), β = (BCG), γ = (BDG), δ = (BEG)):</p>
+<div class="tbl"><table class="mat"><tr><th>new state</th><th>= old</th><th>x=0</th><th>x=1</th></tr><tr><td>α</td><td>(ADFG)</td><td>α, 1</td><td>β, 1</td></tr><tr><td>β</td><td>(BCG)</td><td>β, 1</td><td>γ, 0</td></tr><tr><td>γ</td><td>(BDG)</td><td>α, 1</td><td>γ, 0</td></tr><tr><td>δ</td><td>(BEG)</td><td>β, –</td><td>α, 0</td></tr></table></div>
+<p>Row δ, x = 0: the members B, E, G all have output –, so the entry is "β, –". Several cells could name another set (G is in β, γ, δ, α). Any consistent choice is valid.</p>
+</div></details></div>
+
+<div class="exam"><div class="exam-src">2018–19 Q7(a) · 20 marks</div>
+<div class="exam-q"><p>For the incompletely specified machine in the figure, complete the implication table and determine the maximal compatibles and the maximal incompatibles. Find the upper bound and the lower bound of the number of states of the minimal machine. Give the state table of the minimal machine.</p><div class="tbl"><table class="mat"><tr><th>PS</th><th>x=0</th><th>x=1</th></tr><tr><td>A</td><td>B, 0</td><td>C, 1</td></tr><tr><td>B</td><td>D, 0</td><td>C, 1</td></tr><tr><td>C</td><td>A, 0</td><td>E, 0</td></tr><tr><td>D</td><td>–, –</td><td>F, 1</td></tr><tr><td>E</td><td>G, 1</td><td>F, 0</td></tr><tr><td>F</td><td>B, 0</td><td>–, –</td></tr><tr><td>G</td><td>D, 0</td><td>E, 0</td></tr></table></div><p class="sm">The OCR of this table is garbled. It was re-read from the page image at 150 dpi.</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<div id="w7"></div>
+<p><b>Implication table.</b> One pass crosses AC, BC, CD, AE, BE, CE, DE, EF, AG, BG, DG, EG. Compatible pairs: <b>AB, AD, BD, AF, BF, CF, DF, CG, FG</b>.</p>
+<div id="g7"></div>
+<p><b>Maximal compatibles:</b> (ABDF)(CFG)(E). <b>Maximal incompatibles:</b> (ACE)(AEG)(BCE)(BEG)(CDE)(DEG)(EF). <b>Bounds:</b> u = min(7, 3) = 3 and l = 3. l = u, so this is the answer.</p>
+<div class="tbl"><table class="mat"><tr><th>chosen set</th><th>x=0: next states</th><th>x=1: next states</th><th>closed?</th></tr><tr><td>(ABDF)</td><td>(BD) ⊆ (ABDF)</td><td>(CF) ⊆ (CFG)</td><td>yes</td></tr><tr><td>(CFG)</td><td>(ABD) ⊆ (ABDF)</td><td>(E) ⊆ (E)</td><td>yes</td></tr><tr><td>(E)</td><td>(G) ⊆ (CFG)</td><td>(F) ⊆ (ABDF)</td><td>yes</td></tr></table></div>
+<p><b>Minimal machine</b> (α = (ABDF), β = (CFG), γ = E):</p>
+<div class="tbl"><table class="mat"><tr><th>new state</th><th>= old</th><th>x=0</th><th>x=1</th></tr><tr><td>α</td><td>(ABDF)</td><td>α, 0</td><td>β, 1</td></tr><tr><td>β</td><td>(CFG)</td><td>α, 0</td><td>γ, 0</td></tr><tr><td>γ</td><td>(E)</td><td>β, 1</td><td>α, 0</td></tr></table></div>
+<p>F is in two sets, so the answer is not unique: (ABD)(CFG)(E) is also closed and covering with 3 sets (I checked it: (ABD) needs {B, D} and {C}, (CFG) needs {A, B, D}, and E needs single states). Both are full marks.</p>
+</div></details></div>
+
+<h2>9. Adnan sir's other worked examples</h2>
+<div class="exam"><div class="exam-src">R p72–75 · five states, trial from l = 2</div>
+<div class="exam-q"><p>(x = 0 | x = 1) A: D,– | A,– ; B: E,0 | A,– ; C: D,0 | B,– ; D: C,– | C,– ; E: C,1 | B,–.</p><div class="tbl"><table class="mat"><tr><th>PS</th><th>x=0</th><th>x=1</th></tr><tr><td>A</td><td>D, –</td><td>A, –</td></tr><tr><td>B</td><td>E, 0</td><td>A, –</td></tr><tr><td>C</td><td>D, 0</td><td>B, –</td></tr><tr><td>D</td><td>C, –</td><td>C, –</td></tr><tr><td>E</td><td>C, 1</td><td>B, –</td></tr></table></div></div>
+<details><summary>Answer</summary><div class="exam-a">
+<p>Crossed: BE, CE (output conflict), then BD (needs CE). Compatible: AB, AC, BC, AD, CD, AE, DE. Maximal compatibles (ABC)(ACD)(ADE), so u = min(5, 3) = 3. Maximal incompatibles (BD)(BE)(CE)(A), so l = 2. Try 2 sets: (ABC)(ADE) is covering but <b>not closed</b> (it does not contain all the dependencies). (ABC)(DE) is covering and closed: α = (ABC), β = (DE).</p>
+<div class="tbl"><table class="mat"><tr><th>new state</th><th>= old</th><th>x=0</th><th>x=1</th></tr><tr><td>α</td><td>(ABC)</td><td>β, 0</td><td>α, –</td></tr><tr><td>β</td><td>(DE)</td><td>α, 1</td><td>α, –</td></tr></table></div>
+</div></details></div>
+
+<div class="exam"><div class="exam-src">R p72–75 · six states, compatibility graph</div>
+<div class="exam-q"><p>(I0 | I1) A: E,0 | B,0 ; B: F,0 | A,0 ; C: E,– | C,0 ; D: F,1 | D,0 ; E: C,1 | C,0 ; F: D,– | B,0.</p><div class="tbl"><table class="mat"><tr><th>PS</th><th>x=0</th><th>x=1</th></tr><tr><td>A</td><td>E, 0</td><td>B, 0</td></tr><tr><td>B</td><td>F, 0</td><td>A, 0</td></tr><tr><td>C</td><td>E, –</td><td>C, 0</td></tr><tr><td>D</td><td>F, 1</td><td>D, 0</td></tr><tr><td>E</td><td>C, 1</td><td>C, 0</td></tr><tr><td>F</td><td>D, –</td><td>B, 0</td></tr></table></div></div>
+<details><summary>Answer</summary><div class="exam-a">
+<div id="w8"></div>
+<p>Compatible pairs: AB, AC, BC, CD, CE, DE, AF, CF, EF. Maximal compatibles (ABC)(ACF)(CDE)(CEF), u = min(6, 4) = 4. Maximal incompatibles (BDF)(AD)(AE)(BE)(C), l = 3. So 3 ≤ k ≤ 4, and the search starts at 3. Adnan sir's compatibility graph picks the pairs (AB)(BC)(CA)(CD)(EF), which merge to <b>(ABC)(CD)(EF)</b>, three states. I verified it: (CD) sends I0 to {E, F} ⊆ (EF) and I1 to {C, D}; (EF) sends I0 to {C, D} ⊆ (CD) and I1 to {B, C} ⊆ (ABC); (ABC) sends I0 to {E, F} and I1 to {A, B, C}. Closed and covering.</p>
+<p>The engine finds a different valid cover with the same size, (ABC)(CDE)(CEF), which I also checked by hand. Its table is below. <b>Both are correct</b>; yours may be either.</p>
+<div class="tbl"><table class="mat"><tr><th>chosen set</th><th>x=0: next states</th><th>x=1: next states</th><th>closed?</th></tr><tr><td>(ABC)</td><td>(EF) ⊆ (CEF)</td><td>(ABC) ⊆ (ABC)</td><td>yes</td></tr><tr><td>(CDE)</td><td>(CEF) ⊆ (CEF)</td><td>(CD) ⊆ (CDE)</td><td>yes</td></tr><tr><td>(CEF)</td><td>(CDE) ⊆ (CDE)</td><td>(BC) ⊆ (ABC)</td><td>yes</td></tr></table></div>
+<div class="tbl"><table class="mat"><tr><th>new state</th><th>= old</th><th>x=0</th><th>x=1</th></tr><tr><td>α</td><td>(ABC)</td><td>γ, 0</td><td>α, 0</td></tr><tr><td>β</td><td>(CDE)</td><td>γ, 1</td><td>β, 0</td></tr><tr><td>γ</td><td>(CEF)</td><td>β, 1</td><td>α, 0</td></tr></table></div>
+</div></details></div>
+
+<div class="exam"><div class="exam-src">R p67 · "practice" example, five states</div>
+<div class="exam-q"><p>(x = 0 | x = 1) A: C,1 | E,– ; B: C,– | E,1 ; C: B,0 | A,1 ; D: D,0 | E,1 ; E: D,1 | A,0. His notes leave it unfinished.</p><div class="tbl"><table class="mat"><tr><th>PS</th><th>x=0</th><th>x=1</th></tr><tr><td>A</td><td>C, 1</td><td>E, –</td></tr><tr><td>B</td><td>C, –</td><td>E, 1</td></tr><tr><td>C</td><td>B, 0</td><td>A, 1</td></tr><tr><td>D</td><td>D, 0</td><td>E, 1</td></tr><tr><td>E</td><td>D, 1</td><td>A, 0</td></tr></table></div></div>
+<details><summary>Answer</summary><div class="exam-a">
+<p>Compatible pairs: AB, BC, BD, CD, AE. Maximal compatibles (AB)(AE)(BCD): u = min(5, 3) = 3. Maximal incompatibles (AC)(AD)(BE)(CE)(DE): l = 2. Try 2: <b>(AE)(BCD)</b> covers all five states. Closure: (AE) sends x = 0 to {C, D} ⊆ (BCD) and x = 1 to {E, A}; (BCD) sends x = 0 to {B, D, C} and x = 1 to {E, A, E} ⊆ (AE). Closed, so the minimum is 2 = l.</p>
+<div class="tbl"><table class="mat"><tr><th>new state</th><th>= old</th><th>x=0</th><th>x=1</th></tr><tr><td>α</td><td>(BCD)</td><td>α, 0</td><td>β, 1</td></tr><tr><td>β</td><td>(AE)</td><td>α, 1</td><td>β, 0</td></tr></table></div>
+</div></details></div>
+
+<div class="exam"><div class="exam-src">R p63 · why we do not brute-force it</div>
+<div class="exam-q"><p>Six states, four don't-cares: A: B,– | E,0 ; B: B,1 | E,– ; C: F,0 | C,0 ; D: B,1 | A,1 ; E: D,0 | C,– ; F: D,– | C,1. Adnan sir's naive method: try every way of filling the don't-cares (2<sup>4</sup> = 16 tables), minimise each, and take the best. The compatibility method gets the same answer in one go.</p></div>
+<details><summary>Answer</summary><div class="exam-a">
+<p>Compatible pairs: AB, AC, BD, AE, CE, BF, DF, EF. Maximal compatibles (ACE)(BDF)(AB)(EF). Closure of (ACE)(BDF): (ACE) sends x = 0 to {B, F, D} ⊆ (BDF) and x = 1 to {E, C} ⊆ (ACE); (BDF) sends x = 0 to {B, D} and x = 1 to {E, A, C} ⊆ (ACE). Two states, which is minimal.</p>
+<div class="tbl"><table class="mat"><tr><th>new state</th><th>= old</th><th>x=0</th><th>x=1</th></tr><tr><td>α</td><td>(ACE)</td><td>β, 0</td><td>α, 0</td></tr><tr><td>β</td><td>(BDF)</td><td>β, 1</td><td>α, 1</td></tr></table></div>
+</div></details></div>
+
+<h2>10. An older one: a primitive flow table (2014–15, bank #228, 10 + 5 + 5)</h2>
+<div class="exam"><div class="exam-src">2014–15 · (i) compatible pairs by implication table, (ii) maximal compatibles by merger diagram, (iii) minimal closed cover</div>
+<div class="exam-q"><p>The same task on a primitive flow table (columns 00, 01, 11, 10; next state, output).</p><div class="tbl"><table class="mat"><tr><th>PS</th><th>00</th><th>01</th><th>11</th><th>10</th></tr><tr><td>A</td><td>A, 0</td><td>B, –</td><td>–, –</td><td>E, –</td></tr><tr><td>B</td><td>A, –</td><td>B, 0</td><td>C, –</td><td>–, –</td></tr><tr><td>C</td><td>–, –</td><td>D, –</td><td>C, 0</td><td>H, –</td></tr><tr><td>D</td><td>A, –</td><td>D, 1</td><td>–, –</td><td>–, –</td></tr><tr><td>E</td><td>A, –</td><td>–, –</td><td>F, –</td><td>E, 0</td></tr><tr><td>F</td><td>–, –</td><td>G, –</td><td>F, 0</td><td>H, –</td></tr><tr><td>G</td><td>A, –</td><td>G, 0</td><td>–, –</td><td>–, –</td></tr><tr><td>H</td><td>A, –</td><td>–, –</td><td>–, –</td><td>H, 0</td></tr></table></div></div>
+<details><summary>Answer</summary><div class="exam-a">
+<div id="w9"></div>
+<p>Maximal compatibles: (AEFGH)(ABGH)(CDH)(DEH). Maximal incompatibles: (BCE)(BCF)(BDF)(AC)(AD)(CG)(DG)(H). l = 3, u = min(8, 4) = 4. A closed cover with 3 sets: (AEFGH)(ABGH)(CDH). The bank's solution for this question is <b>wrong</b>: it declares state D isolated, but D <b>is</b> compatible with C, E and H, and it gives a 4-state cover that is valid but not minimal. Don't copy it.</p>
+<div class="tbl"><table class="mat"><tr><th>chosen set</th><th>00: next states</th><th>01: next states</th><th>11: next states</th><th>10: next states</th><th>closed?</th></tr><tr><td>(AEFGH)</td><td>(A) ⊆ (AEFGH)</td><td>(BG) ⊆ (ABGH)</td><td>(F) ⊆ (AEFGH)</td><td>(EH) ⊆ (AEFGH)</td><td>yes</td></tr><tr><td>(ABGH)</td><td>(A) ⊆ (AEFGH)</td><td>(BG) ⊆ (ABGH)</td><td>(C) ⊆ (CDH)</td><td>(EH) ⊆ (AEFGH)</td><td>yes</td></tr><tr><td>(CDH)</td><td>(A) ⊆ (AEFGH)</td><td>(D) ⊆ (CDH)</td><td>(C) ⊆ (CDH)</td><td>(H) ⊆ (AEFGH)</td><td>yes</td></tr></table></div>
+<div class="tbl"><table class="mat"><tr><th>new state</th><th>= old</th><th>00</th><th>01</th><th>11</th><th>10</th></tr><tr><td>α</td><td>(AEFGH)</td><td>α, 0</td><td>β, 0</td><td>α, 0</td><td>α, 0</td></tr><tr><td>β</td><td>(ABGH)</td><td>α, 0</td><td>β, 0</td><td>γ, –</td><td>α, 0</td></tr><tr><td>γ</td><td>(CDH)</td><td>α, –</td><td>γ, 1</td><td>γ, 0</td><td>α, 0</td></tr></table></div>
+</div></details></div>
+
+<div class="write"><h4>What to write (20–25 marks, every year)</h4>
+<ol>
+<li>Copy the table.</li>
+<li><b>Implication table</b>: the staircase, X for output conflicts, implied pairs, ticks. Show pass 2 (a second colour or "2nd pass" tags).</li>
+<li>One line: "Compatible pairs: …".</li>
+<li><b>Merger graph for compatibles</b>: states on a circle, edges for uncrossed cells. Then "Maximal compatibles: (…)(…)…", including lone states.</li>
+<li><b>Merger graph for incompatibles</b>: edges for crossed cells. Then "Maximal incompatibles: (…)…".</li>
+<li><b>Bounds</b>: "u = min(n, number of maximal compatibles) = …; l = max size of a maximal incompatible = …; so l ≤ k ≤ u".</li>
+<li>If l = u: "The maximal compatibles are the minimal cover". Otherwise a <b>trial table</b>, starting at l: candidate, closed?, covering?, with the dependency that fails.</li>
+<li>The chosen cover, with the closure table (each set's implied sets and the chosen set that contains each).</li>
+<li>The <b>minimal state table</b> with new names, "–" where no member specifies.</li>
+<li>One line: "The minimal machine is not unique when don't-cares are present."</li>
+</ol></div>
+
+<div class="trap"><b>Traps that cost marks</b><ul>
+<li>Crossing a cell because one output is "–". A dash never conflicts. Only two specified, different outputs cross a cell.</li>
+<li>Treating compatibility as transitive. A–B and B–C do not give A–C. Take cliques, not chains.</li>
+<li>Forgetting the cycle rule: AB needing BD and BD needing AB are both kept.</li>
+<li>Leaving lone states out of the maximal compatibles or incompatibles. A state that is compatible with nothing is still a set (E and F in CT #1).</li>
+<li>Taking u = number of states. It is the <b>smaller</b> of the number of states and the number of maximal compatibles.</li>
+<li>Trying to shrink the maximal compatibles without checking closure. (ABCD)(EF) looked fine and was not closed.</li>
+<li>Stopping when you find a closed cover without checking it is also <b>covering</b> (every state in some set).</li>
+<li>Writing an output in a merged row that one member does not allow. Members are compatible, so take the specified one; if none, "–".</li>
+<li>Skipping the table. The last step is a mark of its own. Rename the next states in the table to the new names.</li>
+</ul></div>
+
+<h2>Mandatory practice</h2>
+<div id="p1"></div>
+<div id="p2"></div>
+<div id="r1"></div>
+<div id="r2"></div>
+<div id="r3"></div>
+</main>
+<script src="../assets/book.js"></script><script src="../assets/logic.js"></script><script src="../assets/dld.js"></script>
+<script>
+const TXT = { a1: "A: -,- C,1 E,1 B,1\nB: E,0 -,- -,- -,-\nC: F,0 F,1 -,- -,-\nD: -,- -,- B,1 -,-\nE: -,- F,0 A,0 D,1\nF: C,0 -,- B,0 C,1", a2: "A: B,1 D,0\nB: -,- B,0\nC: E,0 D,-\nD: B,1 A,0\nE: -,- C,1\nF: -,0 E,1", a4: "A: E,0 B,0\nB: F,0 A,0\nC: E,- C,0\nD: F,1 D,0\nE: C,1 C,0\nF: D,- B,0", n1: "A: A,- B,1\nB: G,- D,0\nC: B,1 B,-\nD: A,1 B,-\nE: C,- A,-\nF: F,- C,-\nG: G,- G,-", n2: "A: B,0 C,1\nB: D,0 C,1\nC: A,0 E,0\nD: -,- F,1\nE: G,1 F,0\nF: B,0 -,-\nG: D,0 E,0", n3: "A: A,00 E,01 -,- A,01\nB: -,- C,10 B,00 D,11\nC: A,00 C,10 -,- -,-\nD: A,00 -,- -,- D,11\nE: -,- E,01 F,00 -,-\nF: -,- G,10 F,00 G,11\nG: A,00 -,- -,- G,11", n4: "A: C,0 E,1 -,-\nB: C,0 E,- -,-\nC: B,- C,0 A,-\nD: B,0 C,- E,-\nE: -,- E,0 A,-", n5: "A: B,0 C,0\nB: D,0 -,-\nC: F,0 E,1\nD: B,0 G,0\nE: F,0 C,1\nF: E,0 D,1\nG: F,0 -,-", f1: "A: A,0 B,- -,- E,-\nB: A,- B,0 C,- -,-\nC: -,- D,- C,0 H,-\nD: A,- D,1 -,- -,-\nE: A,- -,- F,- E,0\nF: -,- G,- F,0 H,-\nG: A,- G,0 -,- -,-\nH: A,- -,- -,- H,0" };
+const INP = { a1: ["I1","I2","I3","I4"], a2: ["0","1"], a4: ["0","1"], n1: ["0","1"], n2: ["0","1"], n3: ["00","01","11","10"], n4: ["I1","I2","I3"], n5: ["0","1"], f1: ["00","01","11","10"] };
+const T = k => L.parseTable(TXT[k], INP[k]);
+function mergerSVG(key, mode, o = {}) {
+  const M = T(key), R = L.reduce(M), S = M.S, n = S.length, W = o.w || (n > 6 ? 270 : 230), c = W / 2, r = c - 34;
+  const pos = S.map((_, i) => [c + r * Math.sin(2 * Math.PI * i / n), c - r * Math.cos(2 * Math.PI * i / n)]);
+  const isC = (a, b) => R.imp.compat.some(p => (p[0] === a && p[1] === b) || (p[0] === b && p[1] === a));
+  let e = '', lb = '', nd = '';
+  for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) {
+    const comp = isC(S[i], S[j]); if ((mode === 'compat') !== comp) continue;
+    const [x1, y1] = pos[i], [x2, y2] = pos[j];
+    e += `<line class="ed ${mode === 'compat' ? 'tree' : 'cut'}" style="stroke-width:2.2" x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}"/>`;
+    if (o.labels && comp) { const p = R.imp.cell[R.imp.key(S[i], S[j])].pairs; if (p.length) { const t = 0.3 + 0.4 * ((i + j) % 3) / 2; lb += `<text class="dl" x="${(x1 + (x2 - x1) * t).toFixed(1)}" y="${(y1 + (y2 - y1) * t).toFixed(1)}">${p.map(q => q.join('')).join(',')}</text>`; } }
+  }
+  S.forEach((s, i) => { nd += `<circle class="nd" cx="${pos[i][0].toFixed(1)}" cy="${pos[i][1].toFixed(1)}" r="14"/><text class="tx" x="${pos[i][0].toFixed(1)}" y="${pos[i][1].toFixed(1)}">${s}</text>`; });
+  const cl = (mode === 'compat' ? R.maxC : R.maxI).map(x => '(' + x.join('') + ')').join(' ');
+  return `<div style="text-align:center"><div class="fg-wrap"><svg class="dsa-fig" viewBox="0 0 ${W} ${W}" width="${W}" role="img" aria-label="merger graph for ${mode === 'compat' ? 'compatibles' : 'incompatibles'}">${e}${lb}${nd}</svg></div><p style="margin:.2em 0"><b>${mode === 'compat' ? (o.eq ? 'Merger graph (equivalent pairs)' : 'Merger graph for compatibles') : 'Merger graph for incompatibles'}</b><br>maximal cliques: ${cl}</p></div>`;
+}
+function merger(sel, key, o = {}) {
+  const parts = o.only === 'compat' ? ['compat'] : ['compat', 'incompat'];
+  $(sel).innerHTML = `<div style="display:flex;flex-wrap:wrap;gap:12px 24px;justify-content:center">${parts.map(m => mergerSVG(key, m, o)).join('')}</div>`;
+}
+
+implication('#w1', { table: T('a2') });
+merger('#g1', 'a2', { labels: true });
+implication('#w2', { table: T('a1') });
+merger('#g2', 'a1', { labels: true });
+implication('#w3', { table: T('n5') });
+merger('#g3', 'n5');
+implication('#w4', { table: T('n4') });
+merger('#g4', 'n4');
+implication('#w5', { table: T('n3') });
+merger('#g5', 'n3');
+implication('#w6', { table: T('n1') });
+merger('#g6', 'n1');
+implication('#w7', { table: T('n2') });
+merger('#g7', 'n2');
+implication('#w8', { table: T('a4') });
+implication('#w9', { table: T('f1') });
+practice('#p1', { id: 'p1', kind: 'compat', n: 2 });
+recall('#r1', { id: 'r1', marks: 20, q: 'State the full procedure for minimising an incompletely specified machine, and apply it to the 2023–24 Q7(a) table (A–G).', points: ['Implication table: X for output conflict (both specified, different), implied pairs, second pass, cycle rule', 'Compatible pairs AB AD BD CE CG EG', 'Maximal compatibles (ABD)(CEG)(F)', 'Maximal incompatibles: nine sets of size 3, e.g. (ACF)(AEF)', 'Bounds u = min(7, 3) = 3 and l = 3', 'l = u so the maximal compatibles are the minimal cover; closure shown', 'Minimal table with alpha = (ABD), beta = (CEG), gamma = F'], model: '<p>Steps: (1) implication table; (2) merger graph for compatibles and maximal compatibles; (3) merger graph for incompatibles and maximal incompatibles; (4) u = min(states, maximal compatibles), l = largest maximal incompatible; (5) trial and error from l for a closed, covering, minimum set; (6) table. For 2023–24: see section 8, three states.</p>' });
+recall('#r2', { id: 'r2', marks: 8, q: 'Compare compatible and equivalent states. Why is the merger graph for compatibles not a set of disjoint pieces, and why may the set of maximal compatibles not be a minimal machine?', points: ['Compatible: outputs agree wherever both are specified; equivalent: all outputs agree', 'Compatibility is not transitive (AB and BE compatible, AE not)', 'So maximal cliques overlap', 'The set of maximal compatibles is closed and covering', 'It may have more sets than needed (not minimum)', 'Shrinking it can break closure, so every candidate must be checked'], model: '<p>Compatible needs matching outputs only where both are specified; equivalence needs all. Compatibility is not transitive, so the graph has overlapping cliques. The maximal compatibles are closed and covering, but a smaller closed cover often exists, and any shrink must be re-checked for closure.</p>' });
+recall('#r3', { id: 'r3', marks: 6, q: 'A candidate cover for a machine is (AB)(CD)(EF). State exactly how you check it is closed and covering, and how you read the minimal table from it.', points: ['Covering: every state appears in some set', 'Closed: for each set and input, the set of specified next states lies inside one chosen set', 'A set that only implies itself is fine', 'Next state of the new row = the chosen set that contains them (either one if two fit)', 'Output = the specified output of any member, "–" if none', 'Different valid covers and tables are allowed'], model: '<p>List, for each set and input, the next states of its members. Each list must be a subset of some chosen set. Every state must appear in a chosen set. The new row points to that chosen set and takes any specified output.</p>' });
+</script>
+</body>
+</html>

@@ -7,6 +7,7 @@ Term-final study notes, published as a static site on GitHub Pages. No build ste
 | Database Management Systems | [`dbms/`](dbms/) | CSE215 |
 | Electronic Circuits | [`eee/`](eee/) | EEE263 |
 | Data Structures and Algorithms II | [`dsa2/`](dsa2/) | CSE207 |
+| Digital Logic Design | [`dld/`](dld/) | CSE205 |
 
 ## Layout
 
