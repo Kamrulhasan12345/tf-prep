@@ -160,7 +160,7 @@
 <li><b>Definition used.</b> \(B_0\) is one node. \(B_k\) is two copies of \(B_{k-1}\), where the root of one becomes the leftmost child of the root of the other.</li>
 <li><b>Induction on \(k\).</b> Claim: \(B_k\) has \(\binom{k}{i}\) nodes at depth \(i\) for \(0\le i\le k\).</li>
 <li><b>Base \(k=0\).</b> One node at depth 0. \(\binom00=1\). ✓</li>
-<li><b>Step.</b> Assume the claim for \(B_{k-1}\). In \(B_k\), a node at depth \(i\) is either in the copy that kept its root (same depth \(i\) as inside \(B_{k-1}\)): \(\binom{k-1}{i}\) of them, or in the copy that was attached below the root (depth shifts by +1, so depth \(i-1\) inside \(B_{k-1}\)): \(\binom{k-1}{i-1}\) of them.</li>
+<li><b>Step.</b> Assume the claim for \(B_{k-1}\). In \(B_k\), a node at depth \(i\) is either in the copy that kept its root (same depth \(i\) as inside \(B_{k-1}\)): \(\binom{k-1}{i}\) of them, or in the copy that was attached below the root (depth shifts by +1, so depth \(i-1\) inside \(B_{k-1}\)): \(\binom{k-1}{i-1}\) of them. (Take \(\binom{k-1}{k}=\binom{k-1}{-1}=0\), which covers \(i=0\) and \(i=k\).)</li>
 <li>Total: \(\binom{k-1}{i}+\binom{k-1}{i-1}=\binom{k}{i}\) by Pascal's rule. ∎</li>
 </ol>
 <p>This is why the name is "binomial": row \(k\) of Pascal's triangle is the number of nodes per level. Check \(B_3\): levels 1, 3, 3, 1.</p>
@@ -309,8 +309,8 @@
 <li><b>Find the MST (Kruskal).</b> Sorted: AB1, BC2, AC3, AD4, CD5, BD6, CE7, DE8, EF9, DF10, CF11. Accept AB, BC, reject AC (cycle), accept AD, reject CD and BD, accept CE, reject DE, accept EF, reject DF and CF. Tree: <b>AB, BC, AD, CE, EF</b>, weight \(1+2+4+7+9=23\).</li>
 <li><b>Theorem.</b> If all weights are distinct, the MST is unique.</li>
 <li><b>Proof by exchange.</b> Suppose two different MSTs \(T\) and \(T'\). Among the edges in exactly one of them, let \(e\) be the lightest (unique, because weights are distinct). Say \(e\in T\), \(e\notin T'\).</li>
-<li>\(T'+e\) contains a cycle. That cycle has some edge \(f\notin T\) (otherwise \(T\) would contain a cycle). \(f\in T'\setminus T\), so \(f\) is in the symmetric difference, and \(w(f)>w(e)\) because \(e\) was the lightest and weights are distinct.</li>
-<li>\(T''=T'+e-f\) is a spanning tree with \(w(T'')<w(T')\). That contradicts \(T'\) being minimum. So \(T=T'\). ∎</li>
+<li>\(T'+e\) contains exactly one cycle \(C\), and \(e\in C\). \(C\) has some edge \(f\notin T\) (otherwise \(T\) would contain the cycle \(C\)). \(f\ne e\) because \(e\in T\), so \(f\in T'\setminus T\): \(f\) is in the symmetric difference, and \(w(f)>w(e)\) because \(e\) was the lightest there and weights are distinct.</li>
+<li>\(T''=T'+e-f\) is a spanning tree: removing an edge of the only cycle keeps it connected, and it has \(|V|-1\) edges. Also \(w(T'')=w(T')+w(e)-w(f)<w(T')\). That contradicts \(T'\) being minimum. So \(T=T'\). ∎</li>
 <li><b>Cycle-property check on the graph.</b> Every non-tree edge is the unique heaviest edge on the cycle it makes with the tree: AC3 (cycle A-B-C: 1, 2, 3), CD5 (path C-B-A-D has max 4), BD6 (path B-A-D max 4), DE8 (path D-A-B-C-E max 7), DF10 (path D-A-B-C-E-F max 9), CF11 (path C-E-F max 9). A unique heaviest edge on a cycle belongs to no MST, so none of them can appear in any MST.</li>
 <li><b>Cut-property check.</b> Each tree edge is the unique lightest edge across some cut, hence in every MST. For example AB1: the cut \(\{A\}\) versus the rest has edges 1, 3, 4, and 1 is the lightest. EF9: cut \(\{F\}\) versus the rest has edges 9, 10, 11; lightest is 9. CE7: cut \(\{A,B,C,D\}\) versus \(\{E,F\}\) has edges CE7, DE8, DF10, CF11; lightest is 7.</li>
 </ol>
@@ -326,7 +326,7 @@
 <li><b>Tree edges (these make the distances).</b> S→A 2, A→B 2 (4), A→C 3 (5), B→D 3 (7), C→E 3 (8), D→F 2 (9), E→G 3 (11).</li>
 <li><b>Extra edges (strictly longer than the existing distance).</b> S→B 5 (gives 5 &gt; 4), S→C 6 (6 &gt; 5), C→D 4 (5+4=9 &gt; 7), B→F 6 (4+6=10 &gt; 9). Four edges are on no shortest path.</li>
 <li><b>Why Dijkstra gives these distances.</b> Dijkstra is correct for non-negative weights, so it outputs the true distances. Every vertex has the tree path of the right length. No extra edge gives a shorter path (each is strictly longer). So the distances are exactly 0, 2, 4, 5, 7, 8, 9, 11.</li>
-<li><b>Unique shortest paths.</b> For each vertex the tree path has length equal to the distance and every other incoming edge gives a strictly larger value (rows above), so no tie exists. All weights are non-negative integers and every vertex is reachable.</li>
+<li><b>Unique shortest paths.</b> The last edge \(u\to v\) of any shortest path to \(v\) must satisfy \(\delta(u)+w(u,v)=\delta(v)\). For every vertex only its tree edge does (the extra edges give 5, 6, 9, 10, strictly larger than 4, 5, 7, 9; A, E, G have one incoming edge). So, by induction in order of distance, the shortest path to each vertex is the tree path and nothing else. All weights are non-negative integers and every vertex is reachable.</li>
 </ol>
 <div id="g7b"></div>
 <div id="t7b"></div>

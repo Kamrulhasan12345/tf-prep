@@ -62,16 +62,16 @@
 <p><b>(i) Proof (optimal substructure), cut and paste.</b></p>
 <ol>
 <li>Let \(T\) be an MST of \(G\). Remove any edge \(e=(u,v)\) of \(T\). \(T\) splits into two trees \(T_1\) (on vertex set \(V_1\ni u\)) and \(T_2\) (on \(V_2\ni v\)).</li>
-<li>Claim: \(T_1\) is an MST of the subgraph \(G[V_1]\) induced on \(V_1\) (and likewise \(T_2\) of \(G[V_2]\)).</li>
+<li>\(T_1\) uses only edges with both ends in \(V_1\), so it is a spanning tree of the induced subgraph \(G[V_1]\) (likewise \(T_2\) of \(G[V_2]\)). Claim: \(T_1\) is an MST of \(G[V_1]\) (and \(T_2\) of \(G[V_2]\); the argument is symmetric).</li>
 <li>Suppose not: there is a spanning tree \(T_1'\) of \(G[V_1]\) with \(w(T_1')<w(T_1)\).</li>
-<li>Then \(T'=T_1'\cup T_2\cup\{e\}\) is a spanning tree of \(G\): \(T_1'\) spans \(V_1\), \(T_2\) spans \(V_2\), and \(e\) joins them. Its weight is \(w(T_1')+w(T_2)+w(e)<w(T)\).</li>
+<li>Then \(T'=T_1'\cup T_2\cup\{e\}\) is a spanning tree of \(G\): \(T_1'\) spans \(V_1\), \(T_2\) spans \(V_2\), and \(e\) joins them, so \(T'\) is connected with \((|V_1|-1)+(|V_2|-1)+1=|V|-1\) edges. Its weight is \(w(T_1')+w(T_2)+w(e)<w(T)\).</li>
 <li>This contradicts that \(T\) is an MST. So \(T_1\) and \(T_2\) are optimal. \(\blacksquare\)</li>
 </ol>
 <p>(The same argument applies to every subtree of \(T\) hanging off an edge, so the optimal solution is built from optimal sub-solutions.)</p>
 <p><b>(ii) The MST containing x and z.</b> The edge values are unspecified, so state the condition under which both edges belong to an MST, then draw it.</p>
 <ol>
-<li><b>x (F–G).</b> Vertex F has only two edges: A–F (11) and F–G (x). F must be joined by its lighter edge, so F–G is in the MST iff \(x\le11\).</li>
-<li><b>z (B–C).</b> B's edges are A–B 13, B–C z, B–G 14, B–H 8. Edge B–C is on the cycle B–C–D–I–H–B with weights z, 2, 6, 3, 8. It survives iff it is not the heaviest edge on any cycle, which holds iff \(z\le8\).</li>
+<li><b>x (F–G).</b> F has only two edges: A–F (11) and F–G (x). If \(x>11\), F–G is the unique heaviest edge of the cycle F–G–A–F (x, 1, 11), so no MST contains it (cycle property). If \(x\le11\), F–G is a light edge of the cut \((\{F\},V-\{F\})\), so \(A=\{\)F–G\(\}\) is contained in some MST (cut property).</li>
+<li><b>z (B–C).</b> B's edges are A–B 13, B–C z, B–G 14, B–H 8. If \(z>8\), B–C is the unique heaviest edge of the cycle B–C–D–I–H–B (z, 2, 6, 3, 8), so no MST contains it. If \(z\le8\), B–C is a light edge of the cut \((\{B\},V-\{B\})\); this cut respects \(A\) (F–G does not touch B), so \(A\cup\{\)B–C\(\}\) is contained in some MST. So one MST contains both iff \(x\le11\) and \(z\le8\) (checked with the engine for sample values on both sides of each bound).</li>
 <li>Assume \(x\le11\) and \(z\le8\) (this is what "contains x and z" means). Run Kruskal.</li>
 </ol>
 <div class="method"><h4>Kruskal on G (take x = 10, z = 7 as sample values; any x ≤ 11, z ≤ 8 gives the same tree)</h4><ol>
@@ -205,10 +205,10 @@
 </ol>
 <p><b>(ii) Time.</b></p>
 <ol>
-<li><b>Height.</b> The probability that some key reaches level \(c\log_2n\) is at most \(n\cdot2^{-c\log_2n}=n^{1-c}\). So with high probability \(h=O(\log n)\); expected height is \(O(\log n)\).</li>
+<li><b>Height.</b> The probability that some key reaches level \(c\log_2n\) is at most \(n\cdot2^{-c\log_2n}=n^{1-c}\). So with high probability \(h=O(\log n)\). In expectation: \(E[h]=\sum_{i\ge1}P(h\ge i)\le\sum_{i\ge1}\min(1,n/2^i)\le\lfloor\log_2n\rfloor+(1+\tfrac12+\tfrac14+\dots)\le\log_2n+2\) (the first \(\lfloor\log_2n\rfloor\) terms are at most 1, the rest halve each time).</li>
 <li><b>Search cost = number of steps of the search path.</b> Look at the path <b>backwards</b>, from the found position at \(S_0\) up to the top. At each node on the path, we arrived either from the left (the node was not promoted: it has no tower above) or from above (it was promoted). A node was promoted with probability \(1/2\), so each step going backwards moves <i>up</i> with probability \(1/2\) and <i>left</i> otherwise.</li>
 <li>To climb \(h\) levels we need \(h\) "up" steps. The expected number of fair-coin flips to get \(h\) heads is \(2h\). So the expected length of the path is \(\le2h=O(\log n)\).</li>
-<li><b>Insertion</b> = a search (\(O(\log n)\)) + building the tower (expected \(1/(1/2)=2\) levels, \(O(1)\) expected extra splices per level it grows, plus \(O(1)\) per level to link). So expected \(O(\log n)\). \(\blacksquare\)</li>
+<li><b>Insertion</b> = a search (\(O(\log n)\), which also records the last node visited on each level) + building the tower. The tower height is geometric with \(p=1/2\), expected 2 levels, and each level costs \(O(1)\) to splice in after the recorded node. So expected \(O(\log n)\). \(\blacksquare\)</li>
 </ol>
 <p>No chapter covers skip lists; this answer is self-contained.</p>
 </div></details></div>
@@ -235,7 +235,7 @@
 <ol>
 <li>The probe sequence is \(h(k,i)=(h(k)+i^2)\bmod m\) (or with \(c_1i+c_2i^2\)). It visits only the slots \(h(k)+(i^2\bmod m)\).</li>
 <li>Example, \(m=11\), \(h(k)=0\): \(i=0,1,2,\dots,10\) give squares \(0,1,4,9,16,25,36,49,64,81,100\), i.e. slots \(0,1,4,9,5,3,3,5,9,4,1\). Only the 6 slots \(\{0,1,3,4,5,9\}\) are ever probed. Slots 2, 6, 7, 8, 10 are never reached from this key.</li>
-<li>In general, for a prime \(m\), \(i^2\bmod m\) takes only \((m+1)/2\) distinct values (\(i\) and \(m-i\) give the same square). So at most half the table is reachable.</li>
+<li>In general, \((i+m)^2\equiv i^2\) and \((m-i)^2\equiv i^2\pmod m\), so only \(i=0..\lfloor m/2\rfloor\) give new slots: at most \(\lfloor m/2\rfloor+1<m\) for \(m\ge3\). For an odd prime \(m\) it is exactly \((m+1)/2\), about half the table.</li>
 <li>Consequence: an insertion can fail even though the table has empty slots. It is guaranteed to succeed only if \(m\) is prime <b>and</b> the table is less than half full (\(\alpha<1/2\)); this is the known result.</li>
 </ol>
 <p>Chapter: <a href="../heap/01-hashing.html">Chaining and open addressing</a>.</p>
@@ -265,9 +265,9 @@
 <p>Let \(D(k,i)\) be the number of nodes at depth \(i\) in \(B_k\). Claim \(D(k,i)=\binom ki\).</p>
 <ol>
 <li><b>Base:</b> \(B_0\) is one node at depth 0: \(D(0,0)=1\), and 0 elsewhere. Matches \(\binom0i\).</li>
-<li><b>Step:</b> \(B_k\) is two \(B_{k-1}\) trees, one's root made the child of the other's root.</li>
+<li><b>Hypothesis:</b> \(D(k-1,j)=\binom{k-1}j\) for all \(j\). <b>Step:</b> \(B_k\) is two \(B_{k-1}\) trees, one's root made the child of the other's root.</li>
 <li>A node at depth \(i\) in \(B_k\) is a depth-\(i\) node of the tree that kept the root, or a depth-\((i-1)\) node of the attached tree (it is one level lower now).</li>
-<li>\(D(k,i)=D(k-1,i)+D(k-1,i-1)=\binom{k-1}i+\binom{k-1}{i-1}=\binom ki\) by Pascal's rule. \(\blacksquare\)</li>
+<li>\(D(k,i)=D(k-1,i)+D(k-1,i-1)=\binom{k-1}i+\binom{k-1}{i-1}=\binom ki\) by Pascal's rule (with \(\binom{k-1}{-1}=\binom{k-1}{k}=0\) for \(i=0\) and \(i=k\)). \(\blacksquare\)</li>
 </ol>
 <p>Chapter: <a href="../heap/02-binomial-trees.html">Binomial trees and their proofs</a>.</p>
 </div></details></div>
@@ -365,7 +365,7 @@
 <li>Any vertex cover, including an optimal one \(C^*\), must contain at least one endpoint of each edge in \(A\), and these endpoints are all different. So \(|C^*|\ge|A|\).</li>
 <li>\(|C|=2|A|\le2|C^*|\). \(\blacksquare\)</li>
 </ol>
-<p>Time \(O(V+E)\) with adjacency lists. Ratio 2 is tight for this algorithm (a single edge repeated: perfect matching graphs).</p>
+<p>Time \(O(V+E)\) with adjacency lists. Ratio 2 is tight for this algorithm: on a graph that is a perfect matching (e.g. a single edge) it returns both ends of every edge, exactly \(2\cdot OPT\).</p>
 <p><b>Syllabus note:</b> Bayzid sir's notes say not in syllabus, but it was asked in term finals (2022–23, 2024–25, and here).</p>
 <p>Chapter: <a href="../np/06-approximation.html">Approximation algorithms</a>.</p>
 </div></details></div>
@@ -376,7 +376,7 @@
 <ol>
 <li>Running time is \(O(n+X)\) where \(X\) is the total number of comparisons made in all PARTITION calls (each call does one comparison per element against the pivot, and the number of calls is \(\le n\)).</li>
 <li>Let \(z_1<z_2<\dots<z_n\) be the sorted elements. Two elements are compared <b>at most once</b> (one of them is then the pivot and is never used again).</li>
-<li>Let \(X_{ij}=1\) if \(z_i\) and \(z_j\) are ever compared. The elements \(z_i,\dots,z_j\) stay together in one sublist until one of them is chosen as a pivot. \(z_i\) and \(z_j\) are compared iff the <b>first</b> pivot among \(z_i..z_j\) is \(z_i\) or \(z_j\).</li>
+<li>Let \(X_{ij}=1\) if \(z_i\) and \(z_j\) are ever compared. The elements \(z_i,\dots,z_j\) stay together in one sublist until one of them is chosen as a pivot (a pivot below \(z_i\) or above \(z_j\) sends all of them to the same side). \(z_i\) and \(z_j\) are compared iff the <b>first</b> pivot among \(z_i..z_j\) is \(z_i\) or \(z_j\).</li>
 <li>That first pivot is uniform among the \(j-i+1\) elements, so \(P(X_{ij}=1)=\frac2{j-i+1}\).</li>
 <li>\(E[X]=\sum_{i=1}^{n-1}\sum_{j=i+1}^{n}\frac2{j-i+1}=\sum_{i=1}^{n-1}\sum_{k=2}^{n-i+1}\frac2k<\sum_{i=1}^{n-1}2H_n=O(n\log n)\), since the harmonic number \(H_n=O(\log n)\).</li>
 <li>So expected time \(O(n)+O(n\log n)=O(n\log n)\). \(\blacksquare\)</li>

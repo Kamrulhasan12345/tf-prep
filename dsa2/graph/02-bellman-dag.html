@@ -45,9 +45,9 @@ RELAX(u, v, w)                            // O(1)
 <li><b>Path-relaxation property.</b> If \(p=\langle v_0=s,v_1,\dots,v_k\rangle\) is a shortest path and its edges are relaxed in the order \((v_0,v_1),(v_1,v_2),\dots\), possibly with other relaxations in between, then \(v_k.d=\delta(s,v_k)\).</li>
 </ol>
 <div class="method"><h4>Proofs of properties 2, 4 and 5 (CLRS 24.5, the slide "SSSP properties proof")</h4><ol>
-<li><b>Upper bound, by induction on the number of relaxations.</b> At the start \(s.d=0=\delta(s,s)\) and the rest are \(\infty\). Suppose RELAX\((u,v)\) is the first step that makes some \(v.d<\delta(s,v)\). Then \(v.d=u.d+w(u,v)\ge\delta(s,u)+w(u,v)\ge\delta(s,v)\), using the hypothesis for \(u\) and then the triangle inequality. Contradiction. Estimates only decrease and never go below \(\delta\), so once equal they stay equal.</li>
+<li><b>Upper bound, by induction on the number of relaxations.</b> At the start \(s.d=0\ge\delta(s,s)\) (\(\delta(s,s)\) is \(0\), or \(-\infty\) if a negative cycle passes through \(s\)) and the rest are \(\infty\). Suppose RELAX\((u,v)\) is the first step that makes some \(v.d<\delta(s,v)\). Then \(v.d=u.d+w(u,v)\ge\delta(s,u)+w(u,v)\ge\delta(s,v)\), using the hypothesis for \(u\) and then the triangle inequality. Contradiction. Estimates only decrease and never go below \(\delta\), so once equal they stay equal.</li>
 <li><b>Convergence.</b> After relaxing, \(v.d\le u.d+w(u,v)=\delta(s,u)+w(u,v)=\delta(s,v)\) (the last equality because \((u,v)\) lies on a shortest path). With the upper bound, \(v.d=\delta(s,v)\).</li>
-<li><b>Path relaxation, by induction on \(i\).</b> Claim: after \((v_{i-1},v_i)\) is relaxed, \(v_i.d=\delta(s,v_i)\), and it stays so. For \(i=0\): \(s.d=0=\delta(s,s)\). For \(i>0\): by hypothesis \(v_{i-1}.d=\delta(s,v_{i-1})\) when \((v_{i-1},v_i)\) is relaxed, so convergence gives the claim. \(\blacksquare\)</li>
+<li><b>Path relaxation, by induction on \(i\).</b> Claim: after \((v_{i-1},v_i)\) is relaxed, \(v_i.d=\delta(s,v_i)\), and it stays so. <i>Base</i> \(i=0\): \(s.d=0=\delta(s,s)\) from the start (\(p\) is a shortest path, so no negative cycle is on it and \(\delta(s,s)=0\)), and by the upper bound it never changes. <i>Hypothesis:</i> the claim holds for \(i-1\). <i>Step:</i> \((v_{i-2},v_{i-1})\) is relaxed before \((v_{i-1},v_i)\), so by hypothesis \(v_{i-1}.d=\delta(s,v_{i-1})\) when \((v_{i-1},v_i)\) is relaxed. The prefix \(\langle v_0,\dots,v_i\rangle\) is a shortest path (optimal substructure), so convergence gives \(v_i.d=\delta(s,v_i)\), and the upper bound keeps it there. <i>Conclusion:</i> with \(i=k\), \(v_k.d=\delta(s,v_k)\). \(\blacksquare\)</li>
 </ol></div>
 <table class="tbl"><tr><th>Algorithm</th><th>Negative edges?</th><th>Negative cycles?</th><th>Time</th></tr>
 <tr><td>BFS</td><td>no (all weights equal)</td><td>no</td><td>\(O(V+E)\)</td></tr>
@@ -81,7 +81,7 @@ RELAX(u, v, w)                            // O(1)
 <li>Pass \(i\) relaxes every edge, so it relaxes \((v_{i-1},v_i)\). Edges of the path are therefore relaxed in order across passes 1, 2, \(\dots\), \(k\).</li>
 <li>By the path-relaxation property \(v.d=\delta(s,v)\) after \(V-1\) passes. Unreachable vertices keep \(\infty\) (no-path property).</li>
 <li>Now every edge satisfies \(v.d=\delta(s,v)\le\delta(s,u)+w(u,v)=u.d+w(u,v)\) (triangle inequality), so the detection pass finds nothing and returns TRUE.</li>
-<li><b>Negative cycle reachable.</b> Let \(c=\langle v_0,\dots,v_k=v_0\rangle\) with \(\sum w(v_{i-1},v_i)<0\). Suppose the detection pass returned TRUE. Then \(v_i.d\le v_{i-1}.d+w(v_{i-1},v_i)\) for all \(i\). Add these \(k\) inequalities: \(\sum v_i.d\le\sum v_{i-1}.d+w(c)\). Both sums are the same finite number (the cycle is reachable, so every \(d\) is finite, and each vertex appears once in each sum). So \(0\le w(c)\). Contradiction. So it returns FALSE. \(\blacksquare\)</li>
+<li><b>Negative cycle reachable.</b> Let \(c=\langle v_0,\dots,v_k=v_0\rangle\) with \(\sum w(v_{i-1},v_i)<0\). Suppose the detection pass returned TRUE. Then \(v_i.d\le v_{i-1}.d+w(v_{i-1},v_i)\) for all \(i\). Add these \(k\) inequalities: \(\sum v_i.d\le\sum v_{i-1}.d+w(c)\). Both sums are the same finite number: each vertex of \(c\) appears once in each sum, and every \(d\) is finite (each \(v_i\) is reachable by a simple path of at most \(V-1\) edges, and the passes relax its edges in order, so \(v_i.d\le\) that path's weight \(<\infty\)). So \(0\le w(c)\). Contradiction. So it returns FALSE. \(\blacksquare\)</li>
 </ol></div>
 <div class="key"><p><b>Intuitive idea in two lines (2017–18 Q8b, 6+2).</b> "A shortest path has at most \(V-1\) edges, so relaxing all edges \(V-1\) times gives every shortest path. If after that an edge can still be relaxed, the distances are still dropping, which only a negative cycle can cause." Detection of the cycle itself: from the last relaxed vertex follow \(\pi\) back \(V\) times (you are then inside the cycle), then keep following until you return.</p></div>
 
@@ -100,6 +100,7 @@ RELAX(u, v, w)                            // O(1)
 <li>Run the detection pass. Collect every vertex \(v\) for which an edge \((u,v)\) still relaxes.</li>
 <li>Do a BFS or DFS from those vertices. Every vertex reached has \(\delta(s,v)=-\infty\).</li>
 <li>All other reachable vertices have the final \(d\) values as their distances. Unreachable ones stay \(\infty\).</li>
+<li><b>Why this is exactly right.</b> (a) A vertex with finite \(\delta(s,v)\) has a simple shortest path of at most \(V-1\) edges, so by path relaxation its \(d\) is exact after \(V-1\) passes. (b) If \((u,v)\) still relaxes, \(u\) and \(v\) cannot both have finite \(\delta\) (then \(v.d=\delta(s,v)\le\delta(s,u)+w=u.d+w\) by the triangle inequality); \(u\) is reachable since \(u.d<\infty\), so \(\delta(s,u)=-\infty\) or \(\delta(s,v)=-\infty\), and either way \(\delta(s,v)=-\infty\). So every vertex the search reaches is \(-\infty\). (c) Conversely, a \(-\infty\) vertex is reachable from a negative cycle reachable from \(s\); the correctness proof shows some edge of that cycle still relaxes, so its head is collected and the search reaches the vertex.</li>
 </ol></div>
 <p>Cost \(O(VE)+O(V+E)=O(VE)\). A complete answer also says why Dijkstra cannot be used (chapter 3) and gives the pseudocode above.</p>
 
@@ -136,7 +137,7 @@ RELAX(u, v, w)                            // O(1)
       for each v in Adj[u]
           RELAX(u, v, w)</pre>
 <div class="method"><h4>Correctness and complexity</h4><ol>
-<li>Every path in a DAG follows the topological order. So when we process the vertices in that order, the edges of any path \(s=v_0,\dots,v_k\) are relaxed in the order \((v_0,v_1),(v_1,v_2),\dots\)</li>
+<li>Every path in a DAG follows the topological order: for each edge \((v_{i-1},v_i)\), \(v_{i-1}\) comes before \(v_i\). The edge \((v_{i-1},v_i)\) is relaxed when \(v_{i-1}\) is processed. So for any shortest path \(s=v_0,\dots,v_k\) the edges are relaxed in the order \((v_0,v_1),(v_1,v_2),\dots\) (a DAG has no cycles, so every reachable \(v_k\) has such a path).</li>
 <li>By the path-relaxation property, \(v_k.d=\delta(s,v_k)\). Equivalently: when \(u\) is processed, all its predecessors are already final.</li>
 <li>Time: topological sort \(\Theta(V+E)\); initialise \(\Theta(V)\); each edge relaxed once, \(\Theta(E)\). Total <b>\(\Theta(V+E)\)</b>.</li>
 <li>Vertices that come <b>before \(s\)</b> in the order cannot be reached from \(s\); they stay \(\infty\).</li>

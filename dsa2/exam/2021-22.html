@@ -38,14 +38,14 @@
 <ol>
 <li>Let \(T\) be an MST of \(G=(V,E)\) and \(e=(u,v)\in T\). Removing \(e\) splits \(T\) into two trees \(T_1\) on vertex set \(V_1\) and \(T_2\) on \(V_2\).</li>
 <li>Claim: \(T_1\) is an MST of \(G[V_1]\) (the subgraph induced by \(V_1\)), and likewise \(T_2\) of \(G[V_2]\).</li>
-<li>Suppose not: some spanning tree \(T_1'\) of \(G[V_1]\) has \(w(T_1')<w(T_1)\). Then \(T'=T_1'\cup T_2\cup\{e\}\) is a spanning tree of \(G\) with \(w(T')=w(T)-w(T_1)+w(T_1')<w(T)\). That contradicts \(T\) being an MST. ∎</li>
+<li>Suppose not: some spanning tree \(T_1'\) of \(G[V_1]\) has \(w(T_1')<w(T_1)\). Then \(T'=T_1'\cup T_2\cup\{e\}\) is a spanning tree of \(G\): \(T_1'\) connects \(V_1\), \(T_2\) connects \(V_2\), \(e\) joins \(u\in V_1\) to \(v\in V_2\), and it has \((|V_1|-1)+(|V_2|-1)+1=|V|-1\) edges. Also \(w(T')=w(T)-w(T_1)+w(T_1')<w(T)\). That contradicts \(T\) being an MST. ∎</li>
 </ol>
 <p><b>(ii) Greedy-choice property (cut property).</b> Claim: let \((S,V\setminus S)\) be any cut and \(e\) a minimum-weight edge crossing it. Then some MST contains \(e\).</p>
 <ol>
 <li>Let \(T\) be an MST. If \(e\in T\), done.</li>
 <li>Otherwise \(T+e\) has exactly one cycle. The cycle crosses the cut at \(e\), so it must cross back at another edge \(f\in T\) crossing the cut.</li>
 <li>\(w(e)\le w(f)\) since \(e\) is a lightest crossing edge.</li>
-<li>\(T'=T-f+e\) is a spanning tree (the cycle is broken) with \(w(T')=w(T)-w(f)+w(e)\le w(T)\). So \(T'\) is also an MST and contains \(e\). ∎</li>
+<li>\(T'=T-f+e\) is a spanning tree: \(T+e\) is connected, removing \(f\), an edge on its only cycle, keeps it connected, and \(T'\) has \(|V|-1\) edges. Its weight is \(w(T')=w(T)-w(f)+w(e)\le w(T)\). So \(T'\) is also an MST and contains \(e\). ∎</li>
 <li>Kruskal and Prim are this property applied repeatedly: the edge chosen is the lightest across a cut that respects the edges chosen so far.</li>
 </ol>
 </div></details></div>
@@ -71,7 +71,7 @@ KRUSKAL(G, w)
            A = A + {(u, v)};  UNION(FIND(u), FIND(v))
    return A</pre>
 <ol>
-<li><b>Correctness.</b> Each accepted edge is the lightest edge leaving the tree that contains \(u\), among edges not yet considered: it is a light edge across a cut respecting \(A\), so it is safe (cut property). A rejected edge would close a cycle.</li>
+<li><b>Correctness.</b> Let \(C\) be the component of \(A\) containing \(u\) when \((u,v)\) is accepted, so \(v\notin C\). The cut \((C,V-C)\) respects \(A\). Every lighter edge was examined earlier and either accepted (now inside a component) or rejected (both ends in one component), so no lighter edge crosses this cut. So \((u,v)\) is a light edge for a cut respecting \(A\): safe by the cut property. A rejected edge has both ends in one component, so it would close a cycle. \(G\) is connected, so at the end \(A\) is one tree spanning \(V\): an MST.</li>
 <li><b>Cost of unions.</b> A vertex is relabelled only when its set is the smaller one, so its set size at least doubles each time. A vertex is relabelled at most \(\log_2n\) times, so all unions cost \(O(n\log n)\) in total.</li>
 <li><b>Total.</b> Sorting \(O(E\log E)=O(E\log V)\); \(2E\) FIND calls \(O(E)\); unions \(O(V\log V)\). Total \(O(E\log V)\).</li>
 </ol>
@@ -195,7 +195,7 @@ KRUSKAL(G, w)
 <ol>
 <li>Use the same network and find a maximum flow of <b>minimum total cost</b> \(\sum f(u,v)\,\text{cost}(u,v)\).</li>
 <li><b>Successive shortest paths.</b> Start with zero flow. Repeat: in the residual network (a backward edge of an edge with cost \(c\) has cost \(-c\)) find a cheapest \(s\to t\) path, with Bellman-Ford (negative residual costs), and push 1 unit along it. Stop when no path exists.</li>
-<li><b>Why it is optimal:</b> the flow after each step is a min-cost flow for its value, because the residual network never contains a negative cycle (a negative cycle would let us reduce the cost). So after \(|A|\) pushes the flow is a minimum-cost matching of all cars.</li>
+<li><b>Why it is optimal:</b> a flow is min-cost for its value iff its residual network has no negative-cost cycle (a negative cycle would let us reduce the cost; conversely the difference of two flows of equal value splits into residual cycles). Zero flow: only original edges, costs \(\ge0\), no negative cycle. After pushing along a shortest path with distances \(d\): every old residual edge has \(d(v)\le d(u)+c(u,v)\), and each new backward edge \((v,u)\) lies on the shortest path, so \(d(u)=d(v)-c(u,v)\). Hence reduced costs \(c(u,v)+d(u)-d(v)\ge0\) on all residual edges, and a cycle's cost equals its reduced cost, so still no negative cycle. So after \(|A|\) pushes the flow is a minimum-cost matching of all cars.</li>
 <li><b>Time.</b> \(|A|\) augmentations, each Bellman-Ford \(O(VE)\) with \(V=|A|+|B|+2\) and \(E\le|A||B|+|A|+|B|\): \(O(|A|\,VE)\). With Dijkstra and potentials (Johnson's reweighting) each augmentation is \(O(E+V\log V)\). The Hungarian algorithm solves the same assignment problem in \(O(n^3)\) for \(|A|=|B|=n\).</li>
 <li>If a car has no reachable slot (all costs infinite), no full matching exists: report the maximum number that can be parked and the cheapest way to do it.</li>
 </ol>
@@ -356,7 +356,7 @@ KRUSKAL(G, w)
 <li><b>Rounding error per item.</b> \(\bar v_i=\lfloor v_i/\theta\rfloor\) gives \(\theta\bar v_i\le v_i<\theta\bar v_i+\theta\), so \(v_i-\theta\bar v_i<\theta\).</li>
 <li><b>Chain.</b> \(S\) is optimal for the scaled values, and \(S^*\) is feasible, so \(\sum_{S}\bar v_i\ge\sum_{S^*}\bar v_i\). Then \[\sum_{i\in S}v_i\ \ge\ \theta\sum_{S}\bar v_i\ \ge\ \theta\sum_{S^*}\bar v_i\ \ge\ \sum_{S^*}(v_i-\theta)\ \ge\ \text{OPT}-n\theta.\]</li>
 <li>\(n\theta=\varepsilon V_{\max}/2\le\varepsilon\,\text{OPT}/2\). So \(\text{value}(S)\ge(1-\varepsilon/2)\,\text{OPT}\).</li>
-<li>\(\dfrac{1}{1-\varepsilon/2}\le1+\varepsilon\) for \(0<\varepsilon\le1\) because \((1+\varepsilon)(1-\varepsilon/2)=1+\tfrac{\varepsilon}{2}-\tfrac{\varepsilon^2}{2}\ge1\). So \(\text{OPT}\le(1+\varepsilon)\,\text{value}(S)\). ∎</li>
+<li>\(\dfrac{1}{1-\varepsilon/2}\le1+\varepsilon\) for \(0<\varepsilon\le1\) because \((1+\varepsilon)(1-\varepsilon/2)=1+\tfrac{\varepsilon}{2}-\tfrac{\varepsilon^2}{2}\ge1\). So \(\text{OPT}\le(1+\varepsilon)\,\text{value}(S)\). For \(\varepsilon&gt;1\), run with \(\varepsilon=1\): \(\text{OPT}\le2\,\text{value}(S)\le(1+\varepsilon)\,\text{value}(S)\). ∎</li>
 <li><b>Running time.</b> The largest scaled value is \(\lfloor V_{\max}/\theta\rfloor=2n/\varepsilon\). The total of scaled values is at most \(n\cdot2n/\varepsilon=2n^2/\varepsilon\). The table has \(n\) rows and \(2n^2/\varepsilon\) columns, each cell in \(O(1)\): \(O(n\cdot n^2/\varepsilon)=\mathbf{O(n^3/\varepsilon)}\). That is polynomial in \(n\) and \(1/\varepsilon\): a fully polynomial-time approximation scheme (FPTAS).</li>
 </ol>
 </div></details></div>

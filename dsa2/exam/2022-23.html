@@ -49,7 +49,9 @@
 <li>Men need a spanning tree of \(G_m\): \(N-1\) edges. Women need a spanning tree of \(G_w\): \(N-1\) edges. A type-3 road counts for both, types 1 and 2 count for one.</li>
 <li>If \(k_3\) type-3 roads are kept, the men still need \(N-1-k_3\) type-1 roads and the women \(N-1-k_3\) type-2 roads. So \(|K|=k_3+2(N-1-k_3)=2(N-1)-k_3\). <b>Maximise \(k_3\).</b></li>
 <li>The most type-3 roads that can be kept without a cycle is a spanning forest of the type-3 graph. Take it greedily with union-find: \(k_3\) = number of type-3 edges that join two different components.</li>
-<li><b>Why greedy is right (exchange argument).</b> Any optimal solution uses a set of type-3 roads that is acyclic. If it used fewer than a maximal forest, a type-3 road in the forest could replace a type-1 and a type-2 road it makes redundant, reducing \(|K|\). So a maximum acyclic set of type-3 roads is optimal, and the remaining roads are then chosen by the same union-find rule separately for men and women.</li>
+<li><b>Why greedy is right.</b> Let \(c_3\) be the number of components of the type-3 graph. Every maximal acyclic set of type-3 roads (a spanning forest) has exactly \(N-c_3\) edges, so the greedy \(k_3=N-c_3\) is the largest possible.</li>
+<li><b>Lower bound for any valid \(K\).</b> \(K\) contains a spanning tree \(T_m\) of the men's roads and \(T_w\) of the women's roads. \(|K|\ge|T_m\cup T_w|=2(N-1)-|T_m\cap T_w|\). \(T_m\cap T_w\) has only type-3 roads and is acyclic (it lies inside a tree), so \(|T_m\cap T_w|\le k_3\). Hence \(|K|\ge2(N-1)-k_3\).</li>
+<li><b>The algorithm meets it.</b> The type-3 forest has the same components as all type-3 roads, so if \(G_m\) is connected, adding type-1 roads by union-find completes it to a spanning tree: \(k_3+k_m=N-1\). Same for women: \(k_3+k_w=N-1\). Kept \(=k_3+k_m+k_w=2(N-1)-k_3\), the lower bound, so it is optimal.</li>
 </ol>
 <p><b>(iii) Pseudo-code</b> (union-find with path compression and union by size, nearly \(O(1)\) per operation).</p>
 <pre class="code">MAX-RENOVATED(N, edges)
@@ -81,7 +83,7 @@
      for each v in Adj[u] with d[v] == INF
          d[v] = d[u] + 1; parent[v] = u; enqueue v
   // distance = c * d[v]; path from the parent pointers</pre>
-<p>Time \(O(V+E)\). BFS is correct because it visits vertices in order of increasing edge count.</p>
+<p>Time \(O(V+E)\). <b>Correct:</b> by induction the queue always holds vertices with distance \(k\) followed by vertices with distance \(k+1\), so vertices are dequeued in order of edge count. When \(v\) is first discovered from \(u\), \(u\) is a neighbour of \(v\) with the smallest distance, so \(d[v]=d[u]+1\) is the fewest edges from \(s\).</p>
 <p><b>(b) Positive weights: Dijkstra.</b></p>
 <pre class="code">DIJKSTRA(G, w, s)
   INITIALIZE-SINGLE-SOURCE(G, s)      // d[s]=0, others INF
@@ -91,7 +93,13 @@
      for each v in Adj[u]
          if d[v] > d[u] + w(u,v)       // relax
              d[v] = d[u] + w(u,v); parent[v] = u; DECREASE-KEY(Q, v, d[v])</pre>
-<p>Time \(O((V+E)\log V)\) with a binary heap, \(O(V\log V+E)\) with a Fibonacci heap. Correctness: see the proof in the chapter (greedy, needs non-negative weights).</p>
+<p>Time \(O((V+E)\log V)\) with a binary heap, \(O(V\log V+E)\) with a Fibonacci heap. Correctness (full proof in the chapter):</p>
+<ol>
+<li><b>Claim:</b> when \(u\) is extracted, \(d[u]=\delta(s,u)\). Always \(d[u]\ge\delta(s,u)\).</li>
+<li>Suppose \(u\) is the first vertex extracted with \(d[u]&gt;\delta(s,u)\) (\(u\ne s\), and \(u\) is reachable, else both are \(\infty\)). Take a shortest path \(s\leadsto u\). Let \(y\) be its first vertex not in \(S\) and \(x\in S\) the vertex before \(y\).</li>
+<li>\(x\) was correct when extracted and then relaxed \((x,y)\), so \(d[y]=\delta(s,y)\). Weights are positive, so \(\delta(s,y)\le\delta(s,u)&lt;d[u]\).</li>
+<li>Both \(u\) and \(y\) are in \(Q\) and \(u\) was the minimum, so \(d[u]\le d[y]\). Contradiction. \(\blacksquare\)</li>
+</ol>
 <p><b>(c) Negative weights and possible negative cycles: Bellman-Ford with cycle handling.</b></p>
 <pre class="code">BELLMAN-FORD(G, w, s)
   INITIALIZE-SINGLE-SOURCE(G, s)
@@ -102,8 +110,9 @@
   every vertex reachable from a marked vertex has distance -INF
   other vertices: d[v] is the true shortest distance</pre>
 <ol>
-<li>After round \(i\), every vertex whose shortest path has at most \(i\) edges is correct. A shortest path without a cycle has at most \(V-1\) edges, so \(V-1\) rounds are enough when no negative cycle is reachable.</li>
-<li>If after \(V-1\) rounds some edge still relaxes, there is a negative cycle reachable from \(s\). For those vertices no shortest path exists (the distance is \(-\infty\)). A search from the marked vertices finds all of them.</li>
+<li>After round \(i\), every vertex whose shortest path has at most \(i\) edges is correct (induction: if \(s=v_0,\dots,v_i\) is that path, \(d[v_{i-1}]\) was correct after round \(i-1\), and round \(i\) relaxes \((v_{i-1},v_i)\)). A shortest path without a cycle has at most \(V-1\) edges, so \(V-1\) rounds are enough when no negative cycle is reachable. Then no edge can relax again, since \(d=\delta\) satisfies \(\delta(v)\le\delta(u)+w(u,v)\).</li>
+<li>If a negative cycle \(v_0,\dots,v_k=v_0\) is reachable, some edge on it still relaxes: otherwise \(d[v_i]\le d[v_{i-1}]+w(v_{i-1},v_i)\) for all \(i\), and summing around the cycle gives \(0\le w(\text{cycle})&lt;0\). So the extra round detects it, and the head of that edge, on the cycle, is marked.</li>
+<li>A vertex is \(-\infty\) iff it is reachable from a reachable negative cycle. Each such cycle has a marked vertex, so a search from the marked vertices finds all of them; a vertex not reachable from any negative cycle has \(d=\delta\) after \(V-1\) rounds and is never marked.</li>
 </ol>
 <p>Time \(O(VE)\). A DAG would give \(O(V+E)\), but the question allows cycles.</p>
 </div></details></div>
@@ -164,9 +173,9 @@
 <details><summary>Show answer</summary><div class="exam-a">
 <p>Chapter: <a href="../graph/07-mincut-ek.html">Max-flow min-cut, Edmonds-Karp</a>. The full numbered proof is written out in <a href="2023-24.html">the 2023–24 solution, Q11(c)</a>; short form here.</p>
 <ol>
-<li><b>Lemma.</b> For every flow \(f\) and every cut \((S,T)\): \(|f|=f(S,T)-f(T,S)\le c(S,T)\). So max flow \(\le\) min cut.</li>
-<li><b>No augmenting path \(\Rightarrow\) equality.</b> If \(G_f\) has no \(s\leadsto t\) path, let \(S\) = vertices reachable from \(s\) in \(G_f\), \(T\) = the rest (\(t\in T\)). Every edge \(S\to T\) is saturated (else the residual edge would reach \(T\)); every edge \(T\to S\) carries 0 flow. So \(|f|=c(S,T)\).</li>
-<li>By step 1 this flow is maximum and this cut is minimum. So <b>max flow = min cut</b>. A flow is maximum iff there is no augmenting path. ∎</li>
+<li><b>Lemma.</b> For every flow \(f\) and every cut \((S,T)\) with \(s\in S,t\in T\): \(|f|=f(S,T)-f(T,S)\le c(S,T)\). Proof: add (out minus in) over all \(v\in S\); it is \(|f|\) for \(s\) and 0 for the rest (conservation). Edges inside \(S\) cancel, leaving \(f(S,T)-f(T,S)\). Then \(f(S,T)\le c(S,T)\) and \(f(T,S)\ge0\). So max flow \(\le\) min cut.</li>
+<li><b>No augmenting path \(\Rightarrow\) equality.</b> If \(G_f\) has no \(s\leadsto t\) path, let \(S\) = vertices reachable from \(s\) in \(G_f\), \(T\) = the rest (\(t\in T\)). Every edge \(S\to T\) is saturated (else its residual edge would reach \(T\)); every edge \(T\to S\) carries 0 flow (else its backward residual edge \(S\to T\) would reach \(T\)). By the lemma \(|f|=c(S,T)-0=c(S,T)\).</li>
+<li>By step 1 this flow is maximum and this cut is minimum. So <b>max flow = min cut</b>. A flow is maximum iff there is no augmenting path (if there is one, pushing along it increases \(|f|\)). ∎</li>
 </ol>
 </div></details></div>
 
@@ -184,7 +193,7 @@
 <ol>
 <li>Let \(N(h)\) = fewest nodes in an AVL tree of height \(h\). The root has subtrees of height \(h-1\) and, at least, \(h-2\).</li>
 <li>\(N(h)=N(h-1)+N(h-2)+1\), \(N(0)=1,\ N(1)=2\). So 1, 2, 4, 7, 12, 20, ...</li>
-<li>\(N(h)>2N(h-2)\), so \(N(h)\ge 2^{\lfloor h/2\rfloor}\).</li>
+<li>\(N\) is increasing, so \(N(h)>2N(h-2)\). Applying this \(\lfloor h/2\rfloor\) times down to \(N(0)\) or \(N(1)\) (both \(\ge1\)) gives \(N(h)\ge 2^{\lfloor h/2\rfloor}\).</li>
 <li>Any AVL tree of height \(h\) with \(n\) nodes has \(n\ge N(h)\ge2^{(h-1)/2}\), so \(h\le 2\log_2n+1\).</li>
 <li>So height is \(O(\log n)\): search, insert and delete cost \(O(\log n)\). ∎ (The sharper bound is \(1.44\log_2n\).)</li>
 </ol>
@@ -336,6 +345,7 @@ RB-INSERT-FIXUP(T, z)
 <li>\(C(\{j\},j)=d(1,j)\).</li>
 <li>\(C(S,j)=\min_{i\in S\setminus\{j\}}\bigl[C(S\setminus\{j\},i)+d(i,j)\bigr]\).</li>
 <li>Answer \(=\min_{j}\bigl[C(\{2..n\},j)+d(j,1)\bigr]\); rebuild the tour from the stored best \(i\).</li>
+<li><b>Why correct:</b> in a cheapest path for \((S,j)\) the city before \(j\) is some \(i\in S\setminus\{j\}\), and the part up to \(i\) must be a cheapest path for \((S\setminus\{j\},i)\), or swapping in a cheaper one would improve it (optimal substructure). The recurrence tries every \(i\). Every tour is a path ending at some \(j\) plus the edge \(j\to1\).</li>
 <li><b>Time.</b> \(2^{n-1}\) subsets, \(n\) endings, \(n\) choices of \(i\): \(O(n^22^n)\). Space \(O(n2^n)\). (Brute force is \(O((n-1)!)\).)</li>
 </ol>
 <div id="t7a"></div>

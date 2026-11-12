@@ -69,10 +69,10 @@
 <details><summary>Show answer</summary><div class="exam-a">
 <p><b>Proof (cut-and-paste / exchange).</b> Let \(T\) be any MST. If \(e\in T\) we are done. Otherwise:</p>
 <ol>
-<li>\(T\) is a spanning tree, so \(T+e\) contains exactly one cycle \(C\).</li>
-<li>\(e\) crosses the partition \((V_1,V_2)\). A cycle crosses a cut an even number of times, so \(C\) contains another edge \(f\ne e\) that also crosses the cut. \(f\in T\) (it is on the cycle and not \(e\)).</li>
+<li>Write \(e=(u,v)\) with \(u\in V_1\), \(v\in V_2\). \(T\) is a spanning tree, so it has a unique path \(P\) from \(u\) to \(v\), and \(P+e\) is a cycle.</li>
+<li>\(P\) starts in \(V_1\) and ends in \(V_2\), so some edge \(f=(x,y)\) of \(P\) has \(x\in V_1\), \(y\in V_2\): \(f\) crosses the cut. \(f\in T\) (it is on \(P\)) and \(f\ne e\) (because \(e\notin T\)).</li>
 <li>\(e\) is a minimum-weight crossing edge, so \(w(e)\le w(f)\).</li>
-<li>Let \(T'=T-f+e\). Removing \(f\) splits \(T\) into two components, and \(e\) reconnects them (it lies on the cycle with \(f\)), so \(T'\) is a spanning tree.</li>
+<li>Let \(T'=T-f+e\). Removing \(f\) splits \(T\) into two components, \(A\ni x\) and \(B\ni y\). \(P\) is the only \(u\)-\(v\) path in \(T\) and it uses \(f\), so in \(T-f\) the vertices \(u\) and \(v\) are not connected: one is in \(A\), the other in \(B\). So \(e\) joins \(A\) and \(B\), \(T'\) is connected, and it has \(|V|-1\) edges, so \(T'\) is a spanning tree.</li>
 <li>\(w(T')=w(T)-w(f)+w(e)\le w(T)\). Since \(T\) is minimum, \(w(T')=w(T)\), so \(T'\) is an MST.</li>
 <li>\(T'\) contains \(e\). \(\blacksquare\)</li>
 </ol>
@@ -133,7 +133,7 @@
 <ol>
 <li>Plain Ford-Fulkerson with arbitrary paths takes \(O(E\cdot|f^*|)\) with integer capacities. This depends on the flow value, which can be huge. With irrational capacities it may never terminate.</li>
 <li>Key lemma: with shortest augmenting paths, the BFS distance \(\delta_f(s,v)\) of every vertex never decreases from one augmentation to the next.</li>
-<li>Each augmentation saturates at least one <b>critical edge</b> (the bottleneck). An edge \((u,v)\) can be critical again only after the distance of \(u\) has grown by at least 2 (it must be reversed first, then used again). Distances are at most \(V-1\), so each edge is critical \(O(V)\) times.</li>
+<li>Each augmentation saturates at least one <b>critical edge</b> (the bottleneck). An edge \((u,v)\) can be critical again only after the distance of \(u\) has grown by at least 2 (it must be reversed first, then used again). Proof: when \((u,v)\) is critical, \(\delta(v)=\delta(u)+1\) and the edge leaves \(G_f\). It returns only when \((v,u)\) is on a later shortest path, so then \(\delta'(u)=\delta'(v)+1\ge\delta(v)+1=\delta(u)+2\) (distances never decrease). Distances are at most \(V-1\), so each edge is critical \(O(V)\) times.</li>
 <li>There are \(E\) edges (and their reverses), so the number of augmentations is \(O(VE)\).</li>
 <li>Each augmentation costs \(O(E)\) (BFS). Total \(O(VE^2)\), independent of the capacities.</li>
 </ol>
@@ -144,7 +144,7 @@
 <details><summary>Show answer</summary><div class="exam-a">
 <p><b>Idea.</b> This is all-pairs shortest paths with the operations changed: "+" becomes <b>min</b>, "min" becomes <b>max</b>. Floyd-Warshall works unchanged in structure.</p>
 <pre class="code">ALL-PAIRS-STRONGEST(W)            // n x n
- S[i][j] = w(i,j) if edge exists, else 0 (no path);  S[i][i] = INFINITY
+ S[i][j] = w(i,j) if edge exists, else -INFINITY (no path);  S[i][i] = INFINITY
  for k = 1 to n
    for i = 1 to n
      for j = 1 to n
@@ -243,7 +243,7 @@
 <li>Given a graph \(G\) with \(n\) vertices, build a complete graph: weight 1 on edges of \(G\) and weight \(\rho n+1\) on non-edges.</li>
 <li>If \(G\) has a Hamiltonian cycle, the optimum tour costs \(n\), and the algorithm returns a tour of cost \(\le\rho n\).</li>
 <li>If \(G\) has none, every tour uses a non-edge, costing at least \((\rho n+1)+(n-1)>\rho n\).</li>
-<li>So the algorithm would decide Hamiltonian cycle in polynomial time, so P = NP. Hence no \(\rho\)-approximation (unless P = NP).</li>
+<li>So "answer yes iff the returned tour costs \(\le\rho n\)" decides Hamiltonian cycle; the construction is \(O(n^2)\), so this is polynomial. Hamiltonian cycle is NP-complete, so P = NP. Hence no \(\rho\)-approximation (unless P = NP).</li>
 </ol>
 <p><b>Euclidean TSP algorithm (3 marks): MST preorder (the distances satisfy the triangle inequality).</b></p>
 <div class="method"><h4>Algorithm</h4><ol>
@@ -253,7 +253,7 @@
 </ol></div>
 <p><b>Ratio 2 (5 marks).</b></p>
 <ol>
-<li>Let \(OPT\) be the optimal tour. Removing one edge from \(OPT\) leaves a spanning tree, so \(w(T)\le OPT\).</li>
+<li>Let \(OPT\) be the optimal tour. Removing one edge from \(OPT\) leaves a Hamiltonian path, which is a spanning tree. Weights are non-negative and \(T\) is minimum, so \(w(T)\le OPT\).</li>
 <li>The full DFS walk of \(T\) traverses every tree edge twice: cost \(2w(T)\).</li>
 <li>The preorder tour is the full walk with repeated vertices skipped. By the triangle inequality, a shortcut never costs more than the path it replaces. So the tour costs \(\le2w(T)\).</li>
 <li>Cost \(\le2w(T)\le2\cdot OPT\). The ratio is 2. \(\blacksquare\)</li>
@@ -340,8 +340,9 @@
 <p>Convention: height of a leaf = 0. Let \(N(h)\) be the minimum number of nodes in such a tree of height \(h\).</p>
 <ol>
 <li>\(N(0)=1\), \(N(1)=2\).</li>
-<li>A tree of height \(h\ge2\) with fewest nodes has a root, a subtree of height \(h-1\), and (since heights differ by at most 1, and to minimise) a subtree of height \(h-2\). Both subtrees have the same property and must be minimal. So \(N(h)=1+N(h-1)+N(h-2)\).</li>
-<li>\(N(h)>N(h-1)\), so \(N(h-1)>N(h-2)\), giving \(N(h)>2N(h-2)\).</li>
+<li>\(N\) is increasing: a tree of height \(h\) contains, as a proper subtree, a tree of height \(h-1\) with the same property, so \(N(h)>N(h-1)\).</li>
+<li>A tree of height \(h\ge2\) has a root and one child subtree of height exactly \(h-1\); the other has height \(h-1\) or \(h-2\) (they differ by at most 1). Every subtree has the same property. To minimise, take the other subtree of height \(h-2\) (\(N\) is increasing) and make both subtrees minimal. So \(N(h)=1+N(h-1)+N(h-2)\).</li>
+<li>Since \(N(h-1)>N(h-2)\), \(N(h)>2N(h-2)\).</li>
 <li>Unrolling: \(N(h)>2N(h-2)>4N(h-4)>\dots>2^{\lfloor h/2\rfloor}N(h-2\lfloor h/2\rfloor)\ge2^{\lfloor h/2\rfloor}\).</li>
 <li>So \(n\ge N(h)>2^{h/2-1}\), hence \(h<2\log_2n+2\), i.e. \(h=O(\log n)\). \(\blacksquare\)</li>
 </ol>
@@ -415,7 +416,7 @@
 <p><b>The claim: do not believe it.</b></p>
 <ol>
 <li>Suppose every operation were \(O(1)\), including EXTRACT-MIN.</li>
-<li>Then we could sort \(n\) numbers: INSERT all \(n\) (\(n\cdot O(1)\)), then EXTRACT-MIN \(n\) times (\(n\cdot O(1)\)) and read them out in order. Total \(O(n)\).</li>
+<li>Then we could sort \(n\) numbers: INSERT all \(n\) (\(n\cdot O(1)\)), then EXTRACT-MIN \(n\) times (\(n\cdot O(1)\)) and read them out in order. Total \(O(n)\) (worst-case or amortized bounds both give \(O(n)\) for the whole sequence of \(2n\) operations).</li>
 <li>But any comparison-based sort needs \(\Omega(n\log n)\) comparisons in the worst case (decision tree with \(n!\) leaves has height \(\ge\log_2n!=\Theta(n\log n)\)).</li>
 <li>Contradiction, so a comparison-based heap cannot have \(O(1)\) insert and \(O(1)\) extract-min. At least one of them is \(\Omega(\log n)\). Fibonacci heaps get \(O(1)\) amortized for everything <i>except</i> extract-min (and delete) for exactly this reason.</li>
 </ol>
@@ -493,8 +494,9 @@ CONSOLIDATE(H)
 <p>Let \(D(k,i)\) be the number of nodes at depth \(i\) in \(B_k\). Claim \(D(k,i)=\binom ki\).</p>
 <ol>
 <li><b>Base:</b> \(B_0\) is one node: \(D(0,0)=1\), \(D(0,i)=0\) for \(i>0\), matching \(\binom0i\).</li>
-<li><b>Step:</b> \(B_k\) is two \(B_{k-1}\)'s with one root made a child of the other. A node at depth \(i\) is a depth-\(i\) node of the first \(B_{k-1}\) or a depth-\((i-1)\) node of the attached one.</li>
-<li>\(D(k,i)=\binom{k-1}i+\binom{k-1}{i-1}=\binom ki\) by Pascal's rule. \(\blacksquare\)</li>
+<li><b>Hypothesis:</b> \(D(k-1,j)=\binom{k-1}j\) for all \(j\).</li>
+<li><b>Step:</b> \(B_k\) is two \(B_{k-1}\)'s with one root made a child of the other. Depths in the top copy are unchanged; every node of the attached copy goes one level deeper (its root is now at depth 1). So a node at depth \(i\) is a depth-\(i\) node of the top copy or a depth-\((i-1)\) node of the attached one.</li>
+<li>\(D(k,i)=\binom{k-1}i+\binom{k-1}{i-1}=\binom ki\) by Pascal's rule, with \(\binom{k-1}{-1}=\binom{k-1}{k}=0\) covering \(i=0\) and \(i=k\). \(\blacksquare\)</li>
 </ol>
 <p>Chapter: <a href="../heap/02-binomial-trees.html">Binomial trees and their proofs</a>.</p>
 </div></details></div>
@@ -517,7 +519,7 @@ CONSOLIDATE(H)
 <ol>
 <li>Probe sequence \(h(k,i)=(h(k)+i^2)\bmod m\) visits slots \(h(k)+(i^2\bmod m)\).</li>
 <li>Example: \(m=11\), \(h(k)=0\): squares of \(0..10\) mod 11 are \(0,1,4,9,5,3,3,5,9,4,1\). Only 6 distinct slots \(\{0,1,3,4,5,9\}\) are probed; slots 2, 6, 7, 8, 10 are never reached.</li>
-<li>In general, \(i\) and \(m-i\) give the same square, so at most \(\lceil m/2\rceil\) slots are reachable (for prime \(m\), exactly \((m+1)/2\)). So an insertion can fail with the table less than full. (It always succeeds if \(m\) is prime and \(\alpha<1/2\).) \(\blacksquare\)</li>
+<li>In general, \((i+m)^2\equiv i^2\) and \((m-i)^2\equiv i^2 \pmod m\), so only \(i=0,\dots,\lfloor m/2\rfloor\) give new slots: at most \(\lfloor m/2\rfloor+1<m\) slots are reachable for \(m\ge3\) (for an odd prime \(m\), exactly \((m+1)/2\)). So an insertion can fail with the table less than full. (It always succeeds if \(m\) is prime and \(\alpha<1/2\).) \(\blacksquare\)</li>
 </ol>
 <p><b>(ii) Perfect hashing (FKS).</b> A scheme for a <b>static</b> set of \(n\) keys that gives \(O(1)\) <b>worst-case</b> lookup with \(O(n)\) space.</p>
 <ol>
@@ -559,7 +561,7 @@ CONSOLIDATE(H)
  for each edge (u,v) in E            // extra pass
     if d[u] + w(u,v) &lt; d[v] return "negative cycle reachable"
  return d</pre>
-<p><b>Negative cycle detection (2).</b> Run one more pass (the \(V\)-th). If any edge can still be relaxed, a negative-weight cycle is reachable from \(s\): without a negative cycle, all \(d\) values are already final after \(V-1\) passes, so no relaxation could succeed.</p>
+<p><b>Negative cycle detection (2).</b> Run one more pass (the \(V\)-th). If any edge can still be relaxed, a negative-weight cycle is reachable from \(s\): without a negative cycle, all \(d\) values are already final after \(V-1\) passes, so no relaxation could succeed. Conversely, let \(C=v_0,v_1,\dots,v_k=v_0\) be a reachable cycle with \(w(C)<0\) (all \(d[v_i]\) finite). If no edge could be relaxed, \(d[v_i]\le d[v_{i-1}]+w(v_{i-1},v_i)\) for every \(i\); summing round the cycle, the \(d\) terms cancel and \(0\le w(C)\), a contradiction. So the extra pass reports exactly when a negative cycle is reachable.</p>
 <p>Chapter: <a href="../graph/02-bellman-dag.html">Relaxation, Bellman-Ford, DAG</a>.</p>
 </div></details></div>
 
@@ -576,8 +578,8 @@ CONSOLIDATE(H)
           d[v] = d[u] + w(u,v);  pi[v] = u     // DECREASE-KEY in Q</pre>
 <p><b>Correctness (5).</b> Claim: when \(u\) is added to \(S\), \(d[u]=\delta(s,u)\).</p>
 <ol>
-<li>Suppose \(u\) is the first vertex added with \(d[u]\ne\delta(s,u)\). \(u\ne s\) and \(d[u]>\delta(s,u)\) (\(d\) never goes below the true distance). A path from \(s\) to \(u\) exists.</li>
-<li>Take a shortest path \(P\) from \(s\) to \(u\). Let \(y\) be the first vertex of \(P\) not in \(S\), and \(x\) its predecessor, \(x\in S\).</li>
+<li>Suppose \(u\) is the first vertex added with \(d[u]\ne\delta(s,u)\). \(u\ne s\) and \(d[u]>\delta(s,u)\) (\(d\) never goes below the true distance). A path from \(s\) to \(u\) exists (else \(d[u]=\infty=\delta(s,u)\)). \(s\) is extracted first with \(d[s]=0\), so \(s\in S\) and \(u\ne s\).</li>
+<li>Take a shortest path \(P\) from \(s\) to \(u\). It starts in \(S\) and ends outside \(S\), so let \(y\) be the first vertex of \(P\) not in \(S\), and \(x\) its predecessor, \(x\in S\).</li>
 <li>\(x\) is correct (\(u\) is the first wrong one), and \((x,y)\) was relaxed when \(x\) was added, so \(d[y]=\delta(s,y)\) (a prefix of a shortest path is shortest).</li>
 <li>Weights are non-negative, so \(\delta(s,y)\le\delta(s,u)\le d[u]\).</li>
 <li>But \(u\) was extracted before \(y\), so \(d[u]\le d[y]=\delta(s,y)\). Hence \(d[u]=\delta(s,u)\): contradiction. \(\blacksquare\)</li>

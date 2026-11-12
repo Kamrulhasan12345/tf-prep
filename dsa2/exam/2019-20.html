@@ -79,7 +79,7 @@
 <li><b>Structure.</b> \(B_k\) is two copies of \(B_{k-1}\): the root of one becomes the (leftmost) child of the root of the other.</li>
 <li><b>Count.</b> A node at depth \(i\) of \(B_k\) is either (a) a node at depth \(i\) of the first \(B_{k-1}\) (the copy that kept the root), or (b) a node at depth \(i-1\) of the copy that was attached (it sits one level lower now).</li>
 <li>So \(D(k,i)=D(k-1,i)+D(k-1,i-1)\).</li>
-<li>By the hypothesis this is \(\binom{k-1}{i}+\binom{k-1}{i-1}=\binom ki\) (Pascal's rule). \(\blacksquare\)</li>
+<li>By the hypothesis \(D(k-1,j)=\binom{k-1}j\) for all \(j\), this is \(\binom{k-1}{i}+\binom{k-1}{i-1}=\binom ki\) (Pascal's rule; \(\binom{k-1}{-1}=\binom{k-1}{k}=0\) covers \(i=0\) and \(i=k\)). \(\blacksquare\)</li>
 </ol>
 <p>Chapter: <a href="../heap/02-binomial-trees.html">Binomial trees and their proofs</a>.</p>
 </div></details></div>
@@ -308,8 +308,8 @@
         b[v] = min(b[u], w(u,v)); pi[v] = u</pre>
 <p><b>Justification (same proof as Dijkstra).</b></p>
 <ol>
-<li>Claim: when \(u\) is extracted, \(b[u]\) is the true best bottleneck \(\beta(s,u)\).</li>
-<li>Suppose some \(u\) is the first extracted with \(b[u]<\beta(s,u)\). Take an optimal path \(P\) to \(u\); let \((x,y)\) be the first edge on \(P\) leaving the set \(S\) of extracted vertices. \(x\) is correct, so after relaxing, \(b[y]\ge\min(\beta(s,x),w(x,y))\ge\beta(s,u)\), because the bottleneck of the prefix of \(P\) is at least that of the whole path.</li>
+<li>Claim: when \(u\) is extracted, \(b[u]\) is the true best bottleneck \(\beta(s,u)\). Always \(b[v]\le\beta(s,v)\), because every value written into \(b[v]\) is the bottleneck of an actual \(s\)-\(v\) path (or 0).</li>
+<li>Suppose some \(u\) is the first extracted with \(b[u]<\beta(s,u)\). Then \(\beta(s,u)>0\), so a path exists, and \(u\ne s\) (\(s\) is extracted first with \(b[s]=\infty\)). Take an optimal path \(P\) to \(u\). It starts at \(s\in S\) and ends at \(u\notin S\), so let \((x,y)\) be the first edge on \(P\) leaving the set \(S\) of extracted vertices. \(x\) is correct, so after relaxing, \(b[y]\ge\min(\beta(s,x),w(x,y))\ge\beta(s,u)\), because the bottleneck of the prefix of \(P\) is at least that of the whole path.</li>
 <li>Since \(u\) was picked before \(y\), \(b[u]\ge b[y]\ge\beta(s,u)\), contradicting \(b[u]<\beta(s,u)\).</li>
 <li>The key property that makes this work: extending a path can only <b>lower</b> (never raise) its bottleneck, mirroring "extending a path never lowers its length" for non-negative weights.</li>
 </ol>
@@ -323,7 +323,7 @@
 <ol>
 <li>Suppose \(K\neq T\). Both have \(|V|-1\) edges, so they differ. Let \(e\) be the first edge in the sorted order that is in exactly one of \(K\), \(T\). All earlier edges are in both or in neither.</li>
 <li><b>Case \(e\in T\setminus K\).</b> Kruskal rejected \(e\), so \(e\)'s endpoints were already connected by edges of \(K\) that come earlier than \(e\). Those edges are in \(K\), and since they are before \(e\) they are also in \(T\) (no difference before \(e\)). So \(T\) contains a path between the endpoints of \(e\) plus \(e\) itself: a cycle in \(T\). Contradiction.</li>
-<li><b>Case \(e\in K\setminus T\).</b> \(T+e\) contains a cycle \(C\). Not every edge of \(C-e\) is in \(K\) (else \(K\) has a cycle), so some \(f\in C\), \(f\in T\setminus K\) exists. Since \(T\) is an MST and \(e\notin T\), \(w(f)\le w(e)\) (cycle property). Also \(f\) differs between the trees and \(f\neq e\), so \(f\) comes <b>after</b> \(e\) in the order, hence \(w(f)\ge w(e)\). So \(w(f)=w(e)\). But among equal weights T-edges come first, and \(f\in T\), \(e\notin T\), so \(f\) is before \(e\). Contradiction.</li>
+<li><b>Case \(e\in K\setminus T\).</b> \(T+e\) contains a cycle \(C\). Not every edge of \(C-e\) is in \(K\) (else \(K\) has a cycle), so some \(f\in C\), \(f\in T\setminus K\) exists. \(w(f)\le w(e)\): otherwise \(T-f+e\) (a spanning tree, since \(f\) lies on the cycle that \(e\) closes) would be lighter than the MST \(T\). Also \(f\) differs between the trees and \(f\neq e\), so \(f\) comes <b>after</b> \(e\) in the order, hence \(w(f)\ge w(e)\). So \(w(f)=w(e)\). But among equal weights T-edges come first, and \(f\in T\), \(e\notin T\), so \(f\) is before \(e\). Contradiction.</li>
 <li>Both cases are impossible, so \(K=T\). \(\blacksquare\)</li>
 </ol>
 <p>Chapter: <a href="../graph/01-mst.html">Cut property, Kruskal, Prim, uniqueness</a>.</p>
@@ -362,7 +362,8 @@
 <p><b>Correctness (exchange argument).</b></p>
 <ol>
 <li>Take a leaf \(v\) with parent \(p\). Any cover contains \(v\) or \(p\). If it contains \(v\) and not \(p\), swap \(v\) for \(p\): all edges of \(v\) (just \((v,p)\)) are still covered, and the cover is no larger. So some minimum cover contains \(p\).</li>
-<li>Choose \(p\), delete \(p\) and all its edges. The remaining forest is smaller, and a minimum cover of it plus \(p\) is a minimum cover of the tree. Repeat. The post-order processing does exactly this.</li>
+<li>Choose \(p\), delete \(p\) and all its edges, leaving a forest \(F'\). Then \(OPT(T)=OPT(F')+1\): a minimum cover \(C\ni p\) of \(T\) (step 1) gives the cover \(C-\{p\}\) of \(F'\), so \(OPT(F')\le OPT(T)-1\); and any cover of \(F'\) plus \(p\) covers \(T\), so \(OPT(T)\le OPT(F')+1\). The same lemma applies to every tree of a forest, so repeat.</li>
+<li>The post-order loop does exactly this. When \(v\) is processed and \((v,p)\) is uncovered, every child \(c\) of \(v\) is already in the cover (if \((c,v)\) had been uncovered at \(c\), \(v\) would have been chosen then). So after deleting the chosen vertices and their edges, \(v\) is a leaf of the remaining forest whose only edge is \((v,p)\), and choosing \(p\) is the step-1 choice. If \((v,p)\) is already covered, \(v\) is a leaf with no edge left and nothing is needed.</li>
 </ol>
 <p><b>Time.</b> DFS \(O(V+E)\) and one pass, so \(O(V)\) since \(E=V-1\). Equivalent known fact: for a tree, min vertex cover = max matching (König), and the greedy above also builds a maximal matching. (Alternative: DP with states "v in cover / v not in cover", also \(O(V)\).)</p>
 <p>Chapter: <a href="../np/06-approximation.html">Approximation algorithms</a>.</p>

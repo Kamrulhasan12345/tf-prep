@@ -98,23 +98,31 @@
 <li>So one reversal removes at most 2 breakpoints.</li>
 <li>Therefore at least \(\lceil b/2\rceil\) reversals are needed. Example \([4\,1\,2\,3]\): \(b=3\), bound \(\lceil 3/2\rceil=2\). The question's own two reversals are optimal.</li>
 </ol>
-<p><b>(ii) 4-approximation.</b> A <em>strip</em> is a maximal run between breakpoints. It is increasing or decreasing (a single element counts as increasing, except that 0 and \(n+1\) stay put).</p>
+<p><b>(ii) 4-approximation.</b> A <em>strip</em> is a maximal run between breakpoints. It is increasing or decreasing. Convention (Kececioglu-Sankoff): a single element counts as <b>decreasing</b>, except that the strips holding 0 and \(n+1\) count as increasing. So every increasing strip other than those two has length \(\ge 2\).</p>
 <pre class="code">APPROX-REVERSALS(pi)
   while pi has a breakpoint
-     if pi has a decreasing strip of length &gt;= 2
-         reverse a decreasing strip chosen so that some breakpoint is removed
-         (Kececioglu-Sankoff: take the decreasing strip containing the
-          smallest element k, and reverse the block that puts k-1 next to k)
+     if pi has a decreasing strip
+         k = smallest element lying in a decreasing strip
+         reverse the block that puts k-1 next to k (see the lemma)
      else
-         reverse any increasing strip with a breakpoint on both sides
-         (this makes a decreasing strip, and does not add breakpoints)</pre>
+         reverse an increasing strip that is neither the first nor the last
+         (it has length &gt;= 2 and a breakpoint on both sides, so it becomes
+          a decreasing strip and no breakpoint is added)</pre>
+<p><b>Lemma.</b> If \(\pi\) has a decreasing strip, one reversal removes at least one breakpoint.</p>
 <ol>
-<li>When a decreasing strip of length \(\ge 2\) exists, one reversal removes at least one breakpoint (Kececioglu and Sankoff's lemma).</li>
+<li>Let \(k\) be the smallest element in any decreasing strip. \(k\) is the last element of its strip, and its right neighbour \(r\) is not \(k-1\) (then \(k-1\) would be in the same decreasing strip, contradicting minimality) and not \(k+1\) (then the strip would be increasing). So \((k,r)\) is a breakpoint.</li>
+<li>\(k-1\ge 0\) is in an increasing strip (in a decreasing strip it would contradict minimality; 0 counts as increasing). It is the last element of that strip, since the next element of an increasing strip would be \(k\). So \(k-1\) is also followed by a breakpoint.</li>
+<li>If \(k-1\) is left of \(k\): reverse from just after \(k-1\) through \(k\). If \(k-1\) is right of \(k\): reverse from just after \(k\) through \(k-1\). Either way \(k-1\) and \(k\) become adjacent.</li>
+<li>A reversal changes only its two end adjacencies, and both were breakpoints. One of them is now \((k-1,k)\), not a breakpoint, so \(b\) drops by at least 1. \(\blacksquare\)</li>
+</ol>
+<p><b>No decreasing strip but \(b&gt;0\):</b> there are at least three strips (with only two, \(0..a\) and \(a+1..n+1\), there would be no breakpoint), so a middle increasing strip exists.</p>
+<ol>
+<li>When a decreasing strip exists, one reversal removes at least one breakpoint (the lemma).</li>
 <li>If there is none, one reversal of an increasing strip creates a decreasing strip of length \(\ge 2\) without adding breakpoints, then the next reversal removes one. So at worst 2 reversals per breakpoint removed.</li>
 <li>Cost of the algorithm \(\le 2b\). Optimum \(\ge b/2\) by part (i).</li>
 <li>Ratio \(\le 2b / (b/2) = 4\). ∎</li>
 </ol>
-<p>Run on \([4\,1\,2\,3]\): no decreasing strip of length 2 (4 is single, 1 2 3 increasing), so reverse \([1\,2\,3]\) to get \([4\,3\,2\,1]\), now a decreasing strip: reverse the whole block to get \([1\,2\,3\,4]\). Two reversals.</p>
+<p>Run on \([0\,4\,1\,2\,3\,5]\), \(b=3\): the single 4 is a decreasing strip, so \(k=4\); \(k-1=3\) is to its right, so reverse \(1\,2\,3\) to get \([0\,4\,3\,2\,1\,5]\), \(b=2\). Now \(4\,3\,2\,1\) is decreasing, \(k=1\), \(k-1=0\) is to its left: reverse \(4\,3\,2\,1\) to get the identity, \(b=0\). Two reversals, meeting the bound of part (i).</p>
 <div class="trap"><h4>Where marks go</h4><ul><li>The circulating solution's example \([5\ 1\ 2\ 3\ 4\ 8\ 6\ 7]\) is labelled \(b=3\). With 0 and 9 added it is \(0\,|\,5\,|\,1\,2\,3\,4\,|\,8\,|\,6\,7\,|\,9\): the pairs (0,5), (5,1), (4,8), (8,6), (7,9) are breakpoints, so \(b=5\), not 3.</li><li>That solution asserts, but does not prove, that two reversals always remove a breakpoint. Write the strip argument (steps 1 and 2).</li></ul></div>
 <p class="tracer-hint">Doubt: the exact choice of block in the decreasing-strip step is from the literature and is not in the lecture notes. If short of time, give part (i) fully and steps 2 to 4 of part (ii).</p>
 <div class="drawit"><b>Seniors' solutions:</b> <b>Senior A</b>: (i) shows two small cases, one reversal removes 1 or 2 breakpoints, so at most 2 per reversal and at least \(b/2\) reversals. (ii) the loop "reverse a decreasing strip that removes a breakpoint; when none exists, use two reversals", cost \(\le 2b\), optimum \(\ge b/2\), ratio 4. Same bound and ratio as the book. Two faults, found by counting breakpoints with a three-line script (the engine has no reversal code): the start \([5\,1\,2\,3\,4\,8\,6\,7]\) is labelled \(b=3\) but has \(b=5\); its four reversals really run \(b=5,5,3,2,0\), so A's labels 3, 2, 0 do not match. And "a decreasing strip always removes a breakpoint" is only asserted, and is true only for the right strip (the one with the smallest element). <b>Senior B</b>: Q5 is left blank. <b>Adopt</b> A's worked example (five numbers, four reversals, \(b\) written under each line) but with the right counts. Keep the book's strip argument for the 2 per breakpoint step.</div>
@@ -226,8 +234,8 @@
 <li><b>Upper-bound property.</b> Always \(d[v]\ge\delta(s,v)\): initially true (\(\infty\) and \(d[s]=0\)), and a relaxation sets \(d[v]=d[x]+w(x,v)\ge\delta(s,x)+w(x,v)\ge\delta(s,v)\) by the triangle inequality.</li>
 <li><b>Induction on the order in which vertices join \(S\).</b> Base: \(s\) joins with \(d[s]=0=\delta(s,s)\).</li>
 <li><b>Step, by contradiction.</b> Let \(u\) be the first vertex that joins \(S\) with \(d[u]\ne\delta(s,u)\). By step 1, \(d[u]>\delta(s,u)\). \(u\ne s\), and a path from \(s\) to \(u\) exists (otherwise \(\delta=\infty=d[u]\)).</li>
-<li>Take a shortest path \(p\) from \(s\) to \(u\). Let \(y\) be the first vertex on \(p\) not in \(S\), and \(x\) its predecessor, \(x\in S\).</li>
-<li>\(x\) joined \(S\) correctly: \(d[x]=\delta(s,x)\). When \(x\) joined, edge \((x,y)\) was relaxed, so \(d[y]\le d[x]+w(x,y)=\delta(s,y)\) (prefix of a shortest path is shortest). With step 1, \(d[y]=\delta(s,y)\).</li>
+<li>Take a shortest path \(p\) from \(s\) to \(u\). \(p\) starts at \(s\in S\) and ends at \(u\notin S\), so it has a first vertex \(y\) not in \(S\) (possibly \(y=u\)). Let \(x\) be its predecessor on \(p\), \(x\in S\).</li>
+<li>\(x\) joined \(S\) correctly: \(d[x]=\delta(s,x)\). When \(x\) joined, edge \((x,y)\) was relaxed, so \(d[y]\le d[x]+w(x,y)=\delta(s,y)\) (prefix of a shortest path is shortest). \(d\) values only decrease, so this still holds when \(u\) is picked. With step 1, \(d[y]=\delta(s,y)\).</li>
 <li><b>Uses non-negative weights:</b> \(y\) comes before or equal to \(u\) on \(p\), so \(\delta(s,y)\le\delta(s,u)\).</li>
 <li><b>Uses the min-choice:</b> \(u\) was chosen with the smallest \(d\) among vertices outside \(S\), and \(y\notin S\), so \(d[u]\le d[y]\).</li>
 <li>Chain: \(d[u]\le d[y]=\delta(s,y)\le\delta(s,u)\le d[u]\). So all are equal and \(d[u]=\delta(s,u)\), contradicting step 3.</li>
@@ -291,7 +299,7 @@
 <ol>
 <li>Let \(N(h)\) be the fewest nodes in an AVL tree of height \(h\).</li>
 <li>The root has subtrees of heights \(h-1\) and, at the fewest, \(h-2\) (balance factor ±1). So \(N(h)=N(h-1)+N(h-2)+1\), \(N(0)=1\), \(N(1)=2\). Values 1, 2, 4, 7, 12, 20.</li>
-<li>Since \(N(h-1)\ge N(h-2)\): \(N(h) > 2N(h-2)\). Unrolling, \(N(h) \ge 2^{\lfloor h/2\rfloor}\) (bases \(N(0)=1,N(1)=2\)).</li>
+<li>The recurrence gives \(N(h)>N(h-1)\), so \(N\) is increasing and \(N(h-1)\ge N(h-2)\). Hence \(N(h) > 2N(h-2)\). Unrolling, \(N(h) \ge 2^{\lfloor h/2\rfloor}\) (bases \(N(0)=1,N(1)=2\)).</li>
 <li>A tree of height \(h\) has \(n\ge N(h)\ge 2^{(h-1)/2}\) nodes. Taking logs, \(h \le 2\log_2 n + 1 = O(\log n)\).</li>
 <li>Sharper: \(N(h)=F_{h+3}-1\ge\varphi^{h+3}/\sqrt5-2\), so \(h\le 1.44\log_2 n\). ∎</li>
 </ol>
@@ -340,7 +348,7 @@
 <p>Chapter: <a href="../heap/02-binomial-trees.html">Binomial trees and their proofs</a>. Definition: \(B_0\) is a single node. \(B_k\) is two copies of \(B_{k-1}\) with the root of one made the leftmost child of the root of the other. Induction on \(k\).</p>
 <ol>
 <li><b>Nodes.</b> \(k=0\): \(2^0=1\). Step: \(B_k\) has two copies of \(B_{k-1}\): \(2\cdot2^{k-1}=2^k\). ∎</li>
-<li><b>Height.</b> \(k=0\): one node, height 0. Step: the height of \(B_k\) is 1 (the new edge) plus the height of the child tree \(B_{k-1}\), \(=1+(k-1)=k\) (the other copy, containing the root, is no taller than the root plus the child tree). ∎</li>
+<li><b>Height.</b> \(k=0\): one node, height 0. Step: the height of \(B_k\) is 1 (the new edge) plus the height of the child tree \(B_{k-1}\), \(=1+(k-1)=k\). The copy containing the root has height \(k-1\), so the height is \(\max(k-1,\ 1+(k-1))=k\). ∎</li>
 <li><b>Root degree.</b> \(k=0\): degree 0. Step: the root of \(B_k\) is the root of one copy of \(B_{k-1}\) (degree \(k-1\)) with one more child, so \(k-1+1=k\). ∎</li>
 </ol>
 <div class="drawit"><b>Seniors' solutions:</b> <b>Both seniors</b> use induction with two copies of \(B_{k-1}\) joined, the same as the book. A also draws the tree for each part (two triangles, root of one under the root of the other). Agrees. <b>Adopt A's pictures</b>: a drawing of the two \(B_{k-1}\) triangles earns the step quickly.</div>

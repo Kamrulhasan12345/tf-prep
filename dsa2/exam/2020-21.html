@@ -35,7 +35,7 @@
         len[v] = len[u] + w(u,v)
  return max over v of len[v]</pre>
 <ol>
-<li>Correctness by induction on the order: when <code>u</code> is reached, all its in-neighbours came earlier, so <code>len[u]</code> is final.</li>
+<li><b>Correctness</b> (induction on topological position). Claim: when <code>u</code> is processed, <code>len[u]</code> = weight of the longest path ending at <code>u</code>. A longest path ending at <code>u</code> is either <code>u</code> alone (0) or a longest path ending at some in-neighbour <code>x</code> plus edge \((x,u)\). Every in-neighbour \(x\) precedes \(u\) in topological order, so by induction <code>len[x]</code> was final when \(x\) was processed, and it then relaxed \((x,u)\). So <code>len[u]</code> \(=\max(0,\max_x(\texttt{len}[x]+w(x,u)))\), the true value. The answer is the maximum over all end vertices.</li>
 <li>Time: DFS \(\Theta(V+E)\), the loop \(\Theta(V+E)\). Total \(\Theta(V+E)\).</li>
 <li>Equivalent trick: negate every weight and run DAG shortest paths. This is legal because a dag has no cycles, so no negative cycle can appear.</li>
 </ol>
@@ -62,14 +62,14 @@
 
 <div class="exam"><div class="exam-src">Q1(c) · 15 marks</div><div class="exam-q"><p>Let T be a minimum spanning tree of graph G obtained by Prim's algorithm. Let G<sub>new</sub> be a graph obtained by adding to G a new vertex and some edges, with weights, connecting the new vertex to some vertices in G. Can you construct a minimum spanning tree of G<sub>new</sub> by adding one of the new edges to T? If your answer is yes, explain how; if your answer is no, explain why not.</p></div>
 <details><summary>Show answer</summary><div class="exam-a">
-<p><b>Answer: not in general.</b> It works only when the new vertex gets exactly one new edge. With two or more new edges the MST may need several of them and drop an old tree edge.</p>
+<p><b>Answer: not in general.</b> It is guaranteed only when the new vertex gets exactly one new edge (that edge must be in every spanning tree). With two or more new edges the MST may need several of them and drop an old tree edge.</p>
 <p><b>Counterexample.</b> G is the path a–b (5), b–c (5), so T = G. New vertex v with edges v–a (1) and v–c (1). Best "T plus one new edge" is T + v–a, weight 11. But the real MST of G<sub>new</sub> is {v–a, v–c, a–b}, weight 7. It uses two new edges and drops b–c.</p>
 <p><b>What is true: the new MST uses only edges of T and the new edges.</b></p>
 <ol>
-<li>Take any edge \(e\in E(G)\setminus T\). T is an MST of G, so \(e\) is a heaviest edge on the cycle formed by \(T+e\). (If a lighter edge were on that cycle, swapping would give a lighter spanning tree.)</li>
+<li>Take any edge \(e\in E(G)\setminus T\). T is an MST of G, so \(e\) is a heaviest edge on the cycle formed by \(T+e\). (If some tree edge \(f\) on that cycle had \(w(f)&gt;w(e)\), then \(T-f+e\) would be a lighter spanning tree of G.)</li>
 <li>That cycle still exists in G<sub>new</sub>, and \(e\) is still a heaviest edge on it.</li>
 <li>By the cycle property, a heaviest edge of a cycle can be removed without losing an MST. So \(e\) can be discarded.</li>
-<li>Hence an MST of G<sub>new</sub> lies inside \(T\cup F\), where F is the set of new edges.</li>
+<li>Discard the non-tree edges one at a time. Each one's cycle uses only edges of \(T\), which are never discarded, so the cycle property still applies at every step. Hence an MST of G<sub>new</sub> lies inside \(T\cup F\), where F is the set of new edges.</li>
 </ol>
 <p><b>Algorithm.</b> Run Kruskal (or Prim) on the graph \((V\cup\{v\},\ T\cup F)\). It has \(|V|-1+|F|\) edges, so it takes \(O((|V|+|F|)\log |V|)\) instead of re-solving G<sub>new</sub> from scratch.</p>
 <div id="t2"></div>
@@ -121,7 +121,7 @@
 <ol>
 <li>Look at the first moment some person \(p\) knows all \(n\) rumors. Nobody knew all rumors before this.</li>
 <li>Rumors of all \(n\) people had to flow into \(p\), so the messages sent up to that moment connect all \(n\) people. A connected graph on \(n\) vertices needs at least \(n-1\) edges. So at least \(n-1\) messages were sent.</li>
-<li>At that moment only \(p\) knows everything. (The sender of the last message cannot know all, or it would have known all earlier.) The other \(n-1\) people each need at least one more message.</li>
+<li>At that moment only \(p\) knows everything: nobody knew all before, and the message just sent changed only the receiver \(p\). So each of the other \(n-1\) people must still <i>receive</i> at least one later message, and these are \(n-1\) distinct messages (one receiver each).</li>
 <li>Total \(\ge (n-1)+(n-1)=2n-2\). The hub algorithm meets it, so it is optimal.</li>
 </ol>
 <p><b>Check small cases.</b> n = 2: A→B, B→A, 2 messages. n = 3: B→A, C→A, A→B, A→C is 4 messages, and 3 is impossible.</p>
@@ -144,7 +144,9 @@
  return NONE                                    // no single edge helps</pre>
 <ol>
 <li>Such an edge is saturated: if it had residual capacity, \(v\) would be in \(A\), and then \(s\to u\to v\to t\) would be an augmenting path, contradiction.</li>
-<li>Raise its capacity by 1: the residual edge \(u\to v\) appears and \(s\leadsto u\to v\leadsto t\) is an augmenting path, so max flow grows by at least 1. If the edge is not of this kind, some min cut avoids it, and the max flow cannot grow.</li>
+<li>Raise its capacity by 1: the residual edge \(u\to v\) appears and \(s\leadsto u\to v\leadsto t\) is an augmenting path, so max flow grows by at least 1. It grows by at most 1, since every cut gains at most 1. So every such edge gives the same, largest possible gain.</li>
+<li>If the edge is not of this kind, some min cut does not count it. If \(u\notin A\): \((A,V-A)\) is a min cut (the standard cut from max-flow min-cut) and \((u,v)\) does not go from \(A\) to \(V-A\). If \(v\notin B\): \((V-B,B)\) is also a min cut (no residual edge enters \(B\), so every edge into \(B\) is saturated and every edge out of \(B\) is empty), and \((u,v)\) does not enter \(B\). Raising \(c(u,v)\) leaves that cut's capacity unchanged, so max flow cannot grow.</li>
+<li>If the raise may be unlimited, gains can differ: for each candidate edge set its capacity to \(\infty\), recompute max flow and keep the best. Time \(O(E\cdot\text{maxflow})\).</li>
 <li>Time: one max-flow computation + two BFS, \(O(\text{maxflow} + V + E)\). With Edmonds-Karp, \(O(VE^2)\).</li>
 </ol>
 <p>Chapter: <a href="../graph/07-mincut-ek.html">Max-flow min-cut, Edmonds-Karp</a>.</p>
@@ -262,7 +264,7 @@ JACK-STRAWS(S[1..n])
 <p><b>Claim 1: \(b_T\le b^*\)</b> where \(b^*\) is the optimal bottleneck value.</p>
 <ol>
 <li>An optimal tour minus one edge is a spanning tree whose heaviest edge is \(\le b^*\).</li>
-<li>An MST minimises the heaviest edge among all spanning trees. So \(b_T\le b^*\).</li>
+<li>An MST minimises the heaviest edge among all spanning trees: if a spanning tree \(T'\) had every edge lighter than \(b_T\), delete the edge \(b_T\) from \(T\); \(T'\) has an edge crossing the resulting cut, lighter than \(b_T\), and swapping it in gives a lighter spanning tree than \(T\), contradiction. So \(b_T\le b^*\).</li>
 </ol>
 <p><b>Claim 2: if \(u,v\) are at tree distance \(\le 3\), then \(w(u,v)\le 3b_T\).</b> The tree path has at most 3 edges, each \(\le b_T\), and the triangle inequality gives \(w(u,v)\le\) path weight \(\le 3b_T\).</p>
 <p>So every edge of \(H\) weighs at most \(3b_T\le 3b^*\): a 3-approximation.</p>
@@ -304,7 +306,7 @@ JACK-STRAWS(S[1..n])
 <li>When a key is inserted, it is promoted to the next level with probability \(1/2\) (coin flip). So the key appears at level \(i\) with probability \(1/2^{i}\).</li>
 <li>Let \(X_i\) be the number of keys at level \(i\). \(E[X_i]=n/2^{i}\).</li>
 <li>Expected total nodes \(=\sum_{i\ge0}E[X_i]=n\sum_{i\ge0}2^{-i}\le 2n\).</li>
-<li>The two sentinels per level add \(O(h)\), and \(h=O(\log n)\) with high probability. So the expected space is \(O(n)\).</li>
+<li>The sum used linearity of expectation (\(X_i\) are dependent, that does not matter). The two sentinels per level add \(2h\). Level \(i\) is non-empty with probability \(\le\min(1,n/2^i)\), so \(E[h]\le\log_2 n+2\). So the expected space is \(\le 2n+O(\log n)=O(n)\).</li>
 </ol>
 <p><b>Operations.</b> Here "i" is the number of heads: the key is stored in \(S_0,\dots,S_i\). Insert: walk down from the top-left, keep the last node visited on each level (the predecessor), then splice the key in after the predecessor on levels \(0..i\).</p>
 <p><b>(i) Insert 17, i = 2.</b> Search path (predecessors): S3: −∞, S2: 15, S1: 15, S0: 15. Insert 17 after 15 in S0, S1, S2.</p>

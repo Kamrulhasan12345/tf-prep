@@ -38,10 +38,10 @@
 <div class="method"><h4>Proof · amortized costs (write one line per operation)</h4><ol>
 <li><b>Insert.</b> The new node is a new root: t rises by 1, m unchanged. \(\hat c = 1 + 1 = 2\).</li>
 <li><b>Union.</b> Splice the lists: cost 1. Trees and marks just add up, so \(\Delta\Phi = 0\) and \(\hat c = 1\).</li>
-<li><b>Extract-min.</b> The min's at most D(n) children join the root list (cost O(D(n))). Consolidate then walks a root list of at most \(D(n) + t(H) - 1\) roots, and each step is a link or a store, O(1). Actual cost \(O(D(n) + t(H))\).</li>
+<li><b>Extract-min.</b> The min's at most D(n) children join the root list (cost O(D(n))). Consolidate then walks a root list of at most \(D(n) + t(H) - 1\) roots. Each root is stored in A once, and each link removes one root for good, so there are at most \(D(n)+t(H)-1\) links in total, O(1) each. Creating A and rebuilding the root list from it cost O(D(n)). Actual cost \(O(D(n) + t(H))\).</li>
 <li>After consolidation all root degrees differ and are at most D(n), so \(t(H') \le D(n)+1\). No mark is added (children lose their marks if anything), so \(m(H') \le m(H)\). Hence \(\Delta\Phi \le (D(n)+1) - t(H)\).</li>
 <li>\(\hat c = O(D(n)+t(H)) + D(n) + 1 - t(H)\). Scale the unit of potential up so that the \(-t(H)\) term cancels the \(O(t(H))\) in the actual cost. Then \(\hat c = O(D(n)) = O(\log n)\).</li>
-<li><b>Decrease-key.</b> Let c be the number of calls to CASCADING-CUT (the first is the call after the first CUT). That is one CUT for x plus \(c-1\) cascading cuts: actual cost O(c).</li>
+<li><b>Decrease-key.</b> If x is a root or its parent's key is still \(\le\) the new key, nothing is cut: actual O(1), \(\Delta\Phi = 0\), \(\hat c = O(1)\). Otherwise let c be the number of calls to CASCADING-CUT (the first is the call after the first CUT). That is one CUT for x plus \(c-1\) cascading cuts: actual cost O(c).</li>
 <li>Trees: x and each of the \(c-1\) cut ancestors become roots, so \(t(H') = t(H) + c\). Marks: each of the \(c-1\) cascading cuts clears a mark, and the last call marks at most one node, so \(m(H') \le m(H) - (c-1) + 1 = m(H) - c + 2\).</li>
 <li>\(\Delta\Phi \le c + 2(2 - c) = 4 - c\). \(\hat c = O(c) + 4 - c = O(1)\) after scaling. ∎</li>
 <li><b>Delete</b> is decrease-key to \(-\infty\) (O(1)) plus extract-min (O(log n)): O(log n).</li>
@@ -53,12 +53,12 @@
 <p>Notation: \(F_0 = 0\), \(F_1 = 1\), \(F_{k+2} = F_{k+1} + F_k\). So 0, 1, 1, 2, 3, 5, 8, 13, 21, ... <b>Lemma:</b> any node x of degree k in a Fibonacci heap has at least \(F_{k+2}\) nodes in its subtree. Then \(n \ge F_{k+2} \ge \varphi^k\) gives \(k \le \log_\varphi n\).</p>
 <div class="method"><h4>Proof · size of a node of degree k</h4><ol>
 <li>Let \(y_1, \dots, y_k\) be the children of x in the order they were linked to x.</li>
-<li>When \(y_i\) was linked to x, x already had the \(i-1\) children \(y_1..y_{i-1}\). Linking only joins roots of <b>equal degree</b>, so \(y_i\) had degree at least \(i-1\) then.</li>
-<li>Since then \(y_i\) has lost at most one child (a second loss would have cut \(y_i\) away from x). So \(\deg y_i \ge i-2\), for \(i \ge 2\); and \(\deg y_1 \ge 0\).</li>
-<li>Let \(s_k\) be the minimum size of a subtree whose root has degree k. Then \(s_0 = 1\), \(s_1 = 2\), and \[ s_k \ge 2 + \sum_{i=2}^{k} s_{i-2} \] (1 for x itself, 1 for \(y_1\), and at least \(s_{i-2}\) for each \(y_i\) with \(i\ge2\), since \(\deg y_i \ge i-2\) and \(s_k\) never decreases as k grows).</li>
-<li>Claim \(s_k \ge F_{k+2}\), by strong induction. Base: \(s_0 = 1 = F_2\), \(s_1 = 2 = F_3\). Step: \[ s_k \ge 2 + \sum_{i=2}^{k} F_i = 1 + \sum_{i=0}^{k} F_i = F_{k+2}, \] using \(F_0 + F_1 = 1\) and the identity \(F_{k+2} = 1 + \sum_{i=0}^{k} F_i\) (provable by induction: \(F_{k+2} = F_{k+1} + F_k = 1 + \sum_{i=0}^{k-1}F_i + F_k\)).</li>
+<li>When \(y_i\) was linked to x, x already had \(y_1..y_{i-1}\) as children (and possibly others, later cut), so \(\deg x\ge i-1\). Linking only joins roots of <b>equal degree</b>, so \(y_i\) had degree \(\deg x\ge i-1\) then.</li>
+<li>Linking clears \(y_i\)'s mark. Since then \(y_i\) has lost at most one child: the first loss marks it, and a second loss would have cut \(y_i\) away from x by cascading cut, but \(y_i\) is still a child of x. So \(\deg y_i \ge i-2\), for \(i \ge 2\); and \(\deg y_1 \ge 0\).</li>
+<li>Let \(s_k\) be the minimum size of a subtree whose root has degree k. Then \(s_0 = 1\), \(s_1 = 2\), and \[ s_k \ge 2 + \sum_{i=2}^{k} s_{i-2} \] (1 for x itself, 1 for \(y_1\), and at least \(s_{i-2}\) for each \(y_i\) with \(i\ge2\), since \(\deg y_i \ge i-2\) and \(s_k\) never decreases as k grows: deleting the subtree of the last-linked child \(y_{k+1}\) from a smallest degree-\((k+1)\) tree leaves a smaller tree with root degree k whose children still satisfy step 3, so \(s_k \le s_{k+1}\)).</li>
+<li>Claim \(s_k \ge F_{k+2}\), by strong induction. Base: \(s_0 = 1 = F_2\), \(s_1 = 2 = F_3\). Step: \[ s_k \ge 2 + \sum_{i=2}^{k} F_i = 1 + \sum_{i=0}^{k} F_i = F_{k+2}, \] where the hypothesis \(s_{j}\ge F_{j+2}\) for all \(j<k\) gives \(s_{i-2}\ge F_i\), and we use \(F_0 + F_1 = 1\) and the identity \(F_{k+2} = 1 + \sum_{i=0}^{k} F_i\) (by induction: base \(F_2 = 1 = 1+F_0\); step \(F_{k+2} = F_{k+1} + F_k = 1 + \sum_{i=0}^{k-1}F_i + F_k\)).</li>
 <li>\(F_{k+2} \ge \varphi^k\) where \(\varphi = (1+\sqrt5)/2\) satisfies \(\varphi^2 = \varphi + 1\). Base: \(F_2 = 1 \ge \varphi^0\), \(F_3 = 2 \ge \varphi\). Step: \(F_{k+2} = F_{k+1} + F_k \ge \varphi^{k-1} + \varphi^{k-2} = \varphi^{k-2}(\varphi+1) = \varphi^k\).</li>
-<li>So \(n \ge \varphi^k\), i.e. \(D(n) \le \lfloor\log_\varphi n\rfloor = O(\log n)\). ∎</li>
+<li>x's subtree is part of the heap, so \(n \ge s_k \ge F_{k+2} \ge \varphi^k\). Taking \(\log_\varphi\): \(k\le\log_\varphi n\), and k is an integer, so \(D(n) \le \lfloor\log_\varphi n\rfloor = O(\log n)\). ∎</li>
 </ol></div>
 <p>Bayzid sir's notes say the same through "f<sub>k</sub> has f<sub>k−1</sub> and f<sub>k−2</sub> as subtrees, so the size is a Fibonacci number, at least \(c^k\) with c the golden ratio", and conclude the root list has length \(O(\log_c n)\). His notes write f<sub>0</sub> = f<sub>1</sub> = 1; with the tree size counted as above, the sizes are 1, 2, 3, 5, 8, 13, 21 for degree 0, 1, 2, ... (\(F_{k+2}\)). The growth is the same, so the conclusion is the same.</p>
 
@@ -73,6 +73,7 @@
 <li>Mark every non-root node that lost a child. Count the nodes: for degree k you must get \(F_{k+2}\).</li>
 </ol></div>
 <p>In the same shape: the damaged tree D<sub>k</sub> is a root with children D<sub>0</sub>, D<sub>0</sub>, D<sub>1</sub>, D<sub>2</sub>, ..., D<sub>k−2</sub>. The same thing says D<sub>k</sub> = D<sub>k−1</sub> with a D<sub>k−2</sub> hung from its root (Bayzid sir's "f<sub>k</sub> has subtrees f<sub>k−1</sub> and f<sub>k−2</sub>"). Marked nodes carry a star. Sizes are 3, 5, 8, 13, 21.</p>
+<p><b>Why it is the smallest (one line for the 6 marks).</b> The i-th child of D<sub>k</sub> has degree exactly \(\max(0, i-2)\), the least that step 3 of section 3 allows, and by induction \(|D_k| = 1 + |D_0| + \sum_{j=0}^{k-2}|D_j| = 2 + \sum_{i=2}^{k} F_i = F_{k+2}\). That equals the lower bound \(s_k \ge F_{k+2}\), so no tree with root degree k can be smaller.</p>
 <div class="figrow">
 <div><div class="figlabel">degree 2 (3 nodes)</div><div id="g2"></div></div>
 <div><div class="figlabel">degree 3 (5 nodes)</div><div id="g3"></div></div>
