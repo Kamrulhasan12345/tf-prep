@@ -29,7 +29,7 @@ const BOOK = {
       ['tree/03-rb-insert.html', 'RB insertion: the 3 cases', 'must'],
       ['tree/04-rb-delete.html', 'RB deletion: the 4 cases', 'must'],
       ['tree/05-rb-gauntlet.html', 'RB gauntlet: full exam runs', 'drill'],
-      ['tree/06-splay.html', 'Splay trees', '30 min'],
+      ['tree/06-splay.html', 'Splay trees', 'out of syllabus'],
     ] },
     { group: 'Part 2 · Bayzid sir' },
     { title: 'Hashing', chapters: [
