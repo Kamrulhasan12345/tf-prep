@@ -14,7 +14,7 @@ const BOOK = {
       ['vc/01-curves.html', 'First topics: vectors, curves, T N B, acceleration', 'L1–3'],
       ['vc/02-gradient.html', 'Gradient, tangent plane, directional derivative', 'L3–4'],
       ['vc/03-div-curl.html', 'Div, curl, potential φ, r-identities', 'L4'],
-      ['vc/04-jacobian.html', 'Jacobian, Hessian, change of variables', 'not taught'],
+      ['vc/04-jacobian.html', 'Jacobian, Hessian: definitions only', 'defs'],
     ] },
     { title: 'Integration and the theorems', chapters: [
       ['vc/05-line-integrals.html', 'Line integrals and work done', 'L5–6'],
@@ -45,6 +45,7 @@ const BOOK = {
       ['pde/06-euler-cauchy.html', 'Euler-Cauchy (variable coefficients)', 'Ch 4'],
       ['pde/07-classification.html', 'Classification and canonical forms', 'L13'],
       ['pde/08-separation.html', 'Separation of variables: wave, heat', 'L11–13'],
+      ['pde/09-wave-oneil.html', "Wave equation the O'Neil way", 'O\'Neil 16'],
     ] },
     { group: 'Exam' },
     { title: 'Past papers', chapters: [
