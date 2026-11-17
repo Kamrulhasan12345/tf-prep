@@ -392,7 +392,8 @@ function implication(sel, c) {
 
 // ---------- fundamental mode ----------
 function flowHTML(F, cols, hl = {}) {
-  return `<div class="tbl"><table class="mat flow"><tr><th>row</th>${cols.map((c, j) => `<th class="${hl.col === j ? 'hl' : ''}">${c}</th>`).join('')}</tr>${F.S.map(r => `<tr><th class="${hl.row === r ? 'hl' : ''}">${r}</th>${F.t[r].map(([n, o], j) => { const stable = n === r, on = hl.row === r && hl.col === j; return `<td class="${on ? (stable ? 'stab' : 'unst') : ''}">${n === null ? '–' : stable ? `<span class="circ">${n}</span>` : n}${o === null ? '' : ', ' + o}</td>`; }).join('')}</tr>`).join('')}</table></div>`;
+  const hasOut = F.S.some(r => F.t[r].some(c => c[1] !== null)); // show ", –" for an unspecified output only in tables that have outputs
+  return `<div class="tbl"><table class="mat flow"><tr><th>row</th>${cols.map((c, j) => `<th class="${hl.col === j ? 'hl' : ''}">${c}</th>`).join('')}</tr>${F.S.map(r => `<tr><th class="${hl.row === r ? 'hl' : ''}">${r}</th>${F.t[r].map(([n, o], j) => { const stable = n === r, on = hl.row === r && hl.col === j; return `<td class="${on ? (stable ? 'stab' : 'unst') : ''}">${n === null ? '–' : stable ? `<span class="circ">${n}</span>` : n}${o === null ? (hasOut && n !== null ? ', –' : '') : ', ' + o}</td>`; }).join('')}</tr>`).join('')}</table></div>`;
 }
 function flowLab(sel, c) {
   const el = host(sel), F = asTable(c.table), cols = c.cols || ['00', '01', '11', '10'];
