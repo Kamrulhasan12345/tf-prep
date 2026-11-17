@@ -8,6 +8,7 @@ Term-final study notes, published as a static site on GitHub Pages. No build ste
 | Electronic Circuits | [`eee/`](eee/) | EEE263 |
 | Data Structures and Algorithms II | [`dsa2/`](dsa2/) | CSE207 |
 | Digital Logic Design | [`dld/`](dld/) | CSE205 |
+| Advanced Calculus | [`math/`](math/) | MATH241 |
 
 ## Layout
 
