@@ -178,6 +178,8 @@ h4.step{margin:1.2em 0 .3em;font:600 13px var(--mono);text-transform:uppercase;l
 <div id="f8"></div>
 <p><b>Race-free assignment.</b> The moves (unstable entries) are a–b, b–c, c–d and d–a: a ring of 4 with no triangle. A ring of 4 fits the 4 sides of a square, so 2 variables and <b>no spare row</b>: a = 00, b = 01, c = 11, d = 10.</p>
 <div id="r8"></div>
+<p><b>The rest of the design</b> (Adnan sir's pipeline: assignment → transition table → K-maps → equations → circuit). Each row's letter is replaced by its code; D latches, so the next-state bits Y₁Y₂ are the excitation directly:</p>
+<div id="d8"></div>
 </div></details></div>
 <div class="write"><h4>What to write</h4><ol>
 <li>Assumption line, plus "quick → the passing cell takes the new output, slow → the old one".</li>
@@ -358,28 +360,30 @@ function adjOK(T, code) { return L.flowEdges(T).every(([a, b]) => L.pc(code[a] ^
 // synthesis: cols = input column strings, ins names, ys state var names (MSB first)
 function fmSynth(T, code, cols, ins, ys) {
   const ni = ins.length, b = ys.length, vars = [...ins, ...ys], n = ni + b, used = T.S.map(s => code[s]);
-  const Y = ys.map(() => ({ ones: [], dc: [] })), Z = { ones: [], dc: [] }, seen = new Set(), table = {};
+  const zw = Math.max(1, ...T.S.flatMap(s => T.t[s].map(c => c[1] ? c[1].length : 0))); // output width (z1z2 → 2)
+  const Y = ys.map(() => ({ ones: [], dc: [] })), Zs = L.range(zw).map(() => ({ ones: [], dc: [] })), seen = new Set(), table = {};
   T.S.forEach(s => cols.forEach((c, j) => { const idx = (parseInt(c, 2) << b) | code[s], [nx, o] = T.t[s][j]; seen.add(idx);
     if (nx === null) ys.forEach((_, k) => Y[k].dc.push(idx)); else ys.forEach((_, k) => { if ((code[nx] >> (b - 1 - k)) & 1) Y[k].ones.push(idx); });
-    if (o === null) Z.dc.push(idx); else if (o === '1') Z.ones.push(idx); }));
-  L.range(1 << n).forEach(i => { if (!seen.has(i)) { Y.forEach(y => y.dc.push(i)); Z.dc.push(i); } });
+    Zs.forEach((Z, k) => { const bit = o === null ? '-' : o[k]; if (bit === '1') Z.ones.push(idx); else if (bit !== '0') Z.dc.push(idx); }); }));
+  L.range(1 << n).forEach(i => { if (!seen.has(i)) { Y.forEach(y => y.dc.push(i)); Zs.forEach(Z => Z.dc.push(i)); } });
   const f = x => ({ ...x, m: L.minimize(n, x.ones, x.dc, vars) });
-  return { vars, n, Y: Y.map(f), Z: f(Z), b };
+  const Zm = Zs.map(f);
+  return { vars, n, Y: Y.map(f), Z: Zm[0], Zs: Zm, b };
 }
 if (typeof module !== 'undefined') module.exports = { expandFlow, flowText, adjOK, fmSynth };
 
 // ---- fundamental-mode design display ----
 // o: {X: expanded flow table text (rows incl. via rows), code:{row:int}, cols, ins, ys, base:[rows that are original], note}
 function fmShow(sel, o) {
-  const el = host(sel), T = L.parseTable(o.X.replace(/[()]/g, '')), cols = o.cols || ['00', '01', '11', '10'], b = o.ys.length, R = fmSynth(T, o.code, cols, o.ins, o.ys), bin = c => L.bin(c, b);
+  const el = host(sel), T = L.parseTable(o.X.replace(/[()]/g, '')), cols = o.cols || ['00', '01', '11', '10'], b = o.ys.length, R = fmSynth(T, o.code, cols, o.ins, o.ys), bin = c => L.bin(c, b), zn = [].concat(o.zname || 'Z');
   let h = `<h4 class="step">A · Race-free flow table with codes</h4><div class="t1"></div><p>${T.S.map(s => `${s} = ${bin(o.code[s])}`).join(', ')}</p>`;
   const byCode = L.range(1 << b);
   h += `<h4 class="step">B · Transition table (next state ${o.ys.join('')}, output) — rows in code order</h4>` + tbl(['code', 'row', ...cols.map(c => o.ins.join('') + ' = ' + c)], byCode.map(c => { const s = T.S.find(x => o.code[x] === c); return [bin(c), s || '–', ...cols.map((_, j) => { if (!s) return '–'; const [n, z] = T.t[s][j]; return n === null ? '–' : `${bin(o.code[n])}${z === null ? ', –' : ', ' + z}`; })]; }));
-  h += `<h4 class="step">C · K-maps (variables ${R.vars.join(' ')}; unused codes and unspecified cells are don't-cares)</h4><div class="krow">${R.Y.map((y, k) => kmapStatic(R.vars, y.ones, y.dc, 'Y' + o.ys[k].replace(/^y/, ''))).join('')}${kmapStatic(R.vars, R.Z.ones, R.Z.dc, o.zname || 'Z')}</div>`;
-  h += `<h4 class="step">D · Equations (D latches: the transition table is the excitation table, D = Y)</h4><ul class="eqs">${R.Y.map((y, k) => `<li><b>Y${o.ys[k].replace(/^y/, '')}</b> = ${eqh(y.m.sop)}</li>`).join('')}<li><b>${o.zname || 'Z'}</b> = ${eqh(R.Z.m.sop)}</li></ul>`;
+  h += `<h4 class="step">C · K-maps (variables ${R.vars.join(' ')}; unused codes and unspecified cells are don't-cares)</h4><div class="krow">${R.Y.map((y, k) => kmapStatic(R.vars, y.ones, y.dc, 'Y' + o.ys[k].replace(/^y/, ''))).join('')}${R.Zs.map((Z, k) => kmapStatic(R.vars, Z.ones, Z.dc, zn[k] || 'Z' + (k + 1))).join('')}</div>`;
+  h += `<h4 class="step">D · Equations (D latches: the transition table is the excitation table, D = Y)</h4><ul class="eqs">${R.Y.map((y, k) => `<li><b>Y${o.ys[k].replace(/^y/, '')}</b> = ${eqh(y.m.sop)}</li>`).join('')}${R.Zs.map((Z, k) => `<li><b>${zn[k] || 'Z' + (k + 1)}</b> = ${eqh(Z.m.sop)}</li>`).join('')}</ul>`;
   h += `<h4 class="step">E · Circuit</h4><div class="ck"></div>`;
   el.innerHTML = h; ft(el.querySelector('.t1'), flowText(T), cols, { corner: 'row' });
-  sch(el.querySelector('.ck'), { ins: o.ins, ys: o.ys, fns: R.Y.map((y, k) => ({ name: 'Y' + o.ys[k].replace(/^y/, ''), expr: y.m.sop, latch: k, pin: 'D' })), latches: o.ys.map(y => ({ label: y, kind: 'D latch' })), outs: [{ name: o.zname || 'Z', expr: R.Z.m.sop }], note: 'Circuit sketch: Y = next state from the AND-OR network, memory = the feedback delay (drawn as a D latch), y fed back.' });
+  sch(el.querySelector('.ck'), { ins: o.ins, ys: o.ys, fns: R.Y.map((y, k) => ({ name: 'Y' + o.ys[k].replace(/^y/, ''), expr: y.m.sop, latch: k, pin: 'D' })), latches: o.ys.map(y => ({ label: y, kind: 'D latch' })), outs: R.Zs.map((Z, k) => ({ name: zn[k] || 'Z' + (k + 1), expr: Z.m.sop })), note: 'Circuit sketch: Y = next state from the AND-OR network, memory = the feedback delay (drawn as a D latch), y fed back.' });
   return R;
 }
 
@@ -390,6 +394,7 @@ flowLab('#fl0', { table: D.f0 });
 const ADN_P = '1: (1)/00 2/10 - 6/10\n2: 1/10 (2)/10 3/11 -\n3: - 4/11 (3)/11 5/11\n4: 1/01 (4)/01 3/11 -\n5: 1/01 - 3/11 (5)/01\n6: 1/10 - 3/11 (6)/10';
 const ADN_F = 'a: (a)/00 b/10 - b/10\nb: a/10 (b)/10 c/11 (b)/10\nc: - d/11 (c)/11 d/11\nd: a/01 (d)/01 c/11 (d)/01';
 sec('p8', ADN_P); implication('#i8', { table: ADN_P }); flowLab('#f8', { table: ADN_F }); raceFig('#r8', { table: ADN_F });
+fmShow('#d8', { X: ADN_F, code: { a: 0, b: 1, c: 3, d: 2 }, ins: ['x1', 'x2'], ys: ['y1', 'y2'], zname: ['z1', 'z2'] });
 const LAMP_R ='A: (A)/0 (A)/0 (A)/0 B/0\nB: A/0 - C/- (B)/0\nC: A/- A/- (C)/1 (C)/1';
 sec('lampR', LAMP_R); flowLab('#lampL', { table: LAMP_R });
 sec('lampP', 'A00: (A00)/0 A01/0 - B10/0\nA01: A00/0 (A01)/0 A11/0 -\nA11: - A01/0 (A11)/0 B10/0\nB10: A00/0 - C11/- (B10)/0\nC11: - A01/- (C11)/1 C10/1\nC10: A00/- - C11/1 (C10)/1');
